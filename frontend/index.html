@@ -33,7 +33,10 @@
   <section class="hero-panel mb-4">
     <div>
       <p class="panel-eyebrow">Tableau de bord</p>
-      <h2 class="panel-title">Dossiers d'attribution</h2>
+      <div class="panel-title-wrap">
+        <h2 class="panel-title">Dossiers d'attribution</h2>
+        <span id="dashboardPendingBadge" class="dashboard-pending-badge d-none" aria-live="polite"></span>
+      </div>
       <p class="panel-text">Retrouvez un dossier, reprenez les parcours encore modifiables, exportez-les ou supprimez une saisie inutile.</p>
     </div>
     <div class="hero-panel__meta">
@@ -47,6 +50,7 @@
 
   <!-- Liste centrale: sélection multiple, actions unitaires et exports -->
   <section class="content-card">
+    <div id="dashboardUpdateNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
     <div class="filter-toolbar">
       <div class="filter-toolbar__grid">
         <div>

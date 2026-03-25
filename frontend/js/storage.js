@@ -1,4 +1,5 @@
 ﻿const STORAGE_KEY = "dotationDraftsCache";
+const DASHBOARD_PENDING_UPDATES_KEY = "dashboardPendingUpdates";
 const API_BASE = "/api/forms";
 const PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-pdf-batch";
 const DASHBOARD_REFRESH_INTERVAL_MS = 20000;
@@ -7,6 +8,9 @@ let currentDraftRows = [];
 let dashboardRefreshTimer = null;
 let dashboardRefreshInFlight = false;
 let dashboardLastUpdatedAt = "";
+let dashboardKnownIds = new Set();
+let dashboardPendingNewIds = new Set();
+let dashboardSelectedIds = new Set();
 const dashboardFilters = {
   search: "",
   status: "",
@@ -26,6 +30,27 @@ function getCachedDrafts() {
 
 function setCachedDrafts(drafts) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+}
+
+function loadPendingDashboardUpdates() {
+  try {
+    const raw = sessionStorage.getItem(DASHBOARD_PENDING_UPDATES_KEY);
+    const ids = JSON.parse(raw || "[]");
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch (error) {
+    return new Set();
+  }
+}
+
+function persistPendingDashboardUpdates() {
+  try {
+    sessionStorage.setItem(
+      DASHBOARD_PENDING_UPDATES_KEY,
+      JSON.stringify([...dashboardPendingNewIds])
+    );
+  } catch (error) {
+    // Rien de bloquant : le tableau de bord reste utilisable sans cette persistance.
+  }
 }
 
 function upsertCachedDraft(summary, payload) {
@@ -395,8 +420,21 @@ async function renderDraftList() {
   }
 
   try {
+    captureDashboardSelection();
     const drafts = await listForms();
     const sortedDrafts = [...drafts].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    const previousIds = new Set(dashboardKnownIds);
+    const newDraftIds = previousIds.size === 0
+      ? []
+      : sortedDrafts
+        .map((draft) => draft.id)
+        .filter((id) => id && !previousIds.has(id));
+    dashboardKnownIds = new Set(sortedDrafts.map((draft) => draft.id).filter(Boolean));
+    dashboardPendingNewIds = new Set(
+      [...dashboardPendingNewIds].filter((id) => dashboardKnownIds.has(id))
+    );
+    newDraftIds.forEach((id) => dashboardPendingNewIds.add(id));
+    persistPendingDashboardUpdates();
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
     const filteredDrafts = applyDashboardFilters(sortedDrafts);
@@ -408,8 +446,11 @@ async function renderDraftList() {
 
     if (filteredDrafts.length === 0) {
       draftList.innerHTML = "";
+      dashboardSelectedIds = new Set();
       emptyState.classList.remove("d-none");
       updateDashboardRefreshInfo();
+      setDashboardUpdateNotice();
+      updateExportSelectedState();
       return;
     }
 
@@ -419,7 +460,7 @@ async function renderDraftList() {
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     draftList.innerHTML = filteredDrafts.map((draft) => `
-    <tr class="draft-row">
+    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}">
       <td class="draft-check-col">
         ${(canExport || canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(draft.title || buildDraftTitle(draft.data))}">` : ""}
       </td>
@@ -444,8 +485,10 @@ async function renderDraftList() {
 
     dashboardLastUpdatedAt = new Date().toISOString();
     updateDashboardRefreshInfo();
+    setDashboardUpdateNotice();
     bindStatusPreviews();
     bindSelectionActions(canExport, canDelete);
+    restoreDashboardSelection();
   } finally {
     dashboardRefreshInFlight = false;
   }
@@ -481,6 +524,32 @@ async function exportDraftPdf(id) {
 
 function getSelectedDraftIds() {
   return Array.from(document.querySelectorAll(".draft-select:checked")).map((input) => input.value);
+}
+
+function captureDashboardSelection() {
+  dashboardSelectedIds = new Set(getSelectedDraftIds());
+}
+
+function restoreDashboardSelection() {
+  const visibleIds = new Set(
+    Array.from(document.querySelectorAll(".draft-select")).map((input) => input.value)
+  );
+  dashboardSelectedIds = new Set(
+    [...dashboardSelectedIds].filter((id) => visibleIds.has(id))
+  );
+
+  document.querySelectorAll(".draft-select").forEach((input) => {
+    input.checked = dashboardSelectedIds.has(input.value);
+  });
+
+  const selectAll = document.getElementById("selectAllDrafts");
+  if (selectAll) {
+    const all = document.querySelectorAll(".draft-select");
+    const checked = document.querySelectorAll(".draft-select:checked");
+    selectAll.checked = all.length > 0 && all.length === checked.length;
+  }
+
+  updateExportSelectedState();
 }
 
 function updateExportSelectedState() {
@@ -587,13 +656,13 @@ function bindSelectionActions(canExport, canDelete) {
   }
 
   if (selectAll) {
-    selectAll.checked = false;
     selectAll.disabled = !canSelect;
     if (!selectAll.dataset.boundSelectAll) {
       selectAll.addEventListener("change", () => {
         document.querySelectorAll(".draft-select").forEach((input) => {
           input.checked = selectAll.checked;
         });
+        captureDashboardSelection();
         updateExportSelectedState();
       });
       selectAll.dataset.boundSelectAll = "true";
@@ -605,6 +674,7 @@ function bindSelectionActions(canExport, canDelete) {
       return;
     }
     input.addEventListener("change", () => {
+      captureDashboardSelection();
       if (selectAll) {
         const all = document.querySelectorAll(".draft-select");
         const checked = document.querySelectorAll(".draft-select:checked");
@@ -772,6 +842,79 @@ function updateDashboardRefreshInfo() {
   info.textContent = `Mise à jour automatique active. Dernière actualisation : ${formatted}.`;
 }
 
+function acknowledgeDashboardUpdates() {
+  dashboardPendingNewIds = new Set();
+  persistPendingDashboardUpdates();
+  setDashboardUpdateNotice();
+  document.querySelectorAll(".draft-row--new").forEach((row) => {
+    row.classList.remove("draft-row--new");
+  });
+}
+
+function bindDashboardUpdateNotice() {
+  const notice = document.getElementById("dashboardUpdateNotice");
+  if (!notice) {
+    return;
+  }
+  const button = notice.querySelector("[data-dashboard-ack]");
+  if (!button || button.dataset.boundAck) {
+    return;
+  }
+  button.addEventListener("click", acknowledgeDashboardUpdates);
+  button.dataset.boundAck = "true";
+}
+
+function updateDashboardPendingBadge() {
+  const badge = document.getElementById("dashboardPendingBadge");
+  if (!badge) {
+    return;
+  }
+
+  const pendingCount = dashboardPendingNewIds.size;
+  if (pendingCount === 0) {
+    badge.textContent = "";
+    badge.classList.add("d-none");
+    return;
+  }
+
+  badge.textContent = pendingCount > 1 ? `${pendingCount} nouveaux` : "1 nouveau";
+  badge.classList.remove("d-none");
+}
+
+function setDashboardUpdateNotice() {
+  const notice = document.getElementById("dashboardUpdateNotice");
+  if (!notice) {
+    return;
+  }
+
+  const pendingCount = dashboardPendingNewIds.size;
+  updateDashboardPendingBadge();
+
+  if (pendingCount === 0) {
+    persistPendingDashboardUpdates();
+    notice.innerHTML = "";
+    notice.classList.add("d-none");
+    notice.classList.remove("is-highlighted");
+    return;
+  }
+
+  const message = pendingCount > 1
+    ? `${pendingCount} nouveaux dossiers ont été détectés.`
+    : "1 nouveau dossier a été détecté.";
+
+  notice.innerHTML = `
+    <div class="dashboard-update-notice__content">
+      <span>${escapeHtml(message)}</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-dashboard-ack>J'ai vu</button>
+    </div>
+  `;
+  notice.classList.remove("d-none");
+  notice.classList.remove("is-highlighted");
+  void notice.offsetWidth;
+  notice.classList.add("is-highlighted");
+  bindDashboardUpdateNotice();
+}
+
 function refreshDashboardIfVisible() {
   if (document.hidden) {
     return;
@@ -790,6 +933,7 @@ function startDashboardAutoRefresh() {
 
 document.addEventListener("DOMContentLoaded", () => {
   // Initialisation d'accueil : session, liste et masquage du hover au scroll.
+  dashboardPendingNewIds = loadPendingDashboardUpdates();
   void getSessionInfo().then((user) => {
     if (user && (user.permissions.includes("users.manage") || user.permissions.includes("*"))) {
       document.getElementById("adminLink").classList.remove("d-none");
