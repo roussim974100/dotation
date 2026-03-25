@@ -7,10 +7,12 @@ import os
 import sqlite3
 import struct
 import textwrap
+import urllib.request
 import uuid
 import zipfile
 from datetime import datetime, timezone
 from functools import wraps
+from xml.sax.saxutils import escape as xml_escape
 import zlib
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,6 +22,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
+CITY_LOGO_URL = os.environ.get(
+    "CITY_LOGO_URL",
+    "https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png",
+)
+CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
 
 app = Flask(__name__, static_folder=None)
 app.secret_key = os.environ.get("APP_SECRET_KEY", "publier-parcours-2026-session-key")
@@ -62,6 +69,11 @@ DEFAULT_RESOURCE_REFERENCES = [
     {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
     {"code": "vehicule", "label": "Véhicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
 ]
+
+BRAND_LOGO_CACHE = {
+    "loaded": False,
+    "image": None,
+}
 
 
 
@@ -729,6 +741,8 @@ def normalize_pdf_text(value):
     # PDF minimal sans police Unicode embarquee:
     # on degrade proprement vers Latin-1 pour garder un export robuste sans dependance externe.
     text = "" if value is None else str(value)
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    text = " ".join(text.split())
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
@@ -748,15 +762,7 @@ def slugify_filename(value, fallback="dossier_attribution"):
     return slug or fallback
 
 
-def extract_signature_image(signature_data_url):
-    if not signature_data_url or not signature_data_url.startswith("data:image/png;base64,"):
-        return None
-
-    try:
-        png_bytes = base64.b64decode(signature_data_url.split(",", 1)[1])
-    except (ValueError, IndexError):
-        return None
-
+def extract_png_image(png_bytes):
     if png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
         return None
 
@@ -862,114 +868,301 @@ def extract_signature_image(signature_data_url):
     }
 
 
+def extract_signature_image(signature_data_url):
+    if not signature_data_url or not signature_data_url.startswith("data:image/png;base64,"):
+        return None
+
+    try:
+        png_bytes = base64.b64decode(signature_data_url.split(",", 1)[1])
+    except (ValueError, IndexError):
+        return None
+
+    return extract_png_image(png_bytes)
+
+
+def load_brand_logo_image():
+    if BRAND_LOGO_CACHE["loaded"]:
+        return BRAND_LOGO_CACHE["image"]
+
+    image = None
+    local_candidates = [CITY_LOGO_PATH]
+    for candidate in local_candidates:
+        if candidate and os.path.exists(candidate):
+            try:
+                with open(candidate, "rb") as file:
+                    image = extract_png_image(file.read())
+            except OSError:
+                image = None
+            if image:
+                break
+
+    if not image and CITY_LOGO_URL:
+        try:
+            request = urllib.request.Request(
+                CITY_LOGO_URL,
+                headers={
+                    "User-Agent": "Parcours-agents-elus/1.0",
+                    "Accept": "image/png,image/*;q=0.8,*/*;q=0.5",
+                },
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                image_bytes = response.read()
+                image = extract_png_image(image_bytes)
+                if image and CITY_LOGO_PATH:
+                    try:
+                        os.makedirs(os.path.dirname(CITY_LOGO_PATH), exist_ok=True)
+                        with open(CITY_LOGO_PATH, "wb") as file:
+                            file.write(image_bytes)
+                    except OSError:
+                        pass
+        except Exception:
+            image = None
+
+    BRAND_LOGO_CACHE["loaded"] = True
+    BRAND_LOGO_CACHE["image"] = image
+    return image
+
+
+def format_export_datetime(value):
+    if not value:
+        return "-"
+
+    text = str(value).strip()
+    try:
+        normalized = text.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        return parsed.strftime("%d/%m/%Y %H:%M")
+    except ValueError:
+        pass
+
+    for pattern in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            parsed = datetime.strptime(text, pattern)
+            return parsed.strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return text
+
+
+def get_signature_datetime(payload):
+    validation = payload.get("validation", {})
+    meta = payload.get("meta", {})
+    if not validation.get("signatureDataUrl"):
+        return "-"
+    return format_export_datetime(
+        validation.get("signedAt")
+        or meta.get("lockedAt")
+        or meta.get("savedAt")
+        or meta.get("assignedAt")
+    )
+
+
+def format_beneficiary_label(value):
+    labels = {
+        "agent": "Agent",
+        "elu": "Élu(e)",
+    }
+    return labels.get(value, value or "-")
+
+
+def summarize_dynamic_resource(resource):
+    fields = resource.get("fields") or {}
+    if isinstance(fields, dict):
+        values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
+        if values:
+            return " - ".join(values)
+    return str(resource.get("details") or "").strip()
+
+
+def collect_resource_entries(payload):
+    materiel = payload.get("materiel", {})
+    immateriel = payload.get("immateriel", {})
+    additional = payload.get("resources", {}).get("additional", [])
+
+    entries = []
+
+    def add_entry(item_key, service, label, details):
+        clean_details = [str(detail).strip() for detail in details if str(detail or "").strip()]
+        entries.append(
+            {
+                "itemKey": item_key,
+                "service": service or "Non défini",
+                "label": label,
+                "details": " - ".join(clean_details) if clean_details else "-",
+            }
+        )
+
+    if materiel.get("ordinateur", {}).get("selected"):
+        item = materiel["ordinateur"]
+        add_entry("ordinateur", "DSI", "Ordinateur", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+    if materiel.get("ecran", {}).get("selected"):
+        item = materiel["ecran"]
+        add_entry("ecran", "DSI", "Écran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+    if materiel.get("telephone", {}).get("selected"):
+        item = materiel["telephone"]
+        add_entry("telephone", "DSI", "Téléphone", [item.get("marque"), item.get("modele"), item.get("imei")])
+    if immateriel.get("email", {}).get("selected"):
+        add_entry("email", "DSI", "Messagerie", [immateriel["email"].get("adresse")])
+    if immateriel.get("vpn", {}).get("selected"):
+        add_entry("vpn", "DSI", "VPN", [])
+    if materiel.get("badge", {}).get("selected"):
+        add_entry("badge", "Bâtiment", "Badge d'accès", [materiel["badge"].get("numero")])
+    if materiel.get("veste", {}).get("selected"):
+        add_entry("veste", "Bâtiment", "Veste", [])
+    if materiel.get("chaussuresSecurite", {}).get("selected"):
+        add_entry("chaussuresSecurite", "Bâtiment", "Chaussures de sécurité", [])
+    if materiel.get("vehicule", {}).get("selected"):
+        item = materiel["vehicule"]
+        add_entry("vehicule", "Autres services", "Véhicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
+    if materiel.get("autre", {}).get("selected"):
+        add_entry("autre", "Autres services", "Autre ressource", [materiel["autre"].get("description")])
+
+    for resource in additional:
+        if not resource.get("selected"):
+            continue
+        add_entry(
+            resource.get("code") or resource.get("id") or generate_id("resource"),
+            resource.get("issuerService") or resource.get("issuer_service") or "Autres services",
+            resource.get("label") or "Ressource complémentaire",
+            [summarize_dynamic_resource(resource)],
+        )
+
+    return entries
+
+
 def build_form_export_lines(payload):
-    # Vue texte partagee par l'export PDF unitaire et l'export ZIP.
     beneficiaire = payload.get("beneficiaire", {})
     workflow = payload.get("workflow", {})
     dossier = payload.get("dossier", {})
     validation = payload.get("validation", {})
     restitution = payload.get("restitution", {})
-    materiel = payload.get("materiel", {})
-    immateriel = payload.get("immateriel", {})
-
+    signature_datetime = get_signature_datetime(payload)
     lines = [
-        "FICHE DE DOTATION",
+        "DOSSIER D'ATTRIBUTION DE RESSOURCES",
         "",
-        f"État: {format_status_label(workflow.get('status') or 'draft')}",
-        f"Type de dossier: {dossier_type_label(dossier.get('type'))}",
+        f"État : {format_status_label(workflow.get('status') or 'draft')}",
+        f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+        f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
         "",
-        "Beneficiaire",
-        f"Nom: {beneficiaire.get('nom') or '-'}",
-        f"Prénom: {beneficiaire.get('prenom') or '-'}",
-        f"Qualité: {beneficiaire.get('qualite') or '-'}",
-        f"Service: {beneficiaire.get('service') or '-'}",
-        f"Fonction: {beneficiaire.get('fonction') or '-'}",
-        f"Mandat: {beneficiaire.get('mandat') or '-'}",
-        f"Service destination: {dossier.get('serviceDestination') or '-'}",
-        f"Date et heure de remise: {payload.get('meta', {}).get('assignedAt') or '-'}",
+        "Bénéficiaire",
+        f"Nom : {beneficiaire.get('nom') or '-'}",
+        f"Prénom : {beneficiaire.get('prenom') or '-'}",
+        f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+        f"Service : {beneficiaire.get('service') or '-'}",
+        f"Fonction : {beneficiaire.get('fonction') or '-'}",
+        f"Mandat : {beneficiaire.get('mandat') or '-'}",
+        f"Service de destination : {dossier.get('serviceDestination') or '-'}",
         "",
-        "Dotations",
+        "Ressources attribuées",
     ]
 
-    def add_item(label, details):
-        detail_text = " - ".join([str(detail) for detail in details if detail])
-        lines.append(f"- {label}{': ' + detail_text if detail_text else ''}")
-
-    if materiel.get("ordinateur", {}).get("selected"):
-        item = materiel["ordinateur"]
-        add_item("Ordinateur", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
-    if materiel.get("ecran", {}).get("selected"):
-        item = materiel["ecran"]
-        add_item("Ecran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
-    if materiel.get("telephone", {}).get("selected"):
-        item = materiel["telephone"]
-        add_item("Téléphone", [item.get("marque"), item.get("modele"), item.get("imei")])
-    if materiel.get("badge", {}).get("selected"):
-        add_item("Badge d'accès", [materiel["badge"].get("numero")])
-    if materiel.get("veste", {}).get("selected"):
-        add_item("Veste", [])
-    if materiel.get("chaussuresSecurite", {}).get("selected"):
-        add_item("Chaussures de sécurité", [])
-    if materiel.get("vehicule", {}).get("selected"):
-        item = materiel["vehicule"]
-        add_item("Vehicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
-    if materiel.get("autre", {}).get("selected"):
-        add_item("Autre matériel", [materiel["autre"].get("description")])
-    if immateriel.get("email", {}).get("selected"):
-        add_item("Email", [immateriel["email"].get("adresse")])
-    if immateriel.get("vpn", {}).get("selected"):
-        add_item("VPN", [])
-    for resource in payload.get("resources", {}).get("additional", []):
-        if resource.get("selected"):
-            add_item(resource.get("label") or "Ressource complémentaire", [resource.get("details")])
-
-    if lines[-1] == "Dotations":
+    resources = collect_resource_entries(payload)
+    if resources:
+        current_service = None
+        for entry in resources:
+            if entry["service"] != current_service:
+                current_service = entry["service"]
+                lines.append(f"{current_service}")
+            lines.append(f"- {entry['label']} : {entry['details']}")
+    else:
         lines.append("- Aucune ressource renseignée")
 
-    lines.extend([
-        "",
-        "Restitution",
-        f"Date de restitution: {restitution.get('returnedAt') or '-'}",
-        f"Motif: {restitution.get('reason') or '-'}",
-        f"Observations: {restitution.get('notes') or '-'}",
-        "",
-        "Conformite",
-        f"RGPD valide: {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-        f"Signature: {'Signee' if validation.get('signatureDataUrl') else 'Absente'}",
-    ])
+    lines.extend(
+        [
+            "",
+            "Restitution",
+            f"État de restitution : {format_status_label(workflow.get('status') or 'draft')}",
+            f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
+            f"Motif : {restitution.get('reason') or '-'}",
+            f"Observations : {restitution.get('notes') or '-'}",
+            "",
+            "Validation",
+            f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+            f"Signature présente : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+            f"Date de signature : {signature_datetime}",
+        ]
+    )
     return lines
 
 
 def build_pdf_bytes(title, payload):
-    # Generateur PDF minimal sans dependance externe:
-    # suffisant pour des exports de sauvegarde et des envois groupe au format ZIP.
     page_width = 595
     page_height = 842
-    margin = 48
-    line_height = 16
-    y_start = 790
-    max_width = 94
+    margin = 42
+    content_width = page_width - (margin * 2)
+    top_content_start = 660
+    bottom_margin = 52
 
-    raw_lines = build_form_export_lines(payload)
-    wrapped_lines = []
-    for line in raw_lines:
-        if not line:
-            wrapped_lines.append("")
-            continue
-        wrapped_lines.extend(textwrap.wrap(normalize_pdf_text(line), width=max_width) or [""])
+    beneficiaire = payload.get("beneficiaire", {})
+    dossier = payload.get("dossier", {})
+    workflow = payload.get("workflow", {})
+    validation = payload.get("validation", {})
+    restitution = payload.get("restitution", {})
+    signature_datetime = get_signature_datetime(payload)
+    resources = collect_resource_entries(payload)
+    resource_groups = {}
+    for entry in resources:
+        resource_groups.setdefault(entry["service"], []).append(entry)
 
-    pages = []
-    current_page = []
-    y_position = y_start
-    for line in wrapped_lines:
-        if y_position <= margin:
-            pages.append(current_page)
-            current_page = []
-            y_position = y_start
-        current_page.append((margin, y_position, line))
-        y_position -= line_height
-    if current_page:
-        pages.append(current_page)
+    sections = [
+        (
+            "Identification du dossier",
+            [
+                f"État : {format_status_label(workflow.get('status') or 'draft')}",
+                f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+                f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
+                f"Date de création : {format_export_datetime(payload.get('meta', {}).get('createdAt'))}",
+            ],
+        ),
+        (
+            "Bénéficiaire",
+            [
+                f"Nom : {beneficiaire.get('nom') or '-'}",
+                f"Prénom : {beneficiaire.get('prenom') or '-'}",
+                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"Service : {beneficiaire.get('service') or '-'}",
+                f"Fonction : {beneficiaire.get('fonction') or '-'}",
+                f"Mandat : {beneficiaire.get('mandat') or '-'}",
+                f"Service de destination : {dossier.get('serviceDestination') or '-'}",
+            ],
+        ),
+    ]
+
+    if resource_groups:
+        for service, service_entries in sorted(resource_groups.items(), key=lambda item: item[0]):
+            sections.append(
+                (
+                    f"Ressources attribuées - {service}",
+                    [f"{entry['label']} : {entry['details']}" for entry in service_entries],
+                )
+            )
+    else:
+        sections.append(("Ressources attribuées", ["Aucune ressource renseignée."]))
+
+    restitution_lines = [
+        f"Statut : {format_status_label(workflow.get('status') or 'draft')}",
+        f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
+        f"Motif : {restitution.get('reason') or '-'}",
+        f"Observations : {restitution.get('notes') or '-'}",
+    ]
+    for item_key, state in sorted((restitution.get("items") or {}).items()):
+        item_label = next((entry["label"] for entry in resources if entry["itemKey"] == item_key), item_key)
+        restitution_lines.append(
+            f"{item_label} : {state.get('state') or state.get('condition') or 'En attente'}"
+            f" / {format_export_datetime(state.get('returnedAt'))}"
+            f" / {state.get('notes') or '-'}"
+        )
+    sections.append(("Restitution", restitution_lines))
+    sections.append(
+        (
+            "Validation et conformité",
+            [
+                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                f"Signature du bénéficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+                f"Date de signature : {signature_datetime}",
+            ],
+        )
+    )
 
     objects = []
 
@@ -977,63 +1170,160 @@ def build_pdf_bytes(title, payload):
         objects.append(content)
         return len(objects)
 
-    font_object_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-    page_object_ids = []
-    signature_image = extract_signature_image(payload.get("validation", {}).get("signatureDataUrl"))
-    signature_image_object_id = None
+    font_regular_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    font_bold_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+
+    logo_image = load_brand_logo_image()
+    logo_image_id = None
+    if logo_image:
+        logo_stream = logo_image["data"]
+        logo_image_id = add_object(
+            f"<< /Type /XObject /Subtype /Image /Width {logo_image['width']} /Height {logo_image['height']} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(logo_stream)} >>\n"
+            f"stream\n{logo_stream.decode('latin-1')}\nendstream"
+        )
+
+    signature_image = extract_signature_image(validation.get("signatureDataUrl"))
+    signature_image_id = None
     if signature_image:
         signature_stream = signature_image["data"]
-        signature_image_object_id = add_object(
+        signature_image_id = add_object(
             f"<< /Type /XObject /Subtype /Image /Width {signature_image['width']} /Height {signature_image['height']} "
             f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(signature_stream)} >>\n"
             f"stream\n{signature_stream.decode('latin-1')}\nendstream"
         )
 
-    for page_lines in pages:
-        commands = ["BT", "/F1 11 Tf"]
-        for x_pos, y_pos, line in page_lines:
-            commands.append(f"1 0 0 1 {x_pos} {y_pos} Tm ({pdf_escape(line)}) Tj")
-        commands.append("ET")
+    pages = []
+    current_page = []
+    current_y = top_content_start
+
+    def color_fill(r, g, b):
+        return f"{r:.3f} {g:.3f} {b:.3f} rg"
+
+    def color_stroke(r, g, b):
+        return f"{r:.3f} {g:.3f} {b:.3f} RG"
+
+    def draw_text(commands, x_pos, y_pos, text, font="F1", size=11, color=(0.12, 0.16, 0.2)):
+        commands.append(
+            f"q {color_fill(*color)} BT /{font} {size} Tf 1 0 0 1 {x_pos} {y_pos} Tm ({pdf_escape(text)}) Tj ET Q"
+        )
+
+    def draw_rect(commands, x_pos, y_pos, width, height, fill=None, stroke=None, line_width=1):
+        rect_commands = ["q"]
+        if fill:
+            rect_commands.append(color_fill(*fill))
+        if stroke:
+            rect_commands.append(color_stroke(*stroke))
+            rect_commands.append(f"{line_width} w")
+        operator = "B" if fill and stroke else "f" if fill else "S"
+        rect_commands.append(f"{x_pos} {y_pos} {width} {height} re {operator}")
+        rect_commands.append("Q")
+        commands.append(" ".join(rect_commands))
+
+    def ensure_space(required_height):
+        nonlocal current_page, current_y
+        if current_y - required_height >= bottom_margin:
+            return
+        pages.append(current_page)
+        current_page = []
+        current_y = top_content_start
+
+    def wrap_line(text, width=86):
+        normalized = normalize_pdf_text(text)
+        return textwrap.wrap(normalized, width=width) or [""]
+
+    def add_section(title_text, raw_lines):
+        nonlocal current_page, current_y
+        wrapped_lines = []
+        for raw_line in raw_lines:
+            wrapped_lines.extend(wrap_line(raw_line))
+        section_height = 28 + (len(wrapped_lines) * 15) + 18
+        ensure_space(section_height)
+
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.98, 0.985, 0.99), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, normalize_pdf_text(title_text), font="F2", size=12, color=(0.05, 0.26, 0.40))
+
+        line_y = current_y - 40
+        for line in wrapped_lines:
+            draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
+            line_y -= 15
+
+        current_y = box_bottom - 16
+
+    for section_title, section_lines in sections:
+        add_section(section_title, section_lines)
+
+    if signature_image and signature_image_id:
+        max_width = 220
+        max_height = 90
+        ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
+        draw_width = round(signature_image["width"] * ratio, 2)
+        draw_height = round(signature_image["height"] * ratio, 2)
+        section_height = 90 + draw_height
+        ensure_space(section_height)
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la validation du dossier.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        current_page.append(
+            f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
+        )
+        current_y = box_bottom - 16
+
+    if not current_page:
+        current_page = []
+    pages.append(current_page)
+
+    page_object_ids = []
+    total_pages = len(pages)
+    generated_at = format_export_datetime(datetime.now().isoformat())
+
+    for page_index, page_commands in enumerate(pages, start=1):
+        commands = []
+        draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
+        draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
+        if logo_image_id:
+            logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
+            logo_width = round(logo_image["width"] * logo_ratio, 2)
+            logo_height = round(logo_image["height"] * logo_ratio, 2)
+            commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
+        draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
+        draw_text(commands, margin + 100, page_height - 68, "Dossier d'attribution de ressources", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
+        draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
+
+        draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
+        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+
+        commands.extend(page_commands)
+
+        draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
+        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+
         stream = "\n".join(commands).encode("latin-1", "replace")
         content_object_id = add_object(
             f"<< /Length {len(stream)} >>\nstream\n{stream.decode('latin-1')}\nendstream"
         )
+
+        resource_parts = [
+            f"/Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R >>"
+        ]
+        xobjects = []
+        if logo_image_id:
+            xobjects.append(f"/LOGO {logo_image_id} 0 R")
+        if signature_image_id:
+            xobjects.append(f"/SIG1 {signature_image_id} 0 R")
+        if xobjects:
+            resource_parts.append(f"/XObject << {' '.join(xobjects)} >>")
+
         page_object_id = add_object(
             f"<< /Type /Page /Parent PAGES_REF /MediaBox [0 0 {page_width} {page_height}] "
-            f"/Resources << /Font << /F1 {font_object_id} 0 R >> >> /Contents {content_object_id} 0 R >>"
+            f"/Resources << {' '.join(resource_parts)} >> /Contents {content_object_id} 0 R >>"
         )
         page_object_ids.append(page_object_id)
-
-    if signature_image and signature_image_object_id:
-        max_width = 320
-        max_height = 180
-        ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
-        draw_width = round(signature_image["width"] * ratio, 2)
-        draw_height = round(signature_image["height"] * ratio, 2)
-        x_pos = margin
-        y_pos = 520
-        signature_commands = [
-            "BT",
-            "/F1 14 Tf",
-            f"1 0 0 1 {margin} 780 Tm (Signature du beneficiaire) Tj",
-            "/F1 10 Tf",
-            f"1 0 0 1 {margin} 760 Tm (Signature dessinee lors de la validation du dossier) Tj",
-            "ET",
-            "q",
-            f"{draw_width} 0 0 {draw_height} {x_pos} {y_pos} cm",
-            "/SIG1 Do",
-            "Q",
-        ]
-        signature_stream = "\n".join(signature_commands).encode("latin-1", "replace")
-        signature_content_object_id = add_object(
-            f"<< /Length {len(signature_stream)} >>\nstream\n{signature_stream.decode('latin-1')}\nendstream"
-        )
-        signature_page_object_id = add_object(
-            f"<< /Type /Page /Parent PAGES_REF /MediaBox [0 0 {page_width} {page_height}] "
-            f"/Resources << /Font << /F1 {font_object_id} 0 R >> /XObject << /SIG1 {signature_image_object_id} 0 R >> >> "
-            f"/Contents {signature_content_object_id} 0 R >>"
-        )
-        page_object_ids.append(signature_page_object_id)
 
     kids = " ".join(f"{page_id} 0 R" for page_id in page_object_ids)
     pages_object_id = add_object(f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_ids)} >>")
@@ -1042,7 +1332,7 @@ def build_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et elu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -1607,7 +1897,7 @@ def list_forms():
 @app.route("/api/forms/export", methods=["GET"])
 @login_required
 def export_forms():
-    # Export de sauvegarde "ouvert avec Excel" en CSV UTF-8 BOM.
+    # Export Excel lisible en deux onglets : dossiers et ressources.
     if not has_permission("forms.export"):
         return jsonify({"error": "forbidden"}), 403
 
@@ -1621,47 +1911,19 @@ def export_forms():
             ORDER BY updated_at DESC
             """
         ).fetchall()
+        item_rows = connection.execute(
+            """
+            SELECT di.*, df.title
+            FROM dotation_items di
+            JOIN dotation_forms df ON df.id = di.form_id
+            ORDER BY df.updated_at DESC, di.id ASC
+            """
+        ).fetchall()
 
-    headers = [
-        "id", "title", "status", "beneficiary_type", "nom", "prenom", "service",
-        "fonction", "mandat", "dossier_type", "rgpd_accepted", "assigned_at", "returned_at",
-        "return_reason", "return_notes", "created_at", "updated_at", "items"
-    ]
-    csv_lines = [";".join(headers)]
-
-    for row in rows:
-        payload = json.loads(row["payload_json"])
-        items = []
-        for section in [payload.get("materiel", {}), payload.get("immateriel", {})]:
-            for key, value in section.items():
-                if value.get("selected"):
-                    items.append(key)
-
-        line = [
-            row["id"],
-            row["title"],
-            row["status"],
-            row["beneficiary_type"],
-            row["nom"],
-            row["prenom"],
-            row["service"],
-            row["fonction"],
-            row["mandat"],
-            row["dossier_type"],
-            "oui" if row["rgpd_accepted"] else "non",
-            row["assigned_at"],
-            row["returned_at"],
-            row["return_reason"],
-            row["return_notes"],
-            row["created_at"],
-            row["updated_at"],
-            ", ".join(items),
-        ]
-        csv_lines.append(";".join(csv_escape(value) for value in line))
-
-    response = make_response("\ufeff" + "\n".join(csv_lines))
-    response.headers["Content-Type"] = "text/csv; charset=utf-8"
-    response.headers["Content-Disposition"] = 'attachment; filename="dossiers_attribution_backup.csv"'
+    workbook_xml = build_excel_workbook(rows, item_rows)
+    response = make_response(workbook_xml)
+    response.headers["Content-Type"] = "application/vnd.ms-excel; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="dossiers_attribution_export.xls"'
     return response
 
 
@@ -1714,6 +1976,160 @@ def csv_escape(value):
     text = "" if value is None else str(value)
     text = text.replace('"', '""')
     return f'"{text}"'
+
+
+def spreadsheet_cell(value, style_id="cell"):
+    text = "" if value is None else str(value)
+    return (
+        f'<Cell ss:StyleID="{style_id}">'
+        f'<Data ss:Type="String">{xml_escape(text)}</Data>'
+        f"</Cell>"
+    )
+
+
+def build_excel_workbook(rows, item_rows):
+    headers = [
+        "ID dossier",
+        "Titre",
+        "État",
+        "Type de dossier",
+        "Qualité",
+        "Nom",
+        "Prénom",
+        "Service",
+        "Fonction",
+        "Mandat",
+        "Service de destination",
+        "Date de remise",
+        "Date de restitution",
+        "RGPD",
+        "Signature",
+        "Ressources attribuées",
+        "Motif restitution",
+        "Observations",
+        "Créé le",
+        "Mis à jour le",
+    ]
+
+    workbook_rows = [
+        "<Row>" + "".join(spreadsheet_cell(value, "header") for value in headers) + "</Row>"
+    ]
+
+    for row in rows:
+        payload = json.loads(row["payload_json"] or "{}")
+        beneficiaire = payload.get("beneficiaire", {})
+        dossier = payload.get("dossier", {})
+        validation = payload.get("validation", {})
+        resources = collect_resource_entries(payload)
+        workbook_rows.append(
+            "<Row>" + "".join(
+                [
+                    spreadsheet_cell(row["id"]),
+                    spreadsheet_cell(row["title"]),
+                    spreadsheet_cell(format_status_label(row["status"])),
+                    spreadsheet_cell(dossier_type_label(row["dossier_type"])),
+                    spreadsheet_cell(format_beneficiary_label(row["beneficiary_type"])),
+                    spreadsheet_cell(beneficiaire.get("nom") or row["nom"]),
+                    spreadsheet_cell(beneficiaire.get("prenom") or row["prenom"]),
+                    spreadsheet_cell(beneficiaire.get("service") or row["service"]),
+                    spreadsheet_cell(beneficiaire.get("fonction") or row["fonction"]),
+                    spreadsheet_cell(beneficiaire.get("mandat") or row["mandat"]),
+                    spreadsheet_cell(dossier.get("serviceDestination") or "-"),
+                    spreadsheet_cell(format_export_datetime(row["assigned_at"])),
+                    spreadsheet_cell(format_export_datetime(row["returned_at"])),
+                    spreadsheet_cell("Oui" if row["rgpd_accepted"] else "Non"),
+                    spreadsheet_cell("Oui" if validation.get("signatureDataUrl") else "Non"),
+                    spreadsheet_cell("\n".join(f"{item['service']} - {item['label']} : {item['details']}" for item in resources) or "-"),
+                    spreadsheet_cell(row["return_reason"] or "-"),
+                    spreadsheet_cell(row["return_notes"] or "-"),
+                    spreadsheet_cell(format_export_datetime(row["created_at"])),
+                    spreadsheet_cell(format_export_datetime(row["updated_at"])),
+                ]
+            ) + "</Row>"
+        )
+
+    item_headers = [
+        "ID dossier",
+        "Titre dossier",
+        "Service émetteur",
+        "Ressource",
+        "Catégorie",
+        "Détails",
+        "État restitution",
+        "Date restitution",
+        "Observation",
+    ]
+    resource_rows_xml = [
+        "<Row>" + "".join(spreadsheet_cell(value, "header") for value in item_headers) + "</Row>"
+    ]
+
+    for row in item_rows:
+        details = json.loads(row["details_json"] or "{}")
+        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
+            str(value).strip()
+            for key, value in details.items()
+            if key not in {"selected"} and str(value or "").strip()
+        )
+        resource_rows_xml.append(
+            "<Row>" + "".join(
+                [
+                    spreadsheet_cell(row["form_id"]),
+                    spreadsheet_cell(row["title"]),
+                    spreadsheet_cell(details.get("issuerService") or details.get("issuer_service") or "-"),
+                    spreadsheet_cell(row["label"]),
+                    spreadsheet_cell(row["category"]),
+                    spreadsheet_cell(detail_text or "-"),
+                    spreadsheet_cell(row["return_condition"] or "En attente"),
+                    spreadsheet_cell(format_export_datetime(row["returned_at"])),
+                    spreadsheet_cell(row["notes"] or "-"),
+                ]
+            ) + "</Row>"
+        )
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1F2933"/>
+      <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4DDE6"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4DDE6"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4DDE6"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4DDE6"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="header">
+      <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+      <Interior ss:Color="#0F5B8D" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#0A4267"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#0A4267"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#0A4267"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#0A4267"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="cell">
+      <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1F2933"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="Dossiers">
+    <Table>
+      {''.join(workbook_rows)}
+    </Table>
+  </Worksheet>
+  <Worksheet ss:Name="Ressources">
+    <Table>
+      {''.join(resource_rows_xml)}
+    </Table>
+  </Worksheet>
+</Workbook>"""
 
 
 @app.route("/api/forms/<form_id>", methods=["GET"])

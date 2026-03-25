@@ -12,7 +12,7 @@ Ce document sert de point d'entrée pour la remise du projet.
 - journal applicatif dédié
 - corbeille administrateur avec restauration
 - export PDF unitaire et multiple
-- export CSV compatible Excel
+- export Excel lisible en deux feuilles
 
 ## Documents à consulter
 
@@ -54,7 +54,7 @@ http://127.0.0.1:5000/
 - gestion des ressources attribuables
 - journal des actions
 - export PDF
-- export CSV
+- export Excel
 
 ## Recommandation avant diffusion interne
 
