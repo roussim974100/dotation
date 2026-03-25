@@ -1,30 +1,33 @@
-# Parcours agents et élu(e)s
+# Parcours agents et elu(e)s
 
-Application interne de gestion des dossiers d'attribution et des restitutions pour une collectivité.
+Application interne de gestion des dossiers d'attribution et de restitution pour une collectivite.
 
 ## Ce que fait l'application
 
-- créer un dossier pour un agent ou un(e) élu(e)
+- creer un dossier pour un agent ou un(e) elu(e)
 - enregistrer un dossier en brouillon ou en attribution partielle
-- verrouiller un dossier complet une fois signé et validé RGPD
-- suivre la restitution des ressources attribuées
+- verrouiller un dossier complet une fois signe et valide RGPD
+- tracer les reouvertures de dossier encore modifiable
+- suivre la restitution des ressources materielles
 - administrer les comptes, les groupes et les ressources attribuables
-- consulter un journal des actions pour la traçabilité
-- restaurer des suppressions via une corbeille réservée aux admins
-- exporter les dossiers en PDF et les données en Excel
+- consulter un journal des actions
+- restaurer des suppressions via une corbeille reservee aux admins
+- exporter les dossiers et les restitutions en PDF
+- exporter les donnees en Excel
 
 ## Types de dossier
 
-- `arrivee` : nouvelle arrivée
-- `changement_service` : mobilité interne
-- `mise_a_jour` : mise à jour de ressources
+- `arrivee` : nouvelle arrivee
+- `changement_service` : mobilite interne
+- `mise_a_jour` : mise a jour de ressources
 - `sortie` : sortie ou restitution
 
 ## Documents du projet
 
 - `LIVRAISON.md` : vue de remise du projet
 - `GUIDE_UTILISATEUR.md` : guide d'usage rapide
-- `RECETTE_FONCTIONNELLE.md` : checklist et scénarios de test
+- `RECETTE_FONCTIONNELLE.md` : checklist et scenarios de test
+- `wikijs.md` : documentation prete a integrer dans Wiki.js
 
 ## Architecture
 
@@ -34,21 +37,12 @@ Application interne de gestion des dossiers d'attribution et des restitutions po
 ## Fichiers principaux
 
 - `frontend/index.html` : tableau de bord des dossiers
-- `frontend/form.html` : création et mise à jour d'un dossier
-- `frontend/restitution.html` : restitution détaillée
-- `frontend/admin.html` : administration des comptes et des ressources
+- `frontend/form.html` : creation et mise a jour d'un dossier
+- `frontend/restitution.html` : restitution des ressources materielles
+- `frontend/admin.html` : administration
 - `frontend/logs.html` : journal des actions
 - `frontend/trash.html` : corbeille administrateur
-- `frontend/login.html` : connexion
-- `frontend/js/storage.js` : accueil, liste, exports et appels API communs
-- `frontend/js/app.js` : logique métier du formulaire principal
-- `frontend/js/restitution.js` : logique de restitution
-- `frontend/js/admin.js` : logique d'administration
-- `frontend/js/logs.js` : consultation du journal applicatif
-- `frontend/css/style.css` : styles communs
-- `backend/app.py` : backend Flask et règles métier principales
-- `backend/users.json` : comptes et groupes locaux
-- `backend/dotation.db` : base SQLite générée au runtime
+- `backend/app.py` : coeur du backend Flask
 
 ## Lancement
 
@@ -64,121 +58,120 @@ Puis ouvrir :
 http://127.0.0.1:5000/
 ```
 
-## Compte initial
+## Authentification
 
-- identifiant : `admin`
-- mot de passe : `admin123!`
+- la connexion est obligatoire
+- un message d'erreur s'affiche si les identifiants sont incorrects
+- un message specifique s'affiche si la session ne peut pas etre conservee
 
-Il est recommandé de modifier ce mot de passe avant tout usage réel.
+En environnement proxy `nginx + gunicorn`, il est recommande de definir :
 
-## Statuts de dossier
+- `APP_SECRET_KEY`
+- `SESSION_COOKIE_SECURE=1` si le contexte HTTPS est stabilise
 
-- `draft` : brouillon
-- `partial_assignment` : attribution partielle, encore modifiable
-- `active` : attribution complète signée, verrouillée
-- `returned` : restitution terminée
-- `partial_return` : restitution partielle
-- `cancelled` : dossier annulé
+## Tableau de bord
 
-## Règles de sauvegarde
+Le tableau de bord permet de :
 
-- sans signature ou sans validation RGPD, le dossier reste en brouillon
-- avec signature et validation RGPD, l'utilisateur choisit une attribution complète ou partielle
-- une attribution complète passe en `active` et devient verrouillée
-- une attribution partielle reste modifiable
+- creer un nouveau dossier
+- rechercher et filtrer les dossiers
+- ouvrir un dossier
+- lancer une restitution
+- exporter un `PDF dossier`
+- exporter un `PDF restitution`
+- exporter plusieurs `PDF dossier`
+- exporter plusieurs `PDF restitution`
+- supprimer une selection de dossiers
+- exporter les donnees en Excel
+
+Le tableau de bord se rafraichit automatiquement sans `F5` :
+
+- toutes les 20 secondes si l'onglet est visible
+- au retour de focus
+- avec signal visuel des nouveaux dossiers
+- avec acquittement utilisateur `J'ai vu`
+- avec conservation de la selection pendant le rafraichissement
+
+## Dossier
+
+Un dossier peut contenir :
+
+- les informations de la personne
+- la qualite `Agent` ou `Elu(e)`
+- le type de dossier
+- les ressources attribuees par service
+- la signature de remise
+- la validation RGPD
+- la tracabilite de reouverture
+
+Un dossier complet passe en `Attribution active`.
+
+Un dossier incomplet reste en `Attribution partielle` et demeure modifiable.
 
 ## Restitution
 
-La restitution se fait depuis l'accueil, sur un dossier `active`.
+La restitution est geree sur un ecran separe.
 
-La page dédiée permet de renseigner :
+Elle permet de :
 
-- la date
-- le motif
-- les observations
-- l'état de chaque ressource
+- saisir une date de restitution
+- definir rapidement l'etat de chaque materiel
+- ajouter un commentaire uniquement si necessaire
+- signer la restitution ou indiquer pourquoi la signature est impossible ou differee
+- exporter un `PDF restitution` distinct
 
-Les informations de restitution restent ensuite visibles en lecture dans le dossier.
+La restitution reste modifiable tant qu'un materiel est `Non restitue`.
 
 ## Administration
 
-Les profils autorisés peuvent :
+L'administration permet de :
 
-- créer, modifier, désactiver ou supprimer un compte
+- creer, modifier, desactiver ou supprimer un compte
 - changer le mot de passe d'un compte
-- affecter un compte à un ou plusieurs groupes
-- créer, modifier, désactiver ou supprimer une ressource attribuable
-- consulter les groupes et leurs droits
-- consulter le journal des actions
-- consulter et restaurer les éléments supprimés depuis la corbeille admin
+- creer, modifier ou supprimer une ressource attribuable
+- consulter le journal
+- acceder a la corbeille admin
 
-Le journal et la corbeille sont regroupés dans le menu d'administration.
+## Journal et corbeille
 
-## Groupes standards
-
-- `lecture` : consultation avec données sensibles masquées
-- `redaction` : création et modification de dossiers
-- `gestion` : rédaction, restitution, suppression
-- `admin` : contrôle total et gestion des utilisateurs
+- le journal recense les actions systeme et utilisateur
+- la corbeille est reservee au groupe `admin`
+- un dossier, un compte ou une ressource supprime(e) peut etre restaure(e)
 
 ## Exports
 
-### PDF
+### PDF dossier
 
-- export unitaire depuis la liste
-- export multiple par sélection
-- export multiple téléchargé sous forme de ZIP
+Document officiel de remise avec :
 
-### Excel
+- entete institutionnel
+- informations de la personne
+- ressources attribuees
+- RGPD
+- signature
+- date de signature
 
-- export global depuis l'accueil
-- classeur Excel lisible avec une feuille `Dossiers` et une feuille `Ressources`
+### PDF restitution
 
-## Données et stockage
+Document distinct avec :
 
-La base SQLite contient principalement :
+- informations de la personne
+- date de restitution
+- etat de chaque materiel
+- commentaires d'anomalie
+- signature de restitution ou motif d'absence
 
-- `dotation_forms` : dossier principal et payload JSON complet
-- `dotation_items` : vision normalisée par ressource
-- `persons` : personnes suivies
-- `onboarding_dossiers` : dossiers rattachés aux personnes
-- `resource_catalog` : ressources attribuables
-- `audit_events` : audit lié aux dossiers
-- `app_logs` : journal applicatif global
+### Export Excel
 
-## Journal applicatif
+L'export Excel fournit un classeur lisible avec :
 
-Le journal est accessible sur `logs.html` pour les profils ayant le droit `users.manage`.
+- une feuille `Dossiers`
+- une feuille `Ressources`
 
-Il trace notamment :
+## Verification technique
 
-- connexions et déconnexions
-- créations, mises à jour et suppressions de dossiers
-- restitutions
-- actions d'administration sur les comptes
-- actions d'administration sur les ressources
+Controle minimal recommande apres modification :
 
-## Corbeille administrateur
-
-La corbeille est accessible sur `trash.html` uniquement pour le groupe `admin`.
-
-Elle permet de restaurer :
-
-- un dossier supprimé
-- un utilisateur supprimé
-- une ressource supprimée
-
-## Recommandations de maintenance
-
-- garder les règles métier centralisées dans `backend/app.py`
-- vérifier les droits côté backend et côté interface
-- conserver la cohérence des libellés entre frontend et backend
-- faire évoluer la documentation à chaque suppression ou ajout de fonctionnalité
-
-## Pistes d'évolution
-
-- remplacer les `alert()` et `confirm()` par de vraies modales
-- ajouter des filtres avancés dans le journal
-- exporter le journal en CSV
-- découper le backend en modules plus fins
-- ajouter des tests automatiques backend
+```powershell
+python -m py_compile backend\app.py
+```
