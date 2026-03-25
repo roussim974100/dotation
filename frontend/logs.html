@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<title>Journal applicatif</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header">
+  <div class="container app-header__inner">
+    <div class="app-brand">
+      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+      <div>
+        <p class="app-kicker">Journal</p>
+        <h1 class="app-title">Journal applicatif</h1>
+        <p class="app-subtitle">Traçabilité des actions système et utilisateur, avec recherche dédiée pour le debug et le forensic.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="trash.html">Corbeille</a>
+      <a class="btn btn-outline-light" href="admin.html">Administration</a>
+      <a class="btn btn-outline-light" href="index.html">Tableau de bord</a>
+      <a class="btn btn-outline-light" href="/logout">Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <section class="hero-panel mb-4">
+    <div>
+      <p class="panel-eyebrow">Forensic</p>
+      <h2 class="panel-title">Recherche dans les traces</h2>
+      <p class="panel-text">Retrouvez rapidement une action, un utilisateur, une ressource, un dossier ou un détail technique à partir d'un mot-clé.</p>
+    </div>
+    <div class="hero-panel__meta">
+      <div class="stat-card">
+        <span class="stat-card__label">Entrées chargées</span>
+        <strong class="stat-card__value" id="logCount">0</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-card">
+    <div class="filter-toolbar">
+      <div class="filter-toolbar__grid">
+        <div>
+          <label class="form-label" for="logSearchInput">Recherche</label>
+          <input id="logSearchInput" class="form-control" type="search" placeholder="acteur, action, dossier, ressource, détail...">
+        </div>
+        <div>
+          <label class="form-label" for="logLimitSelect">Volume</label>
+          <select id="logLimitSelect" class="form-select">
+            <option value="100">100 dernières entrées</option>
+            <option value="200" selected>200 dernières entrées</option>
+            <option value="500">500 dernières entrées</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-toolbar__actions">
+        <button id="logResetBtn" class="btn btn-outline-secondary" type="button">Réinitialiser</button>
+        <button id="refreshLogsBtn" class="btn btn-primary" type="button">Rafraîchir</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle draft-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Acteur</th>
+            <th>Périmètre</th>
+            <th>Action</th>
+            <th>Cible</th>
+            <th>Détail</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody"></tbody>
+      </table>
+    </div>
+
+    <div id="logsEmptyState" class="empty-state d-none">
+      <h3>Aucune entrée trouvée</h3>
+      <p>Ajustez votre recherche ou rechargez le journal pour afficher d'autres traces.</p>
+    </div>
+  </section>
+</main>
+
+<script src="js/ui.js"></script>
+<script src="js/logs.js"></script>
+</body>
+</html>
