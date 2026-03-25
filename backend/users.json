@@ -1,0 +1,91 @@
+{
+  "_comment": "Configuration locale des groupes et comptes applicatifs. Les mots de passe sont stockes haches avec bcrypt.",
+  "groups": {
+    "lecture": {
+      "label": "Lecture",
+      "description": "Consultation avec donnees personnelles masquees.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.export"
+      ],
+      "data_scope": "masked"
+    },
+    "redaction": {
+      "label": "Redaction",
+      "description": "Creation et modification des fiches en cours.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "gestion": {
+      "label": "Gestion",
+      "description": "Gestion avancee avec restitution et export.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete"
+      ],
+      "data_scope": "full"
+    },
+    "admin": {
+      "label": "Administration",
+      "description": "Controle total et gestion des utilisateurs.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete",
+        "users.manage",
+        "*"
+      ],
+      "data_scope": "full"
+    }
+  },
+  "users": [
+    {
+      "username": "admin",
+      "password_hash": "$2b$12$BgokKgQjVAIc90jozM2T7OSf16Ih2gy0is2JFLFkbwd6AqXI/Bycq",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true
+    },
+    {
+      "username": "samir",
+      "password_hash": "$2b$12$.6bMyjOghJ5fhPjHf29KoOEKqMKzolD2YDvXSNYwr9DALEs5TPYd2",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true
+    },
+    {
+      "username": "drh",
+      "password_hash": "$2b$12$bmOVVsCJZ/ZxqbxeFKSBz./0O6aEw8OmRPiqpZZnt57GbCg/BO/SK",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true
+    },
+    {
+      "username": "slc",
+      "password_hash": "$2b$12$3Fprf0nob5eygT81VvV1T.Q2w1pBgdN362UzPHA2isV.ss92oSWIm",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true
+    }
+  ]
+}

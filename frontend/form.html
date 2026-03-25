@@ -1,0 +1,378 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<title>Dossier d'attribution</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand">
+      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+      <div>
+        <p class="app-kicker">Collectivité</p>
+        <h1 class="app-title">Dossier d'attribution</h1>
+        <p class="app-subtitle">Arrivée, mobilité interne, ressources attribuées et restitution.</p>
+      </div>
+    </div>
+    <div class="header-actions no-print">
+      <button class="btn btn-outline-secondary" type="button" onclick="window.location.href='index.html'">Retour</button>
+      <a class="btn btn-outline-light" href="/logout">Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <div id="pageLoader" class="page-loader">
+    <div class="page-loader__panel">
+      <div class="page-loader__spinner"></div>
+      <strong>Chargement de la fiche</strong>
+      <p>Les informations sont en cours de récupération et de préparation.</p>
+    </div>
+  </div>
+
+  <form id="dotationForm" novalidate>
+    <section class="hero-panel mb-4">
+      <div>
+        <p class="panel-eyebrow">Saisie</p>
+        <h2 class="panel-title">Contexte du dossier</h2>
+        <p class="panel-text">Choisissez le contexte du dossier, puis indiquez s'il concerne un agent ou un(e) élu(e).</p>
+      </div>
+      <div class="hero-panel__meta">
+        <div class="status-pill" id="draftStatus">Nouveau dossier</div>
+      </div>
+    </section>
+
+    <div class="form-layout">
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Personne</p>
+            <h3 class="section-title">Identité, qualité et contexte</h3>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label" for="dossier_type">Type de dossier</label>
+            <select class="form-select" id="dossier_type" name="dossier_type">
+              <option value="arrivee">Nouvelle arrivée</option>
+              <option value="changement_service">Changement de service</option>
+              <option value="mise_a_jour">Mise à jour de ressources</option>
+              <option value="sortie">Sortie / restitution</option>
+            </select>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label" for="nom">Nom</label>
+            <input class="form-control" id="nom" name="nom" placeholder="Dupont" required>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label" for="prenom">Prénom</label>
+            <input class="form-control" id="prenom" name="prenom" placeholder="Marie" required>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label" for="service">Service</label>
+            <select class="form-select" id="service" name="service">
+              <option value="">Sélectionner un service</option>
+              <option value="Affaires juridiques / Commande publique">Affaires juridiques / Commande publique</option>
+              <option value="Bâtiment">Bâtiment</option>
+              <option value="Cabinet du Maire">Cabinet du Maire</option>
+              <option value="CCAS">CCAS</option>
+              <option value="Communication">Communication</option>
+              <option value="Culture et Patrimoine">Culture et Patrimoine</option>
+              <option value="CTM">CTM</option>
+              <option value="DGS">DGS</option>
+              <option value="DSI">DSI</option>
+              <option value="DST">DST</option>
+              <option value="Finances">Finances</option>
+              <option value="PM">PM</option>
+              <option value="DRH">DRH</option>
+              <option value="Population">Population</option>
+              <option value="SEJE">SEJE</option>
+              <option value="Secrétariat service technique">Secrétariat service technique</option>
+              <option value="Sports">Sports</option>
+              <option value="Subvention">Subvention</option>
+              <option value="Urbanisme">Urbanisme</option>
+              <option value="VRD">VRD</option>
+              <option value="__custom__">Autre...</option>
+            </select>
+            <input class="form-control mt-2 d-none" id="service_custom" name="service_custom" placeholder="Autre service">
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label" for="fonction">Fonction</label>
+            <input class="form-control" id="fonction" name="fonction" placeholder="Responsable d'équipe">
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label" for="assigned_at">Date et heure de remise</label>
+            <input class="form-control" id="assigned_at" type="datetime-local">
+          </div>
+          <div class="col-md-6 col-lg-4 d-none" id="serviceDestinationBlock">
+            <label class="form-label" for="service_destination">Nouveau service</label>
+            <input class="form-control" id="service_destination" name="service_destination" placeholder="Service de destination">
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <span class="form-label d-block mb-2">Qualité</span>
+          <div class="choice-group">
+            <label class="choice-chip">
+              <input type="radio" name="qualite" value="agent">
+              <span>Agent</span>
+            </label>
+            <label class="choice-chip">
+              <input type="radio" name="qualite" value="elu">
+              <span>Élu(e)</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="eluBlock" class="mt-3 d-none">
+          <label class="form-label" for="mandat">Mandat</label>
+          <select id="mandat" name="mandat" class="form-select">
+            <option value="">Sélectionner un mandat</option>
+            <option>Maire</option>
+            <option>Adjoint(e)</option>
+            <option>Délégué(e)</option>
+            <option>Conseiller(ère)</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">DSI</p>
+            <h3 class="section-title">Ressources numériques</h3>
+          </div>
+        </div>
+
+        <div class="equipment-grid">
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_pc" data-target="pcFields">
+              <span>Ordinateur</span>
+            </label>
+            <div id="pcFields" class="subgrid d-none">
+              <input class="form-control" placeholder="Marque" id="pc_marque">
+              <input class="form-control" placeholder="Modèle" id="pc_modele">
+              <input class="form-control" placeholder="Numéro de série" id="pc_sn">
+            </div>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_screen" data-target="screenFields">
+              <span>Écran</span>
+            </label>
+            <div id="screenFields" class="subgrid d-none">
+              <input class="form-control" placeholder="Marque" id="screen_marque">
+              <input class="form-control" placeholder="Modèle" id="screen_modele">
+              <input class="form-control" placeholder="Numéro de série" id="screen_sn">
+            </div>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_phone" data-target="phoneFields">
+              <span>Téléphone</span>
+            </label>
+            <div id="phoneFields" class="subgrid d-none">
+              <input class="form-control" placeholder="Marque" id="tel_marque">
+              <input class="form-control" placeholder="Modèle" id="tel_modele">
+              <input class="form-control" placeholder="IMEI" id="tel_imei">
+            </div>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="vpn">
+              <span>VPN</span>
+            </label>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_mail" data-target="mailFields">
+              <span>Email</span>
+            </label>
+            <div id="mailFields" class="single-field d-none">
+              <input class="form-control" placeholder="Adresse email" id="email" type="email">
+            </div>
+          </div>
+        </div>
+        <div id="dynamicResourcesDsiGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Bâtiment</p>
+            <h3 class="section-title">Ressources remises par le service bâtiment</h3>
+          </div>
+        </div>
+
+        <div class="equipment-grid equipment-grid--compact">
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_badge" data-target="badgeFields">
+              <span>Badge d'accès</span>
+            </label>
+            <div id="badgeFields" class="single-field d-none">
+              <input class="form-control" placeholder="Numéro de badge" id="badge_numero">
+            </div>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="veste">
+              <span>Veste</span>
+            </label>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="chaussure">
+              <span>Chaussures de sécurité</span>
+            </label>
+          </div>
+        </div>
+        <div id="dynamicResourcesBatimentGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Autres services</p>
+            <h3 class="section-title">Autres ressources attribuées</h3>
+          </div>
+        </div>
+
+        <div class="equipment-grid equipment-grid--compact">
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_vehicule" data-target="vehiculeFields">
+              <span>Véhicule</span>
+            </label>
+            <div id="vehiculeFields" class="subgrid d-none">
+              <input class="form-control" placeholder="Marque" id="vehicule_marque">
+              <input class="form-control" placeholder="Modèle" id="vehicule_modele">
+              <input class="form-control" placeholder="Immatriculation" id="vehicule_plaque">
+            </div>
+          </div>
+
+          <div class="equipment-item">
+            <label class="equipment-toggle">
+              <input type="checkbox" id="has_autre" data-target="autreFields">
+              <span>Autre matériel</span>
+            </label>
+            <div id="autreFields" class="single-field d-none">
+              <input class="form-control" placeholder="Description" id="autre_materiel">
+            </div>
+          </div>
+        </div>
+        <div id="dynamicResourcesOtherGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+      </section>
+
+      <div id="dynamicServiceSections"></div>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Référentiel</p>
+            <h3 class="section-title">Ressources sans service émetteur défini</h3>
+          </div>
+        </div>
+
+        <p class="panel-text">Ces ressources proviennent du menu administration. Si un service émetteur est renseigné, elles apparaissent directement dans sa section.</p>
+        <div id="dynamicResourcesEmpty" class="empty-state d-none">
+          <h3>Aucune ressource sans service défini</h3>
+          <p>Toutes les ressources actives sont déjà rangées dans leur section de service, ou aucun référentiel supplémentaire n'est encore disponible.</p>
+        </div>
+        <div id="dynamicResourcesGrid" class="equipment-grid equipment-grid--compact"></div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Suivi</p>
+            <h3 class="section-title">État du dossier</h3>
+          </div>
+        </div>
+
+        <div class="row g-3 align-items-stretch">
+          <div class="col-lg-4">
+            <div class="rgpd-card h-100">
+              <h4 class="rgpd-card__title">État actuel</h4>
+              <div class="status-pill" id="workflowStatusDisplay">Brouillon</div>
+              <p class="rgpd-text mt-3 mb-0" id="workflowStatusHint">Le statut est calculé automatiquement selon la signature, la validation RGPD et le niveau de complétude de l'attribution.</p>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="rgpd-card h-100">
+              <h4 class="rgpd-card__title">Restitution</h4>
+              <p class="rgpd-text" id="restitutionSummaryHint">La restitution ne se renseigne plus dans ce formulaire. Elle se gère depuis la page dédiée accessible depuis l'accueil sur les attributions actives.</p>
+              <div id="restitutionSummary" class="d-none"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Validation</p>
+            <h3 class="section-title">Signature et conformité</h3>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <label class="form-label" for="signature">Signature</label>
+            <div class="signature-wrap">
+              <canvas id="signature" class="signature-box"></canvas>
+            </div>
+            <div id="signaturePreviewWrap" class="signature-preview d-none mt-3">
+              <p class="form-label mb-2">Signature enregistrée</p>
+              <img id="signaturePreviewImage" class="signature-preview__image" alt="Signature enregistrée">
+            </div>
+            <div class="d-flex gap-2 mt-3 no-print">
+              <button class="btn btn-outline-secondary" type="button" id="clearSignatureBtn">Effacer la signature</button>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="rgpd-card">
+              <h4 class="rgpd-card__title">Information RGPD</h4>
+              <p class="rgpd-text">Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par la commune de Publier afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.</p>
+              <p class="rgpd-text">Conformément au règlement général sur la protection des données et à la loi Informatique et Libertés, la personne concernée dispose notamment de droits d'accès, de rectification, d'effacement, de limitation et d'opposition, dans les conditions prévues par la réglementation applicable.</p>
+              <p class="rgpd-text">Pour toute question relative au traitement de ses données personnelles ou pour exercer ses droits, la personne concernée peut contacter le délégué à la protection des données à l'adresse suivante : <a href="mailto:dpo@ville-publier.fr">dpo@ville-publier.fr</a>.</p>
+              <label class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" id="rgpdCheck">
+                <span class="form-check-label">Je confirme avoir porté ces informations à la connaissance de la personne concernée avant validation du dossier.</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="action-bar no-print">
+      <div class="action-bar__hint" id="resumeHint">Enregistrez le dossier pour pouvoir le reprendre ensuite depuis l'accueil.</div>
+      <div class="action-bar__buttons">
+        <button class="btn btn-outline-secondary" type="button" onclick="window.location.href='index.html'">Retour</button>
+        <button class="btn btn-warning" type="button" id="saveDraftBtn">Enregistrer</button>
+      </div>
+    </div>
+  </form>
+
+  <section id="printSummary" class="print-summary d-none"></section>
+</main>
+
+<script src="js/ui.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
