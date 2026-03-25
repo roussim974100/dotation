@@ -62,5 +62,22 @@
 
 <script src="js/config.js"></script>
 <script src="js/login.js"></script>
+<script>
+  (function () {
+    const errorBox = document.getElementById("loginError");
+    if (!errorBox) {
+      return;
+    }
+    const error = new URLSearchParams(window.location.search).get("error");
+    if (error === "invalid") {
+      errorBox.textContent = "Identifiants invalides. Vérifiez votre saisie puis réessayez.";
+      errorBox.classList.remove("d-none");
+    }
+    if (error === "session") {
+      errorBox.textContent = "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous.";
+      errorBox.classList.remove("d-none");
+    }
+  })();
+</script>
 </body>
 </html>

@@ -63,6 +63,13 @@ const EQUIPMENT_CONFIG = [
     detail: () => [getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
   },
   {
+    key: "tablette",
+    label: "Tablette",
+    category: "materiel",
+    checkboxId: "has_tablette",
+    detail: () => [getFieldValue("tablette_marque"), getFieldValue("tablette_modele"), getFieldValue("tablette_sn")].filter(Boolean).join(" - ")
+  },
+  {
     key: "vehicule",
     label: "Véhicule",
     category: "materiel",
@@ -75,6 +82,13 @@ const EQUIPMENT_CONFIG = [
     category: "materiel",
     checkboxId: "has_badge",
     detail: () => getFieldValue("badge_numero")
+  },
+  {
+    key: "cles",
+    label: "Clé(s)",
+    category: "materiel",
+    checkboxId: "has_cles",
+    detail: () => getRepeatableValues("clesRows").join(" - ")
   },
   {
     key: "veste",
@@ -110,6 +124,13 @@ const EQUIPMENT_CONFIG = [
     category: "immateriel",
     checkboxId: "has_mail",
     detail: () => getFieldValue("email")
+  },
+  {
+    key: "zoneAlarme",
+    label: "Zone alarme",
+    category: "immateriel",
+    checkboxId: "has_zone_alarme",
+    detail: () => getRepeatableValues("zoneAlarmeRows").join(" - ")
   }
 ];
 
@@ -128,6 +149,11 @@ const CORE_RESOURCE_RULES = {
     { fieldId: "tel_marque", label: "Marque téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
     { fieldId: "tel_modele", label: "Modèle téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
     { fieldId: "tel_imei", label: "IMEI", required: true, pattern: "^\\d{15}$", hint: "15 chiffres" }
+  ],
+  tablette: [
+    { fieldId: "tablette_marque", label: "Marque tablette", required: true, pattern: ".*", hint: "" },
+    { fieldId: "tablette_modele", label: "Modèle tablette", required: true, pattern: ".*", hint: "" },
+    { fieldId: "tablette_sn", label: "Numéro de série tablette", required: true, pattern: ".*", hint: "" }
   ],
   vehicule: [
     { fieldId: "vehicule_marque", label: "Marque véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
@@ -150,7 +176,12 @@ const restitutionStateLabels = {
   returned: "Restitué",
   returned_damaged: "Restitué abîmé",
   missing: "Non restitué",
-  transferred: "Transféré"
+  transferred: "Transféré",
+  conforme: "Conforme",
+  degrade: "Dégradé",
+  non_restitue: "Non restitué",
+  perdu: "Perdu",
+  autre: "Autre"
 };
 
 let currentLockState = false;
@@ -158,6 +189,52 @@ let currentLockState = false;
 // Helpers de lecture du formulaire.
 function getFieldValue(id) {
   return document.getElementById(id).value.trim() || "";
+}
+
+function getRepeatableValues(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return [];
+  }
+  return Array.from(container.querySelectorAll("input"))
+    .map((input) => input.value.trim())
+    .filter(Boolean);
+}
+
+function createRepeatableRow(containerId, placeholder, value = "") {
+  const row = document.createElement("div");
+  row.className = "repeatable-list__row";
+  row.innerHTML = `
+    <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}" value="${escapeAttribute(value)}">
+    <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
+  `;
+  row.querySelector("button")?.addEventListener("click", () => {
+    row.remove();
+  });
+  document.getElementById(containerId)?.appendChild(row);
+}
+
+function ensureRepeatableRow(containerId, placeholder) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+  if (!container.querySelector("input")) {
+    createRepeatableRow(containerId, placeholder);
+  }
+}
+
+function populateRepeatableRows(containerId, placeholder, values = []) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  const normalized = Array.isArray(values) ? values.filter((value) => String(value || "").trim()) : [];
+  if (!normalized.length) {
+    return;
+  }
+  normalized.forEach((value) => createRepeatableRow(containerId, placeholder, value));
 }
 
 function matchesPattern(value, pattern) {
@@ -296,13 +373,27 @@ function setServiceValue(value) {
 }
 
 async function loadDynamicResourceReferences() {
-  const genericContainer = document.getElementById("dynamicResourcesGrid");
-  const dsiContainer = document.getElementById("dynamicResourcesDsiGrid");
-  const batimentContainer = document.getElementById("dynamicResourcesBatimentGrid");
-  const otherContainer = document.getElementById("dynamicResourcesOtherGrid");
+  const genericMaterialContainer = document.getElementById("dynamicResourcesMaterialGrid");
+  const genericImmaterialContainer = document.getElementById("dynamicResourcesImmaterialGrid");
+  const genericMaterialWrap = document.getElementById("dynamicResourcesGenericMaterialWrap");
+  const genericImmaterialWrap = document.getElementById("dynamicResourcesGenericImmaterialWrap");
+  const dsiMaterialContainer = document.getElementById("dynamicResourcesDsiMaterialGrid");
+  const dsiImmaterialContainer = document.getElementById("dynamicResourcesDsiImmaterialGrid");
+  const batimentMaterialContainer = document.getElementById("dynamicResourcesBatimentMaterialGrid");
+  const batimentImmaterialContainer = document.getElementById("dynamicResourcesBatimentImmaterialGrid");
+  const batimentImmaterialWrap = document.getElementById("dynamicResourcesBatimentImmaterialWrap");
+  const otherMaterialContainer = document.getElementById("dynamicResourcesOtherMaterialGrid");
+  const otherImmaterialContainer = document.getElementById("dynamicResourcesOtherImmaterialGrid");
+  const otherImmaterialWrap = document.getElementById("dynamicResourcesOtherImmaterialWrap");
   const dynamicSectionsContainer = document.getElementById("dynamicServiceSections");
   const emptyState = document.getElementById("dynamicResourcesEmpty");
-  if (!genericContainer || !dsiContainer || !batimentContainer || !otherContainer || !dynamicSectionsContainer || !emptyState) {
+  if (
+    !genericMaterialContainer || !genericImmaterialContainer
+    || !dsiMaterialContainer || !dsiImmaterialContainer
+    || !batimentMaterialContainer || !batimentImmaterialContainer
+    || !otherMaterialContainer || !otherImmaterialContainer
+    || !dynamicSectionsContainer || !emptyState
+  ) {
     return;
   }
 
@@ -314,12 +405,19 @@ async function loadDynamicResourceReferences() {
   }
 
   if (!dynamicResourceReferences.length) {
-    genericContainer.innerHTML = "";
-    dsiContainer.innerHTML = "";
-    batimentContainer.innerHTML = "";
-    otherContainer.innerHTML = "";
+    genericMaterialContainer.innerHTML = "";
+    genericImmaterialContainer.innerHTML = "";
+    dsiMaterialContainer.innerHTML = "";
+    dsiImmaterialContainer.innerHTML = "";
+    batimentMaterialContainer.innerHTML = "";
+    batimentImmaterialContainer.innerHTML = "";
+    otherMaterialContainer.innerHTML = "";
+    otherImmaterialContainer.innerHTML = "";
     dynamicSectionsContainer.innerHTML = "";
     emptyState.classList.remove("d-none");
+    genericMaterialWrap?.classList.add("d-none");
+    genericImmaterialWrap?.classList.add("d-none");
+    otherImmaterialWrap?.classList.add("d-none");
     return;
   }
 
@@ -346,45 +444,56 @@ async function loadDynamicResourceReferences() {
   };
 
   const grouped = {
-    dsi: [],
-    batiment: [],
-    other: [],
-    generic: [],
+    dsi: { materiel: [], immateriel: [] },
+    batiment: { materiel: [], immateriel: [] },
+    other: { materiel: [], immateriel: [] },
+    generic: { materiel: [], immateriel: [] },
     services: new Map()
   };
 
   dynamicResourceReferences.forEach((resource) => {
     const issuer = normalizeServiceName(resource.issuer_service);
     const issuerLabel = formatIssuerServiceLabel(resource.issuer_service);
+    const category = resource.category === "immateriel" ? "immateriel" : "materiel";
     if (issuer === "dsi") {
-      grouped.dsi.push(resource);
+      grouped.dsi[category].push(resource);
       return;
     }
     if (issuer === "batiment") {
-      grouped.batiment.push(resource);
+      grouped.batiment[category].push(resource);
       return;
     }
     if (issuer === "autres_services") {
-      grouped.other.push(resource);
+      grouped.other[category].push(resource);
       return;
     }
     if (issuer) {
       if (!grouped.services.has(issuer)) {
         grouped.services.set(issuer, {
           label: issuerLabel,
-          resources: []
+          materiel: [],
+          immateriel: []
         });
       }
-      grouped.services.get(issuer).resources.push(resource);
+      grouped.services.get(issuer)[category].push(resource);
       return;
     }
-    grouped.generic.push(resource);
+    grouped.generic[category].push(resource);
   });
 
-  dsiContainer.innerHTML = grouped.dsi.map(buildResourceCard).join("");
-  batimentContainer.innerHTML = grouped.batiment.map(buildResourceCard).join("");
-  otherContainer.innerHTML = grouped.other.map(buildResourceCard).join("");
-  genericContainer.innerHTML = grouped.generic.map(buildResourceCard).join("");
+  dsiMaterialContainer.innerHTML = grouped.dsi.materiel.map(buildResourceCard).join("");
+  dsiImmaterialContainer.innerHTML = grouped.dsi.immateriel.map(buildResourceCard).join("");
+  batimentMaterialContainer.innerHTML = grouped.batiment.materiel.map(buildResourceCard).join("");
+  batimentImmaterialContainer.innerHTML = grouped.batiment.immateriel.map(buildResourceCard).join("");
+  otherMaterialContainer.innerHTML = grouped.other.materiel.map(buildResourceCard).join("");
+  otherImmaterialContainer.innerHTML = grouped.other.immateriel.map(buildResourceCard).join("");
+  genericMaterialContainer.innerHTML = grouped.generic.materiel.map(buildResourceCard).join("");
+  genericImmaterialContainer.innerHTML = grouped.generic.immateriel.map(buildResourceCard).join("");
+
+  genericMaterialWrap?.classList.toggle("d-none", grouped.generic.materiel.length === 0);
+  genericImmaterialWrap?.classList.toggle("d-none", grouped.generic.immateriel.length === 0);
+  otherImmaterialWrap?.classList.toggle("d-none", grouped.other.immateriel.length === 0);
+
   dynamicSectionsContainer.innerHTML = Array.from(grouped.services.values())
     .sort((left, right) => left.label.localeCompare(right.label, "fr"))
     .map((group) => `
@@ -395,13 +504,32 @@ async function loadDynamicResourceReferences() {
             <h3 class="section-title">Ressources remises par le service ${escapeHtml(group.label)}</h3>
           </div>
         </div>
-        <div class="equipment-grid equipment-grid--compact">
-          ${group.resources.map(buildResourceCard).join("")}
+        <div class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+          </div>
+          <div class="equipment-grid equipment-grid--compact">
+            ${group.materiel.map(buildResourceCard).join("")}
+          </div>
         </div>
+        ${group.immateriel.length ? `
+        <div class="resource-kind-block mt-4">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+          </div>
+          <div class="equipment-grid equipment-grid--compact">
+            ${group.immateriel.map(buildResourceCard).join("")}
+          </div>
+        </div>` : ""}
+        ${(!group.materiel.length && !group.immateriel.length) ? `
+        <div class="empty-state">
+          <p>Aucune ressource active pour ce service.</p>
+        </div>
+        ` : ""}
       </section>
     `)
     .join("");
-  emptyState.classList.toggle("d-none", grouped.generic.length > 0);
+  emptyState.classList.toggle("d-none", (grouped.generic.materiel.length + grouped.generic.immateriel.length) > 0);
 }
 
 function getAdditionalResourcesData() {
@@ -529,6 +657,9 @@ function renderPrintSummary(formData) {
   if (formData.materiel.telephone.selected) {
     pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "));
   }
+  if (formData.materiel.tablette?.selected) {
+    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
+  }
   if (formData.immateriel.vpn.selected) {
     pushItem(dsiItems, "VPN", "");
   }
@@ -539,11 +670,17 @@ function renderPrintSummary(formData) {
   if (formData.materiel.badge.selected) {
     pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero);
   }
+  if (formData.materiel.cles?.selected) {
+    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "));
+  }
   if (formData.materiel.veste.selected) {
     pushItem(batimentItems, "Veste", "");
   }
   if (formData.materiel.chaussuresSecurite.selected) {
     pushItem(batimentItems, "Chaussures de sécurité", "");
+  }
+  if (formData.immateriel.zoneAlarme?.selected) {
+    pushItem(batimentItems, "Zone alarme", (formData.immateriel.zoneAlarme.zones || []).join(" - "));
   }
 
   if (formData.materiel.vehicule.selected) {
@@ -556,7 +693,7 @@ function renderPrintSummary(formData) {
   const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
     const config = EQUIPMENT_CONFIG.find((item) => item.key === key);
     const label = config.label || key;
-    const parts = [restitutionStateLabels[state.state] || state.state, state.returnedAt, state.notes].filter(Boolean);
+    const parts = [restitutionStateLabels[state.state] || state.state, state.notes].filter(Boolean);
     return `<li><strong>${escapeHtml(label)}</strong> : ${escapeHtml(parts.join(" - "))}</li>`;
   });
 
@@ -631,6 +768,12 @@ function initConditionalBlocks() {
   document.querySelectorAll("[data-target]").forEach((checkbox) => {
     const sync = () => {
       toggleField(checkbox.dataset.target, checkbox.checked);
+      if (checkbox.checked && checkbox.id === "has_cles") {
+        ensureRepeatableRow("clesRows", "Référence ou libellé de clé");
+      }
+      if (checkbox.checked && checkbox.id === "has_zone_alarme") {
+        ensureRepeatableRow("zoneAlarmeRows", "Zone alarme");
+      }
     };
     if (!checkbox.dataset.boundToggle) {
       checkbox.addEventListener("change", sync);
@@ -640,12 +783,33 @@ function initConditionalBlocks() {
   });
 }
 
+function initRepeatableResourceLists() {
+  const clesButton = document.getElementById("addCleBtn");
+  const zoneButton = document.getElementById("addZoneAlarmeBtn");
+
+  if (clesButton && !clesButton.dataset.boundRepeatable) {
+    clesButton.addEventListener("click", () => {
+      createRepeatableRow("clesRows", "Référence ou libellé de clé");
+    });
+    clesButton.dataset.boundRepeatable = "true";
+  }
+
+  if (zoneButton && !zoneButton.dataset.boundRepeatable) {
+    zoneButton.addEventListener("click", () => {
+      createRepeatableRow("zoneAlarmeRows", "Zone alarme");
+    });
+    zoneButton.dataset.boundRepeatable = "true";
+  }
+}
+
 function initQualite() {
   const radios = document.querySelectorAll('input[name="qualite"]');
   const service = document.getElementById("service");
   const serviceCustom = document.getElementById("service_custom");
   const fonction = document.getElementById("fonction");
   const mandat = document.getElementById("mandat");
+  const serviceFieldBlock = document.getElementById("serviceFieldBlock");
+  const fonctionFieldBlock = document.getElementById("fonctionFieldBlock");
 
   const sync = () => {
     const selectedInput = document.querySelector('input[name="qualite"]:checked');
@@ -653,6 +817,8 @@ function initQualite() {
     const isElu = selected === "elu";
 
     toggleField("eluBlock", isElu);
+    toggleField("serviceFieldBlock", !isElu);
+    toggleField("fonctionFieldBlock", !isElu);
 
     if (service) {
       service.disabled = isElu;
@@ -722,6 +888,14 @@ function validateFixedResourceSelection() {
       }
     });
   });
+
+  if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
+    issues.push("Au moins une clé doit être renseignée");
+  }
+
+  if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
+    issues.push("Au moins une zone alarme doit être renseignée");
+  }
 
   return issues;
 }
@@ -821,7 +995,6 @@ function renderRestitutionSummary() {
     const label = config.label || key;
     const parts = [
       restitutionStateLabels[state.state] || state.state || "État non renseigné",
-      state.returnedAt || "",
       state.notes || ""
     ].filter(Boolean);
     return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`;
@@ -948,8 +1121,10 @@ function buildEquipmentSelectionMap() {
     ordinateur: { selected: document.getElementById("has_pc").checked, marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn") },
     ecran: { selected: document.getElementById("has_screen").checked, marque: getFieldValue("screen_marque"), modele: getFieldValue("screen_modele"), numeroSerie: getFieldValue("screen_sn") },
     telephone: { selected: document.getElementById("has_phone").checked, marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei") },
+    tablette: { selected: document.getElementById("has_tablette").checked, marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn") },
     vehicule: { selected: document.getElementById("has_vehicule").checked, marque: getFieldValue("vehicule_marque"), modele: getFieldValue("vehicule_modele"), immatriculation: getFieldValue("vehicule_plaque") },
     badge: { selected: document.getElementById("has_badge").checked, numero: getFieldValue("badge_numero") },
+    cles: { selected: document.getElementById("has_cles").checked, values: getRepeatableValues("clesRows") },
     veste: { selected: document.getElementById("veste").checked },
     chaussuresSecurite: { selected: document.getElementById("chaussure").checked },
     autre: { selected: document.getElementById("has_autre").checked, description: getFieldValue("autre_materiel") }
@@ -959,7 +1134,8 @@ function buildEquipmentSelectionMap() {
 function buildIntangibleSelectionMap() {
   return {
     vpn: { selected: document.getElementById("vpn").checked },
-    email: { selected: document.getElementById("has_mail").checked, adresse: getFieldValue("email") }
+    email: { selected: document.getElementById("has_mail").checked, adresse: getFieldValue("email") },
+    zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, zones: getRepeatableValues("zoneAlarmeRows") }
   };
 }
 
@@ -1056,10 +1232,13 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_pc", data.materiel.ordinateur.selected, { pc_sn: data.materiel.ordinateur.numeroSerie });
   setCheckboxAndFields("has_screen", data.materiel.ecran.selected, { screen_sn: data.materiel.ecran.numeroSerie });
   setCheckboxAndFields("has_phone", data.materiel.telephone.selected, { tel_imei: data.materiel.telephone.imei });
+  setCheckboxAndFields("has_tablette", data.materiel.tablette?.selected, { tablette_sn: data.materiel.tablette?.numeroSerie });
   setCheckboxAndFields("has_vehicule", data.materiel.vehicule.selected, { vehicule_plaque: data.materiel.vehicule.immatriculation });
   setCheckboxAndFields("has_badge", data.materiel.badge.selected, { badge_numero: data.materiel.badge.numero });
+  setCheckboxAndFields("has_cles", data.materiel.cles?.selected, {});
   setCheckboxAndFields("has_autre", data.materiel.autre.selected, { autre_materiel: data.materiel.autre.description });
   setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: data.immateriel.email.adresse });
+  setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
 
   document.getElementById("pc_marque").value = data.materiel.ordinateur.marque || "";
   document.getElementById("pc_modele").value = data.materiel.ordinateur.modele || "";
@@ -1067,8 +1246,12 @@ function populateForm(data, signaturePad) {
   document.getElementById("screen_modele").value = data.materiel.ecran.modele || "";
   document.getElementById("tel_marque").value = data.materiel.telephone.marque || "";
   document.getElementById("tel_modele").value = data.materiel.telephone.modele || "";
+  document.getElementById("tablette_marque").value = data.materiel.tablette?.marque || "";
+  document.getElementById("tablette_modele").value = data.materiel.tablette?.modele || "";
   document.getElementById("vehicule_marque").value = data.materiel.vehicule.marque || "";
   document.getElementById("vehicule_modele").value = data.materiel.vehicule.modele || "";
+  populateRepeatableRows("clesRows", "Référence ou libellé de clé", data.materiel.cles?.values || []);
+  populateRepeatableRows("zoneAlarmeRows", "Zone alarme", data.immateriel.zoneAlarme?.zones || []);
 
   document.getElementById("veste").checked = Boolean(data.materiel.veste.selected);
   document.getElementById("chaussure").checked = Boolean(data.materiel.chaussuresSecurite.selected);
@@ -1081,6 +1264,7 @@ function populateForm(data, signaturePad) {
   syncDossierTypeUi();
   updateStatusInfo(form.dataset.workflowStatus || "draft");
   renderRestitutionSummary();
+  renderReopenInfo(data.meta || {});
   signaturePad.restore(data.validation.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
   applyLockState(Boolean(data.meta.lockedAt));
@@ -1189,6 +1373,30 @@ function updateDraftUi(savedAt, isLoaded = false, status = "draft") {
   }
 }
 
+function renderReopenInfo(meta = {}) {
+  const notice = document.getElementById("reopenNotice");
+  const text = document.getElementById("reopenNoticeText");
+  if (!notice || !text) {
+    return;
+  }
+
+  const reopenCount = Number(meta.reopenCount || 0);
+  if (!reopenCount) {
+    notice.classList.add("d-none");
+    text.textContent = "";
+    return;
+  }
+
+  const lastReopenedAt = meta.lastReopenedAt
+    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(meta.lastReopenedAt))
+    : "date non renseignée";
+  const lastReopenedBy = meta.lastReopenedBy || "utilisateur non renseigné";
+  text.textContent = reopenCount === 1
+    ? `Ce dossier a déjà été rouvert 1 fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`
+    : `Ce dossier a déjà été rouvert ${reopenCount} fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`;
+  notice.classList.remove("d-none");
+}
+
 async function loadDraftFromUrl(signaturePad) {
   // Ouvre une fiche existante si l'URL contient id=...
   const params = new URLSearchParams(window.location.search);
@@ -1202,6 +1410,7 @@ async function loadDraftFromUrl(signaturePad) {
     document.getElementById("assigned_at").value = getCurrentDateTimeLocal();
     updateDraftUi("", false, "draft");
     renderRestitutionSummary();
+    renderReopenInfo({});
     applyLockState(false);
     hidePageLoader();
     return;
@@ -1213,6 +1422,22 @@ async function loadDraftFromUrl(signaturePad) {
     alert("La fiche demandee est introuvable.");
     hidePageLoader();
     return;
+  }
+
+  const session = await getSessionInfo();
+  const canEdit = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.edit"));
+  const currentStatus = result.summary?.status || result.data?.workflow?.status || "draft";
+  if (canEdit && ["draft", "partial_assignment"].includes(currentStatus)) {
+    try {
+      const reopenResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/reopen`, {
+        method: "POST"
+      });
+      if (reopenResult?.meta) {
+        result.data.meta = { ...(result.data.meta || {}), ...reopenResult.meta };
+      }
+    } catch (error) {
+      console.error("Impossible de tracer la réouverture du dossier", error);
+    }
   }
 
   populateForm(result.data, signaturePad);
@@ -1311,6 +1536,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await loadDynamicResourceReferences();
     const signaturePad = initSignaturePad();
+    initRepeatableResourceLists();
     initConditionalBlocks();
     initQualite();
     syncDossierTypeUi();

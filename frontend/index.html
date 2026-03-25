@@ -9,15 +9,14 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
-<!-- Header principal: navigation globale, actions de haut niveau et branding commune -->
 <header class="app-header">
   <div class="container app-header__inner">
     <div class="app-brand">
       <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
       <div>
-      <p class="app-kicker">Collectivité</p>
-      <h1 class="app-title">Parcours agents et élu(e)s</h1>
-      <p class="app-subtitle">Arrivées, mobilités internes, ressources attribuées et restitutions.</p>
+        <p class="app-kicker">Collectivité</p>
+        <h1 class="app-title">Parcours agents et élu(e)s</h1>
+        <p class="app-subtitle">Arrivées, mobilités internes, ressources attribuées et restitutions.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -29,7 +28,6 @@
 </header>
 
 <main class="container py-4 py-lg-5">
-  <!-- Hero dashboard: résumé du module et compteur des fiches encore modifiables -->
   <section class="hero-panel mb-4">
     <div>
       <p class="panel-eyebrow">Tableau de bord</p>
@@ -37,7 +35,7 @@
         <h2 class="panel-title">Dossiers d'attribution</h2>
         <span id="dashboardPendingBadge" class="dashboard-pending-badge d-none" aria-live="polite"></span>
       </div>
-      <p class="panel-text">Retrouvez un dossier, reprenez les parcours encore modifiables, exportez-les ou supprimez une saisie inutile.</p>
+      <p class="panel-text">Retrouvez un dossier, reprenez les parcours encore modifiables, exportez les bons utiles et supprimez une saisie inutile.</p>
     </div>
     <div class="hero-panel__meta">
       <button class="btn btn-primary btn-lg" type="button" onclick="newForm()">Nouveau dossier</button>
@@ -48,9 +46,9 @@
     </div>
   </section>
 
-  <!-- Liste centrale: sélection multiple, actions unitaires et exports -->
   <section class="content-card">
     <div id="dashboardUpdateNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
+
     <div class="filter-toolbar">
       <div class="filter-toolbar__grid">
         <div>
@@ -89,18 +87,20 @@
       </div>
     </div>
 
-    <div class="section-heading mb-3">
+    <div class="dashboard-toolbar mb-3">
       <div>
-        <p class="panel-eyebrow">Exports</p>
-        <h3 class="section-title">Actions sur la sélection</h3>
+        <p class="panel-eyebrow">Sélection</p>
+        <h3 class="section-title">Actions groupées sur les dossiers</h3>
         <p class="panel-text mb-0" id="dashboardRefreshInfo">Mise à jour automatique active.</p>
       </div>
-      <div class="header-actions">
+      <div class="dashboard-toolbar__actions">
         <button id="refreshDashboardBtn" class="btn btn-outline-secondary" type="button">Rafraîchir</button>
-        <button id="exportSelectedPdfBtn" class="btn btn-outline-success d-none" type="button">Exporter PDF sélection</button>
+        <button id="exportSelectedPdfBtn" class="btn btn-outline-success d-none" type="button">PDF dossiers sélectionnés</button>
+        <button id="exportSelectedRestitutionPdfBtn" class="btn btn-outline-secondary d-none" type="button">PDF restitutions sélectionnées</button>
         <button id="deleteSelectedBtn" class="btn btn-outline-danger d-none" type="button">Supprimer la sélection</button>
       </div>
     </div>
+
     <div class="table-responsive">
       <table class="table align-middle draft-table">
         <thead>
@@ -118,6 +118,7 @@
         <tbody id="draftList"></tbody>
       </table>
     </div>
+
     <div id="emptyState" class="empty-state d-none">
       <h3>Aucun dossier modifiable pour le moment</h3>
       <p>Vous pouvez commencer un nouveau dossier d'attribution puis l'enregistrer pour le reprendre plus tard s'il reste en brouillon ou en attribution partielle.</p>
@@ -126,8 +127,20 @@
   </section>
 </main>
 
-<!-- Carte flottante affichée au survol de l'état pour prévisualiser les ressources attribuées -->
 <div id="statusHoverCard" class="status-hover-card d-none"></div>
+<div id="exportLoader" class="page-loader is-hidden">
+  <div class="page-loader__panel">
+    <div class="page-loader__spinner"></div>
+    <strong id="exportLoaderTitle">Préparation de l'export</strong>
+    <p id="exportLoaderText">Le document est en cours de génération.</p>
+    <div class="export-progress">
+      <div class="export-progress__track">
+        <div id="exportLoaderBar" class="export-progress__bar"></div>
+      </div>
+      <div id="exportLoaderPercent" class="export-progress__value">0 %</div>
+    </div>
+  </div>
+</div>
 
 <script src="js/ui.js"></script>
 <script src="js/storage.js"></script>

@@ -2,6 +2,7 @@
 const DASHBOARD_PENDING_UPDATES_KEY = "dashboardPendingUpdates";
 const API_BASE = "/api/forms";
 const PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-pdf-batch";
+const RESTITUTION_PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-restitution-pdf-batch";
 const DASHBOARD_REFRESH_INTERVAL_MS = 20000;
 let sessionInfo = null;
 let currentDraftRows = [];
@@ -11,6 +12,7 @@ let dashboardLastUpdatedAt = "";
 let dashboardKnownIds = new Set();
 let dashboardPendingNewIds = new Set();
 let dashboardSelectedIds = new Set();
+let exportProgressFallbackTimer = null;
 const dashboardFilters = {
   search: "",
   status: "",
@@ -151,6 +153,46 @@ function formatStatusLabel(status) {
     cancelled: "Dossier annulé"
   };
   return labels[status] || "Brouillon";
+}
+
+function hasRestitutionData(draft) {
+  const restitution = draft.data?.restitution || {};
+  return Boolean(
+    draft.returnedAt
+    || draft.returnReason
+    || restitution.returnedAt
+    || restitution.notes
+    || restitution.reason
+    || restitution.signatureDataUrl
+    || restitution.signatureReason
+    || Object.keys(restitution.items || {}).length
+  );
+}
+
+function buildDraftActionButtons(draft, options) {
+  const actions = [];
+  actions.push(`<button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir</button>`);
+
+  if (options.canRestitution && ["active", "partial_return"].includes(draft.status || "draft")) {
+    actions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>`);
+  }
+
+  const documentActions = [];
+  if (options.canExport) {
+    documentActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">PDF dossier</button>`);
+  }
+  if (options.canExport && hasRestitutionData(draft)) {
+    documentActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportRestitutionPdf('${draft.id}')">PDF restitution</button>`);
+  }
+  if (documentActions.length) {
+    actions.push(`<div class="draft-actions__group draft-actions__group--documents">${documentActions.join("")}</div>`);
+  }
+
+  if (options.canDelete) {
+    actions.push(`<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer</button>`);
+  }
+
+  return actions.join("");
 }
 
 function normalizeText(value) {
@@ -474,10 +516,7 @@ async function renderDraftList() {
       <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir</button>
-          ${(draft.status || "draft") === "active" && canRestitution ? `<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>` : ""}
-          ${canExport ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">Exporter PDF</button>` : ""}
-          ${canDelete ? `<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer</button>` : ""}
+          ${buildDraftActionButtons(draft, { canExport, canDelete, canRestitution })}
         </div>
       </td>
     </tr>
@@ -522,6 +561,83 @@ async function exportDraftPdf(id) {
   triggerDownload(`${API_BASE}/${encodeURIComponent(id)}/pdf`);
 }
 
+async function exportRestitutionPdf(id) {
+  triggerDownload(`${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`);
+}
+
+function setExportLoaderProgress(value) {
+  const normalized = Math.max(0, Math.min(100, Math.round(value)));
+  const bar = document.getElementById("exportLoaderBar");
+  const percent = document.getElementById("exportLoaderPercent");
+  if (bar) {
+    bar.style.width = `${normalized}%`;
+  }
+  if (percent) {
+    percent.textContent = `${normalized} %`;
+  }
+}
+
+function showExportLoader(title, text) {
+  const overlay = document.getElementById("exportLoader");
+  document.getElementById("exportLoaderTitle").textContent = title;
+  document.getElementById("exportLoaderText").textContent = text;
+  setExportLoaderProgress(0);
+  overlay?.classList.remove("is-hidden");
+}
+
+function hideExportLoader() {
+  if (exportProgressFallbackTimer) {
+    window.clearInterval(exportProgressFallbackTimer);
+    exportProgressFallbackTimer = null;
+  }
+  document.getElementById("exportLoader")?.classList.add("is-hidden");
+}
+
+function startFallbackExportProgress() {
+  if (exportProgressFallbackTimer) {
+    window.clearInterval(exportProgressFallbackTimer);
+  }
+  let value = 8;
+  setExportLoaderProgress(value);
+  exportProgressFallbackTimer = window.setInterval(() => {
+    value = Math.min(value + 6, 90);
+    setExportLoaderProgress(value);
+  }, 350);
+}
+
+async function fetchDownloadWithProgress(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const contentLength = Number(response.headers.get("Content-Length") || 0);
+  if (!response.body || !contentLength) {
+    startFallbackExportProgress();
+    const blob = await response.blob();
+    setExportLoaderProgress(100);
+    return { response, blob };
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    received += value.length;
+    setExportLoaderProgress((received / contentLength) * 100);
+  }
+
+  const blob = new Blob(chunks, { type: response.headers.get("Content-Type") || "application/octet-stream" });
+  setExportLoaderProgress(100);
+  return { response, blob };
+}
+
 function getSelectedDraftIds() {
   return Array.from(document.querySelectorAll(".draft-select:checked")).map((input) => input.value);
 }
@@ -555,11 +671,17 @@ function restoreDashboardSelection() {
 function updateExportSelectedState() {
   const selectedCount = getSelectedDraftIds().length;
   const exportButton = document.getElementById("exportSelectedPdfBtn");
+  const restitutionExportButton = document.getElementById("exportSelectedRestitutionPdfBtn");
   const deleteButton = document.getElementById("deleteSelectedBtn");
 
   if (exportButton) {
     exportButton.disabled = selectedCount === 0;
-    exportButton.textContent = selectedCount > 1 ? `Exporter ${selectedCount} PDF` : "Exporter PDF sélection";
+    exportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} dossiers` : "PDF dossier sélectionné";
+  }
+
+  if (restitutionExportButton) {
+    restitutionExportButton.disabled = selectedCount === 0;
+    restitutionExportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} restitutions` : "PDF restitution sélectionnée";
   }
 
   if (deleteButton) {
@@ -583,25 +705,64 @@ async function exportSelectedPdfs() {
     return;
   }
 
-  const response = await fetch(PDF_BATCH_EXPORT_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    credentials: "same-origin",
-    body: JSON.stringify({ ids })
-  });
+  showExportLoader("Préparation des PDF dossier", "Les documents du lot sont en cours de génération et de compression.");
+  try {
+    const { response, blob } = await fetchDownloadWithProgress(PDF_BATCH_EXPORT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({ ids })
+    });
 
-  if (!response.ok) {
-    alert("Impossible de générer le ZIP des PDF.");
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+    const fileName = fileNameMatch ? fileNameMatch[1] : "dossiers_attribution_pdf.zip";
+    saveBlob(blob, fileName);
+  } catch (error) {
+    alert("Impossible de générer le ZIP des PDF dossier.");
+  } finally {
+    window.setTimeout(() => {
+      hideExportLoader();
+    }, 250);
+  }
+}
+
+async function exportSelectedRestitutionPdfs() {
+  const ids = getSelectedDraftIds();
+  if (ids.length === 0) {
+    alert("Sélectionnez au moins un dossier à exporter.");
     return;
   }
 
-  const blob = await response.blob();
-  const disposition = response.headers.get("Content-Disposition") || "";
-  const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
-  const fileName = fileNameMatch ? fileNameMatch[1] : "dossiers_attribution_pdf.zip";
-  saveBlob(blob, fileName);
+  if (ids.length === 1) {
+    await exportRestitutionPdf(ids[0]);
+    return;
+  }
+
+  showExportLoader("Préparation des PDF restitution", "Les bons de restitution sont en cours de génération et de compression.");
+  try {
+    const { response, blob } = await fetchDownloadWithProgress(RESTITUTION_PDF_BATCH_EXPORT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({ ids })
+    });
+
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+    const fileName = fileNameMatch ? fileNameMatch[1] : "restitutions_pdf.zip";
+    saveBlob(blob, fileName);
+  } catch (error) {
+    alert("Impossible de générer le ZIP des PDF restitution.");
+  } finally {
+    window.setTimeout(() => {
+      hideExportLoader();
+    }, 250);
+  }
 }
 
 async function deleteSelectedDrafts() {
@@ -629,6 +790,7 @@ async function deleteSelectedDrafts() {
 function bindSelectionActions(canExport, canDelete) {
   // Branche le "tout sélectionner" et les actions groupées.
   const exportButton = document.getElementById("exportSelectedPdfBtn");
+  const restitutionExportButton = document.getElementById("exportSelectedRestitutionPdfBtn");
   const deleteButton = document.getElementById("deleteSelectedBtn");
   const selectAll = document.getElementById("selectAllDrafts");
   const canSelect = canExport || canDelete;
@@ -641,6 +803,17 @@ function bindSelectionActions(canExport, canDelete) {
         void exportSelectedPdfs();
       });
       exportButton.dataset.boundExportSelection = "true";
+    }
+  }
+
+  if (restitutionExportButton) {
+    restitutionExportButton.classList.toggle("d-none", !canExport);
+    restitutionExportButton.disabled = true;
+    if (!restitutionExportButton.dataset.boundExportRestitutionSelection) {
+      restitutionExportButton.addEventListener("click", () => {
+        void exportSelectedRestitutionPdfs();
+      });
+      restitutionExportButton.dataset.boundExportRestitutionSelection = "true";
     }
   }
 

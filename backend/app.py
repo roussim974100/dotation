@@ -31,9 +31,10 @@ CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_D
 app = Flask(__name__, static_folder=None)
 app.secret_key = os.environ.get("APP_SECRET_KEY", "publier-parcours-2026-session-key")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") != "0"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
 
 
 @app.after_request
@@ -62,11 +63,14 @@ DEFAULT_RESOURCE_REFERENCES = [
     {"code": "ordinateur", "label": "Ordinateur", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "ecran", "label": "Écran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "telephone", "label": "Téléphone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
+    {"code": "tablette", "label": "Tablette", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "vpn", "label": "VPN", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
     {"code": "email", "label": "Email", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
     {"code": "badge", "label": "Badge d'accès", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "cles", "label": "Clé(s)", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
     {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
     {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "Bâtiment", "requires_return": 0, "trigger_key": ""},
     {"code": "vehicule", "label": "Véhicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
 ]
 
@@ -367,7 +371,9 @@ def login_required(view):
         if "user" not in session:
             if request.path.startswith("/api/"):
                 return jsonify({"error": "authentication_required"}), 401
-            return redirect("/login")
+            cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
+            had_session_cookie = bool(request.cookies.get(cookie_name))
+            return redirect("/login?error=session" if had_session_cookie else "/login")
         return view(*args, **kwargs)
 
     return wrapped_view
@@ -957,6 +963,17 @@ def get_signature_datetime(payload):
     )
 
 
+def get_restitution_signature_datetime(payload):
+    restitution = payload.get("restitution", {})
+    if not restitution.get("signatureDataUrl"):
+        return "-"
+    return format_export_datetime(
+        restitution.get("signedAt")
+        or restitution.get("returnedAt")
+        or payload.get("meta", {}).get("savedAt")
+    )
+
+
 def format_beneficiary_label(value):
     labels = {
         "agent": "Agent",
@@ -981,8 +998,10 @@ def collect_resource_entries(payload):
 
     entries = []
 
-    def add_entry(item_key, service, label, details):
+    def add_entry(item_key, service, label, details, include_if_empty=False):
         clean_details = [str(detail).strip() for detail in details if str(detail or "").strip()]
+        if not clean_details and not include_if_empty:
+            return
         entries.append(
             {
                 "itemKey": item_key,
@@ -1001,16 +1020,23 @@ def collect_resource_entries(payload):
     if materiel.get("telephone", {}).get("selected"):
         item = materiel["telephone"]
         add_entry("telephone", "DSI", "Téléphone", [item.get("marque"), item.get("modele"), item.get("imei")])
+    if materiel.get("tablette", {}).get("selected"):
+        item = materiel["tablette"]
+        add_entry("tablette", "DSI", "Tablette", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if immateriel.get("email", {}).get("selected"):
         add_entry("email", "DSI", "Messagerie", [immateriel["email"].get("adresse")])
     if immateriel.get("vpn", {}).get("selected"):
-        add_entry("vpn", "DSI", "VPN", [])
+        add_entry("vpn", "DSI", "VPN", [], include_if_empty=True)
     if materiel.get("badge", {}).get("selected"):
         add_entry("badge", "Bâtiment", "Badge d'accès", [materiel["badge"].get("numero")])
+    if materiel.get("cles", {}).get("selected"):
+        add_entry("cles", "Bâtiment", "Clé(s)", materiel["cles"].get("values") or [])
     if materiel.get("veste", {}).get("selected"):
-        add_entry("veste", "Bâtiment", "Veste", [])
+        add_entry("veste", "Bâtiment", "Veste", [], include_if_empty=True)
     if materiel.get("chaussuresSecurite", {}).get("selected"):
-        add_entry("chaussuresSecurite", "Bâtiment", "Chaussures de sécurité", [])
+        add_entry("chaussuresSecurite", "Bâtiment", "Chaussures de sécurité", [], include_if_empty=True)
+    if immateriel.get("zoneAlarme", {}).get("selected"):
+        add_entry("zoneAlarme", "Bâtiment", "Zone alarme", immateriel["zoneAlarme"].get("zones") or [])
     if materiel.get("vehicule", {}).get("selected"):
         item = materiel["vehicule"]
         add_entry("vehicule", "Autres services", "Véhicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
@@ -1147,10 +1173,11 @@ def build_pdf_bytes(title, payload):
     ]
     for item_key, state in sorted((restitution.get("items") or {}).items()):
         item_label = next((entry["label"] for entry in resources if entry["itemKey"] == item_key), item_key)
+        state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
+        note = state.get("notes") or "-"
         restitution_lines.append(
-            f"{item_label} : {state.get('state') or state.get('condition') or 'En attente'}"
-            f" / {format_export_datetime(state.get('returnedAt'))}"
-            f" / {state.get('notes') or '-'}"
+            f"{item_label} : {state_label}"
+            f" / {note}"
         )
     sections.append(("Restitution", restitution_lines))
     sections.append(
@@ -1359,6 +1386,262 @@ def build_pdf_bytes(title, payload):
     return buffer.getvalue()
 
 
+def build_restitution_pdf_bytes(title, payload):
+    page_width = 595
+    page_height = 842
+    margin = 42
+    content_width = page_width - (margin * 2)
+    top_content_start = 660
+    bottom_margin = 52
+
+    beneficiaire = payload.get("beneficiaire", {})
+    dossier = payload.get("dossier", {})
+    workflow = payload.get("workflow", {})
+    restitution = payload.get("restitution", {})
+    signature_datetime = get_restitution_signature_datetime(payload)
+    signature_status = restitution.get("signatureStatus") or ("signed" if restitution.get("signatureDataUrl") else "deferred")
+    resources = {entry["itemKey"]: entry for entry in collect_resource_entries(payload)}
+
+    sections = [
+        (
+            "Identification de la restitution",
+            [
+                f"État du dossier : {format_status_label(workflow.get('status') or 'draft')}",
+                f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+                f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
+                f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
+                f"Motif : {restitution.get('reason') or '-'}",
+            ],
+        ),
+        (
+            "Bénéficiaire",
+            [
+                f"Nom : {beneficiaire.get('nom') or '-'}",
+                f"Prénom : {beneficiaire.get('prenom') or '-'}",
+                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"Service : {beneficiaire.get('service') or '-'}",
+                f"Fonction : {beneficiaire.get('fonction') or '-'}",
+                f"Mandat : {beneficiaire.get('mandat') or '-'}",
+            ],
+        ),
+    ]
+
+    restitution_lines = []
+    for item_key, state in sorted((restitution.get("items") or {}).items()):
+        entry = resources.get(item_key, {"label": item_key, "details": "-"})
+        state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
+        note = state.get("notes") or "-"
+        restitution_lines.append(f"{entry['label']} ({entry['details']}) : {state_label} / {note}")
+    if not restitution_lines:
+        restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
+    sections.append(("État des matériels restitués", restitution_lines))
+    sections.append(
+        (
+            "Validation de la restitution",
+            [
+                f"Statut de signature : {format_restitution_signature_status(signature_status)}",
+                f"Date de signature : {signature_datetime}",
+                f"Motif si la signature n'a pas été recueillie : {restitution.get('signatureReason') or '-'}",
+                f"Observations générales : {restitution.get('notes') or '-'}",
+            ],
+        )
+    )
+
+    objects = []
+
+    def add_object(content):
+        objects.append(content)
+        return len(objects)
+
+    font_regular_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    font_bold_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+
+    logo_image = load_brand_logo_image()
+    logo_image_id = None
+    if logo_image:
+        logo_stream = logo_image["data"]
+        logo_image_id = add_object(
+            f"<< /Type /XObject /Subtype /Image /Width {logo_image['width']} /Height {logo_image['height']} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(logo_stream)} >>\n"
+            f"stream\n{logo_stream.decode('latin-1')}\nendstream"
+        )
+
+    signature_image = extract_signature_image(restitution.get("signatureDataUrl"))
+    signature_image_id = None
+    if signature_image:
+        signature_stream = signature_image["data"]
+        signature_image_id = add_object(
+            f"<< /Type /XObject /Subtype /Image /Width {signature_image['width']} /Height {signature_image['height']} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(signature_stream)} >>\n"
+            f"stream\n{signature_stream.decode('latin-1')}\nendstream"
+        )
+
+    pages = []
+    current_page = []
+    current_y = top_content_start
+
+    def color_fill(r, g, b):
+        return f"{r:.3f} {g:.3f} {b:.3f} rg"
+
+    def color_stroke(r, g, b):
+        return f"{r:.3f} {g:.3f} {b:.3f} RG"
+
+    def draw_text(commands, x_pos, y_pos, text, font="F1", size=11, color=(0.12, 0.16, 0.2)):
+        commands.append(
+            f"q {color_fill(*color)} BT /{font} {size} Tf 1 0 0 1 {x_pos} {y_pos} Tm ({pdf_escape(text)}) Tj ET Q"
+        )
+
+    def draw_rect(commands, x_pos, y_pos, width, height, fill=None, stroke=None, line_width=1):
+        rect_commands = ["q"]
+        if fill:
+            rect_commands.append(color_fill(*fill))
+        if stroke:
+            rect_commands.append(color_stroke(*stroke))
+            rect_commands.append(f"{line_width} w")
+        operator = "B" if fill and stroke else "f" if fill else "S"
+        rect_commands.append(f"{x_pos} {y_pos} {width} {height} re {operator}")
+        rect_commands.append("Q")
+        commands.append(" ".join(rect_commands))
+
+    def ensure_space(required_height):
+        nonlocal current_page, current_y
+        if current_y - required_height >= bottom_margin:
+            return
+        pages.append(current_page)
+        current_page = []
+        current_y = top_content_start
+
+    def wrap_line(text, width=86):
+        normalized = normalize_pdf_text(text)
+        return textwrap.wrap(normalized, width=width) or [""]
+
+    def add_section(title_text, raw_lines):
+        nonlocal current_page, current_y
+        wrapped_lines = []
+        for raw_line in raw_lines:
+            wrapped_lines.extend(wrap_line(raw_line))
+        section_height = 28 + (len(wrapped_lines) * 15) + 18
+        ensure_space(section_height)
+
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.98, 0.985, 0.99), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, normalize_pdf_text(title_text), font="F2", size=12, color=(0.05, 0.26, 0.40))
+
+        line_y = current_y - 40
+        for line in wrapped_lines:
+            draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
+            line_y -= 15
+
+        current_y = box_bottom - 16
+
+    for section_title, section_lines in sections:
+        add_section(section_title, section_lines)
+
+    if signature_image and signature_image_id:
+        max_width = 220
+        max_height = 90
+        ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
+        draw_width = round(signature_image["width"] * ratio, 2)
+        draw_height = round(signature_image["height"] * ratio, 2)
+        section_height = 90 + draw_height
+        ensure_space(section_height)
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la restitution.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        current_page.append(
+            f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
+        )
+        current_y = box_bottom - 16
+
+    if not current_page:
+        current_page = []
+    pages.append(current_page)
+
+    page_object_ids = []
+    total_pages = len(pages)
+    generated_at = format_export_datetime(datetime.now().isoformat())
+
+    for page_index, page_commands in enumerate(pages, start=1):
+        commands = []
+        draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
+        draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
+        if logo_image_id:
+            logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
+            logo_width = round(logo_image["width"] * logo_ratio, 2)
+            logo_height = round(logo_image["height"] * logo_ratio, 2)
+            commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
+        draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
+        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
+        draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
+
+        draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
+        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources récupérées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+
+        commands.extend(page_commands)
+
+        draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
+        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+
+        stream = "\n".join(commands).encode("latin-1", "replace")
+        content_object_id = add_object(
+            f"<< /Length {len(stream)} >>\nstream\n{stream.decode('latin-1')}\nendstream"
+        )
+
+        resource_parts = [
+            f"/Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R >>"
+        ]
+        xobjects = []
+        if logo_image_id:
+            xobjects.append(f"/LOGO {logo_image_id} 0 R")
+        if signature_image_id:
+            xobjects.append(f"/SIG1 {signature_image_id} 0 R")
+        if xobjects:
+            resource_parts.append(f"/XObject << {' '.join(xobjects)} >>")
+
+        page_object_id = add_object(
+            f"<< /Type /Page /Parent PAGES_REF /MediaBox [0 0 {page_width} {page_height}] "
+            f"/Resources << {' '.join(resource_parts)} >> /Contents {content_object_id} 0 R >>"
+        )
+        page_object_ids.append(page_object_id)
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_object_ids)
+    pages_object_id = add_object(f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_ids)} >>")
+
+    for page_id in page_object_ids:
+        objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
+
+    info_object_id = add_object(
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+    )
+    catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
+
+    buffer = io.BytesIO()
+    buffer.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, content in enumerate(objects, start=1):
+        offsets.append(buffer.tell())
+        buffer.write(f"{index} 0 obj\n".encode("latin-1"))
+        buffer.write(content.encode("latin-1", "replace"))
+        buffer.write(b"\nendobj\n")
+
+    xref_position = buffer.tell()
+    buffer.write(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
+    buffer.write(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        buffer.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
+
+    trailer = (
+        f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_object_id} 0 R /Info {info_object_id} 0 R >>\n"
+        f"startxref\n{xref_position}\n%%EOF"
+    )
+    buffer.write(trailer.encode("latin-1"))
+    return buffer.getvalue()
+
+
 def format_status_label(status):
     labels = {
         "draft": "Brouillon",
@@ -1369,6 +1652,31 @@ def format_status_label(status):
         "cancelled": "Dossier annulé",
     }
     return labels.get(status, "Brouillon")
+
+
+def format_restitution_state_label(state):
+    labels = {
+        "pending": "En attente",
+        "returned": "Restitué",
+        "returned_damaged": "Restitué abîmé",
+        "missing": "Non restitué",
+        "transferred": "Transféré",
+        "conforme": "Conforme",
+        "degrade": "Dégradé",
+        "non_restitue": "Non restitué",
+        "perdu": "Perdu",
+        "autre": "Autre",
+    }
+    return labels.get(state or "", state or "En attente")
+
+
+def format_restitution_signature_status(value):
+    labels = {
+        "signed": "Signature recueillie",
+        "impossible": "Signature impossible",
+        "deferred": "Signature différée",
+    }
+    return labels.get(value or "", value or "-")
 
 
 def extract_items(payload):
@@ -1382,13 +1690,16 @@ def extract_items(payload):
         ("ordinateur", "materiel", "Ordinateur", materiel.get("ordinateur", {})),
         ("ecran", "materiel", "Écran", materiel.get("ecran", {})),
         ("telephone", "materiel", "Téléphone", materiel.get("telephone", {})),
+        ("tablette", "materiel", "Tablette", materiel.get("tablette", {})),
         ("vehicule", "materiel", "Véhicule", materiel.get("vehicule", {})),
         ("badge", "materiel", "Badge d'accès", materiel.get("badge", {})),
+        ("cles", "materiel", "Clé(s)", materiel.get("cles", {})),
         ("veste", "materiel", "Veste", materiel.get("veste", {})),
         ("chaussuresSecurite", "materiel", "Chaussures de sécurité", materiel.get("chaussuresSecurite", {})),
         ("autre", "materiel", "Autre matériel", materiel.get("autre", {})),
         ("vpn", "immateriel", "VPN", immateriel.get("vpn", {})),
         ("email", "immateriel", "Email", immateriel.get("email", {})),
+        ("zoneAlarme", "immateriel", "Zone alarme", immateriel.get("zoneAlarme", {})),
     ]
 
     for resource in payload.get("resources", {}).get("additional", []):
@@ -1412,7 +1723,7 @@ def extract_items(payload):
                 "category": category,
                 "label": label,
                 "assigned": True,
-                "returned": return_state in {"returned", "returned_damaged", "transferred"},
+                "returned": return_state in {"returned", "returned_damaged", "transferred", "conforme", "degrade"},
                 "returned_at": state.get("returnedAt"),
                 "return_condition": return_state,
                 "notes": state.get("notes"),
@@ -1454,6 +1765,11 @@ def collect_resource_validation_errors(payload):
             ("Modèle téléphone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
             ("IMEI", "imei", r"^\d{15}$"),
         ]),
+        ("tablette", materiel.get("tablette", {}), [
+            ("Marque tablette", "marque", r".+"),
+            ("Modèle tablette", "modele", r".+"),
+            ("Numéro de série tablette", "numeroSerie", r".+"),
+        ]),
         ("vehicule", materiel.get("vehicule", {}), [
             ("Marque véhicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
             ("Modèle véhicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
@@ -1478,6 +1794,12 @@ def collect_resource_validation_errors(payload):
             if not value:
                 errors.append(f"{label} manquant")
                 continue
+
+    if materiel.get("cles", {}).get("selected") and not [value for value in materiel.get("cles", {}).get("values", []) if str(value).strip()]:
+        errors.append("Au moins une clé doit être renseignée")
+
+    if immateriel.get("zoneAlarme", {}).get("selected") and not [value for value in immateriel.get("zoneAlarme", {}).get("zones", []) if str(value).strip()]:
+        errors.append("Au moins une zone alarme doit être renseignée")
 
     for resource in resources:
         if not resource.get("selected"):
@@ -1942,6 +2264,32 @@ def export_form_pdf(form_id):
     return download_response(pdf_bytes, filename, "application/pdf")
 
 
+@app.route("/api/forms/<form_id>/restitution-pdf", methods=["GET"])
+@login_required
+def export_restitution_pdf(form_id):
+    if not has_permission("forms.export"):
+        return jsonify({"error": "forbidden"}), 403
+    form_data = get_form(form_id)
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+
+    restitution = form_data["data"].get("restitution", {})
+    if not (
+        restitution.get("returnedAt")
+        or restitution.get("notes")
+        or restitution.get("reason")
+        or restitution.get("signatureDataUrl")
+        or restitution.get("signatureReason")
+        or restitution.get("items")
+    ):
+        return jsonify({"error": "restitution_not_ready"}), 400
+
+    title = f"Restitution - {form_data['summary']['title']}"
+    pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
+    filename = f"{slugify_filename(title, 'restitution')}.pdf"
+    return download_response(pdf_bytes, filename, "application/pdf")
+
+
 @app.route("/api/forms/export-pdf-batch", methods=["POST"])
 @login_required
 def export_forms_pdf_batch():
@@ -1970,6 +2318,46 @@ def export_forms_pdf_batch():
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return download_response(archive.getvalue(), f"dossiers_attribution_pdf_{timestamp}.zip", "application/zip")
+
+
+@app.route("/api/forms/export-restitution-pdf-batch", methods=["POST"])
+@login_required
+def export_restitution_forms_pdf_batch():
+    if not has_permission("forms.export"):
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    ids = payload.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"error": "invalid_ids"}), 400
+
+    archive = io.BytesIO()
+    exported_count = 0
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for form_id in ids:
+            form_data = get_form(str(form_id))
+            if not form_data:
+                continue
+            restitution = form_data["data"].get("restitution", {})
+            if not (
+                restitution.get("returnedAt")
+                or restitution.get("notes")
+                or restitution.get("reason")
+                or restitution.get("signatureDataUrl")
+                or restitution.get("signatureReason")
+                or restitution.get("items")
+            ):
+                continue
+            title = f"Restitution - {form_data['summary']['title']}"
+            pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
+            zip_file.writestr(f"{slugify_filename(title, 'restitution')}.pdf", pdf_bytes)
+            exported_count += 1
+
+    if exported_count == 0:
+        return jsonify({"error": "not_found"}), 404
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return download_response(archive.getvalue(), f"restitutions_pdf_{timestamp}.zip", "application/zip")
 
 
 def csv_escape(value):
@@ -2079,7 +2467,7 @@ def build_excel_workbook(rows, item_rows):
                     spreadsheet_cell(row["label"]),
                     spreadsheet_cell(row["category"]),
                     spreadsheet_cell(detail_text or "-"),
-                    spreadsheet_cell(row["return_condition"] or "En attente"),
+                    spreadsheet_cell(format_restitution_state_label(row["return_condition"])),
                     spreadsheet_cell(format_export_datetime(row["returned_at"])),
                     spreadsheet_cell(row["notes"] or "-"),
                 ]
@@ -2170,6 +2558,60 @@ def update_form(form_id):
     return jsonify(form_data)
 
 
+@app.route("/api/forms/<form_id>/reopen", methods=["POST"])
+@login_required
+def reopen_form(form_id):
+    if not has_permission("forms.edit"):
+        return jsonify({"error": "forbidden"}), 403
+
+    with get_db() as connection:
+        row = connection.execute(
+            "SELECT id, dossier_id, status, title, payload_json FROM dotation_forms WHERE id = ?",
+            (form_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+
+        if row["status"] not in {"draft", "partial_assignment"}:
+            return jsonify({"error": "not_reopenable"}), 400
+
+        payload = json.loads(row["payload_json"] or "{}")
+        payload.setdefault("meta", {})
+        payload["meta"]["reopenCount"] = int(payload["meta"].get("reopenCount") or 0) + 1
+        payload["meta"]["lastReopenedAt"] = datetime.now(timezone.utc).isoformat()
+        payload["meta"]["lastReopenedBy"] = session.get("user") or "system"
+
+        connection.execute(
+            "UPDATE dotation_forms SET payload_json = ? WHERE id = ?",
+            (json.dumps(payload, ensure_ascii=False), form_id),
+        )
+        insert_audit_event(
+            connection,
+            row["dossier_id"],
+            "form_reopened",
+            "Dossier rouvert",
+            {
+                "form_id": form_id,
+                "title": row["title"],
+                "reopen_count": payload["meta"]["reopenCount"],
+            },
+        )
+        insert_app_log(
+            connection,
+            "dossier",
+            "form_reopened",
+            "Dossier rouvert",
+            "form",
+            form_id,
+            {
+                "title": row["title"],
+                "reopen_count": payload["meta"]["reopenCount"],
+            },
+        )
+
+    return jsonify({"meta": payload["meta"]})
+
+
 @app.route("/api/forms/<form_id>/restitution", methods=["PATCH"])
 @login_required
 def update_restitution(form_id):
@@ -2189,6 +2631,10 @@ def update_restitution(form_id):
     payload["restitution"]["reason"] = patch.get("reason", payload["restitution"].get("reason"))
     payload["restitution"]["notes"] = patch.get("notes", payload["restitution"].get("notes"))
     payload["restitution"]["items"] = patch.get("items", payload["restitution"].get("items", {}))
+    payload["restitution"]["signatureStatus"] = patch.get("signatureStatus", payload["restitution"].get("signatureStatus"))
+    payload["restitution"]["signatureReason"] = patch.get("signatureReason", payload["restitution"].get("signatureReason"))
+    payload["restitution"]["signatureDataUrl"] = patch.get("signatureDataUrl", payload["restitution"].get("signatureDataUrl"))
+    payload["restitution"]["signedAt"] = patch.get("signedAt", payload["restitution"].get("signedAt"))
 
     form_data = persist_form(payload, allow_locked_update=True)
     with get_db() as connection:
