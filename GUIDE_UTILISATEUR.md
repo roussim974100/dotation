@@ -30,7 +30,7 @@ Depuis l'accueil, il est possible de :
 - exporter un PDF
 - exporter plusieurs PDF
 - supprimer plusieurs dossiers si le droit est présent
-- exporter les données en CSV
+- exporter les données en Excel
 
 ## Créer un dossier
 
@@ -109,7 +109,7 @@ Elle permet de restaurer :
 
 - enregistrer le dossier dès que les informations essentielles sont saisies
 - vérifier la date de remise réelle avant validation
-- utiliser l'export CSV pour la sauvegarde régulière
+- utiliser l'export Excel pour la sauvegarde régulière
 - vérifier le journal après une opération sensible ou un incident
 - vérifier la corbeille avant de recréer manuellement un élément supprimé
 - changer le mot de passe administrateur initial avant déploiement réel

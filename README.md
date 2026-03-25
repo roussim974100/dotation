@@ -11,7 +11,7 @@ Application interne de gestion des dossiers d'attribution et des restitutions po
 - administrer les comptes, les groupes et les ressources attribuables
 - consulter un journal des actions pour la traçabilité
 - restaurer des suppressions via une corbeille réservée aux admins
-- exporter les dossiers en PDF et les données en CSV
+- exporter les dossiers en PDF et les données en Excel
 
 ## Types de dossier
 
@@ -129,10 +129,10 @@ Le journal et la corbeille sont regroupés dans le menu d'administration.
 - export multiple par sélection
 - export multiple téléchargé sous forme de ZIP
 
-### CSV
+### Excel
 
 - export global depuis l'accueil
-- fichier compatible Excel
+- classeur Excel lisible avec une feuille `Dossiers` et une feuille `Ressources`
 
 ## Données et stockage
 

@@ -24,7 +24,7 @@ python backend\app.py
 - la restitution fonctionne depuis un dossier actif
 - l'export PDF unitaire fonctionne
 - l'export PDF multiple fonctionne
-- l'export CSV fonctionne
+- l'export Excel fonctionne
 - l'administration des utilisateurs est accessible
 - l'administration des ressources est accessible
 - la page `Journal` est accessible
@@ -141,7 +141,7 @@ Résultat attendu :
 - test sur smartphone
 - test d'impression PDF
 - test de réouverture après redémarrage du serveur
-- sauvegarde CSV puis contrôle dans Excel
+- sauvegarde Excel puis contrôle du classeur
 
 ## Validation de remise
 
