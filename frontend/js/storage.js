@@ -266,35 +266,44 @@ function buildDotationPreview(data) {
     items.push(detail ? `${label} : ${detail}` : label);
   };
 
-  if (materiel.ordinateur.selected) {
+  if (materiel.ordinateur?.selected) {
     pushItem("Ordinateur", [materiel.ordinateur.marque, materiel.ordinateur.modele].filter(Boolean).join(" - "));
   }
-  if (materiel.ecran.selected) {
+  if (materiel.ecran?.selected) {
     pushItem("Écran", [materiel.ecran.marque, materiel.ecran.modele].filter(Boolean).join(" - "));
   }
-  if (materiel.telephone.selected) {
+  if (materiel.telephone?.selected) {
     pushItem("Téléphone", [materiel.telephone.marque, materiel.telephone.modele].filter(Boolean).join(" - "));
   }
-  if (materiel.badge.selected) {
-    pushItem("Badge", materiel.badge.numero || "");
+  if (materiel.tablette?.selected) {
+    pushItem("Tablette", [materiel.tablette.marque, materiel.tablette.modele, materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
   }
-  if (materiel.veste.selected) {
-    pushItem("Veste", "");
+  if (immateriel.email?.selected) {
+    pushItem("Email", immateriel.email.adresse || "");
   }
-  if (materiel.chaussuresSecurite.selected) {
-    pushItem("Chaussures de sécurité", "");
-  }
-  if (materiel.vehicule.selected) {
-    pushItem("Véhicule", [materiel.vehicule.marque, materiel.vehicule.modele].filter(Boolean).join(" - "));
-  }
-  if (materiel.autre.selected) {
-    pushItem("Autre matériel", materiel.autre.description || "");
-  }
-  if (immateriel.vpn.selected) {
+  if (immateriel.vpn?.selected) {
     pushItem("VPN", "");
   }
-  if (immateriel.email.selected) {
-    pushItem("Email", immateriel.email.adresse || "");
+  if (materiel.badge?.selected) {
+    pushItem("Badge", materiel.badge.numero || "");
+  }
+  if (materiel.cles?.selected) {
+    pushItem("Clé(s)", (materiel.cles.values || []).filter(Boolean).join(" - "));
+  }
+  if (materiel.veste?.selected) {
+    pushItem("Veste", "");
+  }
+  if (materiel.chaussuresSecurite?.selected) {
+    pushItem("Chaussures de sécurité", "");
+  }
+  if (immateriel.zoneAlarme?.selected) {
+    pushItem("Zone alarme", (immateriel.zoneAlarme.zones || []).filter(Boolean).join(" - "));
+  }
+  if (materiel.vehicule?.selected) {
+    pushItem("Véhicule", [materiel.vehicule.marque, materiel.vehicule.modele].filter(Boolean).join(" - "));
+  }
+  if (materiel.autre?.selected) {
+    pushItem("Autre matériel", materiel.autre.description || "");
   }
   for (const resource of data.resources?.additional || []) {
     if (resource.selected) {
