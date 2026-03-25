@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<title>Restitution des ressources</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<!-- Header dédié au parcours de restitution -->
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand">
+      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+      <div>
+        <p class="app-kicker">Collectivité</p>
+        <h1 class="app-title">Restitution des ressources</h1>
+        <p class="app-subtitle">Suivi de la restitution des équipements et accès associés à une attribution active.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="index.html">Retour à l'accueil</a>
+      <a class="btn btn-outline-light" href="/logout">Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <!-- Chargement bloquant tant que la fiche active n'est pas complètement prête -->
+  <div id="restitutionLoader" class="page-loader">
+    <div class="page-loader__panel">
+      <div class="page-loader__spinner"></div>
+      <strong>Chargement de la restitution</strong>
+      <p>Les équipements de la fiche sont en cours de préparation.</p>
+    </div>
+  </div>
+
+  <section class="hero-panel mb-4">
+    <div>
+      <p class="panel-eyebrow">Restitution</p>
+      <h2 class="panel-title" id="restitutionTitle">Fiche en cours</h2>
+      <p class="panel-text" id="restitutionSubtitle">Mettez à jour l'état de restitution de chaque ressource attribuée.</p>
+    </div>
+    <div class="hero-panel__meta">
+      <div class="status-pill" id="restitutionStatus">Attribution active</div>
+    </div>
+  </section>
+
+  <!-- Formulaire de restitution global + détail par équipement -->
+  <section class="content-card">
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label" for="global_returned_at">Date de restitution</label>
+        <input class="form-control" type="date" id="global_returned_at">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="global_return_reason">Motif</label>
+        <select class="form-select" id="global_return_reason">
+          <option value="">Sélectionner</option>
+          <option value="fin_de_fonction">Fin de fonction</option>
+          <option value="demission">Démission</option>
+          <option value="mutation">Mutation</option>
+          <option value="fin_de_mandat">Fin de mandat</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="global_return_status">État global</label>
+        <select class="form-select" id="global_return_status">
+          <option value="returned">Restitution terminée</option>
+          <option value="partial_return">Restitution partielle</option>
+          <option value="cancelled">Dossier annulé</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="global_return_notes">Observations generales</label>
+        <textarea class="form-control" id="global_return_notes" rows="3" placeholder="Précisez le contexte général de la restitution."></textarea>
+      </div>
+    </div>
+
+    <div>
+      <label class="form-label">État de restitution par élément</label>
+      <div id="restitutionDetailList" class="restitution-list"></div>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <div class="action-bar__hint">Les états de restitution sont historisés sur le dossier d'attribution.</div>
+    <div class="action-bar__buttons">
+      <a class="btn btn-outline-secondary" href="index.html">Annuler</a>
+      <button class="btn btn-primary" id="saveRestitutionBtn" type="button">Enregistrer la restitution</button>
+    </div>
+  </div>
+</main>
+
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/restitution.js"></script>
+</body>
+</html>
