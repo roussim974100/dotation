@@ -2,15 +2,15 @@
 
 ## Objet
 
-L'application permet de gérer :
+L'application permet de gerer :
 
-- les dossiers d'attribution des agent(e)s et élu(e)s
+- les dossiers d'attribution des agent(e)s et elu(e)s
 - la signature de remise
 - la validation RGPD
-- la restitution des ressources
+- la restitution des ressources materielles
 - l'administration des comptes et des ressources
-- le journal des actions pour la traçabilité
-- la restauration d'éléments supprimés via la corbeille admin
+- le journal des actions pour la tracabilite
+- la restauration d'elements supprimes via la corbeille admin
 
 ## Connexion
 
@@ -18,98 +18,106 @@ L'application permet de gérer :
 2. Saisir l'identifiant et le mot de passe
 3. Cliquer sur `Se connecter`
 
+Si les identifiants sont incorrects, un message d'erreur s'affiche sur la page de connexion.
+
 ## Tableau de bord
 
 Depuis l'accueil, il est possible de :
 
-- créer un nouveau dossier
+- creer un nouveau dossier
 - rechercher un dossier existant
-- filtrer par état, qualité ou service
+- filtrer par etat, qualite ou service
 - ouvrir un dossier
-- lancer une restitution sur une attribution active
-- exporter un PDF
-- exporter plusieurs PDF
-- supprimer plusieurs dossiers si le droit est présent
-- exporter les données en Excel
+- lancer une restitution sur une attribution active ou partielle
+- exporter un `PDF dossier`
+- exporter un `PDF restitution`
+- exporter plusieurs `PDF dossier`
+- exporter plusieurs `PDF restitution`
+- supprimer plusieurs dossiers si le droit est present
+- exporter les donnees en Excel
 
-## Créer un dossier
+Le tableau de bord se met a jour automatiquement. Les nouveaux dossiers peuvent etre signales visuellement jusqu'a acquittement.
+
+## Creer un dossier
 
 1. Cliquer sur `Nouveau dossier`
-2. Choisir le type de dossier
-3. Renseigner l'identité de la personne
-4. Choisir la qualité `Agent` ou `Élu(e)`
-5. Renseigner le service ou le mandat
-6. Saisir les ressources attribuées
-7. Faire signer la fiche
-8. Cocher la validation RGPD
-9. Cliquer sur `Enregistrer`
+2. Renseigner l'identite de la personne
+3. Choisir la qualite `Agent` ou `Elu(e)`
+4. Choisir le type de dossier
+5. Renseigner les ressources attribuees
+6. Saisir la signature de remise si necessaire
+7. Cocher la validation RGPD
+8. Cliquer sur `Enregistrer`
 
-## Statuts
+Un dossier incomplet reste modifiable.
 
-- `Brouillon` : dossier non finalisé, encore modifiable
-- `Attribution partielle` : dossier incomplet, encore modifiable
-- `Attribution active` : dossier complet signé, verrouillé
-- `Restitution terminée` : restitution terminée
-- `Restitution partielle` : restitution partielle
-- `Dossier annulé` : dossier sans suite
+## Reouverture d'un dossier
+
+Quand un dossier encore modifiable est rouvert :
+
+- la reouverture est tracee
+- la date de derniere reouverture est conservee
+- l'utilisateur ayant rouvert le dossier est memorise
 
 ## Restitution
 
-Depuis l'accueil :
+La restitution se fait depuis le bouton `Restitution`.
 
-1. Repérer un dossier en `Attribution active`
-2. Cliquer sur `Restitution`
-3. Renseigner la date, le motif et les observations
-4. Indiquer l'état de chaque ressource
-5. Enregistrer
+Pour chaque materiel :
 
-Les informations de restitution restent ensuite consultables dans le dossier.
+- choisir un etat rapide
+- `Conforme`
+- `Endommage`
+- `Non restitue`
+- `Perdu`
+- `Autre`
+
+Si l'etat n'est pas `Conforme`, un commentaire peut etre saisi.
+
+La restitution comprend aussi :
+
+- une date de restitution
+- une signature de restitution
+- ou un motif si la signature est impossible ou differee
+
+Un `PDF restitution` peut etre exporte separement.
 
 ## Administration
 
-Les profils autorisés peuvent :
+Les administrateurs peuvent :
 
-- créer un utilisateur
-- modifier un utilisateur
-- changer son mot de passe
-- activer ou désactiver un compte
-- supprimer un compte
-- affecter un utilisateur à un ou plusieurs groupes
-- créer une ressource attribuable
-- modifier une ressource
-- désactiver ou supprimer une ressource
-- restaurer un élément supprimé depuis la corbeille
+- gerer les comptes
+- modifier les mots de passe
+- gerer les ressources attribuables
+- consulter le journal
+- acceder a la corbeille
 
-Le `Journal` et la `Corbeille` sont accessibles depuis le menu d'administration.
+## Groupe lecture
+
+Le groupe `lecture` peut :
+
+- consulter les dossiers
+
+Le groupe `lecture` ne peut pas :
+
+- modifier un dossier
+- enregistrer une fiche
+- saisir une restitution
 
 ## Journal
 
-La page `logs.html` permet de consulter le journal applicatif.
+La page `Journal` permet de :
 
-Elle sert à :
-
-- retrouver qui a fait une action
-- vérifier les opérations sur les dossiers
-- suivre les actions d'administration
-- faciliter le debug ou l'analyse d'un incident
-
-Une recherche texte est disponible sur cette page.
+- rechercher dans les actions
+- consulter les traces systeme et utilisateur
+- faciliter le debug ou le forensic
 
 ## Corbeille
 
-La page `trash.html` est réservée au groupe `admin`.
+La corbeille est reservee aux administrateurs.
 
 Elle permet de restaurer :
 
-- un dossier supprimé
-- un utilisateur supprimé
-- une ressource supprimée
-
-## Bonnes pratiques
-
-- enregistrer le dossier dès que les informations essentielles sont saisies
-- vérifier la date de remise réelle avant validation
-- utiliser l'export Excel pour la sauvegarde régulière
-- vérifier le journal après une opération sensible ou un incident
-- vérifier la corbeille avant de recréer manuellement un élément supprimé
-- changer le mot de passe administrateur initial avant déploiement réel
+- un dossier supprime
+- un utilisateur supprime
+- une ressource supprimee

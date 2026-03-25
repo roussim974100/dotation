@@ -1,6 +1,6 @@
 # Recette Fonctionnelle
 
-## Préparation
+## Preparation
 
 1. Lancer l'application :
 
@@ -14,139 +14,131 @@ python backend\app.py
 ## Checklist rapide
 
 - la page de connexion s'affiche correctement
-- l'authentification fonctionne
+- un message d'erreur apparait si les identifiants sont incorrects
 - le tableau de bord se charge
-- un nouveau dossier peut être créé
-- un dossier brouillon peut être enregistré et rouvert
-- un dossier signé complet passe en `Attribution active`
-- un dossier `Attribution active` n'est plus modifiable
+- un nouveau dossier peut etre cree
+- un dossier brouillon peut etre enregistre et rouvert
+- la reouverture du dossier est tracee dans la fiche
+- un dossier signe complet passe en `Attribution active`
 - un dossier `Attribution partielle` reste modifiable
 - la restitution fonctionne depuis un dossier actif
-- l'export PDF unitaire fonctionne
-- l'export PDF multiple fonctionne
+- le `PDF dossier` unitaire fonctionne
+- le `PDF restitution` unitaire fonctionne
+- l'export multiple des `PDF dossier` fonctionne
+- l'export multiple des `PDF restitution` fonctionne
+- la fenetre de chargement d'export s'affiche pendant les lots
 - l'export Excel fonctionne
 - l'administration des utilisateurs est accessible
 - l'administration des ressources est accessible
 - la page `Journal` est accessible
 - la page `Corbeille` est accessible pour un admin
-- la déconnexion fonctionne
+- la deconnexion fonctionne
 
-## Scénarios de test
+## Scenarios de test
 
-### 1. Création d'un brouillon
+### 1. Creation d'un brouillon
 
-1. Créer un dossier sans signature
-2. Ne pas cocher le RGPD
-3. Enregistrer
+1. Cliquer sur `Nouveau dossier`
+2. Renseigner seulement le minimum
+3. Cliquer sur `Enregistrer`
 
-Résultat attendu :
+Attendu :
 
-- le dossier est en `Brouillon`
-- il apparaît dans les dossiers modifiables
-- il peut être rouvert
-
-### 2. Attribution partielle
-
-1. Ouvrir un dossier
-2. Saisir une signature
-3. Cocher le RGPD
-4. Choisir `attribution partielle`
-
-Résultat attendu :
-
-- le dossier passe en `Attribution partielle`
+- le dossier est cree
 - il reste modifiable
+- il apparait dans le tableau de bord
 
-### 3. Attribution active verrouillée
+### 2. Attribution complete
 
-1. Ouvrir un dossier
-2. Saisir une signature
-3. Cocher le RGPD
-4. Choisir `attribution complète`
+1. Ouvrir un nouveau dossier
+2. Renseigner les ressources
+3. Saisir la signature
+4. Cocher le RGPD
+5. Enregistrer
 
-Résultat attendu :
+Attendu :
 
 - le dossier passe en `Attribution active`
-- le dossier devient verrouillé
-- le bouton `Restitution` apparaît depuis l'accueil
+- il n'est plus editable en mode standard
+- le `PDF dossier` est disponible
+
+### 3. Reouverture tracee
+
+1. Ouvrir un dossier encore modifiable
+2. Revenir au tableau de bord
+3. Rouvrir le meme dossier
+
+Attendu :
+
+- le bloc de reouverture apparait
+- le compteur augmente
+- la date et l'utilisateur sont affiches
 
 ### 4. Restitution
 
-1. Depuis l'accueil, ouvrir la restitution d'un dossier actif
-2. Saisir une date
-3. Définir l'état de plusieurs éléments
-4. Enregistrer
+1. Ouvrir un dossier actif
+2. Cliquer sur `Restitution`
+3. Choisir l'etat de chaque materiel
+4. Ajouter un commentaire si necessaire
+5. Saisir une signature ou un motif d'absence
+6. Enregistrer
 
-Résultat attendu :
+Attendu :
 
-- le dossier reflète la restitution
-- les informations sont conservées à la réouverture
+- la restitution est enregistree
+- le `PDF restitution` est disponible
+- le resume apparait dans le dossier
 
-### 5. Administration des utilisateurs
+### 5. Export multiple PDF dossier
 
-1. Ouvrir `Administration`
-2. Créer un utilisateur
-3. Modifier ses groupes
-4. Changer son mot de passe
-5. Désactiver puis réactiver le compte
+1. Cocher plusieurs dossiers
+2. Cliquer sur `PDF dossiers selectionnes`
 
-Résultat attendu :
+Attendu :
 
-- les droits correspondent au groupe choisi
-- le mot de passe est bien pris en compte
-- l'état du compte change correctement
+- une fenetre de chargement apparait
+- un ZIP est propose au telechargement
 
-### 6. Administration des ressources
+### 6. Export multiple PDF restitution
 
-1. Ouvrir `Administration`
-2. Ajouter une ressource attribuable
-3. Modifier cette ressource
-4. Ouvrir un dossier
-5. Vérifier que la ressource est disponible dans le formulaire
+1. Cocher plusieurs dossiers avec restitution
+2. Cliquer sur `PDF restitutions selectionnees`
 
-Résultat attendu :
+Attendu :
 
-- la ressource est visible dans le référentiel
-- la modification est prise en compte
-- elle peut être attribuée dans un dossier
+- une fenetre de chargement apparait
+- un ZIP est propose au telechargement
 
-### 7. Journal applicatif
+### 7. Journal
 
-1. Ouvrir `Journal`
-2. Rechercher un identifiant utilisateur ou une ressource
-3. Vérifier la présence des actions récentes
+1. Ouvrir la page `Journal`
+2. Rechercher un mot-cle
 
-Résultat attendu :
+Attendu :
 
-- les entrées sont visibles
-- la recherche filtre correctement
-- les actions d'administration et de dossier remontent bien
+- les actions correspondantes sont affichees
 
-### 8. Corbeille administrateur
+### 8. Corbeille
 
-1. Supprimer un dossier, une ressource ou un utilisateur de test
-2. Ouvrir `Corbeille`
-3. Restaurer l'élément
+1. Supprimer un element de test
+2. Ouvrir la `Corbeille`
+3. Restaurer l'element
 
-Résultat attendu :
+Attendu :
 
-- l'élément supprimé apparaît dans la corbeille
-- la restauration fonctionne
-- l'élément redevient disponible dans l'application
+- l'element reapparait dans l'application
 
-## Vérifications complémentaires recommandées
+### 9. Smartphone
 
-- test sur écran bureau
-- test sur tablette
-- test sur smartphone
-- test d'impression PDF
-- test de réouverture après redémarrage du serveur
-- sauvegarde Excel puis contrôle du classeur
+1. Ouvrir l'application sur smartphone
+2. Se connecter
+3. Ouvrir le tableau de bord
+4. Ouvrir un dossier long
+5. Tester le bouton `Haut`
 
-## Validation de remise
+Attendu :
 
-Le projet peut être considéré prêt à remise si :
-
-- tous les scénarios ci-dessus sont validés
-- le compte administrateur initial est sécurisé
-- les services, ressources et droits sont conformes au besoin
+- la connexion fonctionne
+- le header reste lisible
+- pas de scroll lateral parasite
+- le bouton `Haut` reste utilisable

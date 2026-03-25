@@ -1,24 +1,27 @@
-# Projet Prêt à Remise
+# Projet Pret a Remise
 
-Ce document sert de point d'entrée pour la remise du projet.
+Ce document sert de point d'entree pour la remise du projet.
 
-## Contenu livré
+## Contenu livre
 
 - application web interne de gestion des dossiers d'attribution
 - backend Flask avec stockage SQLite
 - gestion des utilisateurs et des groupes
 - workflow d'attribution, signature de remise, RGPD et restitution
 - gestion des ressources attribuables
-- journal applicatif dédié
+- journal applicatif dedie
 - corbeille administrateur avec restauration
-- export PDF unitaire et multiple
+- export `PDF dossier` unitaire et multiple
+- export `PDF restitution` unitaire et multiple
 - export Excel lisible en deux feuilles
+- tracabilite de la reouverture des dossiers modifiables
 
-## Documents à consulter
+## Documents a consulter
 
 - [README.md](C:/www/dotation/README.md)
 - [GUIDE_UTILISATEUR.md](C:/www/dotation/GUIDE_UTILISATEUR.md)
 - [RECETTE_FONCTIONNELLE.md](C:/www/dotation/RECETTE_FONCTIONNELLE.md)
+- [wikijs.md](C:/www/dotation/wikijs.md)
 
 ## Lancement
 
@@ -37,25 +40,11 @@ http://127.0.0.1:5000/
 ## Compte d'administration initial
 
 - identifiant : `admin`
-- mot de passe : `admin123!`
+- mot de passe : a modifier apres installation
 
-## Points couverts par la livraison
+## Recommendation avant remise
 
-- connexion utilisateur
-- tableau de bord des dossiers
-- création et modification d'un dossier
-- séparation agent / élu(e)
-- services prédéfinis
-- signature de la fiche
-- validation RGPD
-- verrouillage d'un dossier signé complet
-- restitution détaillée
-- administration des utilisateurs
-- gestion des ressources attribuables
-- journal des actions
-- export PDF
-- export Excel
-
-## Recommandation avant diffusion interne
-
-Faire une recette complète avec [RECETTE_FONCTIONNELLE.md](C:/www/dotation/RECETTE_FONCTIONNELLE.md), puis modifier le mot de passe administrateur initial.
+- verifier la recette fonctionnelle complete
+- definir une vraie valeur `APP_SECRET_KEY`
+- stabiliser la configuration `nginx + gunicorn` si necessaire
+- changer le mot de passe du compte administrateur initial

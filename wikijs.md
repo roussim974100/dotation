@@ -1,201 +1,200 @@
-# Parcours agents et élu(e)s
+# Parcours agents et elu(e)s
 
-## Cartouche de version test
+## Cartouche de version
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposée | `2.6.0` |
-| Statut | `À valider` |
-| Date de mise à jour | `2026-03-25` |
-| Périmètre | `Application complète` |
-| Référence interne | `wikijs.md` |
+| Version proposee | `2.7.0` |
+| Statut | `A valider` |
+| Date de mise a jour | `2026-03-25` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture` |
+| Reference interne | `wikijs.md` |
 
-> Règle de maintenance : à chaque modification fonctionnelle ou documentaire notable, mettre à jour au minimum la version, la date et, si besoin, le périmètre.
+> Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
 
-## Présentation
+## Presentation
 
-`Parcours agents et élu(e)s` est une application interne destinée à la commune pour suivre :
+`Parcours agents et elu(e)s` est une application interne destinee a la commune pour suivre :
 
-- l'arrivée d'un nouvel agent ou d'un(e) nouvel(le) élu(e)
+- l'arrivee d'un nouvel agent ou d'un(e) nouvel(le) elu(e)
 - l'attribution de ressources
 - les changements de service
 - la restitution des ressources
-- l'administration des comptes et des référentiels
-- la traçabilité des actions
+- l'administration des comptes et des referentiels
+- la tracabilite des actions
 
-L'application est utilisée depuis un navigateur web et s'appuie sur une base SQLite.
+L'application est utilisee depuis un navigateur web et s'appuie sur une base SQLite.
 
-## Accès à l'application
+## Acces a l'application
 
 - URL locale habituelle : `http://127.0.0.1:5000/`
 - authentification requise
-- accès réservé aux utilisateurs habilités
+- acces reserve aux utilisateurs habilites
 
 La page de connexion permet de saisir :
 
 - l'identifiant
 - le mot de passe
 
+En cas d'erreur :
+
+- un message s'affiche si les identifiants sont incorrects
+- un message specifique s'affiche si la session ne peut pas etre conservee
+
 ## Tableau de bord
 
 Le tableau de bord centralise les dossiers et permet de :
 
 - rechercher un dossier
-- filtrer par état, qualité et service
+- filtrer par etat, qualite et service
 - ouvrir un dossier
 - lancer une restitution
-- exporter un PDF
-- exporter plusieurs PDF
+- exporter un `PDF dossier`
+- exporter un `PDF restitution`
+- exporter plusieurs `PDF dossier`
+- exporter plusieurs `PDF restitution`
 - supprimer plusieurs dossiers si le profil le permet
 
-## Types de dossier
+Un rafraichissement automatique est present, avec :
 
-Les principaux contextes de dossier sont :
+- signal visuel des nouveaux dossiers
+- badge de nouveaux dossiers
+- acquittement utilisateur `J'ai vu`
+- conservation de la selection pendant le refresh
 
-- `Nouvelle arrivée`
+## Dossiers
+
+Les types de dossier actuellement proposes sont :
+
+- `Nouvelle arrivee`
 - `Changement de service`
-- `Mise à jour de ressources`
+- `Mise a jour de ressources`
 - `Sortie / restitution`
 
-La qualité de la personne reste gérée séparément :
+Un dossier peut contenir :
 
-- `Agent`
-- `Élu(e)`
-
-## Création d'un dossier
-
-La création ou la mise à jour d'un dossier permet de renseigner :
-
-- l'identité de la personne
-- sa qualité
-- son service ou son mandat
-- son contexte de dossier
-- les ressources attribuées par service
-- la date et l'heure de remise
-- la signature
+- les informations d'identite
+- la qualite `Agent` ou `Elu(e)`
+- le service ou le mandat
+- les ressources materielles et immaterielles attribuees
+- la signature de remise
 - la validation RGPD
 
-## Attribution des ressources
+## Tracabilite de reouverture
 
-Les ressources sont regroupées par service émetteur.
+Quand un dossier encore modifiable est rouvert :
 
-Exemples :
+- la reouverture est comptee
+- la date de derniere reouverture est memorisee
+- l'utilisateur qui a rouvert le dossier est memorise
 
-- `DSI`
-- `Bâtiment`
-- tout autre service créé dans l'administration
-
-Si une nouvelle ressource est créée avec un service émetteur spécifique, une section dédiée peut apparaître automatiquement dans le formulaire.
-
-## Signature et validation
-
-Un dossier peut rester en brouillon tant que :
-
-- la signature n'est pas présente
-- ou que la validation RGPD n'est pas cochée
-
-Quand les conditions sont réunies :
-
-- une attribution complète verrouille le dossier
-- une attribution partielle laisse le dossier modifiable
+Ces informations sont visibles dans la fiche et tracees cote backend.
 
 ## Restitution
 
-La restitution se fait depuis une page dédiée.
+La restitution est geree dans une page dediee.
 
-Elle permet de renseigner :
+Le flux permet de :
 
+- choisir rapidement l'etat de chaque materiel
+- utiliser les etats `Conforme`, `Endommage`, `Non restitue`, `Perdu`, `Autre`
+- ajouter un commentaire seulement si necessaire
+- saisir une date de restitution
+- ajouter une signature de restitution
+- ou indiquer qu'elle est impossible ou differee avec motif
+
+La restitution reste modifiable tant qu'un materiel est `Non restitue`.
+
+## Exports
+
+### PDF dossier
+
+Le `PDF dossier` sert de document de remise.
+
+Il contient :
+
+- les informations de la personne
+- les ressources attribuees
+- la validation RGPD
+- la signature de remise
+- la date de signature
+
+### PDF restitution
+
+Le `PDF restitution` est un document distinct.
+
+Il contient :
+
+- les informations de la personne
 - la date de restitution
-- le motif
-- les observations
-- l'état de chaque ressource
+- l'etat de chaque materiel restitue
+- les commentaires d'anomalie
+- la signature de restitution ou le motif d'absence
 
-Les informations de restitution restent visibles en lecture dans le dossier.
+### Export multiple
+
+Les exports multiples produisent des ZIP :
+
+- `PDF dossiers selectionnes`
+- `PDF restitutions selectionnees`
+
+Une fenetre de chargement avec progression est affichee pendant la preparation.
 
 ## Administration
 
-Le menu d'administration permet de gérer :
+L'administration permet de :
 
-- les utilisateurs
-- les groupes
-- les ressources attribuables
-- le journal applicatif
-- la corbeille administrateur
+- gerer les comptes utilisateurs
+- modifier les mots de passe
+- gerer les ressources attribuables
+- consulter le journal
+- acceder a la corbeille
 
-### Comptes utilisateurs
+## Journal
 
-Selon les droits, il est possible de :
+Le journal est disponible dans une page dediee.
 
-- créer un compte
-- modifier un compte
-- changer un mot de passe
-- désactiver un compte
-- supprimer un compte
+Il permet de :
 
-### Ressources
+- consulter les actions systeme et utilisateur
+- rechercher un element precis
+- faciliter le debug ou le forensic
 
-Les ressources peuvent être :
+## Corbeille
 
-- créées
-- modifiées
-- désactivées
-- supprimées
+La corbeille est reservee au groupe `admin`.
 
-Chaque ressource peut être liée à un service émetteur.
+Elle permet de restaurer :
 
-## Journal applicatif
+- un dossier supprime
+- un utilisateur supprime
+- une ressource supprimee
 
-Le journal des actions dispose d'une page dédiée.
+## Roles
 
-Il permet de retrouver :
+### Admin
 
-- les connexions et déconnexions
-- les créations et mises à jour
-- les suppressions
-- les restaurations depuis la corbeille
-- diverses actions système ou utilisateur
+- acces complet
+- administration
+- journal
+- corbeille
 
-Une recherche texte permet de faciliter :
+### Lecture
 
-- le diagnostic
-- le debug
-- le forensic
-
-## Corbeille administrateur
-
-La corbeille est réservée au groupe `admin`.
-
-Elle permet de restaurer certains éléments supprimés par erreur :
-
-- dossiers
-- utilisateurs
-- ressources
-
-## Rôles standards
-
-- `lecture`
-- `redaction`
-- `gestion`
-- `admin`
+- consultation uniquement
+- aucune saisie
+- aucune restitution
+- aucun enregistrement
 
 ## Points d'attention
 
-- le compte `admin` initial doit être sécurisé avant usage réel
-- les droits doivent être attribués avec prudence
-- la documentation doit être mise à jour à chaque évolution métier
-- les suppressions sensibles doivent être vérifiées dans la corbeille
+- definir une vraie valeur `APP_SECRET_KEY` en environnement de deploiement
+- verifier le comportement mobile sur les terminaux reels
+- effectuer une recette complete apres toute evolution importante
 
-## Recommandations d'usage
+## Evolutions possibles
 
-- utiliser un navigateur récent
-- vérifier les exports PDF avant diffusion
-- réserver les suppressions massives aux profils autorisés
-- consulter le journal en cas d'anomalie ou de doute sur une action
-
-## Évolutions possibles
-
-- meilleure harmonisation visuelle des pages
-- filtres avancés dans le journal
-- export du journal
-- modularisation plus fine du backend
-- renforcement éventuel de la sécurité d'accès selon les besoins de la commune
+- regles plus fines sur les ressources par service
+- vue personne consolidee
+- audit encore plus detaille
+- parametrage plus avance des restitutions
