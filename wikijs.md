@@ -1,6 +1,6 @@
 # Parcours agents et élu(e)s
 
-## Cartouche de version !
+## Cartouche de version
 
 | Champ | Valeur |
 | --- | --- |
