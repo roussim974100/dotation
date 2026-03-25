@@ -1,8 +1,12 @@
 ﻿const STORAGE_KEY = "dotationDraftsCache";
 const API_BASE = "/api/forms";
 const PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-pdf-batch";
+const DASHBOARD_REFRESH_INTERVAL_MS = 20000;
 let sessionInfo = null;
 let currentDraftRows = [];
+let dashboardRefreshTimer = null;
+let dashboardRefreshInFlight = false;
+let dashboardLastUpdatedAt = "";
 const dashboardFilters = {
   search: "",
   status: "",
@@ -373,6 +377,10 @@ function openRestitution(id) {
 }
 
 async function renderDraftList() {
+  if (dashboardRefreshInFlight) {
+    return;
+  }
+  dashboardRefreshInFlight = true;
   // Écran principal :
   // - liste toutes les fiches
   // - calcule le compteur des fiches encore modifiables
@@ -382,31 +390,35 @@ async function renderDraftList() {
   const emptyState = document.getElementById("emptyState");
 
   if (!draftList) {
+    dashboardRefreshInFlight = false;
     return;
   }
 
-  const drafts = await listForms();
-  const sortedDrafts = [...drafts].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  currentDraftRows = sortedDrafts;
-  hydrateServiceFilterOptions(sortedDrafts);
-  const filteredDrafts = applyDashboardFilters(sortedDrafts);
-  const editableDrafts = filteredDrafts.filter((draft) => ["draft", "partial_assignment"].includes(draft.status || "draft"));
+  try {
+    const drafts = await listForms();
+    const sortedDrafts = [...drafts].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    currentDraftRows = sortedDrafts;
+    hydrateServiceFilterOptions(sortedDrafts);
+    const filteredDrafts = applyDashboardFilters(sortedDrafts);
+    const editableDrafts = filteredDrafts.filter((draft) => ["draft", "partial_assignment"].includes(draft.status || "draft"));
 
-  if (draftCount) {
-    draftCount.textContent = editableDrafts.length.toString();
-  }
+    if (draftCount) {
+      draftCount.textContent = editableDrafts.length.toString();
+    }
 
-  if (filteredDrafts.length === 0) {
-    draftList.innerHTML = "";
-    emptyState.classList.remove("d-none");
-    return;
-  }
+    if (filteredDrafts.length === 0) {
+      draftList.innerHTML = "";
+      emptyState.classList.remove("d-none");
+      updateDashboardRefreshInfo();
+      return;
+    }
 
-  emptyState.classList.add("d-none");
-  const user = await getSessionInfo();
-  const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
-  const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
-  draftList.innerHTML = filteredDrafts.map((draft) => `
+    emptyState.classList.add("d-none");
+    const user = await getSessionInfo();
+    const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
+    const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
+    const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
+    draftList.innerHTML = filteredDrafts.map((draft) => `
     <tr class="draft-row">
       <td class="draft-check-col">
         ${(canExport || canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(draft.title || buildDraftTitle(draft.data))}">` : ""}
@@ -422,16 +434,21 @@ async function renderDraftList() {
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
           <button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir</button>
-          ${(draft.status || "draft") === "active" ? `<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>` : ""}
+          ${(draft.status || "draft") === "active" && canRestitution ? `<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>` : ""}
           ${canExport ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">Exporter PDF</button>` : ""}
           ${canDelete ? `<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer</button>` : ""}
         </div>
       </td>
     </tr>
-  `).join("");
+    `).join("");
 
-  bindStatusPreviews();
-  bindSelectionActions(canExport, canDelete);
+    dashboardLastUpdatedAt = new Date().toISOString();
+    updateDashboardRefreshInfo();
+    bindStatusPreviews();
+    bindSelectionActions(canExport, canDelete);
+  } finally {
+    dashboardRefreshInFlight = false;
+  }
 }
 
 function triggerDownload(url) {
@@ -739,6 +756,38 @@ function bindDashboardFilters() {
   });
 }
 
+function updateDashboardRefreshInfo() {
+  const info = document.getElementById("dashboardRefreshInfo");
+  if (!info) {
+    return;
+  }
+  if (!dashboardLastUpdatedAt) {
+    info.textContent = "Mise à jour automatique active.";
+    return;
+  }
+  const formatted = new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "medium"
+  }).format(new Date(dashboardLastUpdatedAt));
+  info.textContent = `Mise à jour automatique active. Dernière actualisation : ${formatted}.`;
+}
+
+function refreshDashboardIfVisible() {
+  if (document.hidden) {
+    return;
+  }
+  void renderDraftList();
+}
+
+function startDashboardAutoRefresh() {
+  if (dashboardRefreshTimer) {
+    window.clearInterval(dashboardRefreshTimer);
+  }
+  dashboardRefreshTimer = window.setInterval(() => {
+    refreshDashboardIfVisible();
+  }, DASHBOARD_REFRESH_INTERVAL_MS);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Initialisation d'accueil : session, liste et masquage du hover au scroll.
   void getSessionInfo().then((user) => {
@@ -751,5 +800,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   bindDashboardFilters();
   void renderDraftList();
+  startDashboardAutoRefresh();
+  document.getElementById("refreshDashboardBtn")?.addEventListener("click", () => {
+    refreshDashboardIfVisible();
+  });
+  document.addEventListener("visibilitychange", refreshDashboardIfVisible);
+  window.addEventListener("focus", refreshDashboardIfVisible);
   document.addEventListener("scroll", hideStatusPreview, { passive: true });
 });
