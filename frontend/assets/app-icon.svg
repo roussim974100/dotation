@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Parcours agents et élus">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f5b8d"/>
+      <stop offset="100%" stop-color="#0a4267"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="14" fill="url(#g1)"/>
+  <rect x="16" y="14" width="32" height="38" rx="6" fill="#ffffff" opacity="0.96"/>
+  <circle cx="32" cy="24" r="5.5" fill="#d9a441"/>
+  <path d="M22 40c1.8-4.9 5.8-7.3 10-7.3s8.2 2.4 10 7.3" fill="none" stroke="#0f5b8d" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M22 45h20" stroke="#8aa3b6" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M22 50h14" stroke="#8aa3b6" stroke-width="2.8" stroke-linecap="round"/>
+</svg>
