@@ -27,11 +27,18 @@ function applyLoginError() {
   }
 
   const params = new URLSearchParams(window.location.search);
-  if (params.get("error") !== "invalid") {
+  const error = params.get("error");
+  if (!error) {
     return;
   }
 
-  errorBox.textContent = getAppText("login.errorInvalid", "Identifiants invalides.");
+  if (error === "invalid") {
+    errorBox.textContent = getAppText("login.errorInvalid", "Identifiants invalides.");
+  } else if (error === "session") {
+    errorBox.textContent = getAppText("login.errorSession", "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous.");
+  } else {
+    return;
+  }
   errorBox.classList.remove("d-none");
 }
 

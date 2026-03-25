@@ -47,6 +47,16 @@
       </div>
     </section>
 
+    <section id="reopenNotice" class="content-card mb-4 d-none">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Traçabilité</p>
+          <h3 class="section-title">Réouverture du dossier</h3>
+        </div>
+      </div>
+      <p class="panel-text mb-0" id="reopenNoticeText"></p>
+    </section>
+
     <div class="form-layout">
       <section class="content-card">
         <div class="section-heading">
@@ -74,7 +84,7 @@
             <label class="form-label" for="prenom">Prénom</label>
             <input class="form-control" id="prenom" name="prenom" placeholder="Marie" required>
           </div>
-          <div class="col-md-6 col-lg-3">
+          <div class="col-md-6 col-lg-3" id="serviceFieldBlock">
             <label class="form-label" for="service">Service</label>
             <select class="form-select" id="service" name="service">
               <option value="">Sélectionner un service</option>
@@ -102,7 +112,7 @@
             </select>
             <input class="form-control mt-2 d-none" id="service_custom" name="service_custom" placeholder="Autre service">
           </div>
-          <div class="col-md-6 col-lg-3">
+          <div class="col-md-6 col-lg-3" id="fonctionFieldBlock">
             <label class="form-label" for="fonction">Fonction</label>
             <input class="form-control" id="fonction" name="fonction" placeholder="Responsable d'équipe">
           </div>
@@ -150,61 +160,88 @@
           </div>
         </div>
 
-        <div class="equipment-grid">
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_pc" data-target="pcFields">
-              <span>Ordinateur</span>
-            </label>
-            <div id="pcFields" class="subgrid d-none">
-              <input class="form-control" placeholder="Marque" id="pc_marque">
-              <input class="form-control" placeholder="Modèle" id="pc_modele">
-              <input class="form-control" placeholder="Numéro de série" id="pc_sn">
+        <div class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+            <p class="resource-kind-block__text">Équipements physiques remis par la DSI.</p>
+          </div>
+          <div class="equipment-grid">
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_pc" data-target="pcFields">
+                <span>Ordinateur</span>
+              </label>
+              <div id="pcFields" class="subgrid d-none">
+                <input class="form-control" placeholder="Marque" id="pc_marque">
+                <input class="form-control" placeholder="Modèle" id="pc_modele">
+                <input class="form-control" placeholder="Numéro de série" id="pc_sn">
+              </div>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_screen" data-target="screenFields">
+                <span>Écran</span>
+              </label>
+              <div id="screenFields" class="subgrid d-none">
+                <input class="form-control" placeholder="Marque" id="screen_marque">
+                <input class="form-control" placeholder="Modèle" id="screen_modele">
+                <input class="form-control" placeholder="Numéro de série" id="screen_sn">
+              </div>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_phone" data-target="phoneFields">
+                <span>Téléphone</span>
+              </label>
+              <div id="phoneFields" class="subgrid d-none">
+                <input class="form-control" placeholder="Marque" id="tel_marque">
+                <input class="form-control" placeholder="Modèle" id="tel_modele">
+                <input class="form-control" placeholder="IMEI" id="tel_imei">
+              </div>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_tablette" data-target="tabletteFields">
+                <span>Tablette</span>
+              </label>
+              <div id="tabletteFields" class="subgrid d-none">
+                <input class="form-control" placeholder="Marque" id="tablette_marque">
+                <input class="form-control" placeholder="Modèle" id="tablette_modele">
+                <input class="form-control" placeholder="Numéro de série" id="tablette_sn">
+              </div>
             </div>
           </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_screen" data-target="screenFields">
-              <span>Écran</span>
-            </label>
-            <div id="screenFields" class="subgrid d-none">
-              <input class="form-control" placeholder="Marque" id="screen_marque">
-              <input class="form-control" placeholder="Modèle" id="screen_modele">
-              <input class="form-control" placeholder="Numéro de série" id="screen_sn">
-            </div>
-          </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_phone" data-target="phoneFields">
-              <span>Téléphone</span>
-            </label>
-            <div id="phoneFields" class="subgrid d-none">
-              <input class="form-control" placeholder="Marque" id="tel_marque">
-              <input class="form-control" placeholder="Modèle" id="tel_modele">
-              <input class="form-control" placeholder="IMEI" id="tel_imei">
-            </div>
-          </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="vpn">
-              <span>VPN</span>
-            </label>
-          </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_mail" data-target="mailFields">
-              <span>Email</span>
-            </label>
-            <div id="mailFields" class="single-field d-none">
-              <input class="form-control" placeholder="Adresse email" id="email" type="email">
-            </div>
-          </div>
+          <div id="dynamicResourcesDsiMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
         </div>
-        <div id="dynamicResourcesDsiGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+
+        <div class="resource-kind-block mt-4">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+            <p class="resource-kind-block__text">Accès et droits numériques remis par la DSI.</p>
+          </div>
+          <div class="equipment-grid equipment-grid--compact">
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="vpn">
+                <span>VPN</span>
+              </label>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_mail" data-target="mailFields">
+                <span>Email</span>
+              </label>
+              <div id="mailFields" class="single-field d-none">
+                <input class="form-control" placeholder="Adresse email" id="email" type="email">
+              </div>
+            </div>
+          </div>
+          <div id="dynamicResourcesDsiImmaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+        </div>
       </section>
 
       <section class="content-card">
@@ -215,32 +252,68 @@
           </div>
         </div>
 
-        <div class="equipment-grid equipment-grid--compact">
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_badge" data-target="badgeFields">
-              <span>Badge d'accès</span>
-            </label>
-            <div id="badgeFields" class="single-field d-none">
-              <input class="form-control" placeholder="Numéro de badge" id="badge_numero">
+        <div class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+            <p class="resource-kind-block__text">Éléments physiques remis par le service bâtiment.</p>
+          </div>
+          <div class="equipment-grid equipment-grid--compact">
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_badge" data-target="badgeFields">
+                <span>Badge d'accès</span>
+              </label>
+              <div id="badgeFields" class="single-field d-none">
+                <input class="form-control" placeholder="Numéro de badge" id="badge_numero">
+              </div>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_cles" data-target="clesFields">
+                <span>Clé(s)</span>
+              </label>
+              <div id="clesFields" class="single-field d-none">
+                <div id="clesRows" class="repeatable-list"></div>
+                <button class="btn btn-outline-secondary btn-sm mt-3" type="button" id="addCleBtn">+ Ajouter une clé</button>
+              </div>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="veste">
+                <span>Veste</span>
+              </label>
+            </div>
+
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="chaussure">
+                <span>Chaussures de sécurité</span>
+              </label>
             </div>
           </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="veste">
-              <span>Veste</span>
-            </label>
-          </div>
-
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="chaussure">
-              <span>Chaussures de sécurité</span>
-            </label>
+          <div id="dynamicResourcesBatimentMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+          <div id="dynamicResourcesBatimentImmaterialWrap" class="resource-kind-block mt-4">
+            <div class="resource-kind-block__header">
+              <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+              <p class="resource-kind-block__text">Accès ou droits gérés par le service bâtiment.</p>
+            </div>
+            <div class="equipment-grid equipment-grid--compact mb-3">
+              <div class="equipment-item">
+                <label class="equipment-toggle">
+                  <input type="checkbox" id="has_zone_alarme" data-target="zoneAlarmeFields">
+                  <span>Zone alarme</span>
+                </label>
+                <div id="zoneAlarmeFields" class="single-field d-none">
+                  <div id="zoneAlarmeRows" class="repeatable-list"></div>
+                  <button class="btn btn-outline-secondary btn-sm mt-3" type="button" id="addZoneAlarmeBtn">+ Ajouter une zone</button>
+                </div>
+              </div>
+            </div>
+            <div id="dynamicResourcesBatimentImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
           </div>
         </div>
-        <div id="dynamicResourcesBatimentGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
       </section>
 
       <section class="content-card">
@@ -251,30 +324,43 @@
           </div>
         </div>
 
-        <div class="equipment-grid equipment-grid--compact">
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_vehicule" data-target="vehiculeFields">
-              <span>Véhicule</span>
-            </label>
-            <div id="vehiculeFields" class="subgrid d-none">
-              <input class="form-control" placeholder="Marque" id="vehicule_marque">
-              <input class="form-control" placeholder="Modèle" id="vehicule_modele">
-              <input class="form-control" placeholder="Immatriculation" id="vehicule_plaque">
-            </div>
+        <div class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+            <p class="resource-kind-block__text">Éléments physiques remis par les autres services.</p>
           </div>
+          <div class="equipment-grid equipment-grid--compact">
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_vehicule" data-target="vehiculeFields">
+                <span>Véhicule</span>
+              </label>
+              <div id="vehiculeFields" class="subgrid d-none">
+                <input class="form-control" placeholder="Marque" id="vehicule_marque">
+                <input class="form-control" placeholder="Modèle" id="vehicule_modele">
+                <input class="form-control" placeholder="Immatriculation" id="vehicule_plaque">
+              </div>
+            </div>
 
-          <div class="equipment-item">
-            <label class="equipment-toggle">
-              <input type="checkbox" id="has_autre" data-target="autreFields">
-              <span>Autre matériel</span>
-            </label>
-            <div id="autreFields" class="single-field d-none">
-              <input class="form-control" placeholder="Description" id="autre_materiel">
+            <div class="equipment-item">
+              <label class="equipment-toggle">
+                <input type="checkbox" id="has_autre" data-target="autreFields">
+                <span>Autre matériel</span>
+              </label>
+              <div id="autreFields" class="single-field d-none">
+                <input class="form-control" placeholder="Description" id="autre_materiel">
+              </div>
             </div>
           </div>
+          <div id="dynamicResourcesOtherMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
         </div>
-        <div id="dynamicResourcesOtherGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
+        <div id="dynamicResourcesOtherImmaterialWrap" class="resource-kind-block mt-4 d-none">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+            <p class="resource-kind-block__text">Accès ou droits attribués par les autres services.</p>
+          </div>
+          <div id="dynamicResourcesOtherImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
+        </div>
       </section>
 
       <div id="dynamicServiceSections"></div>
@@ -287,37 +373,22 @@
           </div>
         </div>
 
-        <p class="panel-text">Ces ressources proviennent du menu administration. Si un service émetteur est renseigné, elles apparaissent directement dans sa section.</p>
+        <p class="panel-text">Ces ressources proviennent du menu administration. Si un service émetteur est renseigné, elles apparaissent directement dans sa section, en matériel ou en immatériel selon leur catégorie.</p>
         <div id="dynamicResourcesEmpty" class="empty-state d-none">
           <h3>Aucune ressource sans service défini</h3>
           <p>Toutes les ressources actives sont déjà rangées dans leur section de service, ou aucun référentiel supplémentaire n'est encore disponible.</p>
         </div>
-        <div id="dynamicResourcesGrid" class="equipment-grid equipment-grid--compact"></div>
-      </section>
-
-      <section class="content-card">
-        <div class="section-heading">
-          <div>
-            <p class="panel-eyebrow">Suivi</p>
-            <h3 class="section-title">État du dossier</h3>
+        <div id="dynamicResourcesGenericMaterialWrap" class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
           </div>
+          <div id="dynamicResourcesMaterialGrid" class="equipment-grid equipment-grid--compact"></div>
         </div>
-
-        <div class="row g-3 align-items-stretch">
-          <div class="col-lg-4">
-            <div class="rgpd-card h-100">
-              <h4 class="rgpd-card__title">État actuel</h4>
-              <div class="status-pill" id="workflowStatusDisplay">Brouillon</div>
-              <p class="rgpd-text mt-3 mb-0" id="workflowStatusHint">Le statut est calculé automatiquement selon la signature, la validation RGPD et le niveau de complétude de l'attribution.</p>
-            </div>
+        <div id="dynamicResourcesGenericImmaterialWrap" class="resource-kind-block mt-4 d-none">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
           </div>
-          <div class="col-lg-8">
-            <div class="rgpd-card h-100">
-              <h4 class="rgpd-card__title">Restitution</h4>
-              <p class="rgpd-text" id="restitutionSummaryHint">La restitution ne se renseigne plus dans ce formulaire. Elle se gère depuis la page dédiée accessible depuis l'accueil sur les attributions actives.</p>
-              <div id="restitutionSummary" class="d-none"></div>
-            </div>
-          </div>
+          <div id="dynamicResourcesImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
         </div>
       </section>
 

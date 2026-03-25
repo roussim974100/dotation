@@ -16,6 +16,7 @@ window.APP_TEXT = {
     securityTitle: "Usage interne",
     securityText: "Cet outil est réservé aux agents habilités de la commune pour la gestion des parcours agents et élu(e)s.",
     supportText: "En cas de difficulté, rapprochez-vous de l'administration de l'application.",
-    errorInvalid: "Identifiants invalides. Vérifiez votre saisie puis réessayez."
+    errorInvalid: "Identifiants invalides. Vérifiez votre saisie puis réessayez.",
+    errorSession: "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous."
   }
 };

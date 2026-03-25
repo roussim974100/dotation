@@ -9,7 +9,6 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
-<!-- Header dédié au parcours de restitution -->
 <header class="app-header app-header--compact">
   <div class="container app-header__inner">
     <div class="app-brand">
@@ -17,7 +16,7 @@
       <div>
         <p class="app-kicker">Collectivité</p>
         <h1 class="app-title">Restitution des ressources</h1>
-        <p class="app-subtitle">Suivi de la restitution des équipements et accès associés à une attribution active.</p>
+        <p class="app-subtitle">Saisissez rapidement l'état de chaque ressource matérielle attribuée.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -28,7 +27,6 @@
 </header>
 
 <main class="container py-4 py-lg-5">
-  <!-- Chargement bloquant tant que la fiche active n'est pas complètement prête -->
   <div id="restitutionLoader" class="page-loader">
     <div class="page-loader__panel">
       <div class="page-loader__spinner"></div>
@@ -41,21 +39,20 @@
     <div>
       <p class="panel-eyebrow">Restitution</p>
       <h2 class="panel-title" id="restitutionTitle">Fiche en cours</h2>
-      <p class="panel-text" id="restitutionSubtitle">Mettez à jour l'état de restitution de chaque ressource attribuée.</p>
+      <p class="panel-text" id="restitutionSubtitle">Choisissez un état par matériel. Un commentaire n'est demandé qu'en cas d'écart.</p>
     </div>
     <div class="hero-panel__meta">
       <div class="status-pill" id="restitutionStatus">Attribution active</div>
     </div>
   </section>
 
-  <!-- Formulaire de restitution global + détail par équipement -->
   <section class="content-card">
     <div class="row g-3 mb-4">
-      <div class="col-md-4">
+      <div class="col-md-6">
         <label class="form-label" for="global_returned_at">Date de restitution</label>
         <input class="form-control" type="date" id="global_returned_at">
       </div>
-      <div class="col-md-4">
+      <div class="col-md-6">
         <label class="form-label" for="global_return_reason">Motif</label>
         <select class="form-select" id="global_return_reason">
           <option value="">Sélectionner</option>
@@ -66,30 +63,62 @@
           <option value="autre">Autre</option>
         </select>
       </div>
-      <div class="col-md-4">
-        <label class="form-label" for="global_return_status">État global</label>
-        <select class="form-select" id="global_return_status">
-          <option value="returned">Restitution terminée</option>
-          <option value="partial_return">Restitution partielle</option>
-          <option value="cancelled">Dossier annulé</option>
-        </select>
-      </div>
       <div class="col-12">
-        <label class="form-label" for="global_return_notes">Observations generales</label>
+        <label class="form-label" for="global_return_notes">Observations générales</label>
         <textarea class="form-control" id="global_return_notes" rows="3" placeholder="Précisez le contexte général de la restitution."></textarea>
       </div>
     </div>
 
     <div>
-      <label class="form-label">État de restitution par élément</label>
+      <label class="form-label">État de restitution par ressource matérielle</label>
       <div id="restitutionDetailList" class="restitution-list"></div>
+    </div>
+
+    <div class="mt-4">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Validation</p>
+          <h3 class="section-title">Signature de restitution</h3>
+        </div>
+      </div>
+
+      <div class="choice-group mb-3" id="restitutionSignatureStatusGroup">
+        <label class="choice-chip">
+          <input type="radio" name="restitution_signature_status" value="signed" checked>
+          <span>Signature recueillie</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="restitution_signature_status" value="impossible">
+          <span>Signature impossible</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="restitution_signature_status" value="deferred">
+          <span>Signature différée</span>
+        </label>
+      </div>
+
+      <div id="restitutionSignatureCanvasWrap">
+        <label class="form-label" for="restitution_signature">Signature</label>
+        <div class="signature-wrap">
+          <canvas id="restitution_signature" class="signature-box"></canvas>
+        </div>
+        <div class="d-flex gap-2 mt-3 no-print">
+          <button class="btn btn-outline-secondary" type="button" id="clearRestitutionSignatureBtn">Effacer la signature</button>
+        </div>
+      </div>
+
+      <div id="restitutionSignatureReasonWrap" class="d-none mt-3">
+        <label class="form-label" for="restitution_signature_reason">Motif</label>
+        <textarea class="form-control" id="restitution_signature_reason" rows="3" placeholder="Précisez pourquoi la signature n'a pas pu être recueillie immédiatement."></textarea>
+      </div>
     </div>
   </section>
 
   <div class="action-bar">
-    <div class="action-bar__hint">Les états de restitution sont historisés sur le dossier d'attribution.</div>
+    <div class="action-bar__hint">Chaque ligne est enregistrée avec son état et son commentaire éventuel.</div>
     <div class="action-bar__buttons">
       <a class="btn btn-outline-secondary" href="index.html">Annuler</a>
+      <button class="btn btn-outline-primary" id="exportRestitutionPdfBtn" type="button">Exporter le PDF de restitution</button>
       <button class="btn btn-primary" id="saveRestitutionBtn" type="button">Enregistrer la restitution</button>
     </div>
   </div>
