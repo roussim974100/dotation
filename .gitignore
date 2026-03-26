@@ -4,6 +4,7 @@ __pycache__/
 
 # Virtual env
 venv/
+backend/venv/
 
 # Database
 *.db
@@ -11,3 +12,11 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# users
+backend/users.json
+
+# Cache / logs
+backend/__pycache__/
+*.log
+*.tmp
