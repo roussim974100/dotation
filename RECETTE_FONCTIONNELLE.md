@@ -24,6 +24,7 @@ python backend\app.py
 - la restitution fonctionne depuis un dossier actif
 - le `PDF dossier` unitaire fonctionne
 - le `PDF restitution` unitaire fonctionne
+- les signatures sont masquees dans les PDF exportes par un profil `lecture`
 - l'export multiple des `PDF dossier` fonctionne
 - l'export multiple des `PDF restitution` fonctionne
 - la fenetre de chargement d'export s'affiche pendant les lots
@@ -98,6 +99,19 @@ Attendu :
 
 - une fenetre de chargement apparait
 - un ZIP est propose au telechargement
+
+### 5 bis. Export PDF avec profil lecture
+
+1. Se connecter avec un compte du groupe `lecture`
+2. Exporter un `PDF dossier`
+3. Exporter un `PDF restitution`
+
+Attendu :
+
+- les PDF sont accessibles
+- l'identite reste visible
+- la signature image n'apparait pas
+- une mention indique que la signature est reservee aux personnes autorisees
 
 ### 6. Export multiple PDF restitution
 

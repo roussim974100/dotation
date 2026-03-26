@@ -13,6 +13,7 @@ Ce document sert de point d'entree pour la remise du projet.
 - corbeille administrateur avec restauration
 - export `PDF dossier` unitaire et multiple
 - export `PDF restitution` unitaire et multiple
+- masquage des signatures dans les PDF pour les profils non autorises
 - export Excel lisible en deux feuilles
 - tracabilite de la reouverture des dossiers modifiables
 

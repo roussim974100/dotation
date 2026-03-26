@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.7.0` |
+| Version proposee | `2.7.1` |
 | Statut | `A valider` |
-| Date de mise a jour | `2026-03-25` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture` |
+| Date de mise a jour | `2026-03-26` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
@@ -54,6 +54,8 @@ Le tableau de bord centralise les dossiers et permet de :
 - exporter plusieurs `PDF dossier`
 - exporter plusieurs `PDF restitution`
 - supprimer plusieurs dossiers si le profil le permet
+
+Les profils en consultation seule peuvent exporter les PDF, mais les signatures y sont masquees.
 
 Un rafraichissement automatique est present, avec :
 
@@ -119,6 +121,8 @@ Il contient :
 - la signature de remise
 - la date de signature
 
+Pour un profil non autorise a consulter les signatures, le PDF reste exportable mais la signature est masquee et remplacee par une mention reservee aux personnes autorisees.
+
 ### PDF restitution
 
 Le `PDF restitution` est un document distinct.
@@ -130,6 +134,8 @@ Il contient :
 - l'etat de chaque materiel restitue
 - les commentaires d'anomalie
 - la signature de restitution ou le motif d'absence
+
+Pour un profil non autorise a consulter les signatures, la signature de restitution est masquee dans le document exporte.
 
 ### Export multiple
 
@@ -182,9 +188,12 @@ Elle permet de restaurer :
 ### Lecture
 
 - consultation uniquement
+- export PDF autorise
 - aucune saisie
 - aucune restitution
 - aucun enregistrement
+- aucune suppression
+- signatures masquees dans les PDF
 
 ## Points d'attention
 

@@ -13,6 +13,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - consulter un journal des actions
 - restaurer des suppressions via une corbeille reservee aux admins
 - exporter les dossiers et les restitutions en PDF
+- proteger les signatures dans les exports PDF selon le profil connecte
 - exporter les donnees en Excel
 
 ## Types de dossier
@@ -151,6 +152,8 @@ Document officiel de remise avec :
 - signature
 - date de signature
 
+Pour un profil non autorise a consulter les signatures, le PDF reste exportable mais la signature est masquee avec une mention reservee aux personnes autorisees.
+
 ### PDF restitution
 
 Document distinct avec :
@@ -160,6 +163,8 @@ Document distinct avec :
 - etat de chaque materiel
 - commentaires d'anomalie
 - signature de restitution ou motif d'absence
+
+Pour un profil non autorise a consulter les signatures, la signature de restitution est masquee dans le document exporte.
 
 ### Export Excel
 
