@@ -177,6 +177,14 @@ function buildDraftActionButtons(draft, options) {
     actions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>`);
   }
 
+  if (options.canEdit && ["draft", "partial_assignment"].includes(draft.status || "draft")) {
+    actions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="shareSignatureLink('${draft.id}')">Lien signature</button>`);
+  }
+
+  if (options.canRestitution && hasRestitutionData(draft)) {
+    actions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="shareRestitutionSignatureLink('${draft.id}')">Lien restitution</button>`);
+  }
+
   const documentActions = [];
   if (options.canExport) {
     documentActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">PDF dossier</button>`);
@@ -514,6 +522,7 @@ async function renderDraftList() {
     const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
+    const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
     draftList.innerHTML = filteredDrafts.map((draft) => `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}">
       <td class="draft-check-col">
@@ -529,10 +538,10 @@ async function renderDraftList() {
       <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
-          ${buildDraftActionButtons(draft, { canExport, canDelete, canRestitution })}
-        </div>
-      </td>
-    </tr>
+            ${buildDraftActionButtons(draft, { canExport, canDelete, canRestitution, canEdit })}
+          </div>
+        </td>
+      </tr>
     `).join("");
 
     dashboardLastUpdatedAt = new Date().toISOString();
@@ -576,6 +585,48 @@ async function exportDraftPdf(id) {
 
 async function exportRestitutionPdf(id) {
   triggerDownload(`${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`);
+}
+
+async function shareSignatureLink(id) {
+  try {
+    let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`);
+    if (!result?.link || result.link.status !== "active" || !result.link.url) {
+      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`, {
+        method: "POST"
+      });
+    }
+
+    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+      window.alert("Lien de signature copié dans le presse-papiers.");
+    } catch (error) {
+      window.prompt("Copiez ce lien de signature :", absoluteUrl);
+    }
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer le lien de signature.");
+  }
+}
+
+async function shareRestitutionSignatureLink(id) {
+  try {
+    let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
+    if (!result?.link || result.link.status !== "active" || !result.link.url) {
+      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
+        method: "POST"
+      });
+    }
+
+    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+      window.alert("Lien de signature de restitution copié dans le presse-papiers.");
+    } catch (error) {
+      window.prompt("Copiez ce lien de signature de restitution :", absoluteUrl);
+    }
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer le lien de restitution.");
+  }
 }
 
 function setExportLoaderProgress(value) {

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/assets/app-icon.svg">
+<title>Signature de la restitution</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand">
+      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+      <div>
+        <p class="app-kicker">Collectivité</p>
+        <h1 class="app-title">Validation de la restitution</h1>
+        <p class="app-subtitle">Consultez le récapitulatif de restitution puis signez le document.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <div id="restitutionSignatureLoader" class="page-loader">
+    <div class="page-loader__panel">
+      <div class="page-loader__spinner"></div>
+      <strong>Chargement du lien de restitution</strong>
+      <p>Les informations de restitution sont en cours de récupération.</p>
+    </div>
+  </div>
+
+  <section id="restitutionSignatureErrorCard" class="content-card d-none">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Lien invalide</p>
+        <h2 class="section-title">Ce lien n'est plus valide</h2>
+      </div>
+    </div>
+    <p id="restitutionSignatureErrorText" class="panel-text mb-0">Le lien de signature de restitution est invalide, expiré, déjà utilisé ou révoqué.</p>
+  </section>
+
+  <section id="restitutionSignatureSuccessCard" class="content-card d-none">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Validation</p>
+        <h2 class="section-title">La restitution a bien été signée</h2>
+      </div>
+    </div>
+    <p class="panel-text mb-0">Merci. La signature de restitution a bien été enregistrée.</p>
+  </section>
+
+  <form id="publicRestitutionSignatureForm" class="d-none" novalidate>
+    <section class="hero-panel mb-4">
+      <div>
+        <p class="panel-eyebrow">Restitution</p>
+        <h2 id="publicRestitutionSignatureTitle" class="panel-title">Bon de restitution</h2>
+        <p class="panel-text">Merci de vérifier les éléments saisis avant de signer le bon de restitution.</p>
+      </div>
+      <div class="hero-panel__meta">
+        <div class="stat-card">
+          <span class="stat-card__label">Lien valide jusqu'au</span>
+          <strong class="stat-card__value" id="publicRestitutionExpiresAt">-</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-card mb-4">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Personne</p>
+          <h3 class="section-title">Identité</h3>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="status-card">
+            <span class="status-card__label">Nom</span>
+            <strong id="publicRestitutionNom">-</strong>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="status-card">
+            <span class="status-card__label">Prénom</span>
+            <strong id="publicRestitutionPrenom">-</strong>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="status-card">
+            <span class="status-card__label">Qualité</span>
+            <strong id="publicRestitutionQualite">-</strong>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="status-card">
+            <span class="status-card__label">Service</span>
+            <strong id="publicRestitutionService">-</strong>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="status-card">
+            <span class="status-card__label">Mandat</span>
+            <strong id="publicRestitutionMandat">-</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-card mb-4">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Restitution</p>
+          <h3 class="section-title">Récapitulatif</h3>
+        </div>
+      </div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="status-card">
+            <span class="status-card__label">Date de restitution</span>
+            <strong id="publicRestitutionReturnedAt">-</strong>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="status-card">
+            <span class="status-card__label">Motif</span>
+            <strong id="publicRestitutionReason">-</strong>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="status-card">
+            <span class="status-card__label">Observations générales</span>
+            <strong id="publicRestitutionNotes">-</strong>
+          </div>
+        </div>
+      </div>
+      <div id="publicRestitutionItems" class="stack-gap"></div>
+    </section>
+
+    <section class="content-card">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Signature</p>
+          <h3 class="section-title">Validation de la restitution</h3>
+        </div>
+      </div>
+      <label class="form-label" for="publicRestitutionSignatureCanvas">Signature</label>
+      <div class="signature-wrap">
+        <canvas id="publicRestitutionSignatureCanvas" class="signature-box"></canvas>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-outline-secondary" type="button" id="clearPublicRestitutionSignatureBtn">Effacer la signature</button>
+        <button class="btn btn-primary" type="button" id="submitPublicRestitutionSignatureBtn">Valider et signer la restitution</button>
+      </div>
+    </section>
+  </form>
+</main>
+
+<script src="/js/restitution-signature.js"></script>
+</body>
+</html>

@@ -266,6 +266,27 @@ function getRestitutionSignaturePayload(signaturePad, existing) {
   };
 }
 
+async function shareRestitutionSignatureLink(id) {
+  try {
+    let result = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`);
+    if (!result?.link || result.link.status !== "active" || !result.link.url) {
+      result = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`, {
+        method: "POST"
+      });
+    }
+
+    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+      window.alert("Lien de signature de restitution copié.");
+    } catch (error) {
+      window.prompt("Copiez ce lien de signature de restitution :", absoluteUrl);
+    }
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer le lien de signature de restitution.");
+  }
+}
+
 function restoreRestitutionSignature(restitution, signaturePad) {
   const status = restitution?.signatureStatus || (restitution?.signatureDataUrl ? "signed" : "deferred");
   const radio = document.querySelector(`input[name="restitution_signature_status"][value="${status}"]`);
@@ -319,6 +340,9 @@ async function initRestitutionPage() {
 
   document.getElementById("exportRestitutionPdfBtn")?.addEventListener("click", () => {
     window.location.href = `/api/forms/${encodeURIComponent(id)}/restitution-pdf`;
+  });
+  document.getElementById("shareRestitutionSignatureLinkBtn")?.addEventListener("click", () => {
+    void shareRestitutionSignatureLink(id);
   });
 
   document.getElementById("saveRestitutionBtn").addEventListener("click", async () => {

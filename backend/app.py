@@ -369,6 +369,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS signature_links (
                 id TEXT PRIMARY KEY,
                 form_id TEXT NOT NULL,
+                link_type TEXT NOT NULL DEFAULT 'assignment',
                 token TEXT NOT NULL UNIQUE,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_by TEXT,
@@ -389,6 +390,7 @@ def init_db():
         ensure_column(connection, "dotation_forms", "dossier_type", "dossier_type TEXT")
         ensure_column(connection, "onboarding_dossiers", "dossier_type", "dossier_type TEXT NOT NULL DEFAULT 'arrivee'")
         ensure_column(connection, "resource_catalog", "field_schema_json", "field_schema_json TEXT")
+        ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         seed_reference_catalogs(connection)
         migrate_forms_to_dossiers(connection)
 
@@ -645,6 +647,30 @@ def current_actor(default="system"):
     return session.get("user") or default
 
 
+def signature_link_label(link_type):
+    if link_type == "restitution":
+        return "Lien de signature de restitution"
+    return "Lien de signature"
+
+
+def signature_link_scope(link_type):
+    if link_type == "restitution":
+        return "restitution_signature"
+    return "signature"
+
+
+def signature_link_public_url(link_type, token):
+    if link_type == "restitution":
+        return f"/restitution-signature/{token}"
+    return f"/signature/{token}"
+
+
+def signature_link_public_actor(link_type):
+    if link_type == "restitution":
+        return "public_restitution_signature_link"
+    return "public_signature_link"
+
+
 def signature_link_expiration(hours=72):
     return (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()
 
@@ -678,6 +704,7 @@ def serialize_signature_link(row):
     return {
         "id": row["id"],
         "formId": row["form_id"],
+        "type": row["link_type"],
         "status": row["status"],
         "createdBy": row["created_by"],
         "createdAt": row["created_at"],
@@ -688,14 +715,14 @@ def serialize_signature_link(row):
         "lastOpenedAt": row["last_opened_at"],
         "lastOpenedIp": row["last_opened_ip"],
         "notes": row["notes"] or "",
-        "url": f"/signature/{row['token']}" if row["status"] == "active" else "",
+        "url": signature_link_public_url(row["link_type"], row["token"]) if row["status"] == "active" else "",
     }
 
 
-def get_latest_signature_link(connection, form_id):
+def get_latest_signature_link(connection, form_id, link_type="assignment"):
     row = connection.execute(
-        "SELECT * FROM signature_links WHERE form_id = ? ORDER BY created_at DESC LIMIT 1",
-        (form_id,),
+        "SELECT * FROM signature_links WHERE form_id = ? AND link_type = ? ORDER BY created_at DESC LIMIT 1",
+        (form_id, link_type),
     ).fetchone()
     return materialize_signature_link(connection, row)
 
@@ -716,12 +743,12 @@ def get_signature_link_by_token(connection, token):
     return materialize_signature_link(connection, row)
 
 
-def revoke_signature_links_for_form(connection, form_id, actor=None, except_id=None):
+def revoke_signature_links_for_form(connection, form_id, actor=None, except_id=None, link_type="assignment"):
     actor = actor or current_actor()
     now = utc_now()
     rows = connection.execute(
-        "SELECT * FROM signature_links WHERE form_id = ? AND status = 'active'",
-        (form_id,),
+        "SELECT * FROM signature_links WHERE form_id = ? AND link_type = ? AND status = 'active'",
+        (form_id, link_type),
     ).fetchall()
     revoked = []
     for row in rows:
@@ -739,7 +766,7 @@ def revoke_signature_links_for_form(connection, form_id, actor=None, except_id=N
     return revoked
 
 
-def create_signature_link(connection, form_id, actor=None, expires_in_hours=72):
+def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, link_type="assignment"):
     actor = actor or current_actor()
     form_row = connection.execute(
         "SELECT id, dossier_id, title, payload_json FROM dotation_forms WHERE id = ?",
@@ -749,15 +776,27 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72):
         raise ValueError("Dossier introuvable.")
 
     payload = json.loads(form_row["payload_json"] or "{}")
-    validation = payload.get("validation", {})
-    if validation.get("signatureDataUrl"):
-        raise ValueError("Ce dossier est deja signe.")
+    if link_type == "restitution":
+        restitution = payload.get("restitution", {})
+        has_restitution = bool(
+            restitution.get("returnedAt")
+            and restitution.get("items")
+        )
+        if not has_restitution:
+            raise ValueError("La restitution doit être préparée avant de générer un lien.")
+        if restitution.get("signatureDataUrl"):
+            raise ValueError("Cette restitution est déjà signée.")
+    else:
+        validation = payload.get("validation", {})
+        if validation.get("signatureDataUrl"):
+            raise ValueError("Ce dossier est deja signe.")
 
-    revoke_signature_links_for_form(connection, form_id, actor=actor)
+    revoke_signature_links_for_form(connection, form_id, actor=actor, link_type=link_type)
     now = utc_now()
     row = {
         "id": generate_id("siglink"),
         "form_id": form_id,
+        "link_type": link_type,
         "token": generate_signature_token(),
         "status": "active",
         "created_by": actor,
@@ -773,30 +812,32 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72):
     connection.execute(
         """
         INSERT INTO signature_links (
-            id, form_id, token, status, created_by, created_at, expires_at,
+            id, form_id, link_type, token, status, created_by, created_at, expires_at,
             used_at, revoked_at, revoked_by, last_opened_at, last_opened_ip, notes
         ) VALUES (
-            :id, :form_id, :token, :status, :created_by, :created_at, :expires_at,
+            :id, :form_id, :link_type, :token, :status, :created_by, :created_at, :expires_at,
             :used_at, :revoked_at, :revoked_by, :last_opened_at, :last_opened_ip, :notes
         )
         """,
         row,
     )
+    link_label = signature_link_label(link_type)
+    link_scope = signature_link_scope(link_type)
     insert_audit_event(
         connection,
         form_row["dossier_id"],
         "signature_link_created",
-        "Lien de signature genere",
-        {"form_id": form_id, "title": form_row["title"], "expires_at": row["expires_at"]},
+        f"{link_label} genere",
+        {"form_id": form_id, "title": form_row["title"], "expires_at": row["expires_at"], "link_type": link_type},
     )
     insert_app_log(
         connection,
-        "signature",
+        link_scope,
         "signature_link_created",
-        "Lien de signature genere",
+        f"{link_label} genere",
         "form",
         form_id,
-        {"title": form_row["title"], "expires_at": row["expires_at"]},
+        {"title": form_row["title"], "expires_at": row["expires_at"], "link_type": link_type},
         actor=actor,
     )
     return row
@@ -819,21 +860,23 @@ def revoke_signature_link(connection, link_id, actor=None):
         (row["form_id"],),
     ).fetchone()
     if form_row:
+        link_label = signature_link_label(row["link_type"])
+        link_scope = signature_link_scope(row["link_type"])
         insert_audit_event(
             connection,
             form_row["dossier_id"],
             "signature_link_revoked",
-            "Lien de signature revoque",
-            {"form_id": row["form_id"], "title": form_row["title"]},
+            f"{link_label} revoque",
+            {"form_id": row["form_id"], "title": form_row["title"], "link_type": row["link_type"]},
         )
         insert_app_log(
             connection,
-            "signature",
+            link_scope,
             "signature_link_revoked",
-            "Lien de signature revoque",
+            f"{link_label} revoque",
             "form",
             row["form_id"],
-            {"title": form_row["title"]},
+            {"title": form_row["title"], "link_type": row["link_type"]},
             actor=actor,
         )
     return get_signature_link_by_id(connection, link_id)
@@ -2401,6 +2444,7 @@ def build_signature_public_payload(form_data, link_row):
         "link": {
             "status": link_row["status"],
             "expiresAt": link_row["expires_at"],
+            "type": link_row["link_type"],
         },
         "form": {
             "id": form_data["summary"]["id"],
@@ -2420,6 +2464,61 @@ def build_signature_public_payload(form_data, link_row):
                 "Conformement au reglement general sur la protection des donnees et a la loi Informatique et Libertes, la personne concernee dispose notamment de droits d'acces, de rectification, d'effacement, de limitation et d'opposition, dans les conditions prevues par la reglementation applicable.",
                 "Pour toute question relative au traitement de ses donnees personnelles ou pour exercer ses droits, la personne concernee peut contacter le delegue a la protection des donnees a l'adresse suivante : dpo@ville-publier.fr.",
             ],
+        },
+    }
+
+
+def build_restitution_signature_public_payload(form_data, link_row):
+    payload = form_data["data"]
+    beneficiaire = payload.get("beneficiaire", {})
+    restitution = payload.get("restitution", {})
+    material_index = {
+        item["itemKey"]: item
+        for item in (form_data.get("items") or [])
+        if item.get("category") == "materiel"
+    }
+    restitution_items = []
+    for item_key, state in (restitution.get("items") or {}).items():
+        item = material_index.get(item_key, {})
+        details = item.get("details") or {}
+        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
+            str(value).strip()
+            for key, value in details.items()
+            if key not in {"selected"} and str(value or "").strip()
+        )
+        restitution_items.append(
+            {
+                "label": item.get("label") or item_key,
+                "details": detail_text or "Sans détail complémentaire",
+                "state": state.get("state") or state.get("condition") or "conforme",
+                "stateLabel": format_restitution_state_label(state.get("state") or state.get("condition") or "conforme"),
+                "notes": state.get("notes") or "",
+            }
+        )
+
+    return {
+        "link": {
+            "status": link_row["status"],
+            "expiresAt": link_row["expires_at"],
+            "type": link_row["link_type"],
+        },
+        "form": {
+            "id": form_data["summary"]["id"],
+            "title": form_data["summary"]["title"],
+            "beneficiaire": {
+                "nom": beneficiaire.get("nom") or "",
+                "prenom": beneficiaire.get("prenom") or "",
+                "qualite": beneficiaire.get("qualite") or "",
+                "service": beneficiaire.get("service") or "",
+                "fonction": beneficiaire.get("fonction") or "",
+                "mandat": beneficiaire.get("mandat") or "",
+            },
+            "restitution": {
+                "returnedAt": restitution.get("returnedAt") or "",
+                "reason": restitution.get("reason") or "",
+                "notes": restitution.get("notes") or "",
+                "items": restitution_items,
+            },
         },
     }
 
@@ -2550,6 +2649,11 @@ def restitution_page():
 @app.route("/signature/<token>")
 def signature_page(token):
     return send_from_directory(FRONTEND_DIR, "signature.html")
+
+
+@app.route("/restitution-signature/<token>")
+def restitution_signature_page(token):
+    return send_from_directory(FRONTEND_DIR, "restitution-signature.html")
 
 
 @app.route("/admin.html")
@@ -2943,7 +3047,7 @@ def get_form_signature_link_route(form_id):
     if not get_form(form_id):
         return jsonify({"error": "not_found"}), 404
     with get_db() as connection:
-        link_row = get_latest_signature_link(connection, form_id)
+        link_row = get_latest_signature_link(connection, form_id, link_type="assignment")
     return jsonify({"link": serialize_signature_link(link_row)})
 
 
@@ -2954,7 +3058,32 @@ def create_form_signature_link_route(form_id):
         return jsonify({"error": "forbidden"}), 403
     try:
         with get_db() as connection:
-            link_row = create_signature_link(connection, form_id, actor=current_actor())
+            link_row = create_signature_link(connection, form_id, actor=current_actor(), link_type="assignment")
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"link": serialize_signature_link(link_row)}), 201
+
+
+@app.route("/api/forms/<form_id>/restitution-signature-link", methods=["GET"])
+@login_required
+def get_form_restitution_signature_link_route(form_id):
+    if not has_permission("forms.restitution"):
+        return jsonify({"error": "forbidden"}), 403
+    if not get_form(form_id):
+        return jsonify({"error": "not_found"}), 404
+    with get_db() as connection:
+        link_row = get_latest_signature_link(connection, form_id, link_type="restitution")
+    return jsonify({"link": serialize_signature_link(link_row)})
+
+
+@app.route("/api/forms/<form_id>/restitution-signature-link", methods=["POST"])
+@login_required
+def create_form_restitution_signature_link_route(form_id):
+    if not has_permission("forms.restitution"):
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        with get_db() as connection:
+            link_row = create_signature_link(connection, form_id, actor=current_actor(), link_type="restitution")
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     return jsonify({"link": serialize_signature_link(link_row)}), 201
@@ -2963,9 +3092,13 @@ def create_form_signature_link_route(form_id):
 @app.route("/api/signature-links/<link_id>", methods=["DELETE"])
 @login_required
 def revoke_signature_link_route(link_id):
-    if not has_permission("forms.edit"):
-        return jsonify({"error": "forbidden"}), 403
     with get_db() as connection:
+        existing_link = get_signature_link_by_id(connection, link_id)
+        if not existing_link:
+            return jsonify({"error": "not_found"}), 404
+        required_permission = "forms.restitution" if existing_link["link_type"] == "restitution" else "forms.edit"
+        if not has_permission(required_permission):
+            return jsonify({"error": "forbidden"}), 403
         link_row = revoke_signature_link(connection, link_id, actor=current_actor())
     if not link_row:
         return jsonify({"error": "not_found"}), 404
@@ -2976,7 +3109,7 @@ def revoke_signature_link_route(link_id):
 def get_signature_token_route(token):
     with get_db() as connection:
         link_row = get_signature_link_by_token(connection, token)
-        if not link_row:
+        if not link_row or link_row["link_type"] != "assignment":
             return jsonify({"error": "invalid_link"}), 404
         if link_row["status"] != "active":
             return jsonify({"error": link_row["status"]}), 410
@@ -2991,15 +3124,17 @@ def get_signature_token_route(token):
             (link_row["form_id"],),
         ).fetchone()
         if form_row:
+            link_label = signature_link_label(link_row["link_type"])
+            link_scope = signature_link_scope(link_row["link_type"])
             insert_app_log(
                 connection,
-                "signature",
+                link_scope,
                 "signature_link_opened",
-                "Lien de signature ouvert",
+                f"{link_label} ouvert",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr},
-                actor="public_signature_link",
+                {"title": form_row["title"], "ip": request.remote_addr, "link_type": link_row["link_type"]},
+                actor=signature_link_public_actor(link_row["link_type"]),
             )
 
     form_data = get_form(link_row["form_id"])
@@ -3018,7 +3153,7 @@ def submit_signature_token_route(token):
 
     with get_db() as connection:
         link_row = get_signature_link_by_token(connection, token)
-        if not link_row:
+        if not link_row or link_row["link_type"] != "assignment":
             return jsonify({"error": "invalid_link"}), 404
         if link_row["status"] != "active":
             return jsonify({"error": link_row["status"]}), 410
@@ -3060,22 +3195,126 @@ def submit_signature_token_route(token):
             (link_row["form_id"],),
         ).fetchone()
         if form_row:
+            link_label = signature_link_label(link_row["link_type"])
+            link_scope = signature_link_scope(link_row["link_type"])
             insert_audit_event(
                 connection,
                 form_row["dossier_id"],
                 "signature_link_used",
-                "Lien de signature utilise",
-                {"form_id": link_row["form_id"], "title": form_row["title"]},
+                f"{link_label} utilise",
+                {"form_id": link_row["form_id"], "title": form_row["title"], "link_type": link_row["link_type"]},
             )
             insert_app_log(
                 connection,
-                "signature",
+                link_scope,
                 "signature_link_used",
-                "Lien de signature utilise",
+                f"{link_label} utilise",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr},
-                actor="public_signature_link",
+                {"title": form_row["title"], "ip": request.remote_addr, "link_type": link_row["link_type"]},
+                actor=signature_link_public_actor(link_row["link_type"]),
+            )
+
+    return jsonify({
+        "success": True,
+        "summary": saved["summary"],
+        "link": serialize_signature_link(current_link),
+    })
+
+
+@app.route("/api/restitution-signature/<token>", methods=["GET"])
+def get_restitution_signature_token_route(token):
+    with get_db() as connection:
+        link_row = get_signature_link_by_token(connection, token)
+        if not link_row or link_row["link_type"] != "restitution":
+            return jsonify({"error": "invalid_link"}), 404
+        if link_row["status"] != "active":
+            return jsonify({"error": link_row["status"]}), 410
+
+        now = utc_now()
+        connection.execute(
+            "UPDATE signature_links SET last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
+            (now, request.remote_addr or "", link_row["id"]),
+        )
+        form_row = connection.execute(
+            "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
+            (link_row["form_id"],),
+        ).fetchone()
+        if form_row:
+            insert_app_log(
+                connection,
+                "restitution_signature",
+                "signature_link_opened",
+                "Lien de signature de restitution ouvert",
+                "form",
+                link_row["form_id"],
+                {"title": form_row["title"], "ip": request.remote_addr, "link_type": "restitution"},
+                actor=signature_link_public_actor("restitution"),
+            )
+
+    form_data = get_form(link_row["form_id"])
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(build_restitution_signature_public_payload(form_data, link_row))
+
+
+@app.route("/api/restitution-signature/<token>/submit", methods=["POST"])
+def submit_restitution_signature_token_route(token):
+    payload = request.get_json(silent=True) or {}
+    signature_data = payload.get("signatureDataUrl") or ""
+    if not signature_data:
+        return jsonify({"error": "signature_required"}), 400
+
+    with get_db() as connection:
+        link_row = get_signature_link_by_token(connection, token)
+        if not link_row or link_row["link_type"] != "restitution":
+            return jsonify({"error": "invalid_link"}), 404
+        if link_row["status"] != "active":
+            return jsonify({"error": link_row["status"]}), 410
+
+    form_data = get_form(link_row["form_id"])
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+
+    dossier_payload = form_data["data"]
+    dossier_payload.setdefault("restitution", {})
+    dossier_payload["restitution"]["signatureStatus"] = "signed"
+    dossier_payload["restitution"]["signatureReason"] = ""
+    dossier_payload["restitution"]["signatureDataUrl"] = signature_data
+    dossier_payload["restitution"]["signedAt"] = utc_now()
+
+    try:
+        saved = persist_form(dossier_payload, allow_locked_update=True)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    with get_db() as connection:
+        connection.execute(
+            "UPDATE signature_links SET status = 'used', used_at = ?, last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
+            (utc_now(), utc_now(), request.remote_addr or "", link_row["id"]),
+        )
+        current_link = get_signature_link_by_id(connection, link_row["id"])
+        form_row = connection.execute(
+            "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
+            (link_row["form_id"],),
+        ).fetchone()
+        if form_row:
+            insert_audit_event(
+                connection,
+                form_row["dossier_id"],
+                "signature_link_used",
+                "Lien de signature de restitution utilise",
+                {"form_id": link_row["form_id"], "title": form_row["title"], "link_type": "restitution"},
+            )
+            insert_app_log(
+                connection,
+                "restitution_signature",
+                "signature_link_used",
+                "Lien de signature de restitution utilise",
+                "form",
+                link_row["form_id"],
+                {"title": form_row["title"], "ip": request.remote_addr, "link_type": "restitution"},
+                actor=signature_link_public_actor("restitution"),
             )
 
     return jsonify({

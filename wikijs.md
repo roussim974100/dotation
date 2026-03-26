@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.8.0` |
+| Version proposee | `2.8.1` |
 | Statut | `A valider` |
 | Date de mise a jour | `2026-03-26` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + lien de signature` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + lien de signature remise et restitution` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
@@ -56,6 +56,7 @@ Le tableau de bord centralise les dossiers et permet de :
 - supprimer plusieurs dossiers si le profil le permet
 
 Depuis la fiche, un profil autorise peut aussi generer un lien unique de signature a distance.
+Depuis la restitution et le tableau de bord, un profil autorise peut aussi generer un lien unique de signature de restitution.
 
 Les profils en consultation seule peuvent exporter les PDF, mais les signatures y sont masquees.
 

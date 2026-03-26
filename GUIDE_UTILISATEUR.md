@@ -57,7 +57,8 @@ Un dossier incomplet reste modifiable.
 
 Depuis la fiche dossier, un gestionnaire peut :
 
-- generer un lien de signature
+- generer un lien de signature de remise
+- generer un lien de signature de restitution
 - copier le lien
 - revoquer le lien
 - regenerer le lien si necessaire

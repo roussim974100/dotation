@@ -21,7 +21,8 @@ python backend\app.py
 - la reouverture du dossier est tracee dans la fiche
 - un dossier signe complet passe en `Attribution active`
 - un dossier `Attribution partielle` reste modifiable
-- un lien de signature peut etre genere depuis un dossier
+- un lien de signature de remise peut etre genere depuis un dossier
+- un lien de signature de restitution peut etre genere depuis une restitution preparee
 - la restitution fonctionne depuis un dossier actif
 - le `PDF dossier` unitaire fonctionne
 - le `PDF restitution` unitaire fonctionne
