@@ -38,6 +38,8 @@ Depuis l'accueil, il est possible de :
 
 Le tableau de bord se met a jour automatiquement. Les nouveaux dossiers peuvent etre signales visuellement jusqu'a acquittement.
 
+Les profils en consultation seule peuvent exporter les PDF, mais sans affichage des signatures.
+
 ## Creer un dossier
 
 1. Cliquer sur `Nouveau dossier`
@@ -97,12 +99,18 @@ Les administrateurs peuvent :
 Le groupe `lecture` peut :
 
 - consulter les dossiers
+- exporter un `PDF dossier`
+- exporter un `PDF restitution`
 
 Le groupe `lecture` ne peut pas :
 
 - modifier un dossier
 - enregistrer une fiche
 - saisir une restitution
+- supprimer
+- administrer l'application
+
+Dans les PDF exportes par un profil `lecture`, les signatures sont masquees et remplacees par une mention reservee aux personnes autorisees.
 
 ## Journal
 
