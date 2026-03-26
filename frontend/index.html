@@ -38,7 +38,7 @@
       <p class="panel-text">Retrouvez un dossier, reprenez les parcours encore modifiables, exportez les bons utiles et supprimez une saisie inutile.</p>
     </div>
     <div class="hero-panel__meta">
-      <button class="btn btn-primary btn-lg" type="button" onclick="newForm()">Nouveau dossier</button>
+      <button id="newFormBtn" class="btn btn-primary btn-lg d-none" type="button" onclick="newForm()">Nouveau dossier</button>
       <div class="stat-card">
         <span class="stat-card__label">Dossiers modifiables</span>
         <strong class="stat-card__value" id="draftCount">0</strong>
@@ -122,7 +122,7 @@
     <div id="emptyState" class="empty-state d-none">
       <h3>Aucun dossier modifiable pour le moment</h3>
       <p>Vous pouvez commencer un nouveau dossier d'attribution puis l'enregistrer pour le reprendre plus tard s'il reste en brouillon ou en attribution partielle.</p>
-      <button class="btn btn-outline-primary" type="button" onclick="newForm()">Créer un dossier</button>
+      <button id="emptyStateNewFormBtn" class="btn btn-outline-primary d-none" type="button" onclick="newForm()">Créer un dossier</button>
     </div>
   </section>
 </main>
