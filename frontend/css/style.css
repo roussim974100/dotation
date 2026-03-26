@@ -236,6 +236,60 @@ body.login-shell {
   margin-top: 0.45rem;
 }
 
+.password-generator-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.password-generator-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 28, 40, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.password-generator-modal__dialog {
+  position: relative;
+  width: min(100%, 32rem);
+  padding: 1.35rem;
+  border: 1px solid rgba(212, 221, 230, 0.9);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 56px rgba(15, 55, 84, 0.22);
+}
+
+.password-generator-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.password-generator-modal__content {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.password-generator-modal__result {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #fbfdff, #f4f8fb);
+}
+
+.password-generator-modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 /* Contenants principaux reutilises dans les pages */
 .hero-panel,
 .content-card {
