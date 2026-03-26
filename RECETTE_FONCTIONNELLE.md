@@ -21,6 +21,7 @@ python backend\app.py
 - la reouverture du dossier est tracee dans la fiche
 - un dossier signe complet passe en `Attribution active`
 - un dossier `Attribution partielle` reste modifiable
+- un lien de signature peut etre genere depuis un dossier
 - la restitution fonctionne depuis un dossier actif
 - le `PDF dossier` unitaire fonctionne
 - le `PDF restitution` unitaire fonctionne
@@ -89,6 +90,23 @@ Attendu :
 - la restitution est enregistree
 - le `PDF restitution` est disponible
 - le resume apparait dans le dossier
+
+### 4 bis. Signature a distance
+
+1. Ouvrir un dossier modifiable
+2. Generer un lien de signature
+3. Ouvrir le lien dans un navigateur prive
+4. Valider le RGPD
+5. Signer
+6. Valider
+
+Attendu :
+
+- la page publique s'affiche sans connexion
+- les ressources du dossier sont visibles en lecture seule
+- la signature est enregistree
+- le lien passe a l'etat `utilise`
+- la fiche est mise a jour au retour dans l'application
 
 ### 5. Export multiple PDF dossier
 

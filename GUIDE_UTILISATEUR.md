@@ -53,6 +53,24 @@ Les profils en consultation seule peuvent exporter les PDF, mais sans affichage 
 
 Un dossier incomplet reste modifiable.
 
+## Signature a distance
+
+Depuis la fiche dossier, un gestionnaire peut :
+
+- generer un lien de signature
+- copier le lien
+- revoquer le lien
+- regenerer le lien si necessaire
+
+La personne qui ouvre ce lien peut uniquement :
+
+- consulter le dossier
+- prendre connaissance des ressources remises
+- valider le RGPD
+- signer
+
+Le lien devient inutilisable apres validation.
+
 ## Reouverture d'un dossier
 
 Quand un dossier encore modifiable est rouvert :

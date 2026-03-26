@@ -820,6 +820,70 @@ body.login-shell {
   font-size: 0.95rem;
 }
 
+.signature-link-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #f7fbff, #ffffff);
+}
+
+.signature-link-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.signature-link-card__body {
+  border-top: 1px solid rgba(212, 221, 230, 0.9);
+  padding-top: 1rem;
+}
+
+.signature-link-card__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.signature-link-card__meta strong,
+.signature-link-card__meta span {
+  display: block;
+}
+
+.signature-link-card__meta strong {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.signature-link-card__meta span {
+  margin-top: 0.2rem;
+  color: var(--ink);
+}
+
+.stack-gap {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.status-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.status-card__label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .action-bar {
   display: flex;
   gap: 1rem;

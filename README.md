@@ -7,6 +7,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - creer un dossier pour un agent ou un(e) elu(e)
 - enregistrer un dossier en brouillon ou en attribution partielle
 - verrouiller un dossier complet une fois signe et valide RGPD
+- generer un lien unique de signature a distance
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
 - administrer les comptes, les groupes et les ressources attribuables
@@ -40,6 +41,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - `frontend/index.html` : tableau de bord des dossiers
 - `frontend/form.html` : creation et mise a jour d'un dossier
 - `frontend/restitution.html` : restitution des ressources materielles
+- `frontend/signature.html` : page publique de signature via lien securise
 - `frontend/admin.html` : administration
 - `frontend/logs.html` : journal des actions
 - `frontend/trash.html` : corbeille administrateur
@@ -102,8 +104,31 @@ Un dossier peut contenir :
 - le type de dossier
 - les ressources attribuees par service
 - la signature de remise
+- un lien de signature a distance a usage unique
 - la validation RGPD
 - la tracabilite de reouverture
+
+## Signature a distance
+
+Depuis la fiche dossier, un profil autorise peut :
+
+- generer un lien unique de signature
+- copier ce lien
+- revoquer le lien
+- regenerer un nouveau lien
+
+La page publique de signature permet a la personne concernee de :
+
+- consulter l'identite et les ressources remises
+- prendre connaissance du RGPD
+- signer le dossier sans compte applicatif
+
+Le lien est :
+
+- limite a un seul dossier
+- a usage unique
+- expirable
+- revocable
 
 Un dossier complet passe en `Attribution active`.
 
