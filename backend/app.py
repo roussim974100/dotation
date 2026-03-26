@@ -1013,16 +1013,16 @@ def collect_resource_entries(payload):
 
     if materiel.get("ordinateur", {}).get("selected"):
         item = materiel["ordinateur"]
-        add_entry("ordinateur", "DSI", "Ordinateur", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("ordinateur", "DSI", "Ordinateur", [item.get("nomPoste"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if materiel.get("ecran", {}).get("selected"):
         item = materiel["ecran"]
         add_entry("ecran", "DSI", "Écran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if materiel.get("telephone", {}).get("selected"):
         item = materiel["telephone"]
-        add_entry("telephone", "DSI", "Téléphone", [item.get("marque"), item.get("modele"), item.get("imei")])
+        add_entry("telephone", "DSI", "Téléphone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")])
     if materiel.get("tablette", {}).get("selected"):
         item = materiel["tablette"]
-        add_entry("tablette", "DSI", "Tablette", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("tablette", "DSI", "Tablette", [item.get("nomTablette"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if immateriel.get("email", {}).get("selected"):
         add_entry("email", "DSI", "Messagerie", [immateriel["email"].get("adresse")])
     if immateriel.get("vpn", {}).get("selected"):

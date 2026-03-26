@@ -267,16 +267,16 @@ function buildDotationPreview(data) {
   };
 
   if (materiel.ordinateur?.selected) {
-    pushItem("Ordinateur", [materiel.ordinateur.marque, materiel.ordinateur.modele].filter(Boolean).join(" - "));
+    pushItem("Ordinateur", [materiel.ordinateur.nomPoste, materiel.ordinateur.marque, materiel.ordinateur.modele].filter(Boolean).join(" - "));
   }
   if (materiel.ecran?.selected) {
     pushItem("Écran", [materiel.ecran.marque, materiel.ecran.modele].filter(Boolean).join(" - "));
   }
   if (materiel.telephone?.selected) {
-    pushItem("Téléphone", [materiel.telephone.marque, materiel.telephone.modele].filter(Boolean).join(" - "));
+    pushItem("Téléphone", [materiel.telephone.nomTelephone, materiel.telephone.marque, materiel.telephone.modele].filter(Boolean).join(" - "));
   }
   if (materiel.tablette?.selected) {
-    pushItem("Tablette", [materiel.tablette.marque, materiel.tablette.modele, materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
+    pushItem("Tablette", [materiel.tablette.nomTablette, materiel.tablette.marque, materiel.tablette.modele].filter(Boolean).join(" - "));
   }
   if (immateriel.email?.selected) {
     pushItem("Email", immateriel.email.adresse || "");
