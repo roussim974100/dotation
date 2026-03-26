@@ -46,7 +46,7 @@ const EQUIPMENT_CONFIG = [
     label: "Ordinateur",
     category: "materiel",
     checkboxId: "has_pc",
-    detail: () => [getFieldValue("pc_marque"), getFieldValue("pc_modele"), getFieldValue("pc_sn")].filter(Boolean).join(" - ")
+    detail: () => [getFieldValue("pc_nom"), getFieldValue("pc_marque"), getFieldValue("pc_modele"), getFieldValue("pc_sn")].filter(Boolean).join(" - ")
   },
   {
     key: "ecran",
@@ -60,14 +60,14 @@ const EQUIPMENT_CONFIG = [
     label: "Téléphone",
     category: "materiel",
     checkboxId: "has_phone",
-    detail: () => [getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
+    detail: () => [getFieldValue("tel_nom"), getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
   },
   {
     key: "tablette",
     label: "Tablette",
     category: "materiel",
     checkboxId: "has_tablette",
-    detail: () => [getFieldValue("tablette_marque"), getFieldValue("tablette_modele"), getFieldValue("tablette_sn")].filter(Boolean).join(" - ")
+    detail: () => [getFieldValue("tablette_nom"), getFieldValue("tablette_marque"), getFieldValue("tablette_modele"), getFieldValue("tablette_sn")].filter(Boolean).join(" - ")
   },
   {
     key: "vehicule",
@@ -136,6 +136,7 @@ const EQUIPMENT_CONFIG = [
 
 const CORE_RESOURCE_RULES = {
   ordinateur: [
+    { fieldId: "pc_nom", label: "Nom du poste", required: false, pattern: ".*", hint: "" },
     { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
     { fieldId: "pc_modele", label: "Modèle ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
     { fieldId: "pc_sn", label: "Numéro de série ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
@@ -146,11 +147,13 @@ const CORE_RESOURCE_RULES = {
     { fieldId: "screen_sn", label: "Numéro de série écran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
   ],
   telephone: [
+    { fieldId: "tel_nom", label: "Nom du téléphone", required: false, pattern: ".*", hint: "" },
     { fieldId: "tel_marque", label: "Marque téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
     { fieldId: "tel_modele", label: "Modèle téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
     { fieldId: "tel_imei", label: "IMEI", required: true, pattern: "^\\d{15}$", hint: "15 chiffres" }
   ],
   tablette: [
+    { fieldId: "tablette_nom", label: "Nom de la tablette", required: false, pattern: ".*", hint: "" },
     { fieldId: "tablette_marque", label: "Marque tablette", required: true, pattern: ".*", hint: "" },
     { fieldId: "tablette_modele", label: "Modèle tablette", required: true, pattern: ".*", hint: "" },
     { fieldId: "tablette_sn", label: "Numéro de série tablette", required: true, pattern: ".*", hint: "" }
@@ -649,16 +652,16 @@ function renderPrintSummary(formData) {
   };
 
   if (formData.materiel.ordinateur.selected) {
-    pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "));
   }
   if (formData.materiel.ecran.selected) {
     pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "));
   }
   if (formData.materiel.telephone.selected) {
-    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "));
   }
   if (formData.materiel.tablette?.selected) {
-    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
   }
   if (formData.immateriel.vpn.selected) {
     pushItem(dsiItems, "VPN", "");
@@ -1118,10 +1121,10 @@ function initSignaturePad() {
 
 function buildEquipmentSelectionMap() {
   return {
-    ordinateur: { selected: document.getElementById("has_pc").checked, marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn") },
+    ordinateur: { selected: document.getElementById("has_pc").checked, nomPoste: getFieldValue("pc_nom"), marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn") },
     ecran: { selected: document.getElementById("has_screen").checked, marque: getFieldValue("screen_marque"), modele: getFieldValue("screen_modele"), numeroSerie: getFieldValue("screen_sn") },
-    telephone: { selected: document.getElementById("has_phone").checked, marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei") },
-    tablette: { selected: document.getElementById("has_tablette").checked, marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn") },
+    telephone: { selected: document.getElementById("has_phone").checked, nomTelephone: getFieldValue("tel_nom"), marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei") },
+    tablette: { selected: document.getElementById("has_tablette").checked, nomTablette: getFieldValue("tablette_nom"), marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn") },
     vehicule: { selected: document.getElementById("has_vehicule").checked, marque: getFieldValue("vehicule_marque"), modele: getFieldValue("vehicule_modele"), immatriculation: getFieldValue("vehicule_plaque") },
     badge: { selected: document.getElementById("has_badge").checked, numero: getFieldValue("badge_numero") },
     cles: { selected: document.getElementById("has_cles").checked, values: getRepeatableValues("clesRows") },
@@ -1229,10 +1232,10 @@ function populateForm(data, signaturePad) {
     }
   }
 
-  setCheckboxAndFields("has_pc", data.materiel.ordinateur.selected, { pc_sn: data.materiel.ordinateur.numeroSerie });
+  setCheckboxAndFields("has_pc", data.materiel.ordinateur.selected, { pc_nom: data.materiel.ordinateur.nomPoste, pc_sn: data.materiel.ordinateur.numeroSerie });
   setCheckboxAndFields("has_screen", data.materiel.ecran.selected, { screen_sn: data.materiel.ecran.numeroSerie });
-  setCheckboxAndFields("has_phone", data.materiel.telephone.selected, { tel_imei: data.materiel.telephone.imei });
-  setCheckboxAndFields("has_tablette", data.materiel.tablette?.selected, { tablette_sn: data.materiel.tablette?.numeroSerie });
+  setCheckboxAndFields("has_phone", data.materiel.telephone.selected, { tel_nom: data.materiel.telephone.nomTelephone, tel_imei: data.materiel.telephone.imei });
+  setCheckboxAndFields("has_tablette", data.materiel.tablette?.selected, { tablette_nom: data.materiel.tablette?.nomTablette, tablette_sn: data.materiel.tablette?.numeroSerie });
   setCheckboxAndFields("has_vehicule", data.materiel.vehicule.selected, { vehicule_plaque: data.materiel.vehicule.immatriculation });
   setCheckboxAndFields("has_badge", data.materiel.badge.selected, { badge_numero: data.materiel.badge.numero });
   setCheckboxAndFields("has_cles", data.materiel.cles?.selected, {});
@@ -1240,12 +1243,15 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: data.immateriel.email.adresse });
   setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
 
+  document.getElementById("pc_nom").value = data.materiel.ordinateur.nomPoste || "";
   document.getElementById("pc_marque").value = data.materiel.ordinateur.marque || "";
   document.getElementById("pc_modele").value = data.materiel.ordinateur.modele || "";
   document.getElementById("screen_marque").value = data.materiel.ecran.marque || "";
   document.getElementById("screen_modele").value = data.materiel.ecran.modele || "";
+  document.getElementById("tel_nom").value = data.materiel.telephone.nomTelephone || "";
   document.getElementById("tel_marque").value = data.materiel.telephone.marque || "";
   document.getElementById("tel_modele").value = data.materiel.telephone.modele || "";
+  document.getElementById("tablette_nom").value = data.materiel.tablette?.nomTablette || "";
   document.getElementById("tablette_marque").value = data.materiel.tablette?.marque || "";
   document.getElementById("tablette_modele").value = data.materiel.tablette?.modele || "";
   document.getElementById("vehicule_marque").value = data.materiel.vehicule.marque || "";
