@@ -52,11 +52,13 @@
     <div class="row g-3">
       <div class="col-md-4">
         <label class="form-label" for="admin_username">Identifiant</label>
-        <input class="form-control" id="admin_username" placeholder="prenom.nom">
+        <input class="form-control" id="admin_username" placeholder="Identifiant">
       </div>
       <div class="col-md-4">
         <label class="form-label" for="admin_password">Mot de passe</label>
         <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
+        <div class="form-text">12 caracteres minimum, avec majuscule, minuscule, chiffre et caractere special.</div>
+        <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Generer un mot de passe</button>
       </div>
       <div class="col-md-4 d-flex align-items-end">
         <label class="form-check">
@@ -199,6 +201,40 @@
     </div>
   </section>
 </main>
+
+<div class="password-generator-modal d-none" id="passwordGeneratorModal" aria-hidden="true">
+  <div class="password-generator-modal__backdrop" data-password-modal-close="true"></div>
+  <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="passwordGeneratorTitle">
+    <div class="password-generator-modal__header">
+      <div>
+        <p class="panel-eyebrow">Generateur</p>
+        <h2 class="section-title" id="passwordGeneratorTitle">Mot de passe thematique</h2>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" type="button" data-password-modal-close="true">Fermer</button>
+    </div>
+    <div class="password-generator-modal__content">
+      <label class="form-label" for="passwordThemeSelect">Theme</label>
+      <select class="form-select" id="passwordThemeSelect">
+        <option value="licorne">Licorne</option>
+        <option value="starwars">StarWars</option>
+        <option value="marvel">Marvel</option>
+        <option value="film_francais">Film francais</option>
+        <option value="publier">Ville de Publier</option>
+      </select>
+
+      <div class="password-generator-modal__result">
+        <label class="form-label" for="generatedPasswordValue">Mot de passe genere</label>
+        <input class="form-control form-control-lg" id="generatedPasswordValue" type="text" readonly>
+      </div>
+
+      <div class="password-generator-modal__actions">
+        <button class="btn btn-outline-primary" id="refreshGeneratedPasswordBtn" type="button">Regenerer</button>
+        <button class="btn btn-outline-secondary" id="copyGeneratedPasswordBtn" type="button">Copier</button>
+        <button class="btn btn-primary" id="applyGeneratedPasswordBtn" type="button">Utiliser ce mot de passe</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="js/ui.js"></script>
 <script src="js/admin.js"></script>

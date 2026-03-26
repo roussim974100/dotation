@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session
+﻿from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
 import base64
 import bcrypt
 import io
@@ -15,6 +15,7 @@ from functools import wraps
 from xml.sax.saxutils import escape as xml_escape
 import zlib
 from werkzeug.middleware.proxy_fix import ProxyFix
+import re
 
 
 # Paths principaux du projet: frontend servi par Flask, base SQLite et cache catalogue.
@@ -61,17 +62,17 @@ CORE_RESOURCE_CODES = {
 
 DEFAULT_RESOURCE_REFERENCES = [
     {"code": "ordinateur", "label": "Ordinateur", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "ecran", "label": "Écran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "telephone", "label": "Téléphone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
+    {"code": "ecran", "label": "Ã‰cran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
+    {"code": "telephone", "label": "TÃ©lÃ©phone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "tablette", "label": "Tablette", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "vpn", "label": "VPN", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
     {"code": "email", "label": "Email", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
-    {"code": "badge", "label": "Badge d'accès", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "cles", "label": "Clé(s)", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "Bâtiment", "requires_return": 0, "trigger_key": ""},
-    {"code": "vehicule", "label": "Véhicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
+    {"code": "badge", "label": "Badge d'accÃ¨s", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
+    {"code": "cles", "label": "ClÃ©(s)", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
+    {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
+    {"code": "chaussuresSecurite", "label": "Chaussures de sÃ©curitÃ©", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
+    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "BÃ¢timent", "requires_return": 0, "trigger_key": ""},
+    {"code": "vehicule", "label": "VÃ©hicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
 ]
 
 BRAND_LOGO_CACHE = {
@@ -86,9 +87,9 @@ USERS_FILE = os.path.join(BASE_DIR, "users.json")
 DEFAULT_GROUPS = {
     "lecture": {
         "label": "Lecture",
-        "description": "Consultation avec donnees personnelles masquees.",
+        "description": "Consultation seule, sans possibilite de saisie.",
         "permissions": ["forms.read_list", "forms.read_detail", "forms.export"],
-        "data_scope": "masked",
+        "data_scope": "full",
     },
     "redaction": {
         "label": "Redaction",
@@ -119,6 +120,17 @@ def load_auth_config():
         raw = json.load(file)
 
     if "users" in raw and "groups" in raw:
+        changed = False
+        for user in raw.get("users", []):
+            status = user.get("status")
+            if not status:
+                user["status"] = "active" if user.get("is_active", True) else "disabled"
+                changed = True
+            if "is_active" not in user:
+                user["is_active"] = user.get("status") != "disabled"
+                changed = True
+        if changed:
+            save_auth_config(raw)
         return raw
 
     migrated_users = [
@@ -420,6 +432,25 @@ def get_user_record(username):
     return None
 
 
+def password_complexity_error(password):
+    value = str(password or "")
+    if len(value) < 12:
+        return "password_too_short"
+    if not re.search(r"[A-Z]", value):
+        return "password_missing_upper"
+    if not re.search(r"[a-z]", value):
+        return "password_missing_lower"
+    if not re.search(r"\d", value):
+        return "password_missing_digit"
+    if not re.search(r"[^A-Za-z0-9]", value):
+        return "password_missing_special"
+    return None
+
+
+def is_valid_username(username):
+    return bool(re.fullmatch(r"[A-Za-z0-9._-]{3,64}", str(username or "").strip()))
+
+
 def build_user_context(username):
     # Les permissions sont calculees a partir des groupes.
     # data_scope pilote ensuite le masquage RGPD des reponses.
@@ -445,6 +476,15 @@ def current_user():
     return build_user_context(username)
 
 
+def can_export_signature_assets():
+    if not has_request_context():
+        return True
+    user = current_user()
+    if not user:
+        return False
+    return "*" in user["permissions"] or "forms.edit" in user["permissions"] or "forms.restitution" in user["permissions"]
+
+
 def has_permission(permission):
     user = current_user()
     if not user:
@@ -454,9 +494,15 @@ def has_permission(permission):
 
 def check_user(username, password):
     user = get_user_record(username)
-    if not user or not user.get("is_active", True):
-        return False
-    return bcrypt.checkpw(password.encode(), user["password_hash"].encode())
+    if not user:
+        return "invalid"
+    if user.get("status") == "pending":
+        return "pending"
+    if user.get("status") == "disabled" or not user.get("is_active", True):
+        return "disabled"
+    if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        return "invalid"
+    return "ok"
 
 
 def bool_to_int(value):
@@ -531,12 +577,12 @@ def normalize_dossier_type(value):
 
 def dossier_type_label(value):
     labels = {
-        "arrivee": "Nouvelle arrivée",
+        "arrivee": "Nouvelle arrivÃ©e",
         "changement_service": "Changement de service",
-        "mise_a_jour": "Mise à jour de ressources",
+        "mise_a_jour": "Mise Ã  jour de ressources",
         "sortie": "Sortie / restitution",
     }
-    return labels.get(normalize_dossier_type(value), "Nouvelle arrivée")
+    return labels.get(normalize_dossier_type(value), "Nouvelle arrivÃ©e")
 
 
 def insert_audit_event(connection, dossier_id, event_type, event_label, details=None):
@@ -977,7 +1023,7 @@ def get_restitution_signature_datetime(payload):
 def format_beneficiary_label(value):
     labels = {
         "agent": "Agent",
-        "elu": "Élu(e)",
+        "elu": "Ã‰lu(e)",
     }
     return labels.get(value, value or "-")
 
@@ -1005,7 +1051,7 @@ def collect_resource_entries(payload):
         entries.append(
             {
                 "itemKey": item_key,
-                "service": service or "Non défini",
+                "service": service or "Non dÃ©fini",
                 "label": label,
                 "details": " - ".join(clean_details) if clean_details else "-",
             }
@@ -1016,10 +1062,10 @@ def collect_resource_entries(payload):
         add_entry("ordinateur", "DSI", "Ordinateur", [item.get("nomPoste"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if materiel.get("ecran", {}).get("selected"):
         item = materiel["ecran"]
-        add_entry("ecran", "DSI", "Écran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("ecran", "DSI", "Ã‰cran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
     if materiel.get("telephone", {}).get("selected"):
         item = materiel["telephone"]
-        add_entry("telephone", "DSI", "Téléphone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")])
+        add_entry("telephone", "DSI", "TÃ©lÃ©phone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")])
     if materiel.get("tablette", {}).get("selected"):
         item = materiel["tablette"]
         add_entry("tablette", "DSI", "Tablette", [item.get("nomTablette"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
@@ -1028,18 +1074,18 @@ def collect_resource_entries(payload):
     if immateriel.get("vpn", {}).get("selected"):
         add_entry("vpn", "DSI", "VPN", [], include_if_empty=True)
     if materiel.get("badge", {}).get("selected"):
-        add_entry("badge", "Bâtiment", "Badge d'accès", [materiel["badge"].get("numero")])
+        add_entry("badge", "BÃ¢timent", "Badge d'accÃ¨s", [materiel["badge"].get("numero")])
     if materiel.get("cles", {}).get("selected"):
-        add_entry("cles", "Bâtiment", "Clé(s)", materiel["cles"].get("values") or [])
+        add_entry("cles", "BÃ¢timent", "ClÃ©(s)", materiel["cles"].get("values") or [])
     if materiel.get("veste", {}).get("selected"):
-        add_entry("veste", "Bâtiment", "Veste", [], include_if_empty=True)
+        add_entry("veste", "BÃ¢timent", "Veste", [], include_if_empty=True)
     if materiel.get("chaussuresSecurite", {}).get("selected"):
-        add_entry("chaussuresSecurite", "Bâtiment", "Chaussures de sécurité", [], include_if_empty=True)
+        add_entry("chaussuresSecurite", "BÃ¢timent", "Chaussures de sÃ©curitÃ©", [], include_if_empty=True)
     if immateriel.get("zoneAlarme", {}).get("selected"):
-        add_entry("zoneAlarme", "Bâtiment", "Zone alarme", immateriel["zoneAlarme"].get("zones") or [])
+        add_entry("zoneAlarme", "BÃ¢timent", "Zone alarme", immateriel["zoneAlarme"].get("zones") or [])
     if materiel.get("vehicule", {}).get("selected"):
         item = materiel["vehicule"]
-        add_entry("vehicule", "Autres services", "Véhicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
+        add_entry("vehicule", "Autres services", "VÃ©hicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
     if materiel.get("autre", {}).get("selected"):
         add_entry("autre", "Autres services", "Autre ressource", [materiel["autre"].get("description")])
 
@@ -1049,7 +1095,7 @@ def collect_resource_entries(payload):
         add_entry(
             resource.get("code") or resource.get("id") or generate_id("resource"),
             resource.get("issuerService") or resource.get("issuer_service") or "Autres services",
-            resource.get("label") or "Ressource complémentaire",
+            resource.get("label") or "Ressource complÃ©mentaire",
             [summarize_dynamic_resource(resource)],
         )
 
@@ -1066,20 +1112,20 @@ def build_form_export_lines(payload):
     lines = [
         "DOSSIER D'ATTRIBUTION DE RESSOURCES",
         "",
-        f"État : {format_status_label(workflow.get('status') or 'draft')}",
+        f"Ã‰tat : {format_status_label(workflow.get('status') or 'draft')}",
         f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
         f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
         "",
-        "Bénéficiaire",
+        "BÃ©nÃ©ficiaire",
         f"Nom : {beneficiaire.get('nom') or '-'}",
-        f"Prénom : {beneficiaire.get('prenom') or '-'}",
-        f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+        f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
+        f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
         f"Service : {beneficiaire.get('service') or '-'}",
         f"Fonction : {beneficiaire.get('fonction') or '-'}",
         f"Mandat : {beneficiaire.get('mandat') or '-'}",
         f"Service de destination : {dossier.get('serviceDestination') or '-'}",
         "",
-        "Ressources attribuées",
+        "Ressources attribuÃ©es",
     ]
 
     resources = collect_resource_entries(payload)
@@ -1091,20 +1137,20 @@ def build_form_export_lines(payload):
                 lines.append(f"{current_service}")
             lines.append(f"- {entry['label']} : {entry['details']}")
     else:
-        lines.append("- Aucune ressource renseignée")
+        lines.append("- Aucune ressource renseignÃ©e")
 
     lines.extend(
         [
             "",
             "Restitution",
-            f"État de restitution : {format_status_label(workflow.get('status') or 'draft')}",
+            f"Ã‰tat de restitution : {format_status_label(workflow.get('status') or 'draft')}",
             f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
             f"Motif : {restitution.get('reason') or '-'}",
             f"Observations : {restitution.get('notes') or '-'}",
             "",
             "Validation",
-            f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-            f"Signature présente : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+            f"Information RGPD portÃ©e Ã  connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+            f"Signature prÃ©sente : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
             f"Date de signature : {signature_datetime}",
         ]
     )
@@ -1125,6 +1171,8 @@ def build_pdf_bytes(title, payload):
     validation = payload.get("validation", {})
     restitution = payload.get("restitution", {})
     signature_datetime = get_signature_datetime(payload)
+    signature_export_allowed = can_export_signature_assets()
+    signature_present = bool(validation.get("signatureDataUrl"))
     resources = collect_resource_entries(payload)
     resource_groups = {}
     for entry in resources:
@@ -1134,18 +1182,18 @@ def build_pdf_bytes(title, payload):
         (
             "Identification du dossier",
             [
-                f"État : {format_status_label(workflow.get('status') or 'draft')}",
+                f"Ã‰tat : {format_status_label(workflow.get('status') or 'draft')}",
                 f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
                 f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
-                f"Date de création : {format_export_datetime(payload.get('meta', {}).get('createdAt'))}",
+                f"Date de crÃ©ation : {format_export_datetime(payload.get('meta', {}).get('createdAt'))}",
             ],
         ),
         (
-            "Bénéficiaire",
+            "BÃ©nÃ©ficiaire",
             [
                 f"Nom : {beneficiaire.get('nom') or '-'}",
-                f"Prénom : {beneficiaire.get('prenom') or '-'}",
-                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
+                f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
                 f"Service : {beneficiaire.get('service') or '-'}",
                 f"Fonction : {beneficiaire.get('fonction') or '-'}",
                 f"Mandat : {beneficiaire.get('mandat') or '-'}",
@@ -1158,12 +1206,12 @@ def build_pdf_bytes(title, payload):
         for service, service_entries in sorted(resource_groups.items(), key=lambda item: item[0]):
             sections.append(
                 (
-                    f"Ressources attribuées - {service}",
+                    f"Ressources attribuÃ©es - {service}",
                     [f"{entry['label']} : {entry['details']}" for entry in service_entries],
                 )
             )
     else:
-        sections.append(("Ressources attribuées", ["Aucune ressource renseignée."]))
+        sections.append(("Ressources attribuÃ©es", ["Aucune ressource renseignÃ©e."]))
 
     restitution_lines = [
         f"Statut : {format_status_label(workflow.get('status') or 'draft')}",
@@ -1182,14 +1230,25 @@ def build_pdf_bytes(title, payload):
     sections.append(("Restitution", restitution_lines))
     sections.append(
         (
-            "Validation et conformité",
+            "Validation et conformit??",
             [
-                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-                f"Signature du bénéficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+                f"Information RGPD port??e ?? connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                f"Signature du b??n??ficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
                 f"Date de signature : {signature_datetime}",
             ],
         )
     )
+
+    if not signature_export_allowed:
+        sections[-1] = (
+            sections[-1][0],
+            [
+                f"Information RGPD port?e ? connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                "Signature du b?n?ficiaire : Masqu?e",
+                "Mention : la signature est r?serv?e aux personnes autoris?es.",
+            ],
+        )
+
 
     objects = []
 
@@ -1210,7 +1269,7 @@ def build_pdf_bytes(title, payload):
             f"stream\n{logo_stream.decode('latin-1')}\nendstream"
         )
 
-    signature_image = extract_signature_image(validation.get("signatureDataUrl"))
+    signature_image = extract_signature_image(validation.get("signatureDataUrl")) if signature_export_allowed else None
     signature_image_id = None
     if signature_image:
         signature_stream = signature_image["data"]
@@ -1291,12 +1350,23 @@ def build_pdf_bytes(title, payload):
         ensure_space(section_height)
         box_bottom = current_y - section_height
         draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature du bÃ©nÃ©ficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
         draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
         draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la validation du dossier.", font="F1", size=10, color=(0.28, 0.36, 0.44))
         current_page.append(
             f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
         )
+        current_y = box_bottom - 16
+
+    if signature_present and not signature_export_allowed:
+        section_height = 92
+        ensure_space(section_height)
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature du b?n?ficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 38, "Signature masqu?e dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "La signature est r?serv?e aux personnes autoris?es.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
         current_y = box_bottom - 16
 
     if not current_page:
@@ -1317,17 +1387,17 @@ def build_pdf_bytes(title, payload):
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
         draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Dossier d'attribution de ressources", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et Ã©lu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
         draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuÃ©es", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
 
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "Parcours agents et Ã©lu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -1359,7 +1429,7 @@ def build_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et Ã©lu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -1400,13 +1470,15 @@ def build_restitution_pdf_bytes(title, payload):
     restitution = payload.get("restitution", {})
     signature_datetime = get_restitution_signature_datetime(payload)
     signature_status = restitution.get("signatureStatus") or ("signed" if restitution.get("signatureDataUrl") else "deferred")
+    signature_export_allowed = can_export_signature_assets()
+    signature_present = bool(restitution.get("signatureDataUrl"))
     resources = {entry["itemKey"]: entry for entry in collect_resource_entries(payload)}
 
     sections = [
         (
             "Identification de la restitution",
             [
-                f"État du dossier : {format_status_label(workflow.get('status') or 'draft')}",
+                f"Ã‰tat du dossier : {format_status_label(workflow.get('status') or 'draft')}",
                 f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
                 f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
                 f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
@@ -1414,11 +1486,11 @@ def build_restitution_pdf_bytes(title, payload):
             ],
         ),
         (
-            "Bénéficiaire",
+            "BÃ©nÃ©ficiaire",
             [
                 f"Nom : {beneficiaire.get('nom') or '-'}",
-                f"Prénom : {beneficiaire.get('prenom') or '-'}",
-                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
+                f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
                 f"Service : {beneficiaire.get('service') or '-'}",
                 f"Fonction : {beneficiaire.get('fonction') or '-'}",
                 f"Mandat : {beneficiaire.get('mandat') or '-'}",
@@ -1433,19 +1505,30 @@ def build_restitution_pdf_bytes(title, payload):
         note = state.get("notes") or "-"
         restitution_lines.append(f"{entry['label']} ({entry['details']}) : {state_label} / {note}")
     if not restitution_lines:
-        restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
-    sections.append(("État des matériels restitués", restitution_lines))
+        restitution_lines.append("Aucun matÃ©riel n'a encore Ã©tÃ© renseignÃ© dans la restitution.")
+    sections.append(("Ã‰tat des matÃ©riels restituÃ©s", restitution_lines))
     sections.append(
         (
             "Validation de la restitution",
             [
                 f"Statut de signature : {format_restitution_signature_status(signature_status)}",
                 f"Date de signature : {signature_datetime}",
-                f"Motif si la signature n'a pas été recueillie : {restitution.get('signatureReason') or '-'}",
-                f"Observations générales : {restitution.get('notes') or '-'}",
+                f"Motif si la signature n'a pas Ã©tÃ© recueillie : {restitution.get('signatureReason') or '-'}",
+                f"Observations gÃ©nÃ©rales : {restitution.get('notes') or '-'}",
             ],
         )
     )
+
+    if not signature_export_allowed:
+        sections[-1] = (
+            sections[-1][0],
+            [
+                "Statut de signature : Masqu?e",
+                "Mention : la signature est r?serv?e aux personnes autoris?es.",
+                "Motif si la signature n'a pas ?t? recueillie : Information r?serv?e.",
+                f"Observations g?n?rales : {restitution.get('notes') or '-'}",
+            ],
+        )
 
     objects = []
 
@@ -1466,7 +1549,7 @@ def build_restitution_pdf_bytes(title, payload):
             f"stream\n{logo_stream.decode('latin-1')}\nendstream"
         )
 
-    signature_image = extract_signature_image(restitution.get("signatureDataUrl"))
+    signature_image = extract_signature_image(restitution.get("signatureDataUrl")) if signature_export_allowed else None
     signature_image_id = None
     if signature_image:
         signature_stream = signature_image["data"]
@@ -1532,7 +1615,7 @@ def build_restitution_pdf_bytes(title, payload):
             draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
             line_y -= 15
 
-        current_y = box_bottom - 16
+
 
     for section_title, section_lines in sections:
         add_section(section_title, section_lines)
@@ -1555,6 +1638,17 @@ def build_restitution_pdf_bytes(title, payload):
         )
         current_y = box_bottom - 16
 
+    if signature_present and not signature_export_allowed:
+        section_height = 92
+        ensure_space(section_height)
+        box_bottom = current_y - section_height
+        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 38, "Signature masqu?e dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "La signature est r?serv?e aux personnes autoris?es.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        current_y = box_bottom - 16
+
     if not current_page:
         current_page = []
     pages.append(current_page)
@@ -1573,17 +1667,17 @@ def build_restitution_pdf_bytes(title, payload):
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
         draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et Ã©lu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
         draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources récupérées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources rÃ©cupÃ©rÃ©es", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
 
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "Parcours agents et Ã©lu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -1615,7 +1709,7 @@ def build_restitution_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et Ã©lu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -1647,9 +1741,9 @@ def format_status_label(status):
         "draft": "Brouillon",
         "partial_assignment": "Attribution partielle",
         "active": "Attribution active",
-        "returned": "Restitution terminée",
+        "returned": "Restitution terminÃ©e",
         "partial_return": "Restitution partielle",
-        "cancelled": "Dossier annulé",
+        "cancelled": "Dossier annulÃ©",
     }
     return labels.get(status, "Brouillon")
 
@@ -1657,13 +1751,13 @@ def format_status_label(status):
 def format_restitution_state_label(state):
     labels = {
         "pending": "En attente",
-        "returned": "Restitué",
-        "returned_damaged": "Restitué abîmé",
-        "missing": "Non restitué",
-        "transferred": "Transféré",
+        "returned": "RestituÃ©",
+        "returned_damaged": "RestituÃ© abÃ®mÃ©",
+        "missing": "Non restituÃ©",
+        "transferred": "TransfÃ©rÃ©",
         "conforme": "Conforme",
-        "degrade": "Dégradé",
-        "non_restitue": "Non restitué",
+        "degrade": "DÃ©gradÃ©",
+        "non_restitue": "Non restituÃ©",
         "perdu": "Perdu",
         "autre": "Autre",
     }
@@ -1674,7 +1768,7 @@ def format_restitution_signature_status(value):
     labels = {
         "signed": "Signature recueillie",
         "impossible": "Signature impossible",
-        "deferred": "Signature différée",
+        "deferred": "Signature diffÃ©rÃ©e",
     }
     return labels.get(value or "", value or "-")
 
@@ -1688,15 +1782,15 @@ def extract_items(payload):
 
     items = [
         ("ordinateur", "materiel", "Ordinateur", materiel.get("ordinateur", {})),
-        ("ecran", "materiel", "Écran", materiel.get("ecran", {})),
-        ("telephone", "materiel", "Téléphone", materiel.get("telephone", {})),
+        ("ecran", "materiel", "Ã‰cran", materiel.get("ecran", {})),
+        ("telephone", "materiel", "TÃ©lÃ©phone", materiel.get("telephone", {})),
         ("tablette", "materiel", "Tablette", materiel.get("tablette", {})),
-        ("vehicule", "materiel", "Véhicule", materiel.get("vehicule", {})),
-        ("badge", "materiel", "Badge d'accès", materiel.get("badge", {})),
-        ("cles", "materiel", "Clé(s)", materiel.get("cles", {})),
+        ("vehicule", "materiel", "VÃ©hicule", materiel.get("vehicule", {})),
+        ("badge", "materiel", "Badge d'accÃ¨s", materiel.get("badge", {})),
+        ("cles", "materiel", "ClÃ©(s)", materiel.get("cles", {})),
         ("veste", "materiel", "Veste", materiel.get("veste", {})),
-        ("chaussuresSecurite", "materiel", "Chaussures de sécurité", materiel.get("chaussuresSecurite", {})),
-        ("autre", "materiel", "Autre matériel", materiel.get("autre", {})),
+        ("chaussuresSecurite", "materiel", "Chaussures de sÃ©curitÃ©", materiel.get("chaussuresSecurite", {})),
+        ("autre", "materiel", "Autre matÃ©riel", materiel.get("autre", {})),
         ("vpn", "immateriel", "VPN", immateriel.get("vpn", {})),
         ("email", "immateriel", "Email", immateriel.get("email", {})),
         ("zoneAlarme", "immateriel", "Zone alarme", immateriel.get("zoneAlarme", {})),
@@ -1706,7 +1800,7 @@ def extract_items(payload):
         items.append((
             resource.get("code") or resource.get("id") or generate_id("resource"),
             resource.get("category") or "materiel",
-            resource.get("label") or "Ressource complémentaire",
+            resource.get("label") or "Ressource complÃ©mentaire",
             resource,
         ))
 
@@ -1752,34 +1846,34 @@ def collect_resource_validation_errors(payload):
     fixed_rules = [
         ("ordinateur", materiel.get("ordinateur", {}), [
             ("Marque ordinateur", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle ordinateur", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("Numéro de série ordinateur", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("ModÃ¨le ordinateur", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("NumÃ©ro de sÃ©rie ordinateur", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
         ]),
         ("ecran", materiel.get("ecran", {}), [
-            ("Marque écran", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle écran", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("Numéro de série écran", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("Marque Ã©cran", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("ModÃ¨le Ã©cran", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("NumÃ©ro de sÃ©rie Ã©cran", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
         ]),
         ("telephone", materiel.get("telephone", {}), [
-            ("Marque téléphone", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle téléphone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Marque tÃ©lÃ©phone", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("ModÃ¨le tÃ©lÃ©phone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
             ("IMEI", "imei", r"^\d{15}$"),
         ]),
         ("tablette", materiel.get("tablette", {}), [
             ("Marque tablette", "marque", r".+"),
-            ("Modèle tablette", "modele", r".+"),
-            ("Numéro de série tablette", "numeroSerie", r".+"),
+            ("ModÃ¨le tablette", "modele", r".+"),
+            ("NumÃ©ro de sÃ©rie tablette", "numeroSerie", r".+"),
         ]),
         ("vehicule", materiel.get("vehicule", {}), [
-            ("Marque véhicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle véhicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Marque vÃ©hicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("ModÃ¨le vÃ©hicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
             ("Immatriculation", "immatriculation", r"^[A-Z]{2}-\d{3}-[A-Z]{2}$"),
         ]),
         ("badge", materiel.get("badge", {}), [
-            ("Numéro de badge", "numero", r"^[A-Za-z0-9-]{3,30}$"),
+            ("NumÃ©ro de badge", "numero", r"^[A-Za-z0-9-]{3,30}$"),
         ]),
         ("autre", materiel.get("autre", {}), [
-            ("Description autre matériel", "description", r"^.{3,120}$"),
+            ("Description autre matÃ©riel", "description", r"^.{3,120}$"),
         ]),
         ("email", immateriel.get("email", {}), [
             ("Adresse email", "adresse", r"^[^\s@]+@[^\s@]+\.[^\s@]+$"),
@@ -1796,10 +1890,10 @@ def collect_resource_validation_errors(payload):
                 continue
 
     if materiel.get("cles", {}).get("selected") and not [value for value in materiel.get("cles", {}).get("values", []) if str(value).strip()]:
-        errors.append("Au moins une clé doit être renseignée")
+        errors.append("Au moins une clÃ© doit Ãªtre renseignÃ©e")
 
     if immateriel.get("zoneAlarme", {}).get("selected") and not [value for value in immateriel.get("zoneAlarme", {}).get("zones", []) if str(value).strip()]:
-        errors.append("Au moins une zone alarme doit être renseignée")
+        errors.append("Au moins une zone alarme doit Ãªtre renseignÃ©e")
 
     for resource in resources:
         if not resource.get("selected"):
@@ -1813,7 +1907,7 @@ def collect_resource_validation_errors(payload):
                     errors.append(f"{resource.get('label') or 'Ressource'} : {field['label']} manquant")
                     continue
         elif not summarize_dynamic_resource(resource):
-            errors.append(f"{resource.get('label') or 'Ressource complémentaire'} incomplète")
+            errors.append(f"{resource.get('label') or 'Ressource complÃ©mentaire'} incomplÃ¨te")
 
     return errors
 
@@ -1902,7 +1996,7 @@ def persist_form(payload, allow_locked_update=False):
         if exists:
             existing_payload = json.loads(exists["payload_json"])
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
-                raise ValueError("Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
+                raise ValueError("Cette fiche est signÃ©e et verrouillÃ©e. Elle ne peut plus Ãªtre modifiÃ©e.")
             row["created_at"] = exists["created_at"]
         _, dossier_id = sync_person_and_dossier(connection, payload, exists)
         row["dossier_id"] = dossier_id
@@ -2015,6 +2109,10 @@ def row_to_summary(row):
     if user and user.get("data_scope") == "masked":
         summary["nom"] = mask_text(summary["nom"])
         summary["prenom"] = mask_text(summary["prenom"])
+        prefix = (summary["mandat"] if summary["beneficiaryType"] == "elu" else summary["service"]) or (
+            "MANDAT" if summary["beneficiaryType"] == "elu" else "SERVICE"
+        )
+        summary["title"] = f"{str(prefix).upper()} - {summary['nom']} {summary['prenom']}".strip()
     return summary
 
 
@@ -2083,10 +2181,11 @@ init_db()
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        auth_state = check_user(username, password)
 
-        if check_user(username, password):
+        if auth_state == "ok":
             session["user"] = username
             with get_db() as connection:
                 insert_app_log(
@@ -2100,9 +2199,53 @@ def login():
                     actor=username,
                 )
             return redirect("/")
-        return redirect("/login?error=invalid")
+        return redirect(f"/login?error={auth_state}")
 
     return send_from_directory(FRONTEND_DIR, "login.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        password_confirm = request.form.get("password_confirm") or ""
+        config = load_auth_config()
+
+        if not username or not password or not password_confirm:
+            return redirect("/signup?error=missing_fields")
+        if not is_valid_username(username):
+            return redirect("/signup?error=invalid_username")
+        if get_user_record(username):
+            return redirect("/signup?error=user_exists")
+        if password != password_confirm:
+            return redirect("/signup?error=password_mismatch")
+        complexity_error = password_complexity_error(password)
+        if complexity_error:
+            return redirect(f"/signup?error={complexity_error}")
+
+        config.setdefault("users", []).append({
+            "username": username,
+            "password_hash": bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+            "groups": ["lecture"],
+            "is_active": True,
+            "status": "pending",
+        })
+        save_auth_config(config)
+        with get_db() as connection:
+            insert_app_log(
+                connection,
+                "security",
+                "signup_requested",
+                "Demande d'inscription",
+                "user",
+                username,
+                {"groups": ["lecture"], "status": "pending"},
+                actor=username,
+            )
+        return redirect("/login?notice=signup_pending")
+
+    return send_from_directory(FRONTEND_DIR, "signup.html")
 
 
 @app.route("/logout")
@@ -2379,11 +2522,11 @@ def build_excel_workbook(rows, item_rows):
     headers = [
         "ID dossier",
         "Titre",
-        "État",
+        "Ã‰tat",
         "Type de dossier",
-        "Qualité",
+        "QualitÃ©",
         "Nom",
-        "Prénom",
+        "PrÃ©nom",
         "Service",
         "Fonction",
         "Mandat",
@@ -2392,11 +2535,11 @@ def build_excel_workbook(rows, item_rows):
         "Date de restitution",
         "RGPD",
         "Signature",
-        "Ressources attribuées",
+        "Ressources attribuÃ©es",
         "Motif restitution",
         "Observations",
-        "Créé le",
-        "Mis à jour le",
+        "CrÃ©Ã© le",
+        "Mis Ã  jour le",
     ]
 
     workbook_rows = [
@@ -2439,11 +2582,11 @@ def build_excel_workbook(rows, item_rows):
     item_headers = [
         "ID dossier",
         "Titre dossier",
-        "Service émetteur",
+        "Service Ã©metteur",
         "Ressource",
-        "Catégorie",
-        "Détails",
-        "État restitution",
+        "CatÃ©gorie",
+        "DÃ©tails",
+        "Ã‰tat restitution",
         "Date restitution",
         "Observation",
     ]
@@ -2729,6 +2872,7 @@ def admin_users():
             "username": user["username"],
             "groups": user.get("groups", []),
             "is_active": user.get("is_active", True),
+            "status": user.get("status", "active" if user.get("is_active", True) else "disabled"),
         }
         for user in config.get("users", [])
     ])
@@ -3052,14 +3196,21 @@ def create_admin_user():
 
     if not username or not password:
         return jsonify({"error": "username_and_password_required"}), 400
+    if not is_valid_username(username):
+        return jsonify({"error": "invalid_username"}), 400
+    complexity_error = password_complexity_error(password)
+    if complexity_error:
+        return jsonify({"error": complexity_error}), 400
     if get_user_record(username):
         return jsonify({"error": "user_exists"}), 409
 
+    status = "active" if is_active else "disabled"
     config["users"].append({
         "username": username,
         "password_hash": bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
         "groups": [group for group in groups if group in config.get("groups", {})],
         "is_active": is_active,
+        "status": status,
     })
     save_auth_config(config)
     with get_db() as connection:
@@ -3070,7 +3221,7 @@ def create_admin_user():
             "Compte utilisateur cree",
             "user",
             username,
-            {"groups": [group for group in groups if group in config.get("groups", {})], "is_active": is_active},
+            {"groups": [group for group in groups if group in config.get("groups", {})], "is_active": is_active, "status": status},
         )
     return jsonify({"created": True}), 201
 
@@ -3086,8 +3237,17 @@ def update_admin_user(username):
         return jsonify({"error": "not_found"}), 404
 
     user["groups"] = [group for group in payload.get("groups", user.get("groups", [])) if group in config.get("groups", {})]
-    user["is_active"] = bool(payload.get("is_active", user.get("is_active", True)))
+    requested_status = payload.get("status")
+    if requested_status in {"pending", "active", "disabled"}:
+        user["status"] = requested_status
+        user["is_active"] = requested_status != "disabled"
+    else:
+        user["is_active"] = bool(payload.get("is_active", user.get("is_active", True)))
+        user["status"] = "active" if user.get("is_active", True) else "disabled"
     if payload.get("password"):
+        complexity_error = password_complexity_error(payload["password"])
+        if complexity_error:
+            return jsonify({"error": complexity_error}), 400
         user["password_hash"] = bcrypt.hashpw(payload["password"].encode(), bcrypt.gensalt()).decode()
 
     save_auth_config(config)
@@ -3102,6 +3262,7 @@ def update_admin_user(username):
             {
                 "groups": user.get("groups", []),
                 "is_active": user.get("is_active", True),
+                "status": user.get("status", "active"),
                 "password_changed": bool(payload.get("password")),
             },
         )

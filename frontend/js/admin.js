@@ -27,6 +27,17 @@ let currentResources = [];
 let editingUsername = null;
 let editingResourceId = null;
 
+function getUserStatusMeta(user) {
+  const status = user.status || (user.is_active ? "active" : "disabled");
+  if (status === "pending") {
+    return { code: "draft", label: "En attente" };
+  }
+  if (status === "disabled" || !user.is_active) {
+    return { code: "cancelled", label: "Desactive" };
+  }
+  return { code: "active", label: "Actif" };
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -212,6 +223,9 @@ function populateUserForm(username) {
   document.getElementById("admin_password").value = "";
   document.getElementById("admin_password").placeholder = "Nouveau mot de passe (optionnel)";
   document.getElementById("admin_active").checked = Boolean(user.is_active);
+  if (user.status === "pending") {
+    setNotice("userEditNotice", "Ce compte est en attente. Vous pouvez le valider ou ajuster ses groupes avant activation.", true);
+  }
   setSelectedGroups(user.groups || []);
 }
 
@@ -404,6 +418,249 @@ async function deleteResource(resourceId) {
   await loadResources();
 }
 
+function getUserStatusMeta(user) {
+  const status = user.status || (user.is_active ? "active" : "disabled");
+  if (status === "pending") {
+    return { code: "draft", label: "En attente" };
+  }
+  if (status === "disabled" || !user.is_active) {
+    return { code: "cancelled", label: "Desactive" };
+  }
+  return { code: "active", label: "Actif" };
+}
+
+function validatePasswordComplexity(password) {
+  if (!password) {
+    return null;
+  }
+  if (password.length < 12) {
+    return "Le mot de passe doit contenir au moins 12 caracteres.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Le mot de passe doit contenir au moins une majuscule.";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Le mot de passe doit contenir au moins une minuscule.";
+  }
+  if (!/\d/.test(password)) {
+    return "Le mot de passe doit contenir au moins un chiffre.";
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return "Le mot de passe doit contenir au moins un caractere special.";
+  }
+  return null;
+}
+
+function generateThemedPassword(theme = "licorne") {
+  const themes = {
+    licorne: {
+      first: ["Licorne", "Arcane", "Cristal", "Aurore", "Etoile", "Nuage", "Paillet", "Corail"],
+      second: ["violet", "sucre", "soie", "nacre", "brume", "velours", "lumiere", "satin"]
+    },
+    starwars: {
+      first: ["Jedi", "Yoda", "Leia", "Andor", "Lando", "Ahsoka", "Rey", "Kenobi"],
+      second: ["galaxie", "sabre", "force", "etoile", "rebel", "nebuleuse", "holo", "hyper"]
+    },
+    marvel: {
+      first: ["Marvel", "Stark", "Thor", "Vision", "Loki", "Wanda", "Rocket", "Panther"],
+      second: ["vibranium", "quantum", "cosmos", "hero", "arc", "multivers", "storm", "shield"]
+    },
+    film_francais: {
+      first: ["Amelie", "Belmondo", "Truffaut", "Renoir", "Tautou", "Noiret", "Depardieu", "Audiard"],
+      second: ["cinema", "paris", "camera", "dialogue", "lumiere", "ecran", "replique", "studio"]
+    },
+    publier: {
+      first: ["Publier", "Leman", "Mairie", "Alpes", "Geneve", "Rive", "Port", "Chablais"],
+      second: ["lac", "maison", "service", "rivage", "commune", "montagne", "horizon", "village"]
+    }
+  };
+  const symbols = ["!", "@", "#", "$", "%"];
+  const source = themes[theme] || themes.licorne;
+  const left = source.first[Math.floor(Math.random() * source.first.length)];
+  const right = source.second[Math.floor(Math.random() * source.second.length)];
+  const digits = String(Math.floor(10 + Math.random() * 90));
+  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+  return `${left}-${right}${digits}${symbol}`;
+}
+
+function initPasswordGeneratorModal(options) {
+  const modal = document.getElementById("passwordGeneratorModal");
+  if (!modal) {
+    return;
+  }
+
+  const themeSelect = document.getElementById("passwordThemeSelect");
+  const valueField = document.getElementById("generatedPasswordValue");
+  const refreshBtn = document.getElementById("refreshGeneratedPasswordBtn");
+  const copyBtn = document.getElementById("copyGeneratedPasswordBtn");
+  const applyBtn = document.getElementById("applyGeneratedPasswordBtn");
+  let currentPassword = "";
+
+  const refreshPassword = () => {
+    currentPassword = generateThemedPassword(themeSelect?.value || "licorne");
+    if (valueField) {
+      valueField.value = currentPassword;
+    }
+  };
+
+  const closeModal = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  };
+
+  const openModal = () => {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+    refreshPassword();
+  };
+
+  themeSelect?.addEventListener("change", refreshPassword);
+  refreshBtn?.addEventListener("click", refreshPassword);
+  copyBtn?.addEventListener("click", async () => {
+    if (!currentPassword) {
+      refreshPassword();
+    }
+    await navigator.clipboard.writeText(currentPassword);
+  });
+  applyBtn?.addEventListener("click", () => {
+    if (!currentPassword) {
+      refreshPassword();
+    }
+    options.onApply(currentPassword);
+    closeModal();
+  });
+  modal.querySelectorAll("[data-password-modal-close='true']").forEach((element) => {
+    element.addEventListener("click", closeModal);
+  });
+
+  document.getElementById("generateAdminPasswordBtn")?.addEventListener("click", openModal);
+}
+
+async function loadUsers() {
+  currentUsers = await adminRequest("/api/admin/users");
+  document.getElementById("userTableBody").innerHTML = currentUsers.map((user) => {
+    const statusMeta = getUserStatusMeta(user);
+    const statusAction = user.status === "pending"
+      ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="approveUser('${escapeHtml(user.username)}')">Valider</button>`
+      : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleUserState('${escapeHtml(user.username)}', ${user.is_active ? "false" : "true"})">${user.is_active ? "Desactiver" : "Activer"}</button>`;
+
+    return `
+      <tr>
+        <td>${escapeHtml(user.username)}</td>
+        <td>${escapeHtml(user.groups.join(", ") || "-")}</td>
+        <td><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
+        <td class="text-end">
+          <div class="draft-actions">
+            <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateUserForm('${escapeHtml(user.username)}')">Modifier</button>
+            ${statusAction}
+            <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteUser('${escapeHtml(user.username)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function populateUserForm(username) {
+  const user = currentUsers.find((item) => item.username === username);
+  if (!user) {
+    return;
+  }
+
+  editingUsername = user.username;
+  document.getElementById("userFormTitle").textContent = `Modifier le compte ${user.username}`;
+  document.getElementById("saveUserBtn").textContent = "Enregistrer les modifications";
+  document.getElementById("cancelUserEditBtn").classList.remove("d-none");
+  setNotice(
+    "userEditNotice",
+    user.status === "pending"
+      ? "Ce compte est en attente. Vous pouvez le valider ou ajuster ses groupes avant activation."
+      : "Laissez le mot de passe vide si vous ne souhaitez pas le modifier.",
+    true
+  );
+  document.getElementById("admin_username").value = user.username;
+  document.getElementById("admin_username").disabled = true;
+  document.getElementById("admin_password").value = "";
+  document.getElementById("admin_password").placeholder = "Nouveau mot de passe (optionnel)";
+  document.getElementById("admin_active").checked = user.status !== "disabled";
+  setSelectedGroups(user.groups || []);
+}
+
+async function toggleUserState(username, nextState) {
+  const user = currentUsers.find((item) => item.username === username);
+  if (!user) {
+    return;
+  }
+  await adminRequest(`/api/admin/users/${encodeURIComponent(username)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      groups: user.groups,
+      is_active: nextState,
+      status: nextState ? "active" : "disabled"
+    })
+  });
+  await loadUsers();
+}
+
+async function approveUser(username) {
+  const user = currentUsers.find((item) => item.username === username);
+  if (!user) {
+    return;
+  }
+  await adminRequest(`/api/admin/users/${encodeURIComponent(username)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      groups: user.groups,
+      is_active: true,
+      status: "active"
+    })
+  });
+  await loadUsers();
+}
+
+async function saveUser() {
+  const username = document.getElementById("admin_username").value.trim();
+  const password = document.getElementById("admin_password").value;
+  const isActive = document.getElementById("admin_active").checked;
+  const selectedGroups = getSelectedGroups();
+  const passwordError = validatePasswordComplexity(password);
+
+  if (!editingUsername && !password) {
+    window.alert("Le mot de passe est obligatoire.");
+    return;
+  }
+  if (passwordError) {
+    window.alert(passwordError);
+    return;
+  }
+
+  if (!editingUsername) {
+    await adminRequest("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({
+        username,
+        password,
+        groups: selectedGroups,
+        is_active: isActive,
+        status: isActive ? "active" : "disabled"
+      })
+    });
+  } else {
+    await adminRequest(`/api/admin/users/${encodeURIComponent(editingUsername)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        groups: selectedGroups,
+        is_active: isActive,
+        status: isActive ? "active" : "disabled",
+        password
+      })
+    });
+  }
+
+  resetUserForm();
+  await loadUsers();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   groups = await adminRequest("/api/admin/groups");
   renderGroups();
@@ -427,6 +684,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("cancelUserEditBtn").addEventListener("click", () => {
     resetUserForm();
+  });
+
+  initPasswordGeneratorModal({
+    onApply(password) {
+      document.getElementById("admin_password").value = password;
+    }
   });
 
   document.getElementById("saveResourceBtn").addEventListener("click", async () => {
