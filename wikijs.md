@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.7.1` |
+| Version proposee | `2.8.0` |
 | Statut | `A valider` |
 | Date de mise a jour | `2026-03-26` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + lien de signature` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
@@ -55,6 +55,8 @@ Le tableau de bord centralise les dossiers et permet de :
 - exporter plusieurs `PDF restitution`
 - supprimer plusieurs dossiers si le profil le permet
 
+Depuis la fiche, un profil autorise peut aussi generer un lien unique de signature a distance.
+
 Les profils en consultation seule peuvent exporter les PDF, mais les signatures y sont masquees.
 
 Un rafraichissement automatique est present, avec :
@@ -81,6 +83,7 @@ Un dossier peut contenir :
 - les ressources materielles et immaterielles attribuees
 - la signature de remise
 - la validation RGPD
+- un lien de signature a distance
 
 ## Tracabilite de reouverture
 
@@ -91,6 +94,28 @@ Quand un dossier encore modifiable est rouvert :
 - l'utilisateur qui a rouvert le dossier est memorise
 
 Ces informations sont visibles dans la fiche et tracees cote backend.
+
+## Signature a distance
+
+Depuis la fiche dossier, un utilisateur autorise peut :
+
+- generer un lien de signature
+- copier le lien
+- revoquer le lien
+- regenerer un lien
+
+Le lien permet a la personne concernee de :
+
+- consulter les ressources remises
+- prendre connaissance du RGPD
+- signer sans compte applicatif
+
+Regles de base :
+
+- un seul lien actif par dossier
+- lien a usage unique
+- expiration automatique
+- revocation manuelle possible
 
 ## Restitution
 

@@ -37,6 +37,7 @@ let currentRestitutionData = {
   notes: "",
   items: {}
 };
+let currentSignatureLink = null;
 
 // Mapping central des équipements :
 // on s'en sert pour générer la restitution, les résumés et certaines validations.
@@ -1403,6 +1404,139 @@ function renderReopenInfo(meta = {}) {
   notice.classList.remove("d-none");
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+  try {
+    return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+  } catch (error) {
+    return value;
+  }
+}
+
+function updateSignatureLinkUi(link) {
+  currentSignatureLink = link || null;
+  const card = document.getElementById("signatureLinkCard");
+  const emptyState = document.getElementById("signatureLinkEmptyState");
+  const details = document.getElementById("signatureLinkDetails");
+  const status = document.getElementById("signatureLinkStatus");
+  const urlField = document.getElementById("signatureLinkUrl");
+  const expiresAt = document.getElementById("signatureLinkExpiresAt");
+  const createdBy = document.getElementById("signatureLinkCreatedBy");
+  const lastOpenedAt = document.getElementById("signatureLinkLastOpenedAt");
+  const createBtn = document.getElementById("createSignatureLinkBtn");
+  const copyBtn = document.getElementById("copySignatureLinkBtn");
+  const revokeBtn = document.getElementById("revokeSignatureLinkBtn");
+  const refreshBtn = document.getElementById("refreshSignatureLinkBtn");
+  if (!card) {
+    return;
+  }
+
+  const canEdit = Boolean(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.edit"));
+  if (!canEdit) {
+    card.classList.add("d-none");
+    return;
+  }
+  card.classList.remove("d-none");
+
+  const hasCollectedSignature = Boolean(form.dataset.lockedAt || document.getElementById("signature")?.dataset.signed === "true");
+  if (!link) {
+    status.textContent = hasCollectedSignature ? "Dossier signé" : "Aucun lien";
+    emptyState.classList.remove("d-none");
+    details.classList.add("d-none");
+    if (createBtn) {
+      createBtn.disabled = hasCollectedSignature || !form.dataset.draftId;
+    }
+    if (hasCollectedSignature) {
+      emptyState.innerHTML = "<p class=\"panel-text mb-0\">La signature a déjà été recueillie pour ce dossier. Le lien à distance n'est plus nécessaire.</p>";
+    }
+    return;
+  }
+
+  const statusLabels = {
+    active: "Lien actif",
+    used: "Lien utilisé",
+    revoked: "Lien révoqué",
+    expired: "Lien expiré"
+  };
+  status.textContent = statusLabels[link.status] || "Lien";
+  emptyState.classList.add("d-none");
+  details.classList.remove("d-none");
+  urlField.value = link.url ? new URL(link.url, window.location.origin).href : "";
+  expiresAt.textContent = formatDateTime(link.expiresAt);
+  createdBy.textContent = link.createdBy || "-";
+  lastOpenedAt.textContent = formatDateTime(link.lastOpenedAt);
+  if (copyBtn) {
+    copyBtn.disabled = !link.url;
+  }
+  if (revokeBtn) {
+    revokeBtn.disabled = link.status !== "active";
+  }
+  if (refreshBtn) {
+    refreshBtn.disabled = hasCollectedSignature;
+  }
+}
+
+async function loadSignatureLinkState() {
+  if (!form.dataset.draftId) {
+    updateSignatureLinkUi(null);
+    return;
+  }
+  try {
+    const result = await requestJson(`/api/forms/${encodeURIComponent(form.dataset.draftId)}/signature-link`);
+    updateSignatureLinkUi(result.link);
+  } catch (error) {
+    updateSignatureLinkUi(null);
+  }
+}
+
+async function createSignatureLink() {
+  if (!form.dataset.draftId) {
+    window.alert("Enregistrez d'abord le dossier avant de générer un lien.");
+    return;
+  }
+  try {
+    const result = await requestJson(`/api/forms/${encodeURIComponent(form.dataset.draftId)}/signature-link`, {
+      method: "POST"
+    });
+    updateSignatureLinkUi(result.link);
+    window.alert("Le lien de signature a été généré.");
+  } catch (error) {
+    window.alert(error.message || "Impossible de générer le lien de signature.");
+  }
+}
+
+async function revokeSignatureLink() {
+  if (!currentSignatureLink?.id) {
+    return;
+  }
+  if (!window.confirm("Révoquer le lien de signature actif ?")) {
+    return;
+  }
+  try {
+    const result = await requestJson(`/api/signature-links/${encodeURIComponent(currentSignatureLink.id)}`, {
+      method: "DELETE"
+    });
+    updateSignatureLinkUi(result.link);
+  } catch (error) {
+    window.alert(error.message || "Impossible de révoquer ce lien.");
+  }
+}
+
+async function copySignatureLink() {
+  if (!currentSignatureLink?.url) {
+    return;
+  }
+  const absoluteUrl = new URL(currentSignatureLink.url, window.location.origin).href;
+  try {
+    await navigator.clipboard.writeText(absoluteUrl);
+    window.alert("Lien de signature copié.");
+  } catch (error) {
+    window.prompt("Copiez ce lien :", absoluteUrl);
+  }
+}
+
 async function loadDraftFromUrl(signaturePad) {
   // Ouvre une fiche existante si l'URL contient id=...
   const params = new URLSearchParams(window.location.search);
@@ -1417,6 +1551,7 @@ async function loadDraftFromUrl(signaturePad) {
     updateDraftUi("", false, "draft");
     renderRestitutionSummary();
     renderReopenInfo({});
+    updateSignatureLinkUi(null);
     applyLockState(false);
     hidePageLoader();
     return;
@@ -1447,6 +1582,7 @@ async function loadDraftFromUrl(signaturePad) {
   }
 
   populateForm(result.data, signaturePad);
+  await loadSignatureLinkState();
   requestAnimationFrame(() => {
     requestAnimationFrame(() => hidePageLoader());
   });
@@ -1469,6 +1605,7 @@ async function saveDraft(signaturePad) {
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || formData.meta.lockedAt || "";
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
+    await loadSignatureLinkState();
     if (form.dataset.lockedAt) {
       applyLockState(true);
     }
@@ -1541,6 +1678,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   showPageLoader("Chargement du formulaire...");
   try {
     await loadDynamicResourceReferences();
+    await getSessionInfo();
     const signaturePad = initSignaturePad();
     initRepeatableResourceLists();
     initConditionalBlocks();
@@ -1555,6 +1693,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("saveDraftBtn").addEventListener("click", () => {
       void saveDraft(signaturePad);
+    });
+    document.getElementById("createSignatureLinkBtn")?.addEventListener("click", () => {
+      void createSignatureLink();
+    });
+    document.getElementById("refreshSignatureLinkBtn")?.addEventListener("click", () => {
+      void createSignatureLink();
+    });
+    document.getElementById("revokeSignatureLinkBtn")?.addEventListener("click", () => {
+      void revokeSignatureLink();
+    });
+    document.getElementById("copySignatureLinkBtn")?.addEventListener("click", () => {
+      void copySignatureLink();
     });
     [
       "has_pc",
