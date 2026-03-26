@@ -441,6 +441,10 @@ async function deleteDraft(id) {
 }
 
 function newForm() {
+  if (!(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create"))) {
+    window.alert("Votre profil est en consultation seule. La création de dossier n'est pas autorisée.");
+    return;
+  }
   window.location.href = "form.html";
 }
 
@@ -1122,6 +1126,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
       document.getElementById("backupExportLink").classList.remove("d-none");
+    }
+    if (user && (user.permissions.includes("forms.create") || user.permissions.includes("*"))) {
+      document.getElementById("newFormBtn")?.classList.remove("d-none");
+      document.getElementById("emptyStateNewFormBtn")?.classList.remove("d-none");
     }
   });
   bindDashboardFilters();
