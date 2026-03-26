@@ -7,7 +7,8 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - creer un dossier pour un agent ou un(e) elu(e)
 - enregistrer un dossier en brouillon ou en attribution partielle
 - verrouiller un dossier complet une fois signe et valide RGPD
-- generer un lien unique de signature a distance
+- generer un lien unique de signature a distance pour la remise
+- generer un lien unique de signature a distance pour la restitution
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
 - administrer les comptes, les groupes et les ressources attribuables
@@ -104,7 +105,8 @@ Un dossier peut contenir :
 - le type de dossier
 - les ressources attribuees par service
 - la signature de remise
-- un lien de signature a distance a usage unique
+- un lien de signature a distance a usage unique pour la remise
+- un lien de signature de restitution a usage unique
 - la validation RGPD
 - la tracabilite de reouverture
 
