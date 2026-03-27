@@ -4,15 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
 <title>Dossier d'attribution</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<!-- En-tête de la fiche d'attribution. -->
 <header class="app-header app-header--compact">
   <div class="container app-header__inner">
-    <div class="app-brand">
-      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
       <div>
         <p class="app-kicker">Collectivité</p>
         <h1 class="app-title">Dossier d'attribution</h1>
@@ -26,6 +28,7 @@
   </div>
 </header>
 
+<!-- Formulaire métier principal : identité, ressources, validation et impression. -->
 <main class="container py-4 py-lg-5">
   <div id="pageLoader" class="page-loader">
     <div class="page-loader__panel">
@@ -47,6 +50,23 @@
       </div>
     </section>
 
+    <section class="content-card mb-4 page-anchor-nav">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Navigation</p>
+          <h3 class="section-title">Repères dans la fiche</h3>
+          <p class="panel-text">La fiche est longue. Utilisez ces accès rapides pour aller directement au bon bloc.</p>
+        </div>
+      </div>
+      <div class="page-anchor-nav__links">
+        <a class="page-anchor-nav__link" href="#section-personne">Personne</a>
+        <a class="page-anchor-nav__link" href="#section-dsi">DSI</a>
+        <a class="page-anchor-nav__link" href="#section-batiment">Bâtiment</a>
+        <a class="page-anchor-nav__link" href="#section-autres">Autres services</a>
+        <a class="page-anchor-nav__link" href="#section-validation">Validation</a>
+      </div>
+    </section>
+
     <section id="reopenNotice" class="content-card mb-4 d-none">
       <div class="section-heading">
         <div>
@@ -58,7 +78,7 @@
     </section>
 
     <div class="form-layout">
-      <section class="content-card">
+      <section class="content-card" id="section-personne">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Personne</p>
@@ -117,12 +137,40 @@
             <input class="form-control" id="fonction" name="fonction" placeholder="Responsable d'équipe">
           </div>
           <div class="col-md-6 col-lg-4">
+            <label class="form-label" for="start_at">Date de prise de fonction</label>
+            <input class="form-control" id="start_at" type="date">
+          </div>
+          <div class="col-md-6 col-lg-4">
             <label class="form-label" for="assigned_at">Date et heure de remise</label>
             <input class="form-control" id="assigned_at" type="datetime-local">
           </div>
           <div class="col-md-6 col-lg-4 d-none" id="serviceDestinationBlock">
             <label class="form-label" for="service_destination">Nouveau service</label>
-            <input class="form-control" id="service_destination" name="service_destination" placeholder="Service de destination">
+            <select class="form-select" id="service_destination" name="service_destination">
+              <option value="">Sélectionner un service</option>
+              <option value="Affaires juridiques / Commande publique">Affaires juridiques / Commande publique</option>
+              <option value="Bâtiment">Bâtiment</option>
+              <option value="Cabinet du Maire">Cabinet du Maire</option>
+              <option value="CCAS">CCAS</option>
+              <option value="Communication">Communication</option>
+              <option value="Culture et Patrimoine">Culture et Patrimoine</option>
+              <option value="CTM">CTM</option>
+              <option value="DGS">DGS</option>
+              <option value="DSI">DSI</option>
+              <option value="DST">DST</option>
+              <option value="Finances">Finances</option>
+              <option value="PM">PM</option>
+              <option value="DRH">DRH</option>
+              <option value="Population">Population</option>
+              <option value="SEJE">SEJE</option>
+              <option value="Secrétariat service technique">Secrétariat service technique</option>
+              <option value="Sports">Sports</option>
+              <option value="Subvention">Subvention</option>
+              <option value="Urbanisme">Urbanisme</option>
+              <option value="VRD">VRD</option>
+              <option value="__custom__">Autre...</option>
+            </select>
+            <input class="form-control mt-2 d-none" id="service_destination_custom" name="service_destination_custom" placeholder="Service de destination">
           </div>
         </div>
 
@@ -152,7 +200,7 @@
         </div>
       </section>
 
-      <section class="content-card">
+      <section class="content-card" id="section-dsi">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">DSI</p>
@@ -247,7 +295,7 @@
         </div>
       </section>
 
-      <section class="content-card">
+      <section class="content-card" id="section-batiment">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Bâtiment</p>
@@ -319,7 +367,7 @@
         </div>
       </section>
 
-      <section class="content-card">
+      <section class="content-card" id="section-autres">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Autres services</p>
@@ -395,7 +443,7 @@
         </div>
       </section>
 
-      <section class="content-card">
+      <section class="content-card" id="section-validation">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Validation</p>
@@ -416,9 +464,9 @@
           <div class="col-lg-6">
             <div class="rgpd-card">
               <h4 class="rgpd-card__title">Information RGPD</h4>
-              <p class="rgpd-text">Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par la commune de Publier afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.</p>
+              <p class="rgpd-text" data-rgpd-org-text>Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par la commune de Publier afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.</p>
               <p class="rgpd-text">Conformément au règlement général sur la protection des données et à la loi Informatique et Libertés, la personne concernée dispose notamment de droits d'accès, de rectification, d'effacement, de limitation et d'opposition, dans les conditions prévues par la réglementation applicable.</p>
-              <p class="rgpd-text">Pour toute question relative au traitement de ses données personnelles ou pour exercer ses droits, la personne concernée peut contacter le délégué à la protection des données à l'adresse suivante : <a href="mailto:dpo@ville-publier.fr">dpo@ville-publier.fr</a>.</p>
+              <p class="rgpd-text">Pour toute question relative au traitement de ses données personnelles ou pour exercer ses droits, la personne concernée peut contacter le délégué à la protection des données à l'adresse suivante : <a href="mailto:dpo@ville-publier.fr" data-brand-dpo-email-link data-brand-dpo-email-text>dpo@ville-publier.fr</a>.</p>
               <label class="form-check mt-3">
                 <input class="form-check-input" type="checkbox" id="rgpdCheck">
                 <span class="form-check-label">Je confirme avoir porté ces informations à la connaissance de la personne concernée avant validation du dossier.</span>
@@ -471,9 +519,16 @@
   <section id="printSummary" class="print-summary d-none"></section>
 </main>
 
+<!-- Chaîne de scripts de la fiche : branding, UI partagée, stockage et logique métier. -->
+<script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
+
+
+
+
+
 

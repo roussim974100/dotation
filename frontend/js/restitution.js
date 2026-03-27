@@ -1,13 +1,50 @@
 const restitutionLoader = document.getElementById("restitutionLoader");
 const restitutionDetailList = document.getElementById("restitutionDetailList");
+const DASHBOARD_SIGNATURE_LINK_NOTICE_KEY = "dashboardSignatureLinkNotice";
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    },
+    credentials: "same-origin",
+    ...options
+  });
+
+  if (!response.ok) {
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      payload = null;
+    }
+    const requestError = new Error(payload?.error || `HTTP ${response.status}`);
+    requestError.status = response.status;
+    throw requestError;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+}
+
+async function getDraftById(id) {
+  return requestJson(`/api/forms/${encodeURIComponent(id)}`);
+}
 
 const restitutionStateLabels = {
   conforme: "Conforme",
-  degrade: "Endommagé",
-  non_restitue: "Non restitué",
+  degrade: "Endommage",
+  non_restitue: "Non restitue",
   perdu: "Perdu",
   autre: "Autre"
 };
+
+function todayDateInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function showRestitutionLoader() {
   restitutionLoader?.classList.remove("is-hidden");
@@ -65,6 +102,9 @@ function initSignaturePad(canvasId, clearButtonId) {
   let hasDrawn = false;
 
   function setupContext() {
+    if (!context) {
+      return;
+    }
     context.lineWidth = 2;
     context.lineCap = "round";
     context.lineJoin = "round";
@@ -78,7 +118,7 @@ function initSignaturePad(canvasId, clearButtonId) {
     canvas.height = rect.height;
     setupContext();
 
-    if (snapshot) {
+    if (snapshot && context) {
       const image = new Image();
       image.onload = () => {
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -98,6 +138,9 @@ function initSignaturePad(canvasId, clearButtonId) {
   }
 
   function startDrawing(event) {
+    if (!context) {
+      return;
+    }
     event.preventDefault();
     const point = getPoint(event);
     isDrawing = true;
@@ -106,7 +149,7 @@ function initSignaturePad(canvasId, clearButtonId) {
   }
 
   function draw(event) {
-    if (!isDrawing) {
+    if (!isDrawing || !context) {
       return;
     }
     event.preventDefault();
@@ -121,6 +164,9 @@ function initSignaturePad(canvasId, clearButtonId) {
   }
 
   function clear() {
+    if (!context) {
+      return;
+    }
     context.clearRect(0, 0, canvas.width, canvas.height);
     hasDrawn = false;
   }
@@ -140,7 +186,7 @@ function initSignaturePad(canvasId, clearButtonId) {
     clear,
     restore(dataUrl) {
       clear();
-      if (!dataUrl) {
+      if (!dataUrl || !context) {
         return;
       }
       const image = new Image();
@@ -157,7 +203,14 @@ function initSignaturePad(canvasId, clearButtonId) {
 function toggleSignatureMode() {
   const mode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
   document.getElementById("restitutionSignatureCanvasWrap")?.classList.toggle("d-none", mode !== "signed");
-  document.getElementById("restitutionSignatureReasonWrap")?.classList.toggle("d-none", mode === "signed");
+  document.getElementById("restitutionSignatureReasonWrap")?.classList.toggle("d-none", mode !== "impossible");
+  document.getElementById("restitutionLinkValidityWrap")?.classList.toggle("d-none", mode !== "deferred");
+  const saveButton = document.getElementById("saveRestitutionBtn");
+  if (saveButton) {
+    saveButton.textContent = mode === "deferred"
+      ? "Enregistrer et generer le lien"
+      : "Enregistrer la restitution";
+  }
 }
 
 function renderRestitutionItems(items, existingStates) {
@@ -170,10 +223,10 @@ function renderRestitutionItems(items, existingStates) {
       <div class="restitution-row">
         <div>
           <div class="restitution-row__title">${escapeHtml(item.label)}</div>
-          <div class="restitution-row__meta">${escapeHtml(selectedDetail(item.details) || "Aucun détail complémentaire")}</div>
+          <div class="restitution-row__meta">${escapeHtml(selectedDetail(item.details) || "Aucun detail complementaire")}</div>
         </div>
         <div>
-          <label class="form-label d-block">État</label>
+          <label class="form-label d-block">Etat</label>
           <div class="choice-group restitution-choice-group" data-rest-group="${item.itemKey}">
             <label class="choice-chip">
               <input type="radio" name="rest_state_${item.itemKey}" value="conforme" ${currentState === "conforme" ? "checked" : ""}>
@@ -181,11 +234,11 @@ function renderRestitutionItems(items, existingStates) {
             </label>
             <label class="choice-chip">
               <input type="radio" name="rest_state_${item.itemKey}" value="degrade" ${currentState === "degrade" ? "checked" : ""}>
-              <span>Endommagé</span>
+              <span>Endommage</span>
             </label>
             <label class="choice-chip">
               <input type="radio" name="rest_state_${item.itemKey}" value="non_restitue" ${currentState === "non_restitue" ? "checked" : ""}>
-              <span>Non restitué</span>
+              <span>Non restitue</span>
             </label>
             <label class="choice-chip">
               <input type="radio" name="rest_state_${item.itemKey}" value="perdu" ${currentState === "perdu" ? "checked" : ""}>
@@ -199,7 +252,7 @@ function renderRestitutionItems(items, existingStates) {
         </div>
         <div id="rest_note_wrap_${item.itemKey}" class="${showNotes ? "" : "d-none"}">
           <label class="form-label" for="rest_note_${item.itemKey}">Commentaire</label>
-          <input class="form-control" id="rest_note_${item.itemKey}" value="${escapeHtml(state.notes || "")}" placeholder="Précisez l'état ou la situation">
+          <input class="form-control" id="rest_note_${item.itemKey}" value="${escapeHtml(state.notes || "")}" placeholder="Precisez l'etat ou la situation">
         </div>
       </div>
     `;
@@ -266,132 +319,200 @@ function getRestitutionSignaturePayload(signaturePad, existing) {
   };
 }
 
-async function shareRestitutionSignatureLink(id) {
-  try {
-    let result = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`);
-    if (!result?.link || result.link.status !== "active" || !result.link.url) {
-      result = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`, {
-        method: "POST"
-      });
-    }
-
-    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
-    try {
-      await navigator.clipboard.writeText(absoluteUrl);
-      window.alert("Lien de signature de restitution copié.");
-    } catch (error) {
-      window.prompt("Copiez ce lien de signature de restitution :", absoluteUrl);
-    }
-  } catch (error) {
-    window.alert(error.message || "Impossible de préparer le lien de signature de restitution.");
-  }
-}
-
 function restoreRestitutionSignature(restitution, signaturePad) {
   const status = restitution?.signatureStatus || (restitution?.signatureDataUrl ? "signed" : "deferred");
   const radio = document.querySelector(`input[name="restitution_signature_status"][value="${status}"]`);
   if (radio) {
     radio.checked = true;
   }
-  document.getElementById("restitution_signature_reason").value = restitution?.signatureReason || "";
+  const reasonField = document.getElementById("restitution_signature_reason");
+  if (reasonField) {
+    reasonField.value = restitution?.signatureReason || "";
+  }
   signaturePad.restore(status === "signed" ? (restitution?.signatureDataUrl || "") : "");
   toggleSignatureMode();
 }
 
+function getRestitutionLinkValidityDays() {
+  const field = document.getElementById("restitution_link_validity_days");
+  const rawValue = Number.parseInt(field?.value || "7", 10);
+  const sanitized = Number.isFinite(rawValue) ? Math.min(60, Math.max(1, rawValue)) : 7;
+  if (field) {
+    field.value = String(sanitized);
+  }
+  return sanitized;
+}
+
+function applyRestitutionReadOnlyMode() {
+  document.getElementById("restitutionSubtitle").textContent = "Consultation de la restitution finalisée. Les informations restent visibles, sans modification possible.";
+  document.getElementById("restitutionStatus").textContent = "Restitution terminée";
+  document.querySelector(".action-bar__hint")?.replaceChildren(
+    document.createTextNode("Consultation seule : la restitution est déjà finalisée.")
+  );
+  document.getElementById("saveRestitutionBtn")?.classList.add("d-none");
+  document.getElementById("clearRestitutionSignatureBtn")?.classList.add("d-none");
+  document.getElementById("restitution_signature")?.classList.add("signature-box--readonly");
+
+  document.querySelectorAll(
+    "#restitution-context input, #restitution-context select, #restitution-context textarea, " +
+    "#restitution-items input, #restitution-items textarea, #restitution-signature input, #restitution-signature textarea"
+  ).forEach((field) => {
+    field.disabled = true;
+  });
+}
+
 async function initRestitutionPage() {
-  showRestitutionLoader();
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  if (!id) {
-    alert("Aucune fiche sélectionnée.");
-    window.location.href = "index.html";
-    return;
-  }
-
-  const result = await getDraftById(id);
-  if (!result?.data) {
-    alert("Fiche introuvable.");
-    window.location.href = "index.html";
-    return;
-  }
-
-  const currentStatus = result.summary?.status || result.data?.workflow?.status;
-  if (!["active", "partial_return"].includes(currentStatus)) {
-    alert("La restitution n'est modifiable que si du matériel reste à récupérer.");
-    window.location.href = "index.html";
-    return;
-  }
-
-  const signaturePad = initSignaturePad("restitution_signature", "clearRestitutionSignatureBtn");
-  document.querySelectorAll('input[name="restitution_signature_status"]').forEach((input) => {
-    input.addEventListener("change", () => toggleSignatureMode());
-  });
-
-  document.getElementById("restitutionTitle").textContent = `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`;
-  document.getElementById("restitutionSubtitle").textContent = result.data.beneficiaire.service || result.data.beneficiaire.mandat || "Fiche active";
-  document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return" ? "Restitution partielle" : "Attribution active";
-  document.getElementById("global_returned_at").value = result.data.restitution?.returnedAt || "";
-  document.getElementById("global_return_reason").value = result.data.restitution?.reason || "";
-  document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
-
-  const materialItems = (result.items || []).filter((item) => item.category === "materiel");
-  renderRestitutionItems(materialItems, result.data.restitution?.items || {});
-  restoreRestitutionSignature(result.data.restitution || {}, signaturePad);
-
-  document.getElementById("exportRestitutionPdfBtn")?.addEventListener("click", () => {
-    window.location.href = `/api/forms/${encodeURIComponent(id)}/restitution-pdf`;
-  });
-  document.getElementById("shareRestitutionSignatureLinkBtn")?.addEventListener("click", () => {
-    void shareRestitutionSignatureLink(id);
-  });
-
-  document.getElementById("saveRestitutionBtn").addEventListener("click", async () => {
-    const returnedAt = document.getElementById("global_returned_at").value;
-    if (!returnedAt) {
-      alert("Veuillez renseigner la date de restitution.");
+  try {
+    showRestitutionLoader();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (!id) {
+      alert("Aucune fiche selectionnee.");
+      window.location.href = "index.html";
       return;
     }
 
-    const itemStates = getItemStates(materialItems, returnedAt, result.data.restitution?.items || {});
-    const signature = getRestitutionSignaturePayload(signaturePad, result.data.restitution || {});
-    if (signature.signatureStatus !== "signed" && !signature.signatureReason) {
-      alert("Veuillez préciser pourquoi la signature n'a pas pu être recueillie.");
-      return;
-    }
-    if (signature.signatureStatus === "signed" && !signature.signatureDataUrl) {
-      alert("Veuillez recueillir la signature ou choisir un autre statut de signature.");
+    const result = await getDraftById(id);
+    if (!result?.data) {
+      alert("Fiche introuvable.");
+      window.location.href = "index.html";
       return;
     }
 
-    const payload = {
-      status: deriveWorkflowStatus(itemStates),
-      returnedAt,
-      reason: document.getElementById("global_return_reason").value,
-      notes: document.getElementById("global_return_notes").value.trim(),
-      items: itemStates,
-      signatureStatus: signature.signatureStatus,
-      signatureReason: signature.signatureReason,
-      signatureDataUrl: signature.signatureDataUrl,
-      signedAt: signature.signedAt
-    };
+    const currentStatus = result.summary?.status || result.data?.workflow?.status;
+    if (!["active", "partial_return", "awaiting_signature", "returned"].includes(currentStatus)) {
+      alert("La restitution n'est disponible que pour les dossiers avec materiel a restituer ou deja restitue.");
+      window.location.href = "index.html";
+      return;
+    }
+    const readOnlyMode = currentStatus === "returned";
 
-    try {
-      await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution`, {
+    const signaturePad = initSignaturePad("restitution_signature", "clearRestitutionSignatureBtn");
+    document.querySelectorAll('input[name="restitution_signature_status"]').forEach((input) => {
+      input.addEventListener("change", () => toggleSignatureMode());
+    });
+
+    document.getElementById("restitutionTitle").textContent = `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`;
+    document.getElementById("restitutionSubtitle").textContent = result.data.beneficiaire.service || result.data.beneficiaire.mandat || "Fiche active";
+    document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return"
+      ? "Restitution partielle"
+      : (currentStatus === "awaiting_signature" ? "En attente de signature" : (currentStatus === "returned" ? "Restitution terminée" : "Attribution active"));
+    document.getElementById("global_returned_at").value = result.data.restitution?.returnedAt || todayDateInputValue();
+    document.getElementById("global_return_reason").value = result.data.restitution?.reason || "";
+    document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
+
+    const materialItems = (result.items || []).filter((item) => item.category === "materiel");
+    renderRestitutionItems(materialItems, result.data.restitution?.items || {});
+    let currentRestitution = result.data.restitution || {};
+    restoreRestitutionSignature(currentRestitution, signaturePad);
+    if (readOnlyMode) {
+      applyRestitutionReadOnlyMode();
+    }
+
+    function buildRestitutionPayload(forceDeferredSignature = false) {
+      const returnedAt = document.getElementById("global_returned_at").value || todayDateInputValue();
+      document.getElementById("global_returned_at").value = returnedAt;
+      if (!returnedAt) {
+        throw new Error("Veuillez renseigner la date de restitution.");
+      }
+
+      const itemStates = getItemStates(materialItems, returnedAt, currentRestitution?.items || {});
+      let signature = getRestitutionSignaturePayload(signaturePad, currentRestitution || {});
+
+      if (forceDeferredSignature) {
+        signature = {
+          signatureStatus: "deferred",
+          signatureReason: "",
+          signatureDataUrl: "",
+          signedAt: ""
+        };
+      }
+
+      if (signature.signatureStatus === "impossible" && !signature.signatureReason && !forceDeferredSignature) {
+        throw new Error("Veuillez preciser pourquoi la signature n'a pas pu etre recueillie sur place.");
+      }
+      if (signature.signatureStatus === "signed" && !signature.signatureDataUrl) {
+        throw new Error("Veuillez recueillir la signature sur place ou choisir un autre mode de signature.");
+      }
+
+      return {
+        status: deriveWorkflowStatus(itemStates),
+        returnedAt,
+        reason: document.getElementById("global_return_reason").value,
+        notes: document.getElementById("global_return_notes").value.trim(),
+        items: itemStates,
+        signatureStatus: signature.signatureStatus,
+        signatureReason: signature.signatureReason,
+        signatureDataUrl: signature.signatureDataUrl,
+        signedAt: signature.signedAt
+      };
+    }
+
+    async function saveRestitution(payload) {
+      const response = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution`, {
         method: "PATCH",
         body: JSON.stringify(payload)
       });
-      alert("Restitution enregistrée.");
-      window.location.href = "index.html";
-    } catch (error) {
-      alert("Impossible d'enregistrer la restitution.");
+      currentRestitution = response?.data?.restitution || {
+        ...currentRestitution,
+        ...payload
+      };
+      return response;
     }
-  });
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => hideRestitutionLoader());
-  });
+    async function shareRestitutionSignatureLink() {
+      try {
+        await saveRestitution(buildRestitutionPayload(true));
+
+        const linkResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`, {
+          method: "POST",
+          body: JSON.stringify({
+            validityDays: getRestitutionLinkValidityDays()
+          })
+        });
+
+        const absoluteUrl = new URL(linkResult.link.url, window.location.origin).href;
+        sessionStorage.setItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY, JSON.stringify({
+          kind: "restitution",
+          formId: id,
+          linkId: linkResult.link.id,
+          title: `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`.trim(),
+          url: absoluteUrl
+        }));
+        window.location.href = "index.html";
+      } catch (error) {
+        window.alert(error.message || "Impossible de generer le lien de signature de restitution.");
+      }
+    }
+
+    document.getElementById("saveRestitutionBtn")?.addEventListener("click", async () => {
+      try {
+        const selectedSignatureMode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
+        if (selectedSignatureMode === "deferred") {
+          await shareRestitutionSignatureLink();
+          return;
+        }
+        await saveRestitution(buildRestitutionPayload(false));
+        alert("Restitution enregistree.");
+        window.location.href = "index.html";
+      } catch (error) {
+        alert(error.message || "Impossible d'enregistrer la restitution.");
+      }
+    });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => hideRestitutionLoader());
+    });
+  } catch (error) {
+    console.error("Erreur lors du chargement de la restitution", error);
+    hideRestitutionLoader();
+    alert("Impossible de charger la restitution.");
+    window.location.href = "index.html";
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   void initRestitutionPage();
 });
+// Écran interne de restitution :
+// préparation du retour, collecte des états et partage du lien public.

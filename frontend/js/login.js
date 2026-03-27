@@ -57,3 +57,5 @@ document.addEventListener("DOMContentLoaded", () => {
   applyLoginTexts();
   applyLoginMessages();
 });
+// Enrichit l'écran de connexion avec les libellés configurables
+// et les messages d'état issus des paramètres d'URL.

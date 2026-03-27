@@ -32,9 +32,11 @@ python backend\app.py
 - la fenetre de chargement d'export s'affiche pendant les lots
 - l'export Excel fonctionne
 - l'administration des utilisateurs est accessible
+- l'administration des services est accessible
 - l'administration des ressources est accessible
 - la page `Journal` est accessible
 - la page `Corbeille` est accessible pour un admin
+- le dossier `administratif/versions/` est present
 - la deconnexion fonctionne
 
 ## Scenarios de test

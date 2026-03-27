@@ -9,6 +9,7 @@ Ce document sert de point d'entree pour la remise du projet.
 - gestion des utilisateurs et des groupes
 - workflow d'attribution, signature de remise, RGPD et restitution
 - gestion des ressources attribuables
+- gestion administrable des services proposes dans les formulaires
 - journal applicatif dedie
 - corbeille administrateur avec restauration
 - export `PDF dossier` unitaire et multiple
@@ -16,6 +17,7 @@ Ce document sert de point d'entree pour la remise du projet.
 - masquage des signatures dans les PDF pour les profils non autorises
 - export Excel lisible en deux feuilles
 - tracabilite de la reouverture des dossiers modifiables
+- archivage documentaire par version
 
 ## Documents a consulter
 
@@ -23,6 +25,7 @@ Ce document sert de point d'entree pour la remise du projet.
 - [GUIDE_UTILISATEUR.md](C:/www/dotation/GUIDE_UTILISATEUR.md)
 - [RECETTE_FONCTIONNELLE.md](C:/www/dotation/RECETTE_FONCTIONNELLE.md)
 - [wikijs.md](C:/www/dotation/wikijs.md)
+- [administratif/versions/README.md](C:/www/dotation/administratif/versions/README.md)
 
 ## Lancement
 

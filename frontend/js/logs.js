@@ -132,3 +132,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 250);
   });
 });
+// Gère l'écran de journal d'activité :
+// chargement, filtrage et rendu lisible des événements.

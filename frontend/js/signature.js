@@ -1,4 +1,4 @@
-const publicSignatureForm = document.getElementById("publicSignatureForm");
+﻿const publicSignatureForm = document.getElementById("publicSignatureForm");
 const signaturePageLoader = document.getElementById("signaturePageLoader");
 const signatureErrorCard = document.getElementById("signatureErrorCard");
 const signatureSuccessCard = document.getElementById("signatureSuccessCard");
@@ -150,6 +150,7 @@ function renderResourceList(targetId, items = []) {
       <span class="status-card__label">${item.service || "Service"}</span>
       <strong>${item.label}</strong>
       <div class="panel-text mb-0">${item.details || "Sans détail complémentaire"}</div>
+      ${item.assignmentSummary ? `<div class="panel-text mb-0 mt-2"><strong>${item.assignmentSummary}</strong></div>` : ""}
     </div>
   `).join("");
 }
@@ -226,3 +227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     showPublicError(messages[error.message] || "Impossible de charger ce lien de signature.");
   }
 });
+
+
+// Page publique de signature d'attribution :
+// consultation du dossier, validation RGPD et signature sans compte.

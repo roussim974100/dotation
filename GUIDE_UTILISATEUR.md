@@ -8,7 +8,7 @@ L'application permet de gerer :
 - la signature de remise
 - la validation RGPD
 - la restitution des ressources materielles
-- l'administration des comptes et des ressources
+- l'administration des comptes, des services et des ressources
 - le journal des actions pour la tracabilite
 - la restauration d'elements supprimes via la corbeille admin
 
@@ -109,9 +109,17 @@ Les administrateurs peuvent :
 
 - gerer les comptes
 - modifier les mots de passe
+- gerer les services proposes dans les formulaires
 - gerer les ressources attribuables
 - consulter le journal
 - acceder a la corbeille
+
+L'administration est decoupee en sous-pages :
+
+- `admin.html` pour la vue d'ensemble
+- `admin-comptes.html` pour les comptes
+- `admin-services.html` pour les services
+- `admin-ressources.html` pour les ressources
 
 ## Groupe lecture
 
@@ -148,3 +156,8 @@ Elle permet de restaurer :
 - un dossier supprime
 - un utilisateur supprime
 - une ressource supprimee
+
+## Archives documentaires
+
+Les versions documentaires sont archivees dans `administratif/versions/`.
+Chaque version dispose de son propre dossier et de fichiers suffixes par la version.

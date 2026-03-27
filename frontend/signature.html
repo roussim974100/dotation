@@ -4,15 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="/assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
 <title>Signature du dossier</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="app-shell">
+<!-- Page publique de signature d'attribution accessible par lien sécurisé. -->
 <header class="app-header app-header--compact">
   <div class="container app-header__inner">
     <div class="app-brand">
-      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
       <div>
         <p class="app-kicker">Collectivité</p>
         <h1 class="app-title">Validation du dossier de remise</h1>
@@ -22,6 +24,7 @@
   </div>
 </header>
 
+<!-- Consultation du dossier, RGPD et capture de signature sans compte. -->
 <main class="container py-4 py-lg-5">
   <div id="signaturePageLoader" class="page-loader">
     <div class="page-loader__panel">
@@ -169,6 +172,9 @@
   </form>
 </main>
 
+<!-- Scripts du branding public et du parcours de signature. -->
+<script src="/js/branding.js"></script>
 <script src="/js/signature.js"></script>
 </body>
 </html>
+
