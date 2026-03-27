@@ -1,3 +1,5 @@
+// Gère l'inscription avec génération assistée de mot de passe
+// et affichage des erreurs de parcours.
 function applySignupError() {
   const errorBox = document.getElementById("signupError");
   if (!errorBox) {

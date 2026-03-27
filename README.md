@@ -11,7 +11,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - generer un lien unique de signature a distance pour la restitution
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
-- administrer les comptes, les groupes et les ressources attribuables
+- administrer les comptes, les groupes, les services et les ressources attribuables
 - consulter un journal des actions
 - restaurer des suppressions via une corbeille reservee aux admins
 - exporter les dossiers et les restitutions en PDF
@@ -31,6 +31,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - `GUIDE_UTILISATEUR.md` : guide d'usage rapide
 - `RECETTE_FONCTIONNELLE.md` : checklist et scenarios de test
 - `wikijs.md` : documentation prete a integrer dans Wiki.js
+- `administratif/versions/` : archives documentaires par version
 
 ## Architecture
 
@@ -43,7 +44,10 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - `frontend/form.html` : creation et mise a jour d'un dossier
 - `frontend/restitution.html` : restitution des ressources materielles
 - `frontend/signature.html` : page publique de signature via lien securise
-- `frontend/admin.html` : administration
+- `frontend/admin.html` : portail administration
+- `frontend/admin-comptes.html` : gestion des comptes
+- `frontend/admin-services.html` : catalogue des services
+- `frontend/admin-ressources.html` : catalogue des ressources
 - `frontend/logs.html` : journal des actions
 - `frontend/trash.html` : corbeille administrateur
 - `backend/app.py` : coeur du backend Flask
@@ -156,9 +160,17 @@ L'administration permet de :
 
 - creer, modifier, desactiver ou supprimer un compte
 - changer le mot de passe d'un compte
+- creer, modifier, activer ou desactiver un service
 - creer, modifier ou supprimer une ressource attribuable
 - consulter le journal
 - acceder a la corbeille admin
+
+L'administration est maintenant organisee en sous-pages :
+
+- `admin.html` pour la vue d'ensemble
+- `admin-comptes.html` pour les comptes et les groupes
+- `admin-services.html` pour les services
+- `admin-ressources.html` pour les ressources
 
 ## Journal et corbeille
 

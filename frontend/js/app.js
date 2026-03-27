@@ -8,7 +8,7 @@ const DOSSIER_TYPE_LABELS = {
   mise_a_jour: "Mise à jour de ressources",
   sortie: "Sortie / restitution"
 };
-const SERVICE_OPTIONS = [
+const DEFAULT_SERVICE_OPTIONS = [
   "Affaires juridiques / Commande publique",
   "Bâtiment",
   "Cabinet du Maire",
@@ -30,6 +30,7 @@ const SERVICE_OPTIONS = [
   "Urbanisme",
   "VRD"
 ];
+let serviceOptions = [...DEFAULT_SERVICE_OPTIONS];
 let dynamicResourceReferences = [];
 let currentRestitutionData = {
   returnedAt: "",
@@ -188,11 +189,46 @@ const restitutionStateLabels = {
   autre: "Autre"
 };
 
+const ASSIGNMENT_CONDITION_LABELS = {
+  neuf: "Neuf",
+  bon_etat: "Bon état",
+  etat_usage: "État d'usage",
+  degrade: "Dégradé"
+};
+
+const ASSIGNMENT_CONDITION_CONFIG = [
+  { checkboxId: "has_pc", targetId: "pcFields", prefix: "pc" },
+  { checkboxId: "has_screen", targetId: "screenFields", prefix: "screen" },
+  { checkboxId: "has_phone", targetId: "phoneFields", prefix: "tel" },
+  { checkboxId: "has_tablette", targetId: "tabletteFields", prefix: "tablette" },
+  { checkboxId: "vpn", targetId: "vpnFields", prefix: "vpn", createTarget: true, stacked: true, dateOnly: true },
+  { checkboxId: "has_mail", targetId: "mailFields", prefix: "email", stacked: true, dateOnly: true },
+  { checkboxId: "has_zone_alarme", targetId: "zoneAlarmeFields", prefix: "zoneAlarme", stacked: true, afterSelector: "#addZoneAlarmeBtn", dateOnly: true },
+  { checkboxId: "has_badge", targetId: "badgeFields", prefix: "badge", stacked: true, dateOnly: true },
+  { checkboxId: "has_cles", targetId: "clesFields", prefix: "cles", stacked: true, afterSelector: "#addCleBtn" },
+  { checkboxId: "veste", targetId: "vesteFields", prefix: "veste", createTarget: true, stacked: true },
+  { checkboxId: "chaussure", targetId: "chaussureFields", prefix: "chaussure", createTarget: true, stacked: true },
+  { checkboxId: "has_vehicule", targetId: "vehiculeFields", prefix: "vehicule" },
+  { checkboxId: "has_autre", targetId: "autreFields", prefix: "autre", stacked: true }
+];
+
 let currentLockState = false;
 
 // Helpers de lecture du formulaire.
 function getFieldValue(id) {
-  return document.getElementById(id).value.trim() || "";
+  const field = document.getElementById(id);
+  if (!field || typeof field.value !== "string") {
+    return "";
+  }
+  return field.value.trim() || "";
+}
+
+function setFieldValueIfExists(id, value) {
+  const field = document.getElementById(id);
+  if (!field) {
+    return;
+  }
+  field.value = value || "";
 }
 
 function getRepeatableValues(containerId) {
@@ -203,6 +239,123 @@ function getRepeatableValues(containerId) {
   return Array.from(container.querySelectorAll("input"))
     .map((input) => input.value.trim())
     .filter(Boolean);
+}
+
+function getAssignmentConditionData(prefix) {
+  return {
+    assignedAt: getFieldValue(`${prefix}_assigned_at`),
+    conditionAttribution: getFieldValue(`${prefix}_condition`),
+    conditionNotes: getFieldValue(`${prefix}_condition_notes`)
+  };
+}
+
+function normalizeDateInputValue(value) {
+  if (!value) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return "";
+  }
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(date);
+}
+
+function formatAssignmentConditionLabel(value) {
+  return ASSIGNMENT_CONDITION_LABELS[value] || value || "";
+}
+
+function buildAssignmentConditionSummary(item) {
+  if (!item) {
+    return "";
+  }
+  const parts = [];
+  const conditionLabel = formatAssignmentConditionLabel(item.conditionAttribution);
+  if (conditionLabel) {
+    parts.push(`État à la remise : ${conditionLabel}`);
+  }
+  if (item.assignedAt) {
+    parts.push(`Date d'attribution : ${formatDisplayDate(item.assignedAt)}`);
+  }
+  if (item.conditionNotes) {
+    parts.push(`Observation : ${item.conditionNotes}`);
+  }
+  return parts.join(" - ");
+}
+
+function buildAssignmentConditionFieldsHtml(prefix, stacked = false, dateOnly = false) {
+  const marginClass = stacked ? " mt-2" : "";
+  if (dateOnly) {
+    return `
+      <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
+    `;
+  }
+  return `
+      <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
+      <select class="form-select${marginClass}" id="${prefix}_condition">
+        <option value="">État à la remise</option>
+      <option value="neuf">Neuf</option>
+      <option value="bon_etat">Bon état</option>
+      <option value="etat_usage">État d'usage</option>
+      <option value="degrade">Dégradé</option>
+    </select>
+    <input class="form-control${marginClass}" placeholder="Observation de remise" id="${prefix}_condition_notes">
+  `;
+}
+
+function ensureAssignmentConditionFields() {
+  ASSIGNMENT_CONDITION_CONFIG.forEach((config) => {
+    const checkbox = document.getElementById(config.checkboxId);
+    if (!checkbox) {
+      return;
+    }
+
+    let target = document.getElementById(config.targetId);
+    if (!target && config.createTarget) {
+      const equipmentItem = checkbox.closest(".equipment-item");
+      if (!equipmentItem) {
+        return;
+      }
+      target = document.createElement("div");
+      target.id = config.targetId;
+      target.className = "single-field d-none";
+      equipmentItem.appendChild(target);
+      checkbox.dataset.target = config.targetId;
+    }
+
+    if (!target || target.querySelector(`#${config.prefix}_assigned_at`)) {
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = config.stacked ? "assignment-condition-block" : "";
+    wrapper.innerHTML = buildAssignmentConditionFieldsHtml(config.prefix, Boolean(config.stacked), Boolean(config.dateOnly));
+
+    if (config.afterSelector) {
+      const anchor = target.querySelector(config.afterSelector);
+      if (anchor) {
+        anchor.insertAdjacentElement("afterend", wrapper);
+        return;
+      }
+    }
+    target.appendChild(wrapper);
+  });
 }
 
 function createRepeatableRow(containerId, placeholder, value = "") {
@@ -242,7 +395,16 @@ function populateRepeatableRows(containerId, placeholder, values = []) {
 }
 
 function matchesPattern(value, pattern) {
-  return true;
+  if (!pattern) {
+    return true;
+  }
+  try {
+    return new RegExp(pattern).test(String(value || ""));
+  } catch (error) {
+    // Une expression invalide ne doit pas bloquer la saisie;
+    // on considère alors la règle comme non bloquante.
+    return true;
+  }
 }
 
 function clearFieldError(field) {
@@ -330,9 +492,17 @@ function getServiceValue() {
   return serviceField.value === "__custom__" ? getFieldValue("service_custom") : serviceField.value;
 }
 
-function syncServiceCustomField() {
-  const serviceField = document.getElementById("service");
-  const customField = document.getElementById("service_custom");
+function getServiceSelectValue(fieldId, customFieldId) {
+  const serviceField = document.getElementById(fieldId);
+  if (!serviceField) {
+    return "";
+  }
+  return serviceField.value === "__custom__" ? getFieldValue(customFieldId) : serviceField.value;
+}
+
+function syncServiceCustomField(fieldId = "service", customFieldId = "service_custom") {
+  const serviceField = document.getElementById(fieldId);
+  const customField = document.getElementById(customFieldId);
   if (!serviceField || !customField) {
     return;
   }
@@ -344,19 +514,19 @@ function syncServiceCustomField() {
   }
 }
 
-function setServiceValue(value) {
-  const serviceField = document.getElementById("service");
-  const customField = document.getElementById("service_custom");
+function setServiceSelectValue(value, fieldId = "service", customFieldId = "service_custom") {
+  const serviceField = document.getElementById(fieldId);
+  const customField = document.getElementById(customFieldId);
   if (!serviceField) {
     return;
   }
 
-  if (value && SERVICE_OPTIONS.includes(value)) {
+  if (value && serviceOptions.includes(value)) {
     serviceField.value = value;
     if (customField) {
       customField.value = "";
     }
-    syncServiceCustomField();
+    syncServiceCustomField(fieldId, customFieldId);
     return;
   }
 
@@ -365,7 +535,7 @@ function setServiceValue(value) {
     if (customField) {
       customField.value = value;
     }
-    syncServiceCustomField();
+    syncServiceCustomField(fieldId, customFieldId);
     return;
   }
 
@@ -373,7 +543,56 @@ function setServiceValue(value) {
   if (customField) {
     customField.value = "";
   }
-  syncServiceCustomField();
+  syncServiceCustomField(fieldId, customFieldId);
+}
+
+function setServiceValue(value) {
+  setServiceSelectValue(value, "service", "service_custom");
+}
+
+function getServiceDestinationValue() {
+  return getServiceSelectValue("service_destination", "service_destination_custom");
+}
+
+function setServiceDestinationValue(value) {
+  setServiceSelectValue(value, "service_destination", "service_destination_custom");
+}
+
+function renderServiceOptions(options = []) {
+  const serviceField = document.getElementById("service");
+  const destinationField = document.getElementById("service_destination");
+  if (!serviceField && !destinationField) {
+    return;
+  }
+
+  const currentValue = getServiceValue();
+  const currentDestinationValue = getServiceDestinationValue();
+  serviceOptions = options.length ? [...options] : [...DEFAULT_SERVICE_OPTIONS];
+  const optionsMarkup = `
+    <option value="">Sélectionner un service</option>
+    ${serviceOptions.map((option) => `<option value="${escapeAttribute(option)}">${escapeHtml(option)}</option>`).join("")}
+    <option value="__custom__">Autre...</option>
+  `;
+  if (serviceField) {
+    serviceField.innerHTML = optionsMarkup;
+  }
+  if (destinationField) {
+    destinationField.innerHTML = optionsMarkup;
+  }
+  setServiceValue(currentValue);
+  setServiceDestinationValue(currentDestinationValue);
+}
+
+async function loadServiceOptions() {
+  try {
+    const services = await requestJson("/api/reference/services");
+    const labels = services
+      .map((service) => String(service.label || "").trim())
+      .filter(Boolean);
+    renderServiceOptions(labels);
+  } catch (error) {
+    renderServiceOptions(DEFAULT_SERVICE_OPTIONS);
+  }
 }
 
 async function loadDynamicResourceReferences() {
@@ -442,6 +661,9 @@ async function loadDynamicResourceReferences() {
           <span>${escapeHtml(resource.label)}</span>
         </label>
         ${fieldsMarkup}
+        <div class="single-field mt-3">
+          <input class="form-control dynamic-resource-assigned-at" type="date" id="dynamic_resource_assigned_at_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
+        </div>
         <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</p>
       </div>
     `;
@@ -552,7 +774,8 @@ function getAdditionalResourcesData() {
         .map((field) => [field.key, getDynamicResourceFieldValue(resource.id, field.key)])
         .filter(([, value]) => value)
     ),
-    details: getFieldValue(`dynamic_resource_details_${resource.id}`)
+    details: getFieldValue(`dynamic_resource_details_${resource.id}`),
+    assignedAt: getFieldValue(`dynamic_resource_assigned_at_${resource.id}`)
   })).map((resource) => ({
     ...resource,
     details: resource.details || summarizeDynamicResource(resource)
@@ -569,6 +792,10 @@ function populateAdditionalResources(data = {}) {
     }
     if (details) {
       details.value = resource.details || "";
+    }
+    const assignedAtField = document.getElementById(`dynamic_resource_assigned_at_${resource.id}`);
+    if (assignedAtField) {
+      assignedAtField.value = normalizeDateInputValue(resource.assignedAt || "");
     }
     Object.entries(resource.fields || {}).forEach(([fieldKey, value]) => {
       const field = document.getElementById(`dynamic_resource_${resource.id}_${fieldKey}`);
@@ -648,21 +875,22 @@ function renderPrintSummary(formData) {
   const batimentItems = [];
   const otherItems = [];
 
-  const pushItem = (target, label, detail) => {
-    target.push(`<li><strong>${escapeHtml(label)}</strong>${detail ? ` : ${escapeHtml(detail)}` : ""}</li>`);
+  const pushItem = (target, label, detail, conditionSummary = "") => {
+    const parts = [detail, conditionSummary].filter(Boolean);
+    target.push(`<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`);
   };
 
   if (formData.materiel.ordinateur.selected) {
-    pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ordinateur));
   }
   if (formData.materiel.ecran.selected) {
-    pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
   }
   if (formData.materiel.telephone.selected) {
-    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
   }
   if (formData.materiel.tablette?.selected) {
-    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "));
+    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.tablette));
   }
   if (formData.immateriel.vpn.selected) {
     pushItem(dsiItems, "VPN", "");
@@ -672,26 +900,26 @@ function renderPrintSummary(formData) {
   }
 
   if (formData.materiel.badge.selected) {
-    pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero);
+    pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
   }
   if (formData.materiel.cles?.selected) {
-    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "));
+    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
   }
   if (formData.materiel.veste.selected) {
-    pushItem(batimentItems, "Veste", "");
+    pushItem(batimentItems, "Veste", "", buildAssignmentConditionSummary(formData.materiel.veste));
   }
   if (formData.materiel.chaussuresSecurite.selected) {
-    pushItem(batimentItems, "Chaussures de sécurité", "");
+    pushItem(batimentItems, "Chaussures de sécurité", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
   }
   if (formData.immateriel.zoneAlarme?.selected) {
     pushItem(batimentItems, "Zone alarme", (formData.immateriel.zoneAlarme.zones || []).join(" - "));
   }
 
   if (formData.materiel.vehicule.selected) {
-    pushItem(otherItems, "Véhicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "));
+    pushItem(otherItems, "Véhicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
   }
   if (formData.materiel.autre.selected) {
-    pushItem(otherItems, "Autre matériel", formData.materiel.autre.description);
+    pushItem(otherItems, "Autre matériel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
   }
 
   const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
@@ -810,6 +1038,8 @@ function initQualite() {
   const radios = document.querySelectorAll('input[name="qualite"]');
   const service = document.getElementById("service");
   const serviceCustom = document.getElementById("service_custom");
+  const serviceDestination = document.getElementById("service_destination");
+  const serviceDestinationCustom = document.getElementById("service_destination_custom");
   const fonction = document.getElementById("fonction");
   const mandat = document.getElementById("mandat");
   const serviceFieldBlock = document.getElementById("serviceFieldBlock");
@@ -830,17 +1060,30 @@ function initQualite() {
         service.value = "";
       }
     }
-    if (serviceCustom) {
-      serviceCustom.disabled = isElu;
-      if (isElu) {
-        serviceCustom.value = "";
+      if (serviceCustom) {
+        serviceCustom.disabled = isElu;
+        if (isElu) {
+          serviceCustom.value = "";
+        }
       }
-    }
-    syncServiceCustomField();
+      syncServiceCustomField();
+      if (serviceDestination) {
+        serviceDestination.disabled = isElu;
+        if (isElu) {
+          serviceDestination.value = "";
+        }
+      }
+      if (serviceDestinationCustom) {
+        serviceDestinationCustom.disabled = isElu;
+        if (isElu) {
+          serviceDestinationCustom.value = "";
+        }
+      }
+      syncServiceCustomField("service_destination", "service_destination_custom");
 
-    if (fonction) {
-      fonction.disabled = isElu;
-      if (isElu) {
+      if (fonction) {
+        fonction.disabled = isElu;
+        if (isElu) {
         fonction.value = "";
       }
     }
@@ -870,6 +1113,8 @@ function initQualite() {
 }
 
 function validateFixedResourceSelection() {
+  // Valide uniquement les ressources effectivement cochées
+  // pour éviter les faux positifs sur les blocs masqués.
   const issues = [];
   Object.values(CORE_RESOURCE_RULES).flat().forEach((rule) => {
     clearFieldError(document.getElementById(rule.fieldId));
@@ -889,6 +1134,11 @@ function validateFixedResourceSelection() {
         setFieldError(field, `${rule.label} obligatoire.`);
         issues.push(`${rule.label} manquant`);
         return;
+      }
+      if (value && !matchesPattern(value, rule.pattern)) {
+        const message = rule.hint ? `${rule.label} invalide (${rule.hint}).` : `${rule.label} invalide.`;
+        setFieldError(field, message);
+        issues.push(`${rule.label} invalide`);
       }
     });
   });
@@ -958,6 +1208,7 @@ function updateStatusInfo(status = "draft") {
   const hints = {
     draft: "Le dossier reste modifiable tant qu'il n'est pas signé et validé.",
     partial_assignment: "Le dossier reste modifiable car l'attribution est partielle ou parce qu'au moins une ressource cochée reste incomplète.",
+    awaiting_signature: "Le dossier est prêt et n'attend plus que la signature finale.",
     active: "Le dossier est verrouillé et la restitution se gère depuis la page dédiée.",
     returned: "Le dossier a été restitué. Les détails restent consultables depuis la restitution.",
     partial_return: "Une partie des ressources a été restituée. Le détail est visible dans la page de restitution.",
@@ -1122,24 +1373,66 @@ function initSignaturePad() {
 
 function buildEquipmentSelectionMap() {
   return {
-    ordinateur: { selected: document.getElementById("has_pc").checked, nomPoste: getFieldValue("pc_nom"), marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn") },
-    ecran: { selected: document.getElementById("has_screen").checked, marque: getFieldValue("screen_marque"), modele: getFieldValue("screen_modele"), numeroSerie: getFieldValue("screen_sn") },
-    telephone: { selected: document.getElementById("has_phone").checked, nomTelephone: getFieldValue("tel_nom"), marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei") },
-    tablette: { selected: document.getElementById("has_tablette").checked, nomTablette: getFieldValue("tablette_nom"), marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn") },
-    vehicule: { selected: document.getElementById("has_vehicule").checked, marque: getFieldValue("vehicule_marque"), modele: getFieldValue("vehicule_modele"), immatriculation: getFieldValue("vehicule_plaque") },
-    badge: { selected: document.getElementById("has_badge").checked, numero: getFieldValue("badge_numero") },
-    cles: { selected: document.getElementById("has_cles").checked, values: getRepeatableValues("clesRows") },
-    veste: { selected: document.getElementById("veste").checked },
-    chaussuresSecurite: { selected: document.getElementById("chaussure").checked },
-    autre: { selected: document.getElementById("has_autre").checked, description: getFieldValue("autre_materiel") }
+    ordinateur: { selected: document.getElementById("has_pc").checked, nomPoste: getFieldValue("pc_nom"), marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn"), ...getAssignmentConditionData("pc") },
+    ecran: { selected: document.getElementById("has_screen").checked, marque: getFieldValue("screen_marque"), modele: getFieldValue("screen_modele"), numeroSerie: getFieldValue("screen_sn"), ...getAssignmentConditionData("screen") },
+    telephone: { selected: document.getElementById("has_phone").checked, nomTelephone: getFieldValue("tel_nom"), marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei"), ...getAssignmentConditionData("tel") },
+    tablette: { selected: document.getElementById("has_tablette").checked, nomTablette: getFieldValue("tablette_nom"), marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn"), ...getAssignmentConditionData("tablette") },
+    vehicule: { selected: document.getElementById("has_vehicule").checked, marque: getFieldValue("vehicule_marque"), modele: getFieldValue("vehicule_modele"), immatriculation: getFieldValue("vehicule_plaque"), ...getAssignmentConditionData("vehicule") },
+    badge: { selected: document.getElementById("has_badge").checked, numero: getFieldValue("badge_numero"), ...getAssignmentConditionData("badge") },
+    cles: { selected: document.getElementById("has_cles").checked, values: getRepeatableValues("clesRows"), ...getAssignmentConditionData("cles") },
+    veste: { selected: document.getElementById("veste").checked, ...getAssignmentConditionData("veste") },
+    chaussuresSecurite: { selected: document.getElementById("chaussure").checked, ...getAssignmentConditionData("chaussure") },
+    autre: { selected: document.getElementById("has_autre").checked, description: getFieldValue("autre_materiel"), ...getAssignmentConditionData("autre") }
   };
 }
 
 function buildIntangibleSelectionMap() {
   return {
-    vpn: { selected: document.getElementById("vpn").checked },
-    email: { selected: document.getElementById("has_mail").checked, adresse: getFieldValue("email") },
-    zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, zones: getRepeatableValues("zoneAlarmeRows") }
+    vpn: { selected: document.getElementById("vpn").checked, category: "immateriel", ...getAssignmentConditionData("vpn") },
+    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: getFieldValue("email"), ...getAssignmentConditionData("email") },
+    zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, category: "immateriel", zones: getRepeatableValues("zoneAlarmeRows"), ...getAssignmentConditionData("zoneAlarme") }
+  };
+}
+
+function collectRequestedResourcesFromFormData(formData) {
+  const resources = [];
+  const pushIfSelected = (key, item, label) => {
+    if (item?.selected) {
+      resources.push({
+        key,
+        label,
+        assignedAt: item.assignedAt || ""
+      });
+    }
+  };
+
+  Object.entries(formData.materiel || {}).forEach(([key, item]) => {
+    const config = EQUIPMENT_CONFIG.find((entry) => entry.key === key);
+    pushIfSelected(key, item, config?.label || key);
+  });
+  Object.entries(formData.immateriel || {}).forEach(([key, item]) => {
+    const config = EQUIPMENT_CONFIG.find((entry) => entry.key === key);
+    pushIfSelected(key, item, config?.label || key);
+  });
+  (formData.resources?.additional || []).forEach((resource) => {
+    if (resource?.selected) {
+      resources.push({
+        key: resource.id || resource.code || "resource",
+        label: resource.label || "Ressource complémentaire",
+        assignedAt: resource.assignedAt || ""
+      });
+    }
+  });
+
+  return resources;
+}
+
+function summarizeRequestedResourceCompletion(formData) {
+  const requested = collectRequestedResourcesFromFormData(formData);
+  return {
+    total: requested.length,
+    completed: requested.filter((resource) => resource.assignedAt).length,
+    missing: requested.filter((resource) => !resource.assignedAt)
   };
 }
 
@@ -1153,21 +1446,23 @@ function getFormData(signaturePad) {
   const status = signatureDataUrl && selectedStatus === "draft" ? "active" : selectedStatus;
   const lockedAt = form.dataset.lockedAt || (signatureDataUrl ? now : "");
   const assignedAt = document.getElementById("assigned_at").value || getCurrentDateTimeLocal();
+  const startAt = document.getElementById("start_at").value || "";
 
   return {
     meta: {
       id: currentDraftId,
       savedAt: now,
       lockedAt,
-      assignedAt
+      assignedAt,
+      startAt
     },
-    workflow: {
-      status
-    },
-    dossier: {
-      type: normalizeDossierType(document.getElementById("dossier_type").value || "arrivee"),
-      serviceDestination: getFieldValue("service_destination")
-    },
+      workflow: {
+        status
+      },
+      dossier: {
+        type: normalizeDossierType(document.getElementById("dossier_type").value || "arrivee"),
+        serviceDestination: getServiceDestinationValue()
+      },
     beneficiaire: {
       nom: document.getElementById("nom").value.trim(),
       prenom: document.getElementById("prenom").value.trim(),
@@ -1212,12 +1507,13 @@ function populateForm(data, signaturePad) {
   form.dataset.draftId = data.meta.id || "";
   form.dataset.lockedAt = data.meta.lockedAt || "";
   document.getElementById("nom").value = data.beneficiaire.nom || "";
-  document.getElementById("prenom").value = data.beneficiaire.prenom || "";
-  document.getElementById("dossier_type").value = normalizeDossierType(data.dossier.type || "arrivee");
-  setServiceValue(data.beneficiaire.service || "");
-  document.getElementById("service_destination").value = data.dossier.serviceDestination || "";
+    document.getElementById("prenom").value = data.beneficiaire.prenom || "";
+    document.getElementById("dossier_type").value = normalizeDossierType(data.dossier.type || "arrivee");
+    setServiceValue(data.beneficiaire.service || "");
+    setServiceDestinationValue(data.dossier.serviceDestination || "");
   document.getElementById("fonction").value = data.beneficiaire.fonction || "";
   document.getElementById("mandat").value = data.beneficiaire.mandat || "";
+  document.getElementById("start_at").value = normalizeDateInputValue(data.meta.startAt || "");
   document.getElementById("assigned_at").value = normalizeDateTimeLocal(data.meta.assignedAt || data.meta.savedAt || "");
   form.dataset.workflowStatus = data.workflow.status || "draft";
   currentRestitutionData = JSON.parse(JSON.stringify(data.restitution || {
@@ -1257,6 +1553,39 @@ function populateForm(data, signaturePad) {
   document.getElementById("tablette_modele").value = data.materiel.tablette?.modele || "";
   document.getElementById("vehicule_marque").value = data.materiel.vehicule.marque || "";
   document.getElementById("vehicule_modele").value = data.materiel.vehicule.modele || "";
+  document.getElementById("pc_condition").value = data.materiel.ordinateur.conditionAttribution || "";
+  document.getElementById("pc_assigned_at").value = normalizeDateInputValue(data.materiel.ordinateur.assignedAt || "");
+  document.getElementById("pc_condition_notes").value = data.materiel.ordinateur.conditionNotes || "";
+  document.getElementById("screen_condition").value = data.materiel.ecran.conditionAttribution || "";
+  document.getElementById("screen_assigned_at").value = normalizeDateInputValue(data.materiel.ecran.assignedAt || "");
+  document.getElementById("screen_condition_notes").value = data.materiel.ecran.conditionNotes || "";
+  document.getElementById("tel_condition").value = data.materiel.telephone.conditionAttribution || "";
+  document.getElementById("tel_assigned_at").value = normalizeDateInputValue(data.materiel.telephone.assignedAt || "");
+  document.getElementById("tel_condition_notes").value = data.materiel.telephone.conditionNotes || "";
+  document.getElementById("tablette_condition").value = data.materiel.tablette?.conditionAttribution || "";
+  document.getElementById("tablette_assigned_at").value = normalizeDateInputValue(data.materiel.tablette?.assignedAt || "");
+  document.getElementById("tablette_condition_notes").value = data.materiel.tablette?.conditionNotes || "";
+  document.getElementById("vehicule_condition").value = data.materiel.vehicule.conditionAttribution || "";
+  document.getElementById("vehicule_assigned_at").value = normalizeDateInputValue(data.materiel.vehicule.assignedAt || "");
+  document.getElementById("vehicule_condition_notes").value = data.materiel.vehicule.conditionNotes || "";
+  setFieldValueIfExists("badge_condition", data.materiel.badge.conditionAttribution || "");
+  setFieldValueIfExists("badge_assigned_at", normalizeDateInputValue(data.materiel.badge.assignedAt || ""));
+  setFieldValueIfExists("badge_condition_notes", data.materiel.badge.conditionNotes || "");
+  document.getElementById("cles_condition").value = data.materiel.cles?.conditionAttribution || "";
+  document.getElementById("cles_assigned_at").value = normalizeDateInputValue(data.materiel.cles?.assignedAt || "");
+  document.getElementById("cles_condition_notes").value = data.materiel.cles?.conditionNotes || "";
+  document.getElementById("veste_condition").value = data.materiel.veste.conditionAttribution || "";
+  document.getElementById("veste_assigned_at").value = normalizeDateInputValue(data.materiel.veste.assignedAt || "");
+  document.getElementById("veste_condition_notes").value = data.materiel.veste.conditionNotes || "";
+  document.getElementById("chaussure_condition").value = data.materiel.chaussuresSecurite.conditionAttribution || "";
+  document.getElementById("chaussure_assigned_at").value = normalizeDateInputValue(data.materiel.chaussuresSecurite.assignedAt || "");
+  document.getElementById("chaussure_condition_notes").value = data.materiel.chaussuresSecurite.conditionNotes || "";
+  document.getElementById("autre_condition").value = data.materiel.autre.conditionAttribution || "";
+  document.getElementById("autre_assigned_at").value = normalizeDateInputValue(data.materiel.autre.assignedAt || "");
+  document.getElementById("autre_condition_notes").value = data.materiel.autre.conditionNotes || "";
+  document.getElementById("vpn_assigned_at").value = normalizeDateInputValue(data.immateriel.vpn.assignedAt || "");
+  document.getElementById("email_assigned_at").value = normalizeDateInputValue(data.immateriel.email.assignedAt || "");
+  document.getElementById("zoneAlarme_assigned_at").value = normalizeDateInputValue(data.immateriel.zoneAlarme?.assignedAt || "");
   populateRepeatableRows("clesRows", "Référence ou libellé de clé", data.materiel.cles?.values || []);
   populateRepeatableRows("zoneAlarmeRows", "Zone alarme", data.immateriel.zoneAlarme?.zones || []);
 
@@ -1308,6 +1637,7 @@ function formatStatusLabel(status) {
   const labels = {
     draft: "Brouillon",
     partial_assignment: "Attribution partielle",
+    awaiting_signature: "En attente de signature",
     active: "Attribution active",
     returned: "Restitution terminée",
     partial_return: "Restitution partielle",
@@ -1325,6 +1655,7 @@ function resolveSaveWorkflow(formData) {
   const rgpdAccepted = Boolean(formData.validation.rgpdAccepted);
   const currentStatus = formData.workflow.status;
   const resourceIssues = formData.meta.resourceValidationErrors || [];
+  const resourceCompletion = summarizeRequestedResourceCompletion(formData);
 
   if (["returned", "partial_return", "cancelled"].includes(currentStatus)) {
     return formData;
@@ -1339,7 +1670,23 @@ function resolveSaveWorkflow(formData) {
   if (resourceIssues.length > 0) {
     formData.workflow.status = "partial_assignment";
     formData.meta.lockedAt = "";
-    alert("Certaines ressources cochées ne sont pas complètement renseignées. Le dossier sera conservé comme attribution partielle et restera modifiable.");
+    const details = resourceIssues.map((issue) => `- ${issue}`).join("\n");
+    alert(`Certaines ressources cochées ne sont pas complètement renseignées.\n\n${details}\n\nLe dossier sera conservé comme attribution partielle et restera modifiable.`);
+    return formData;
+  }
+
+  if (resourceCompletion.completed < resourceCompletion.total) {
+    formData.workflow.status = "partial_assignment";
+    formData.meta.lockedAt = "";
+    const missingDetails = resourceCompletion.missing.map((resource) => `- ${resource.label} : date d'attribution manquante`).join("\n");
+    alert(`L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) sont attribuées.\n\n${missingDetails}\n\nLe dossier sera conservé comme attribution partielle et restera modifiable.`);
+    return formData;
+  }
+
+  if (!hasSignature) {
+    formData.workflow.status = "awaiting_signature";
+    formData.meta.lockedAt = "";
+    alert("Le dossier est complet et n'attend plus que la signature finale.");
     return formData;
   }
 
@@ -1568,7 +1915,7 @@ async function loadDraftFromUrl(signaturePad) {
   const session = await getSessionInfo();
   const canEdit = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.edit"));
   const currentStatus = result.summary?.status || result.data?.workflow?.status || "draft";
-  if (canEdit && ["draft", "partial_assignment"].includes(currentStatus)) {
+  if (canEdit && ["draft", "partial_assignment", "awaiting_signature"].includes(currentStatus)) {
     try {
       const reopenResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/reopen`, {
         method: "POST"
@@ -1593,7 +1940,7 @@ async function exportPDF(signaturePad) {
 }
 
 async function saveDraft(signaturePad) {
-  // Sauvegarde principale de la fiche depuis l'écran de saisie.
+  // Sauvegarde principale de la fiche depuis l'Écran de saisie.
   try {
     const formData = getFormData(signaturePad);
     if (!validateFormData(formData)) {
@@ -1677,9 +2024,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   showPageLoader("Chargement du formulaire...");
   try {
+    await loadServiceOptions();
     await loadDynamicResourceReferences();
     await getSessionInfo();
     const signaturePad = initSignaturePad();
+    ensureAssignmentConditionFields();
     initRepeatableResourceLists();
     initConditionalBlocks();
     initQualite();
@@ -1706,24 +2055,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("copySignatureLinkBtn")?.addEventListener("click", () => {
       void copySignatureLink();
     });
-    [
-      "has_pc",
-      "has_screen",
-      "has_phone",
-      "has_mail",
-      "vpn",
-      "dossier_type"
-    ].forEach((id) => {
-      const field = document.getElementById(id);
-      if (!field) {
-        return;
-      }
-      field.addEventListener("change", () => {
-        if (id === "dossier_type") {
-          syncDossierTypeUi();
+      [
+        "has_pc",
+        "has_screen",
+        "has_phone",
+        "has_mail",
+        "vpn",
+        "dossier_type",
+        "service",
+        "service_destination"
+      ].forEach((id) => {
+        const field = document.getElementById(id);
+        if (!field) {
+          return;
         }
+        field.addEventListener("change", () => {
+          if (id === "dossier_type") {
+            syncDossierTypeUi();
+            return;
+          }
+          if (id === "service") {
+            syncServiceCustomField();
+            return;
+          }
+          if (id === "service_destination") {
+            syncServiceCustomField("service_destination", "service_destination_custom");
+          }
+        });
       });
-    });
   } catch (error) {
     console.error("Erreur de chargement du formulaire", error);
     alert("Impossible de charger correctement le formulaire. La page a été débloquée pour permettre un nouveau test.");
@@ -1744,3 +2103,8 @@ function normalizeDossierType(value) {
 }
 
 
+
+
+
+// Module principal de la fiche d'attribution :
+// collecte métier, validation locale et sérialisation du payload.

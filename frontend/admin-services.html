@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
+<title>Administration des services</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<!-- En-tête commun de l'administration. -->
+<header class="app-header">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
+      <div>
+        <p class="app-kicker">Administration</p>
+        <h1 class="app-title">Catalogue des services</h1>
+        <p class="app-subtitle">Maintenez ici la liste des services proposés dans les formulaires de dossier.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="admin.html">Accueil admin</a>
+      <a class="btn btn-outline-light" href="/logout">Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<!-- Page dédiée au catalogue de services utilisé par les formulaires. -->
+<main class="container py-4 py-lg-5">
+  <div class="admin-layout">
+    <aside class="content-card admin-sidebar">
+      <p class="panel-eyebrow">Navigation</p>
+      <nav class="admin-nav" aria-label="Navigation administration">
+        <a class="admin-nav__link" href="admin.html"><span>Accueil admin</span><small>Vue d'ensemble</small></a>
+        <a class="admin-nav__link" href="admin-comptes.html"><span>Comptes</span><small>Utilisateurs et groupes</small></a>
+        <a class="admin-nav__link" href="#admin-services"><span>Services</span><small>Catalogue du formulaire</small></a>
+        <a class="admin-nav__link" href="admin-ressources.html"><span>Ressources</span><small>Référentiel</small></a>
+        <a class="admin-nav__link" href="logs.html"><span>Journal</span><small>Traçabilité</small></a>
+        <a class="admin-nav__link" href="admin-personnalisation.html"><span>Personnalisation</span><small>Logo et thèmes</small></a>
+      </nav>
+    </aside>
+
+    <div class="admin-content">
+      <section class="hero-panel admin-hero">
+        <div>
+          <p class="panel-eyebrow">Services</p>
+          <div class="panel-title-wrap">
+            <h2 class="panel-title">Référentiel des services</h2>
+          </div>
+          <p class="panel-text">Ajoutez un service, mettez-le à jour ou désactivez-le sans toucher au reste de l'administration.</p>
+        </div>
+        <div class="admin-stats">
+          <div class="stat-card">
+            <span class="stat-card__label">Services actifs</span>
+            <span class="stat-card__value" id="adminServicesCount">0</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card mt-4" id="admin-services">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Référentiel</p>
+            <h2 class="section-title" id="serviceFormTitle">Services</h2>
+            <p class="panel-text">Pilotez ici la liste des services proposés dans les formulaires.</p>
+          </div>
+        </div>
+        <div id="serviceEditNotice" class="alert alert-info d-none" role="alert"></div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label" for="service_label">Libellé du service</label>
+            <input class="form-control" id="service_label" placeholder="Exemple : Marchés publics">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" id="service_active" checked>
+              <span class="form-check-label">Service actif</span>
+            </label>
+          </div>
+          <div class="col-12">
+            <div class="header-actions">
+              <button class="btn btn-primary" id="saveServiceBtn" type="button">Ajouter le service</button>
+              <button class="btn btn-outline-secondary d-none" id="cancelServiceEditBtn" type="button">Annuler la modification</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle draft-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>État</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="serviceTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<!-- Scripts mutualisés de branding et d'administration. -->
+<script src="js/branding.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
+
+
+
+
+

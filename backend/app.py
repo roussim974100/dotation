@@ -23,6 +23,7 @@ import re
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
+CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
 CITY_LOGO_URL = os.environ.get(
     "CITY_LOGO_URL",
@@ -63,22 +64,185 @@ CORE_RESOURCE_CODES = {
 
 DEFAULT_RESOURCE_REFERENCES = [
     {"code": "ordinateur", "label": "Ordinateur", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "ecran", "label": "Ã‰cran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "telephone", "label": "TÃ©lÃ©phone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
+    {"code": "ecran", "label": "Écran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
+    {"code": "telephone", "label": "Téléphone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "tablette", "label": "Tablette", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
     {"code": "vpn", "label": "VPN", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
     {"code": "email", "label": "Email", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
-    {"code": "badge", "label": "Badge d'accÃ¨s", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
-    {"code": "cles", "label": "ClÃ©(s)", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
-    {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
-    {"code": "chaussuresSecurite", "label": "Chaussures de sÃ©curitÃ©", "category": "materiel", "issuer_service": "BÃ¢timent", "requires_return": 1, "trigger_key": ""},
-    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "BÃ¢timent", "requires_return": 0, "trigger_key": ""},
-    {"code": "vehicule", "label": "VÃ©hicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
+    {"code": "badge", "label": "Badge d'accès", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "cles", "label": "Clé(s)", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
+    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "Bâtiment", "requires_return": 0, "trigger_key": ""},
+    {"code": "vehicule", "label": "Véhicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
+]
+
+DEFAULT_SERVICE_REFERENCES = [
+    "Affaires juridiques / Commande publique",
+    "Bâtiment",
+    "Cabinet du Maire",
+    "CCAS",
+    "Communication",
+    "Culture et Patrimoine",
+    "CTM",
+    "DGS",
+    "DRH",
+    "DSI",
+    "DST",
+    "Finances",
+    "PM",
+    "Population",
+    "SEJE",
+    "Secrétariat service technique",
+    "Sports",
+    "Subvention",
+    "Urbanisme",
+    "VRD",
 ]
 
 BRAND_LOGO_CACHE = {
     "loaded": False,
+    "cache_key": None,
     "image": None,
+}
+
+DEFAULT_APP_SETTINGS = {
+    "org_name": "Ville de Publier",
+    "app_name": "Parcours agents et elu(e)s",
+    "dpo_email": "dpo@ville-publier.fr",
+    "brand_logo_mode": "url",
+    "brand_logo_url": CITY_LOGO_URL,
+    "brand_logo_file": "",
+    "theme_id": "institutionnel",
+    "dark_mode_policy": "disabled",
+}
+
+THEME_PRESETS = {
+    "institutionnel": {
+        "label": "Institutionnel bleu",
+        "light": {
+            "brand": "#0f5b8d",
+            "brandDark": "#0a4267",
+            "brandSoft": "#dbeaf3",
+            "accent": "#d9a441",
+            "surface": "#ffffff",
+            "surfaceAlt": "#f5f8fb",
+            "text": "#1f2933",
+            "muted": "#607080",
+            "border": "#d4dde6",
+        },
+        "dark": {
+            "brand": "#68a7d1",
+            "brandDark": "#0f5b8d",
+            "brandSoft": "#17354a",
+            "accent": "#e3b85f",
+            "surface": "#10212d",
+            "surfaceAlt": "#163040",
+            "text": "#edf4f8",
+            "muted": "#acc0ce",
+            "border": "#2d4b5f",
+        },
+    },
+    "lac_montagne": {
+        "label": "Lac et montagne",
+        "light": {
+            "brand": "#1e6f74",
+            "brandDark": "#174f53",
+            "brandSoft": "#d7eeec",
+            "accent": "#9b7b45",
+            "surface": "#ffffff",
+            "surfaceAlt": "#f2f7f6",
+            "text": "#20313a",
+            "muted": "#5d7682",
+            "border": "#cfdedd",
+        },
+        "dark": {
+            "brand": "#5fb2b7",
+            "brandDark": "#1e6f74",
+            "brandSoft": "#15353a",
+            "accent": "#c6a26a",
+            "surface": "#0f1d22",
+            "surfaceAlt": "#16282f",
+            "text": "#e7f4f3",
+            "muted": "#a7c2c4",
+            "border": "#335259",
+        },
+    },
+    "ardoise": {
+        "label": "Ardoise",
+        "light": {
+            "brand": "#43576b",
+            "brandDark": "#2f4050",
+            "brandSoft": "#e2e8ee",
+            "accent": "#c48d45",
+            "surface": "#ffffff",
+            "surfaceAlt": "#f5f7fa",
+            "text": "#22303c",
+            "muted": "#677786",
+            "border": "#d6dfe7",
+        },
+        "dark": {
+            "brand": "#8da4b8",
+            "brandDark": "#43576b",
+            "brandSoft": "#1d2832",
+            "accent": "#d3a05c",
+            "surface": "#12181f",
+            "surfaceAlt": "#1a232d",
+            "text": "#eef3f7",
+            "muted": "#aeb9c3",
+            "border": "#364350",
+        },
+    },
+    "sable": {
+        "label": "Sable",
+        "light": {
+            "brand": "#9b6f3e",
+            "brandDark": "#77522d",
+            "brandSoft": "#f3e9dc",
+            "accent": "#3f7b8a",
+            "surface": "#fffdfa",
+            "surfaceAlt": "#fbf5ee",
+            "text": "#332820",
+            "muted": "#7b6a5b",
+            "border": "#e5d8ca",
+        },
+        "dark": {
+            "brand": "#d2a06a",
+            "brandDark": "#9b6f3e",
+            "brandSoft": "#38281a",
+            "accent": "#74aebe",
+            "surface": "#1c1712",
+            "surfaceAlt": "#272018",
+            "text": "#f7efe6",
+            "muted": "#c2b2a2",
+            "border": "#4d3e2f",
+        },
+    },
+    "foret": {
+        "label": "For?t",
+        "light": {
+            "brand": "#2f6d4f",
+            "brandDark": "#24513b",
+            "brandSoft": "#dceee4",
+            "accent": "#c89b49",
+            "surface": "#ffffff",
+            "surfaceAlt": "#f4f8f5",
+            "text": "#20332a",
+            "muted": "#61786b",
+            "border": "#d3e1d8",
+        },
+        "dark": {
+            "brand": "#68b388",
+            "brandDark": "#2f6d4f",
+            "brandSoft": "#183225",
+            "accent": "#dfb367",
+            "surface": "#101914",
+            "surfaceAlt": "#17231c",
+            "text": "#edf5f0",
+            "muted": "#adc4b7",
+            "border": "#345241",
+        },
+    },
 }
 
 
@@ -209,6 +373,31 @@ def seed_reference_catalogs(connection):
             ),
         )
 
+
+def seed_service_catalog(connection):
+    now = utc_now()
+    for label in DEFAULT_SERVICE_REFERENCES:
+        existing = connection.execute(
+            "SELECT id FROM service_catalog WHERE label = ?",
+            (label,),
+        ).fetchone()
+        if existing:
+            continue
+        connection.execute(
+            """
+            INSERT INTO service_catalog (
+                id, label, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, 1, 1, ?, ?)
+            """,
+            (
+                generate_id("service"),
+                label,
+                now,
+                now,
+            ),
+        )
+
+
 def normalize_reference_row(row):
     if not row:
         return None
@@ -221,6 +410,148 @@ def normalize_reference_row(row):
     except (TypeError, json.JSONDecodeError):
         data["field_schema"] = []
     return data
+
+
+def normalize_service_row(row):
+    if not row:
+        return None
+    return {
+        key: row[key]
+        for key in row.keys()
+    }
+
+
+def seed_app_settings(connection):
+    now = utc_now()
+    for key, value in DEFAULT_APP_SETTINGS.items():
+        existing = connection.execute(
+            "SELECT setting_key FROM app_settings WHERE setting_key = ?",
+            (key,),
+        ).fetchone()
+        if existing:
+            continue
+        connection.execute(
+            """
+            INSERT INTO app_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (key, str(value), now),
+        )
+
+
+def get_app_settings(connection=None):
+    close_after = False
+    if connection is None:
+        connection = get_db()
+        close_after = True
+    try:
+        rows = connection.execute("SELECT setting_key, setting_value FROM app_settings").fetchall()
+        settings = dict(DEFAULT_APP_SETTINGS)
+        for row in rows:
+            settings[row["setting_key"]] = row["setting_value"]
+        return settings
+    finally:
+        if close_after:
+            connection.close()
+
+
+def save_app_settings(connection, updates):
+    now = utc_now()
+    sanitized = {}
+    for key in DEFAULT_APP_SETTINGS.keys():
+        if key not in updates:
+            continue
+        value = updates.get(key)
+        sanitized[key] = "" if value is None else str(value).strip()
+
+    if "brand_logo_mode" in sanitized and sanitized["brand_logo_mode"] not in {"default", "url", "file"}:
+        sanitized["brand_logo_mode"] = DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    if "theme_id" in sanitized and sanitized["theme_id"] not in THEME_PRESETS:
+        sanitized["theme_id"] = DEFAULT_APP_SETTINGS["theme_id"]
+    if "dark_mode_policy" in sanitized and sanitized["dark_mode_policy"] not in {"disabled", "allowed", "forced"}:
+        sanitized["dark_mode_policy"] = DEFAULT_APP_SETTINGS["dark_mode_policy"]
+
+    for key, value in sanitized.items():
+        connection.execute(
+            """
+            INSERT INTO app_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                setting_value = excluded.setting_value,
+                updated_at = excluded.updated_at
+            """,
+            (key, value, now),
+        )
+    BRAND_LOGO_CACHE["loaded"] = False
+    BRAND_LOGO_CACHE["cache_key"] = None
+    BRAND_LOGO_CACHE["image"] = None
+
+
+def sanitize_brand_file_name(filename):
+    stem, extension = os.path.splitext(str(filename or ""))
+    extension = extension.lower()
+    safe_stem = slugify_field_key(stem) or "logo"
+    return f"{safe_stem}{extension}"
+
+
+def get_brand_logo_public_url(settings):
+    logo_mode = settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    if logo_mode == "file":
+        relative_path = (settings.get("brand_logo_file") or "").replace("\\", "/").lstrip("/")
+        if relative_path and os.path.exists(os.path.join(FRONTEND_ASSETS_DIR, relative_path)):
+            return f"/assets/{relative_path}"
+    if logo_mode == "url":
+        return settings.get("brand_logo_url") or CITY_LOGO_URL
+    if os.path.exists(CITY_LOGO_PATH):
+        return "/assets/city-logo.png"
+    return CITY_LOGO_URL
+
+
+def get_brand_logo_candidates(settings):
+    logo_mode = settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    local_candidates = []
+    remote_url = ""
+
+    if logo_mode == "file":
+        relative_path = (settings.get("brand_logo_file") or "").replace("\\", "/").lstrip("/")
+        if relative_path:
+            local_candidates.append(os.path.join(FRONTEND_ASSETS_DIR, relative_path))
+    elif logo_mode == "url":
+        remote_url = settings.get("brand_logo_url") or CITY_LOGO_URL
+    else:
+        local_candidates.append(CITY_LOGO_PATH)
+        remote_url = CITY_LOGO_URL
+
+    return local_candidates, remote_url
+
+
+def resolve_theme_id(settings):
+    theme_id = settings.get("theme_id") or DEFAULT_APP_SETTINGS["theme_id"]
+    return theme_id if theme_id in THEME_PRESETS else DEFAULT_APP_SETTINGS["theme_id"]
+
+
+def resolve_dark_mode(settings):
+    policy = settings.get("dark_mode_policy") or DEFAULT_APP_SETTINGS["dark_mode_policy"]
+    return policy if policy in {"disabled", "allowed", "forced"} else DEFAULT_APP_SETTINGS["dark_mode_policy"]
+
+
+def build_public_settings_payload(settings=None):
+    settings = settings or get_app_settings()
+    theme_id = resolve_theme_id(settings)
+    return {
+        "orgName": settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"],
+        "appName": settings.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
+        "dpoEmail": get_dpo_email(settings),
+        "logoUrl": "/api/settings/logo",
+        "logoMode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
+        "themeId": theme_id,
+        "themeLabel": THEME_PRESETS[theme_id]["label"],
+        "darkModePolicy": resolve_dark_mode(settings),
+        "themes": {
+            key: {"label": value["label"]}
+            for key, value in THEME_PRESETS.items()
+        },
+    }
 
 
 def slugify_field_key(value):
@@ -366,6 +697,21 @@ def init_db():
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS service_catalog (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL UNIQUE,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_builtin INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS signature_links (
                 id TEXT PRIMARY KEY,
                 form_id TEXT NOT NULL,
@@ -392,6 +738,8 @@ def init_db():
         ensure_column(connection, "resource_catalog", "field_schema_json", "field_schema_json TEXT")
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         seed_reference_catalogs(connection)
+        seed_service_catalog(connection)
+        seed_app_settings(connection)
         migrate_forms_to_dossiers(connection)
 
 
@@ -560,7 +908,7 @@ def mask_payload(payload):
 
 
 def derive_dossier_status(payload):
-    workflow_status = payload.get("workflow", {}).get("status") or "draft"
+    workflow_status = compute_effective_workflow_status(payload)
     has_signature = bool(payload.get("validation", {}).get("signatureDataUrl"))
     has_items = any(
         item.get("selected")
@@ -573,6 +921,8 @@ def derive_dossier_status(payload):
         return "en_restitution"
     if workflow_status == "cancelled":
         return "clos"
+    if workflow_status == "awaiting_signature":
+        return "en_signature"
     if workflow_status == "active":
         return "actif"
     if workflow_status == "partial_assignment":
@@ -597,12 +947,12 @@ def normalize_dossier_type(value):
 
 def dossier_type_label(value):
     labels = {
-        "arrivee": "Nouvelle arrivÃ©e",
+        "arrivee": "Nouvelle arrivée",
         "changement_service": "Changement de service",
-        "mise_a_jour": "Mise Ã  jour de ressources",
+        "mise_a_jour": "Mise à jour de ressources",
         "sortie": "Sortie / restitution",
     }
-    return labels.get(normalize_dossier_type(value), "Nouvelle arrivÃ©e")
+    return labels.get(normalize_dossier_type(value), "Nouvelle arrivée")
 
 
 def insert_audit_event(connection, dossier_id, event_type, event_label, details=None):
@@ -680,6 +1030,8 @@ def generate_signature_token():
 
 
 def materialize_signature_link(connection, row):
+    # Lecture normalisée d'un lien avec expiration recalculée à la volée,
+    # pour éviter d'éparpiller cette logique dans plusieurs routes.
     if not row:
         return None
 
@@ -780,7 +1132,6 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, 
         restitution = payload.get("restitution", {})
         has_restitution = bool(
             restitution.get("returnedAt")
-            and restitution.get("items")
         )
         if not has_restitution:
             raise ValueError("La restitution doit être préparée avant de générer un lien.")
@@ -906,6 +1257,7 @@ def sync_person_and_dossier(connection, payload, existing_row=None):
     meta = payload.setdefault("meta", {})
     saved_at = meta.get("savedAt") or utc_now()
     assigned_at = meta.get("assignedAt") or saved_at
+    start_at = meta.get("startAt") or assigned_at
 
     person_id = meta.get("personId")
     dossier_id = meta.get("dossierId")
@@ -937,7 +1289,7 @@ def sync_person_and_dossier(connection, payload, existing_row=None):
         "service": beneficiaire.get("service"),
         "fonction": beneficiaire.get("fonction"),
         "mandat": beneficiaire.get("mandat"),
-        "date_arrivee": assigned_at,
+        "date_arrivee": start_at,
         "is_active": 1,
         "created_at": person_exists["created_at"] if person_exists else saved_at,
         "updated_at": saved_at,
@@ -1015,6 +1367,7 @@ def sync_person_and_dossier(connection, payload, existing_row=None):
     meta["personId"] = person_id
     meta["dossierId"] = dossier_id
     meta["assignedAt"] = assigned_at
+    meta["startAt"] = start_at
     return person_id, dossier_id
 
 
@@ -1049,12 +1402,21 @@ def build_title(payload):
 
 
 def normalize_pdf_text(value):
-    # PDF minimal sans police Unicode embarquee:
-    # on degrade proprement vers Latin-1 pour garder un export robuste sans dependance externe.
+    # Le PDF utilise WinAnsiEncoding (CP1252).
+    # On repare d'abord les chaines mojibakees les plus courantes, puis on force un encodage CP1252
+    # avant de retransformer en chaine "byte-safe" pour l'ecriture finale du flux PDF.
     text = "" if value is None else str(value)
+    for encoding in ("cp1252", "latin-1"):
+        if any(marker in text for marker in ("Ã", "â", "ï¿½")):
+            try:
+                repaired = text.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if repaired.count("Ã") + repaired.count("â") + repaired.count("ï¿½") < text.count("Ã") + text.count("â") + text.count("ï¿½"):
+                text = repaired
     text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("\t", " ")
     text = " ".join(text.split())
-    return text.encode("latin-1", "replace").decode("latin-1")
+    return text.encode("cp1252", "replace").decode("latin-1")
 
 
 def pdf_escape(value):
@@ -1192,11 +1554,17 @@ def extract_signature_image(signature_data_url):
 
 
 def load_brand_logo_image():
-    if BRAND_LOGO_CACHE["loaded"]:
+    settings = get_app_settings()
+    local_candidates, remote_url = get_brand_logo_candidates(settings)
+    cache_key = json.dumps({
+        "local": local_candidates,
+        "remote": remote_url,
+    }, ensure_ascii=False)
+
+    if BRAND_LOGO_CACHE["loaded"] and BRAND_LOGO_CACHE.get("cache_key") == cache_key:
         return BRAND_LOGO_CACHE["image"]
 
     image = None
-    local_candidates = [CITY_LOGO_PATH]
     for candidate in local_candidates:
         if candidate and os.path.exists(candidate):
             try:
@@ -1207,10 +1575,10 @@ def load_brand_logo_image():
             if image:
                 break
 
-    if not image and CITY_LOGO_URL:
+    if not image and remote_url:
         try:
             request = urllib.request.Request(
-                CITY_LOGO_URL,
+                remote_url,
                 headers={
                     "User-Agent": "Parcours-agents-elus/1.0",
                     "Accept": "image/png,image/*;q=0.8,*/*;q=0.5",
@@ -1230,6 +1598,7 @@ def load_brand_logo_image():
             image = None
 
     BRAND_LOGO_CACHE["loaded"] = True
+    BRAND_LOGO_CACHE["cache_key"] = cache_key
     BRAND_LOGO_CACHE["image"] = image
     return image
 
@@ -1279,15 +1648,37 @@ def get_restitution_signature_datetime(payload):
     )
 
 
+def get_dpo_email(settings=None):
+    settings = settings or get_app_settings()
+    return settings.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"]
+
+
+def derive_restitution_workflow_status(item_states, signature_status="", signature_data=""):
+    states = list((item_states or {}).values())
+    base_status = "returned"
+    if states and any((state or {}).get("state") == "non_restitue" for state in states):
+        base_status = "partial_return"
+
+    # Une restitution preparee pour signature a distance ne doit pas etre
+    # consideree comme terminee tant que la signature de restitution n'a pas
+    # ete effectivement recueillie.
+    if base_status == "returned" and signature_status == "deferred" and not signature_data:
+        return "awaiting_signature"
+
+    return base_status
+
+
 def format_beneficiary_label(value):
     labels = {
         "agent": "Agent",
-        "elu": "Ã‰lu(e)",
+        "elu": "Élu(e)",
     }
     return labels.get(value, value or "-")
 
 
 def summarize_dynamic_resource(resource):
+    # Une ressource dynamique peut être décrite par plusieurs champs saisis
+    # ou par un simple détail libre; on prépare ici un résumé stable.
     fields = resource.get("fields") or {}
     if isinstance(fields, dict):
         values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
@@ -1303,51 +1694,57 @@ def collect_resource_entries(payload):
 
     entries = []
 
-    def add_entry(item_key, category, service, label, details, include_if_empty=False):
+    def add_entry(item_key, category, service, label, details, include_if_empty=False, assignment_source=None):
         clean_details = [str(detail).strip() for detail in details if str(detail or "").strip()]
         if not clean_details and not include_if_empty:
             return
+        assignment_summary = " - ".join(describe_assignment_condition(assignment_source))
         entries.append(
             {
                 "itemKey": item_key,
                 "category": category or "materiel",
-                "service": service or "Non dÃ©fini",
+                "service": service or "Non défini",
                 "label": label,
                 "details": " - ".join(clean_details) if clean_details else "-",
+                "assignedAt": assignment_source.get("assignedAt") if isinstance(assignment_source, dict) else "",
+                "assignmentCondition": assignment_source.get("conditionAttribution") if isinstance(assignment_source, dict) else "",
+                "assignmentConditionLabel": format_assignment_condition_label(assignment_source.get("conditionAttribution")) if isinstance(assignment_source, dict) and assignment_source.get("conditionAttribution") else "",
+                "assignmentConditionNotes": assignment_source.get("conditionNotes") if isinstance(assignment_source, dict) else "",
+                "assignmentSummary": assignment_summary,
             }
         )
 
     if materiel.get("ordinateur", {}).get("selected"):
         item = materiel["ordinateur"]
-        add_entry("ordinateur", "materiel", "DSI", "Ordinateur", [item.get("nomPoste"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("ordinateur", "materiel", "DSI", "Ordinateur", [item.get("nomPoste"), item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)
     if materiel.get("ecran", {}).get("selected"):
         item = materiel["ecran"]
-        add_entry("ecran", "materiel", "DSI", "Ã‰cran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("ecran", "materiel", "DSI", "Écran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)
     if materiel.get("telephone", {}).get("selected"):
         item = materiel["telephone"]
-        add_entry("telephone", "materiel", "DSI", "TÃ©lÃ©phone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")])
+        add_entry("telephone", "materiel", "DSI", "Téléphone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")], assignment_source=item)
     if materiel.get("tablette", {}).get("selected"):
         item = materiel["tablette"]
-        add_entry("tablette", "materiel", "DSI", "Tablette", [item.get("nomTablette"), item.get("marque"), item.get("modele"), item.get("numeroSerie")])
+        add_entry("tablette", "materiel", "DSI", "Tablette", [item.get("nomTablette"), item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)
     if immateriel.get("email", {}).get("selected"):
-        add_entry("email", "immateriel", "DSI", "Messagerie", [immateriel["email"].get("adresse")])
+        add_entry("email", "immateriel", "DSI", "Messagerie", [immateriel["email"].get("adresse")], assignment_source=immateriel["email"])
     if immateriel.get("vpn", {}).get("selected"):
-        add_entry("vpn", "immateriel", "DSI", "VPN", [], include_if_empty=True)
+        add_entry("vpn", "immateriel", "DSI", "VPN", [], include_if_empty=True, assignment_source=immateriel["vpn"])
     if materiel.get("badge", {}).get("selected"):
-        add_entry("badge", "materiel", "BÃ¢timent", "Badge d'accÃ¨s", [materiel["badge"].get("numero")])
+        add_entry("badge", "materiel", "Bâtiment", "Badge d'accès", [materiel["badge"].get("numero")], assignment_source=materiel["badge"])
     if materiel.get("cles", {}).get("selected"):
-        add_entry("cles", "materiel", "BÃ¢timent", "ClÃ©(s)", materiel["cles"].get("values") or [])
+        add_entry("cles", "materiel", "Bâtiment", "Clé(s)", materiel["cles"].get("values") or [], assignment_source=materiel["cles"])
     if materiel.get("veste", {}).get("selected"):
-        add_entry("veste", "materiel", "BÃ¢timent", "Veste", [], include_if_empty=True)
+        add_entry("veste", "materiel", "Bâtiment", "Veste", [], include_if_empty=True, assignment_source=materiel["veste"])
     if materiel.get("chaussuresSecurite", {}).get("selected"):
-        add_entry("chaussuresSecurite", "materiel", "BÃ¢timent", "Chaussures de sÃ©curitÃ©", [], include_if_empty=True)
+        add_entry("chaussuresSecurite", "materiel", "Bâtiment", "Chaussures de sécurité", [], include_if_empty=True, assignment_source=materiel["chaussuresSecurite"])
     if immateriel.get("zoneAlarme", {}).get("selected"):
-        add_entry("zoneAlarme", "immateriel", "BÃ¢timent", "Zone alarme", immateriel["zoneAlarme"].get("zones") or [])
+        add_entry("zoneAlarme", "immateriel", "Bâtiment", "Zone alarme", immateriel["zoneAlarme"].get("zones") or [], assignment_source=immateriel["zoneAlarme"])
     if materiel.get("vehicule", {}).get("selected"):
         item = materiel["vehicule"]
-        add_entry("vehicule", "materiel", "Autres services", "VÃ©hicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")])
+        add_entry("vehicule", "materiel", "Autres services", "Véhicule", [item.get("marque"), item.get("modele"), item.get("immatriculation")], assignment_source=item)
     if materiel.get("autre", {}).get("selected"):
-        add_entry("autre", "materiel", "Autres services", "Autre ressource", [materiel["autre"].get("description")])
+        add_entry("autre", "materiel", "Autres services", "Autre ressource", [materiel["autre"].get("description")], assignment_source=materiel["autre"])
 
     for resource in additional:
         if not resource.get("selected"):
@@ -1356,8 +1753,9 @@ def collect_resource_entries(payload):
             resource.get("code") or resource.get("id") or generate_id("resource"),
             resource.get("category") or "materiel",
             resource.get("issuerService") or resource.get("issuer_service") or "Autres services",
-            resource.get("label") or "Ressource complÃ©mentaire",
+            resource.get("label") or "Ressource complémentaire",
             [summarize_dynamic_resource(resource)],
+            assignment_source=resource,
         )
 
     return entries
@@ -1373,20 +1771,21 @@ def build_form_export_lines(payload):
     lines = [
         "DOSSIER D'ATTRIBUTION DE RESSOURCES",
         "",
-        f"Ã‰tat : {format_status_label(workflow.get('status') or 'draft')}",
+        f"État : {format_status_label(workflow.get('status') or 'draft')}",
         f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+        f"Date de prise de fonction : {format_export_datetime(payload.get('meta', {}).get('startAt'))}",
         f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
         "",
-        "BÃ©nÃ©ficiaire",
+        "Bénéficiaire",
         f"Nom : {beneficiaire.get('nom') or '-'}",
-        f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
-        f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+        f"Prénom : {beneficiaire.get('prenom') or '-'}",
+        f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
         f"Service : {beneficiaire.get('service') or '-'}",
         f"Fonction : {beneficiaire.get('fonction') or '-'}",
         f"Mandat : {beneficiaire.get('mandat') or '-'}",
         f"Service de destination : {dossier.get('serviceDestination') or '-'}",
         "",
-        "Ressources attribuÃ©es",
+        "Ressources attribuées",
     ]
 
     resources = collect_resource_entries(payload)
@@ -1398,20 +1797,20 @@ def build_form_export_lines(payload):
                 lines.append(f"{current_service}")
             lines.append(f"- {entry['label']} : {entry['details']}")
     else:
-        lines.append("- Aucune ressource renseignÃ©e")
+        lines.append("- Aucune ressource renseignée")
 
     lines.extend(
         [
             "",
             "Restitution",
-            f"Ã‰tat de restitution : {format_status_label(workflow.get('status') or 'draft')}",
+            f"État de restitution : {format_status_label(workflow.get('status') or 'draft')}",
             f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
             f"Motif : {restitution.get('reason') or '-'}",
             f"Observations : {restitution.get('notes') or '-'}",
             "",
             "Validation",
-            f"Information RGPD portÃ©e Ã  connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-            f"Signature prÃ©sente : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+            f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+            f"Signature présente : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
             f"Date de signature : {signature_datetime}",
         ]
     )
@@ -1419,6 +1818,8 @@ def build_form_export_lines(payload):
 
 
 def build_pdf_bytes(title, payload):
+    settings = get_app_settings()
+    org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
     page_width = 595
     page_height = 842
     margin = 42
@@ -1443,18 +1844,19 @@ def build_pdf_bytes(title, payload):
         (
             "Identification du dossier",
             [
-                f"Ã‰tat : {format_status_label(workflow.get('status') or 'draft')}",
+                f"État : {format_status_label(workflow.get('status') or 'draft')}",
                 f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+                f"Date de prise de fonction : {format_export_datetime(payload.get('meta', {}).get('startAt'))}",
                 f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
-                f"Date de crÃ©ation : {format_export_datetime(payload.get('meta', {}).get('createdAt'))}",
+                f"Date de création : {format_export_datetime(payload.get('meta', {}).get('createdAt'))}",
             ],
         ),
         (
-            "BÃ©nÃ©ficiaire",
+            "Bénéficiaire",
             [
                 f"Nom : {beneficiaire.get('nom') or '-'}",
-                f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
-                f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"Prénom : {beneficiaire.get('prenom') or '-'}",
+                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
                 f"Service : {beneficiaire.get('service') or '-'}",
                 f"Fonction : {beneficiaire.get('fonction') or '-'}",
                 f"Mandat : {beneficiaire.get('mandat') or '-'}",
@@ -1467,12 +1869,16 @@ def build_pdf_bytes(title, payload):
         for service, service_entries in sorted(resource_groups.items(), key=lambda item: item[0]):
             sections.append(
                 (
-                    f"Ressources attribuÃ©es - {service}",
-                    [f"{entry['label']} : {entry['details']}" for entry in service_entries],
+                    f"Ressources attribuées - {service}",
+                    [
+                        f"{entry['label']} : {entry['details']}"
+                        f"{' / ' + entry['assignmentSummary'] if entry.get('assignmentSummary') else ''}"
+                        for entry in service_entries
+                    ],
                 )
             )
     else:
-        sections.append(("Ressources attribuÃ©es", ["Aucune ressource renseignÃ©e."]))
+        sections.append(("Ressources attribuées", ["Aucune ressource renseignée."]))
 
     restitution_lines = [
         f"Statut : {format_status_label(workflow.get('status') or 'draft')}",
@@ -1491,10 +1897,10 @@ def build_pdf_bytes(title, payload):
     sections.append(("Restitution", restitution_lines))
     sections.append(
         (
-            "Validation et conformit??",
+            "Validation et conformité",
             [
-                f"Information RGPD port??e ?? connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-                f"Signature du b??n??ficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
+                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                f"Signature du bénéficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
                 f"Date de signature : {signature_datetime}",
             ],
         )
@@ -1504,9 +1910,9 @@ def build_pdf_bytes(title, payload):
         sections[-1] = (
             sections[-1][0],
             [
-                f"Information RGPD port?e ? connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-                "Signature du b?n?ficiaire : Masqu?e",
-                "Mention : la signature est r?serv?e aux personnes autoris?es.",
+                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                "Signature du bénéficiaire : Masquée",
+                "Mention : la signature est réservée aux personnes autorisées.",
             ],
         )
 
@@ -1611,7 +2017,7 @@ def build_pdf_bytes(title, payload):
         ensure_space(section_height)
         box_bottom = current_y - section_height
         draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature du bÃ©nÃ©ficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
         draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
         draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la validation du dossier.", font="F1", size=10, color=(0.28, 0.36, 0.44))
         current_page.append(
@@ -1620,14 +2026,19 @@ def build_pdf_bytes(title, payload):
         current_y = box_bottom - 16
 
     if signature_present and not signature_export_allowed:
-        section_height = 92
+        reservation_lines = wrap_line(f"Réserve : {restitution.get('signataireComment') or '-'}", width=72) if restitution.get("signataireDecision") == "with_reservation" else []
+        section_height = 92 + (len(reservation_lines) * 14)
         ensure_space(section_height)
         box_bottom = current_y - section_height
         draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature du b?n?ficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, "Signature masqu?e dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "La signature est r?serv?e aux personnes autoris?es.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
+        draw_text(current_page, margin + 14, current_y - 38, "Signature masquée dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "La signature est réservée aux personnes autorisées.", font="F1", size=10, color=(0.28, 0.36, 0.44))
         draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        text_y = current_y - 86
+        for line in reservation_lines:
+            draw_text(current_page, margin + 14, text_y, normalize_pdf_text(line), font="F1", size=10, color=(0.45, 0.17, 0.12))
+            text_y -= 14
         current_y = box_bottom - 16
 
     if not current_page:
@@ -1647,18 +2058,18 @@ def build_pdf_bytes(title, payload):
             logo_width = round(logo_image["width"] * logo_ratio, 2)
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
-        draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et Ã©lu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
+        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
         draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuÃ©es", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
 
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et Ã©lu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -1690,7 +2101,7 @@ def build_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et Ã©lu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -1718,6 +2129,8 @@ def build_pdf_bytes(title, payload):
 
 
 def build_restitution_pdf_bytes(title, payload):
+    settings = get_app_settings()
+    org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
     page_width = 595
     page_height = 842
     margin = 42
@@ -1731,27 +2144,57 @@ def build_restitution_pdf_bytes(title, payload):
     restitution = payload.get("restitution", {})
     signature_datetime = get_restitution_signature_datetime(payload)
     signature_status = restitution.get("signatureStatus") or ("signed" if restitution.get("signatureDataUrl") else "deferred")
+    decision_label = format_restitution_decision_label(signature_status, restitution.get("signataireDecision"))
     signature_export_allowed = can_export_signature_assets()
     signature_present = bool(restitution.get("signatureDataUrl"))
-    resources = {entry["itemKey"]: entry for entry in collect_resource_entries(payload)}
+    material_entries = {}
+    for item in extract_items(payload):
+        if item.get("category") != "materiel":
+            continue
+        details = json.loads(item.get("details_json") or "{}") if item.get("details_json") else {}
+        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
+            str(value).strip()
+            for key, value in details.items()
+            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
+        )
+        material_entries[item["item_key"]] = {
+            "itemKey": item["item_key"],
+            "label": item["label"],
+            "details": detail_text or "-",
+            "assignmentSummary": " - ".join(describe_assignment_condition(details)),
+        }
+
+    for entry in collect_resource_entries(payload):
+        if entry.get("category") != "materiel":
+            continue
+        existing = material_entries.get(entry["itemKey"], {})
+        material_entries[entry["itemKey"]] = {
+            "itemKey": entry["itemKey"],
+            "label": entry.get("label") or existing.get("label") or entry["itemKey"],
+            "details": entry.get("details") or existing.get("details") or "-",
+            "assignmentSummary": entry.get("assignmentSummary") or existing.get("assignmentSummary") or "",
+        }
+
+    material_items = sorted(material_entries.values(), key=lambda item: item.get("label") or item.get("itemKey"))
 
     sections = [
         (
             "Identification de la restitution",
             [
-                f"Ã‰tat du dossier : {format_status_label(workflow.get('status') or 'draft')}",
+                f"État du dossier : {format_status_label(workflow.get('status') or 'draft')}",
                 f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
+                f"Date de prise de fonction : {format_export_datetime(payload.get('meta', {}).get('startAt'))}",
                 f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
                 f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
                 f"Motif : {restitution.get('reason') or '-'}",
             ],
         ),
         (
-            "BÃ©nÃ©ficiaire",
+            "Bénéficiaire",
             [
                 f"Nom : {beneficiaire.get('nom') or '-'}",
-                f"PrÃ©nom : {beneficiaire.get('prenom') or '-'}",
-                f"QualitÃ© : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"Prénom : {beneficiaire.get('prenom') or '-'}",
+                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
                 f"Service : {beneficiaire.get('service') or '-'}",
                 f"Fonction : {beneficiaire.get('fonction') or '-'}",
                 f"Mandat : {beneficiaire.get('mandat') or '-'}",
@@ -1760,34 +2203,52 @@ def build_restitution_pdf_bytes(title, payload):
     ]
 
     restitution_lines = []
-    for item_key, state in sorted((restitution.get("items") or {}).items()):
-        entry = resources.get(item_key, {"label": item_key, "details": "-"})
+    for item in material_items:
+        item_key = item["itemKey"]
+        state = (restitution.get("items") or {}).get(item_key, {})
         state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
         note = state.get("notes") or "-"
-        restitution_lines.append(f"{entry['label']} ({entry['details']}) : {state_label} / {note}")
+        restitution_lines.append(
+            f"{item['label']} ({item.get('details') or '-'}) : {state_label} / {note}"
+            f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
+        )
     if not restitution_lines:
-        restitution_lines.append("Aucun matÃ©riel n'a encore Ã©tÃ© renseignÃ© dans la restitution.")
-    sections.append(("Ã‰tat des matÃ©riels restituÃ©s", restitution_lines))
+        restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
+    sections.append(("État des matériels restitués", restitution_lines))
     sections.append(
         (
             "Validation de la restitution",
             [
                 f"Statut de signature : {format_restitution_signature_status(signature_status)}",
                 f"Date de signature : {signature_datetime}",
-                f"Motif si la signature n'a pas Ã©tÃ© recueillie : {restitution.get('signatureReason') or '-'}",
-                f"Observations gÃ©nÃ©rales : {restitution.get('notes') or '-'}",
+                f"Motif si la signature n'a pas été recueillie : {restitution.get('signatureReason') or '-'}",
+                f"Décision du signataire : {decision_label}",
+                f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
+                f"Observations générales : {restitution.get('notes') or '-'}",
             ],
         )
     )
+    if restitution.get("signataireDecision") == "with_reservation":
+        sections.append(
+            (
+                "Réserve du signataire",
+                [
+                    "La restitution a été signée avec réserve par la personne concernée.",
+                    f"Réclamation formulée : {restitution.get('signataireComment') or '-'}",
+                ],
+            )
+        )
 
     if not signature_export_allowed:
         sections[-1] = (
             sections[-1][0],
             [
-                "Statut de signature : Masqu?e",
-                "Mention : la signature est r?serv?e aux personnes autoris?es.",
-                "Motif si la signature n'a pas ?t? recueillie : Information r?serv?e.",
-                f"Observations g?n?rales : {restitution.get('notes') or '-'}",
+                "Statut de signature : Masquée",
+                "Mention : la signature est réservée aux personnes autorisées.",
+                "Motif si la signature n'a pas été recueillie : Information réservée.",
+                f"Décision du signataire : {decision_label}",
+                f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
+                f"Observations générales : {restitution.get('notes') or '-'}",
             ],
         )
 
@@ -1887,13 +2348,26 @@ def build_restitution_pdf_bytes(title, payload):
         ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
         draw_width = round(signature_image["width"] * ratio, 2)
         draw_height = round(signature_image["height"] * ratio, 2)
-        section_height = 90 + draw_height
+        reservation_lines = wrap_line(f"Réserve : {restitution.get('signataireComment') or '-'}", width=72) if restitution.get("signataireDecision") == "with_reservation" else []
+        section_height = 90 + draw_height + (len(reservation_lines) * 14)
         ensure_space(section_height)
         box_bottom = current_y - section_height
         draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
         draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
         draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la restitution.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(
+            current_page,
+            margin + 14,
+            current_y - 54,
+            "Signature recueillie avec réserve." if restitution.get("signataireDecision") == "with_reservation" else "Signature recueillie lors de la restitution.",
+            font="F1",
+            size=10,
+            color=(0.28, 0.36, 0.44),
+        )
+        text_y = current_y - 70
+        for line in reservation_lines:
+            draw_text(current_page, margin + 14, text_y, normalize_pdf_text(line), font="F1", size=10, color=(0.45, 0.17, 0.12))
+            text_y -= 14
         current_page.append(
             f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
         )
@@ -1905,8 +2379,8 @@ def build_restitution_pdf_bytes(title, payload):
         box_bottom = current_y - section_height
         draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
         draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, "Signature masqu?e dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "La signature est r?serv?e aux personnes autoris?es.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 38, "Signature masquée dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
+        draw_text(current_page, margin + 14, current_y - 54, "La signature est réservée aux personnes autorisées.", font="F1", size=10, color=(0.28, 0.36, 0.44))
         draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
         current_y = box_bottom - 16
 
@@ -1927,18 +2401,18 @@ def build_restitution_pdf_bytes(title, payload):
             logo_width = round(logo_image["width"] * logo_ratio, 2)
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
-        draw_text(commands, margin + 100, page_height - 48, "Ville de Publier", font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et Ã©lu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
+        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
         draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources rÃ©cupÃ©rÃ©es", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
+        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources récupérées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
 
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et Ã©lu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -1970,7 +2444,7 @@ def build_restitution_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et Ã©lu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -2001,10 +2475,11 @@ def format_status_label(status):
     labels = {
         "draft": "Brouillon",
         "partial_assignment": "Attribution partielle",
+        "awaiting_signature": "En attente de signature",
         "active": "Attribution active",
-        "returned": "Restitution terminÃ©e",
+        "returned": "Restitution terminée",
         "partial_return": "Restitution partielle",
-        "cancelled": "Dossier annulÃ©",
+        "cancelled": "Dossier annulé",
     }
     return labels.get(status, "Brouillon")
 
@@ -2012,13 +2487,13 @@ def format_status_label(status):
 def format_restitution_state_label(state):
     labels = {
         "pending": "En attente",
-        "returned": "RestituÃ©",
-        "returned_damaged": "RestituÃ© abÃ®mÃ©",
-        "missing": "Non restituÃ©",
-        "transferred": "TransfÃ©rÃ©",
+        "returned": "Restitué",
+        "returned_damaged": "Restitué abîmé",
+        "missing": "Non restitué",
+        "transferred": "Transféré",
         "conforme": "Conforme",
-        "degrade": "DÃ©gradÃ©",
-        "non_restitue": "Non restituÃ©",
+        "degrade": "Dégradé",
+        "non_restitue": "Non restitué",
         "perdu": "Perdu",
         "autre": "Autre",
     }
@@ -2027,11 +2502,126 @@ def format_restitution_state_label(state):
 
 def format_restitution_signature_status(value):
     labels = {
-        "signed": "Signature recueillie",
+        "signed": "Signature recueillie sur place",
         "impossible": "Signature impossible",
-        "deferred": "Signature diffÃ©rÃ©e",
+        "deferred": "Signature à distance par lien",
     }
     return labels.get(value or "", value or "-")
+
+
+def format_restitution_decision_label(signature_status, signataire_decision):
+    if signataire_decision == "with_reservation":
+        return "Signée avec réserve"
+    if signature_status == "signed":
+        return "Restitution confirmée"
+    if signature_status == "deferred":
+        return "En attente de signature"
+    if signature_status == "impossible":
+        return "Signature impossible"
+    return "-"
+
+
+def format_assignment_condition_label(value):
+    labels = {
+        "neuf": "Neuf",
+        "bon_etat": "Bon état",
+        "etat_usage": "État d'usage",
+        "degrade": "Dégradé",
+    }
+    return labels.get(value or "", value or "-")
+
+
+def describe_assignment_condition(item):
+    if not isinstance(item, dict):
+        return []
+    parts = []
+    is_immaterial = item.get("category") == "immateriel"
+    if item.get("assignedAt"):
+        parts.append(f"Date d'attribution : {format_export_datetime(item.get('assignedAt'))}")
+    if not is_immaterial and item.get("conditionAttribution"):
+        parts.append(f"État à la remise : {format_assignment_condition_label(item.get('conditionAttribution'))}")
+    notes = str(item.get("conditionNotes") or "").strip()
+    if notes and not is_immaterial:
+        parts.append(f"Observation de remise : {notes}")
+    return parts
+
+
+def summarize_assignment_progress(payload):
+    requested_items = extract_items(payload)
+    total_requested = len(requested_items)
+    completed = 0
+    for item in requested_items:
+        try:
+            details = json.loads(item.get("details_json") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            details = {}
+        if isinstance(details, dict) and details.get("assignedAt"):
+            completed += 1
+    start_at = (
+        payload.get("meta", {}).get("startAt")
+        or payload.get("beneficiaire", {}).get("datePriseFonction")
+        or ""
+    )
+    if total_requested == 0:
+        return {
+            "startAt": start_at,
+            "completed": 0,
+            "total": 0,
+            "ratio": 0,
+            "timingStatus": "neutral",
+            "timingLabel": "À planifier",
+        }
+
+    if completed >= total_requested:
+        return {
+            "startAt": start_at,
+            "completed": completed,
+            "total": total_requested,
+            "ratio": 1,
+            "timingStatus": "ok",
+            "timingLabel": "Prêt",
+        }
+
+    if not start_at:
+        return {
+            "startAt": "",
+            "completed": completed,
+            "total": total_requested,
+            "ratio": round(completed / total_requested, 4),
+            "timingStatus": "neutral",
+            "timingLabel": "À planifier",
+        }
+
+    try:
+        if len(start_at) == 10:
+            start_date = datetime.strptime(start_at, "%Y-%m-%d").date()
+        else:
+            start_date = datetime.fromisoformat(start_at.replace("Z", "+00:00")).date()
+        days_until_start = (start_date - datetime.now().date()).days
+    except ValueError:
+        days_until_start = None
+
+    if days_until_start is None:
+        timing_status = "neutral"
+        timing_label = "À planifier"
+    elif days_until_start < 0:
+        timing_status = "late"
+        timing_label = "En retard"
+    elif days_until_start <= 3:
+        timing_status = "warning"
+        timing_label = "En danger"
+    else:
+        timing_status = "ok"
+        timing_label = "Dans les temps"
+
+    return {
+        "startAt": start_at,
+        "completed": completed,
+        "total": total_requested,
+        "ratio": round(completed / total_requested, 4),
+        "timingStatus": timing_status,
+        "timingLabel": timing_label,
+    }
 
 
 def extract_items(payload):
@@ -2043,15 +2633,15 @@ def extract_items(payload):
 
     items = [
         ("ordinateur", "materiel", "Ordinateur", materiel.get("ordinateur", {})),
-        ("ecran", "materiel", "Ã‰cran", materiel.get("ecran", {})),
-        ("telephone", "materiel", "TÃ©lÃ©phone", materiel.get("telephone", {})),
+        ("ecran", "materiel", "Écran", materiel.get("ecran", {})),
+        ("telephone", "materiel", "Téléphone", materiel.get("telephone", {})),
         ("tablette", "materiel", "Tablette", materiel.get("tablette", {})),
-        ("vehicule", "materiel", "VÃ©hicule", materiel.get("vehicule", {})),
-        ("badge", "materiel", "Badge d'accÃ¨s", materiel.get("badge", {})),
-        ("cles", "materiel", "ClÃ©(s)", materiel.get("cles", {})),
+        ("vehicule", "materiel", "Véhicule", materiel.get("vehicule", {})),
+        ("badge", "materiel", "Badge d'accès", materiel.get("badge", {})),
+        ("cles", "materiel", "Clé(s)", materiel.get("cles", {})),
         ("veste", "materiel", "Veste", materiel.get("veste", {})),
-        ("chaussuresSecurite", "materiel", "Chaussures de sÃ©curitÃ©", materiel.get("chaussuresSecurite", {})),
-        ("autre", "materiel", "Autre matÃ©riel", materiel.get("autre", {})),
+        ("chaussuresSecurite", "materiel", "Chaussures de sécurité", materiel.get("chaussuresSecurite", {})),
+        ("autre", "materiel", "Autre matériel", materiel.get("autre", {})),
         ("vpn", "immateriel", "VPN", immateriel.get("vpn", {})),
         ("email", "immateriel", "Email", immateriel.get("email", {})),
         ("zoneAlarme", "immateriel", "Zone alarme", immateriel.get("zoneAlarme", {})),
@@ -2061,7 +2651,7 @@ def extract_items(payload):
         items.append((
             resource.get("code") or resource.get("id") or generate_id("resource"),
             resource.get("category") or "materiel",
-            resource.get("label") or "Ressource complÃ©mentaire",
+            resource.get("label") or "Ressource complémentaire",
             resource,
         ))
 
@@ -2088,16 +2678,6 @@ def extract_items(payload):
 
     return extracted
 
-
-def summarize_dynamic_resource(resource):
-    fields = resource.get("fields") or {}
-    if isinstance(fields, dict):
-        parts = [str(value).strip() for value in fields.values() if str(value or "").strip()]
-        if parts:
-            return " - ".join(parts)
-    return str(resource.get("details") or "").strip()
-
-
 def collect_resource_validation_errors(payload):
     errors = []
     materiel = payload.get("materiel", {})
@@ -2107,34 +2687,34 @@ def collect_resource_validation_errors(payload):
     fixed_rules = [
         ("ordinateur", materiel.get("ordinateur", {}), [
             ("Marque ordinateur", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("ModÃ¨le ordinateur", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("NumÃ©ro de sÃ©rie ordinateur", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("Modèle ordinateur", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Numéro de série ordinateur", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
         ]),
         ("ecran", materiel.get("ecran", {}), [
-            ("Marque Ã©cran", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("ModÃ¨le Ã©cran", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("NumÃ©ro de sÃ©rie Ã©cran", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("Marque écran", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("Modèle écran", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Numéro de série écran", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
         ]),
         ("telephone", materiel.get("telephone", {}), [
-            ("Marque tÃ©lÃ©phone", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("ModÃ¨le tÃ©lÃ©phone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Marque téléphone", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("Modèle téléphone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
             ("IMEI", "imei", r"^\d{15}$"),
         ]),
         ("tablette", materiel.get("tablette", {}), [
             ("Marque tablette", "marque", r".+"),
-            ("ModÃ¨le tablette", "modele", r".+"),
-            ("NumÃ©ro de sÃ©rie tablette", "numeroSerie", r".+"),
+            ("Modèle tablette", "modele", r".+"),
+            ("Numéro de série tablette", "numeroSerie", r".+"),
         ]),
         ("vehicule", materiel.get("vehicule", {}), [
-            ("Marque vÃ©hicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("ModÃ¨le vÃ©hicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
+            ("Marque véhicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
+            ("Modèle véhicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
             ("Immatriculation", "immatriculation", r"^[A-Z]{2}-\d{3}-[A-Z]{2}$"),
         ]),
         ("badge", materiel.get("badge", {}), [
-            ("NumÃ©ro de badge", "numero", r"^[A-Za-z0-9-]{3,30}$"),
+            ("Numéro de badge", "numero", r"^[A-Za-z0-9-]{3,30}$"),
         ]),
         ("autre", materiel.get("autre", {}), [
-            ("Description autre matÃ©riel", "description", r"^.{3,120}$"),
+            ("Description autre matériel", "description", r"^.{3,120}$"),
         ]),
         ("email", immateriel.get("email", {}), [
             ("Adresse email", "adresse", r"^[^\s@]+@[^\s@]+\.[^\s@]+$"),
@@ -2151,10 +2731,10 @@ def collect_resource_validation_errors(payload):
                 continue
 
     if materiel.get("cles", {}).get("selected") and not [value for value in materiel.get("cles", {}).get("values", []) if str(value).strip()]:
-        errors.append("Au moins une clÃ© doit Ãªtre renseignÃ©e")
+        errors.append("Au moins une clé doit être renseignée")
 
     if immateriel.get("zoneAlarme", {}).get("selected") and not [value for value in immateriel.get("zoneAlarme", {}).get("zones", []) if str(value).strip()]:
-        errors.append("Au moins une zone alarme doit Ãªtre renseignÃ©e")
+        errors.append("Au moins une zone alarme doit être renseignée")
 
     for resource in resources:
         if not resource.get("selected"):
@@ -2168,39 +2748,79 @@ def collect_resource_validation_errors(payload):
                     errors.append(f"{resource.get('label') or 'Ressource'} : {field['label']} manquant")
                     continue
         elif not summarize_dynamic_resource(resource):
-            errors.append(f"{resource.get('label') or 'Ressource complÃ©mentaire'} incomplÃ¨te")
+            errors.append(f"{resource.get('label') or 'Ressource complémentaire'} incomplète")
 
     return errors
 
 
-def normalize_workflow_before_save(payload):
-    workflow = payload.setdefault("workflow", {})
+def compute_effective_workflow_status(payload):
+    # Recalcule le statut metier a partir de l'etat reel du dossier.
+    # Cela permet aussi de corriger a l'affichage les anciennes fiches
+    # enregistrees avec "active" alors que toutes les attributions
+    # n'etaient pas encore datees.
+    workflow = payload.get("workflow", {})
+    current_status = workflow.get("status") or "draft"
+    restitution = payload.get("restitution", {})
+
+    if current_status == "cancelled":
+        return current_status
+    if current_status in {"returned", "partial_return"} or (
+        current_status == "awaiting_signature"
+        and (
+            restitution.get("items")
+            or restitution.get("returnedAt")
+            or restitution.get("signatureStatus") == "deferred"
+        )
+    ):
+        return derive_restitution_workflow_status(
+            restitution.get("items", {}),
+            restitution.get("signatureStatus") or "",
+            restitution.get("signatureDataUrl") or "",
+        )
+
     validation = payload.get("validation", {})
     has_signature = bool(validation.get("signatureDataUrl"))
     rgpd_accepted = bool(validation.get("rgpdAccepted"))
-    current_status = workflow.get("status") or "draft"
+    resource_errors = payload.get("meta", {}).get("resourceValidationErrors")
+    if not isinstance(resource_errors, list):
+        resource_errors = collect_resource_validation_errors(payload)
 
-    if current_status in {"returned", "partial_return", "cancelled"}:
+    progress = summarize_assignment_progress(payload)
+    if not has_signature and not resource_errors and progress["total"] > 0 and progress["completed"] >= progress["total"]:
+        return "awaiting_signature"
+    if not has_signature or not rgpd_accepted:
+        return "draft"
+    if resource_errors or progress["completed"] < progress["total"]:
+        return "partial_assignment"
+
+    if current_status == "active":
+        return "active"
+
+    return "partial_assignment"
+
+
+def normalize_workflow_before_save(payload):
+    workflow = payload.setdefault("workflow", {})
+    current_status = workflow.get("status") or "draft"
+    restitution = payload.get("restitution", {})
+
+    if current_status in {"returned", "partial_return", "cancelled"} or (
+        current_status == "awaiting_signature"
+        and (
+            restitution.get("items")
+            or restitution.get("returnedAt")
+            or restitution.get("signatureStatus") == "deferred"
+        )
+    ):
         return payload
 
     resource_errors = collect_resource_validation_errors(payload)
     payload.setdefault("meta", {})["resourceValidationErrors"] = resource_errors
-
-    if not has_signature or not rgpd_accepted:
-        workflow["status"] = "draft"
-        payload["meta"]["lockedAt"] = ""
-        return payload
-
-    if resource_errors:
-        workflow["status"] = "partial_assignment"
-        payload["meta"]["lockedAt"] = ""
-        return payload
-
-    if workflow.get("status") == "active":
+    workflow["status"] = compute_effective_workflow_status(payload)
+    if workflow["status"] == "active":
         payload["meta"]["lockedAt"] = payload["meta"].get("lockedAt") or utc_now()
         return payload
 
-    workflow["status"] = "partial_assignment"
     payload["meta"]["lockedAt"] = ""
     return payload
 
@@ -2223,6 +2843,7 @@ def persist_form(payload, allow_locked_update=False):
     restitution = payload.get("restitution", {})
     dossier = payload.get("dossier", {})
     assigned_at = payload.get("meta", {}).get("assignedAt") or payload["meta"]["savedAt"]
+    payload["meta"]["startAt"] = payload.get("meta", {}).get("startAt") or ""
 
     row = {
         "id": form_id,
@@ -2257,7 +2878,7 @@ def persist_form(payload, allow_locked_update=False):
         if exists:
             existing_payload = json.loads(exists["payload_json"])
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
-                raise ValueError("Cette fiche est signÃ©e et verrouillÃ©e. Elle ne peut plus Ãªtre modifiÃ©e.")
+                raise ValueError("Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
             row["created_at"] = exists["created_at"]
         _, dossier_id = sync_person_and_dossier(connection, payload, exists)
         row["dossier_id"] = dossier_id
@@ -2349,13 +2970,20 @@ def persist_form(payload, allow_locked_update=False):
 
 def row_to_summary(row):
     # Resume leger pour la page d'accueil.
+    payload = {}
+    try:
+        payload = json.loads(row["payload_json"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        payload = {}
+    effective_status = compute_effective_workflow_status(payload)
+    progress = summarize_assignment_progress(payload)
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],
         "dossierType": row["dossier_type"],
         "title": row["title"],
-        "status": row["status"],
-        "isLocked": row["status"] == "active",
+        "status": effective_status,
+        "isLocked": effective_status == "active",
         "beneficiaryType": row["beneficiary_type"],
         "nom": row["nom"],
         "prenom": row["prenom"],
@@ -2363,8 +2991,14 @@ def row_to_summary(row):
         "fonction": row["fonction"],
         "mandat": row["mandat"],
         "assignedAt": row["assigned_at"],
+        "startAt": progress["startAt"],
         "returnedAt": row["returned_at"],
         "updatedAt": row["updated_at"],
+        "completedResources": progress["completed"],
+        "totalResources": progress["total"],
+        "resourceProgressRatio": progress["ratio"],
+        "timingStatus": progress["timingStatus"],
+        "timingLabel": progress["timingLabel"],
     }
     user = current_user()
     if user and user.get("data_scope") == "masked":
@@ -2404,6 +3038,9 @@ def get_form(form_id):
     payload["meta"]["savedAt"] = form_row["updated_at"]
     payload["meta"]["assignedAt"] = form_row["assigned_at"]
     payload["dossier"]["type"] = normalize_dossier_type(payload.get("dossier", {}).get("type") or form_row["dossier_type"] or "arrivee")
+    payload.setdefault("workflow", {})["status"] = compute_effective_workflow_status(payload)
+    if payload["workflow"]["status"] != "active":
+        payload["meta"]["lockedAt"] = ""
     user = current_user()
     if user and user.get("data_scope") == "masked":
         payload = mask_payload(payload)
@@ -2431,6 +3068,9 @@ def get_form(form_id):
 
 def build_signature_public_payload(form_data, link_row):
     payload = form_data["data"]
+    settings = get_app_settings()
+    org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
+    dpo_email = get_dpo_email(settings)
     beneficiaire = payload.get("beneficiaire", {})
     grouped_resources = {"materiel": [], "immateriel": []}
     for entry in collect_resource_entries(payload):
@@ -2438,6 +3078,9 @@ def build_signature_public_payload(form_data, link_row):
             "label": entry["label"],
             "details": entry["details"],
             "service": entry["service"],
+            "assignmentConditionLabel": entry.get("assignmentConditionLabel") or "",
+            "assignmentConditionNotes": entry.get("assignmentConditionNotes") or "",
+            "assignmentSummary": entry.get("assignmentSummary") or "",
         })
 
     return {
@@ -2460,9 +3103,9 @@ def build_signature_public_payload(form_data, link_row):
             },
             "resources": grouped_resources,
             "rgpdText": [
-                "Les donnees a caractere personnel renseignees dans ce dossier font l'objet d'un traitement par la commune de Publier afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas echeant, des restitutions.",
+                f"Les donnees a caractere personnel renseignees dans ce dossier font l'objet d'un traitement par {org_name} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas echeant, des restitutions.",
                 "Conformement au reglement general sur la protection des donnees et a la loi Informatique et Libertes, la personne concernee dispose notamment de droits d'acces, de rectification, d'effacement, de limitation et d'opposition, dans les conditions prevues par la reglementation applicable.",
-                "Pour toute question relative au traitement de ses donnees personnelles ou pour exercer ses droits, la personne concernee peut contacter le delegue a la protection des donnees a l'adresse suivante : dpo@ville-publier.fr.",
+                f"Pour toute question relative au traitement de ses donnees personnelles ou pour exercer ses droits, la personne concernee peut contacter le delegue a la protection des donnees a l'adresse suivante : {dpo_email}.",
             ],
         },
     }
@@ -2484,7 +3127,7 @@ def build_restitution_signature_public_payload(form_data, link_row):
         detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
             str(value).strip()
             for key, value in details.items()
-            if key not in {"selected"} and str(value or "").strip()
+            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
         )
         restitution_items.append(
             {
@@ -2493,6 +3136,7 @@ def build_restitution_signature_public_payload(form_data, link_row):
                 "state": state.get("state") or state.get("condition") or "conforme",
                 "stateLabel": format_restitution_state_label(state.get("state") or state.get("condition") or "conforme"),
                 "notes": state.get("notes") or "",
+                "assignmentSummary": " - ".join(describe_assignment_condition(details)),
             }
         )
 
@@ -2518,6 +3162,8 @@ def build_restitution_signature_public_payload(form_data, link_row):
                 "reason": restitution.get("reason") or "",
                 "notes": restitution.get("notes") or "",
                 "items": restitution_items,
+                "signataireDecision": restitution.get("signataireDecision") or "confirmed",
+                "signataireComment": restitution.get("signataireComment") or "",
             },
         },
     }
@@ -2648,12 +3294,16 @@ def restitution_page():
 
 @app.route("/signature/<token>")
 def signature_page(token):
-    return send_from_directory(FRONTEND_DIR, "signature.html")
+    response = make_response(send_from_directory(FRONTEND_DIR, "signature.html"))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/restitution-signature/<token>")
 def restitution_signature_page(token):
-    return send_from_directory(FRONTEND_DIR, "restitution-signature.html")
+    response = make_response(send_from_directory(FRONTEND_DIR, "restitution-signature.html"))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/admin.html")
@@ -2662,6 +3312,38 @@ def admin_page():
     if not has_permission("users.manage"):
         return redirect("/")
     return send_from_directory(FRONTEND_DIR, "admin.html")
+
+
+@app.route("/admin-comptes.html")
+@login_required
+def admin_accounts_page():
+    if not has_permission("users.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-comptes.html")
+
+
+@app.route("/admin-services.html")
+@login_required
+def admin_services_page():
+    if not has_permission("users.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-services.html")
+
+
+@app.route("/admin-ressources.html")
+@login_required
+def admin_resources_page():
+    if not has_permission("users.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-ressources.html")
+
+
+@app.route("/admin-personnalisation.html")
+@login_required
+def admin_branding_page():
+    if not has_permission("users.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-personnalisation.html")
 
 
 @app.route("/logs.html")
@@ -2691,6 +3373,41 @@ def send_js(path):
 @app.route("/assets/<path:path>")
 def send_assets(path):
     return send_from_directory(FRONTEND_ASSETS_DIR, path)
+
+
+@app.route("/api/settings/logo", methods=["GET"])
+def public_logo_route():
+    settings = get_app_settings()
+    logo_mode = settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    load_brand_logo_image()
+
+    if logo_mode == "file":
+        relative_path = (settings.get("brand_logo_file") or "").replace("\\", "/").lstrip("/")
+        absolute_path = os.path.join(FRONTEND_ASSETS_DIR, relative_path) if relative_path else ""
+        if relative_path and os.path.exists(absolute_path):
+            response = send_from_directory(FRONTEND_ASSETS_DIR, relative_path)
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            return response
+
+    if os.path.exists(CITY_LOGO_PATH):
+        response = send_from_directory(FRONTEND_ASSETS_DIR, os.path.basename(CITY_LOGO_PATH))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+    if logo_mode == "url":
+        remote_url = settings.get("brand_logo_url") or CITY_LOGO_URL
+        if remote_url:
+            return redirect(remote_url, code=302)
+
+    response = send_from_directory(FRONTEND_ASSETS_DIR, "app-icon.svg")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/api/forms", methods=["GET"])
@@ -2768,7 +3485,7 @@ def export_form_pdf(form_id):
 
     title = form_data["summary"]["title"]
     pdf_bytes = build_pdf_bytes(title, form_data["data"])
-    filename = f"{slugify_filename(title)}.pdf"
+    filename = f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf"
     return download_response(pdf_bytes, filename, "application/pdf")
 
 
@@ -2818,7 +3535,7 @@ def export_forms_pdf_batch():
                 continue
             title = form_data["summary"]["title"]
             pdf_bytes = build_pdf_bytes(title, form_data["data"])
-            zip_file.writestr(f"{slugify_filename(title)}.pdf", pdf_bytes)
+            zip_file.writestr(f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf", pdf_bytes)
             exported_count += 1
 
     if exported_count == 0:
@@ -2887,24 +3604,25 @@ def build_excel_workbook(rows, item_rows):
     headers = [
         "ID dossier",
         "Titre",
-        "Ã‰tat",
+        "État",
         "Type de dossier",
-        "QualitÃ©",
+        "Qualité",
         "Nom",
-        "PrÃ©nom",
+        "Prénom",
         "Service",
         "Fonction",
         "Mandat",
         "Service de destination",
+        "Date de prise de fonction",
         "Date de remise",
         "Date de restitution",
         "RGPD",
         "Signature",
-        "Ressources attribuÃ©es",
+        "Ressources attribuées",
         "Motif restitution",
         "Observations",
-        "CrÃ©Ã© le",
-        "Mis Ã  jour le",
+        "Créé le",
+        "Mis à jour le",
     ]
 
     workbook_rows = [
@@ -2931,6 +3649,7 @@ def build_excel_workbook(rows, item_rows):
                     spreadsheet_cell(beneficiaire.get("fonction") or row["fonction"]),
                     spreadsheet_cell(beneficiaire.get("mandat") or row["mandat"]),
                     spreadsheet_cell(dossier.get("serviceDestination") or "-"),
+                    spreadsheet_cell(format_export_datetime(payload.get("meta", {}).get("startAt"))),
                     spreadsheet_cell(format_export_datetime(row["assigned_at"])),
                     spreadsheet_cell(format_export_datetime(row["returned_at"])),
                     spreadsheet_cell("Oui" if row["rgpd_accepted"] else "Non"),
@@ -2947,11 +3666,11 @@ def build_excel_workbook(rows, item_rows):
     item_headers = [
         "ID dossier",
         "Titre dossier",
-        "Service Ã©metteur",
+        "Service émetteur",
         "Ressource",
-        "CatÃ©gorie",
-        "DÃ©tails",
-        "Ã‰tat restitution",
+        "Catégorie",
+        "Détails",
+        "État restitution",
         "Date restitution",
         "Observation",
     ]
@@ -2964,7 +3683,7 @@ def build_excel_workbook(rows, item_rows):
         detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
             str(value).strip()
             for key, value in details.items()
-            if key not in {"selected"} and str(value or "").strip()
+            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
         )
         resource_rows_xml.append(
             "<Row>" + "".join(
@@ -3081,9 +3800,23 @@ def get_form_restitution_signature_link_route(form_id):
 def create_form_restitution_signature_link_route(form_id):
     if not has_permission("forms.restitution"):
         return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json(silent=True) or {}
+    validity_days = payload.get("validityDays", 7)
+    try:
+        validity_days = int(validity_days)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_validity_days"}), 400
+    if validity_days < 1 or validity_days > 60:
+        return jsonify({"error": "invalid_validity_days"}), 400
     try:
         with get_db() as connection:
-            link_row = create_signature_link(connection, form_id, actor=current_actor(), link_type="restitution")
+            link_row = create_signature_link(
+                connection,
+                form_id,
+                actor=current_actor(),
+                expires_in_hours=validity_days * 24,
+                link_type="restitution",
+            )
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     return jsonify({"link": serialize_signature_link(link_row)}), 201
@@ -3255,15 +3988,23 @@ def get_restitution_signature_token_route(token):
     form_data = get_form(link_row["form_id"])
     if not form_data:
         return jsonify({"error": "not_found"}), 404
-    return jsonify(build_restitution_signature_public_payload(form_data, link_row))
+    response = jsonify(build_restitution_signature_public_payload(form_data, link_row))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/api/restitution-signature/<token>/submit", methods=["POST"])
 def submit_restitution_signature_token_route(token):
     payload = request.get_json(silent=True) or {}
     signature_data = payload.get("signatureDataUrl") or ""
+    signataire_decision = payload.get("signataireDecision") or "confirmed"
+    signataire_comment = str(payload.get("signataireComment") or "").strip()
     if not signature_data:
         return jsonify({"error": "signature_required"}), 400
+    if signataire_decision not in {"confirmed", "with_reservation"}:
+        return jsonify({"error": "invalid_decision"}), 400
+    if signataire_decision == "with_reservation" and not signataire_comment:
+        return jsonify({"error": "reservation_comment_required"}), 400
 
     with get_db() as connection:
         link_row = get_signature_link_by_token(connection, token)
@@ -3282,6 +4023,14 @@ def submit_restitution_signature_token_route(token):
     dossier_payload["restitution"]["signatureReason"] = ""
     dossier_payload["restitution"]["signatureDataUrl"] = signature_data
     dossier_payload["restitution"]["signedAt"] = utc_now()
+    dossier_payload["restitution"]["signataireDecision"] = signataire_decision
+    dossier_payload["restitution"]["signataireComment"] = signataire_comment
+    dossier_payload.setdefault("workflow", {})
+    dossier_payload["workflow"]["status"] = derive_restitution_workflow_status(
+        dossier_payload["restitution"].get("items", {}),
+        dossier_payload["restitution"].get("signatureStatus") or "",
+        dossier_payload["restitution"].get("signatureDataUrl") or "",
+    )
 
     try:
         saved = persist_form(dossier_payload, allow_locked_update=True)
@@ -3365,7 +4114,7 @@ def reopen_form(form_id):
         if not row:
             return jsonify({"error": "not_found"}), 404
 
-        if row["status"] not in {"draft", "partial_assignment"}:
+        if row["status"] not in {"draft", "partial_assignment", "awaiting_signature"}:
             return jsonify({"error": "not_reopenable"}), 400
 
         payload = json.loads(row["payload_json"] or "{}")
@@ -3419,7 +4168,6 @@ def update_restitution(form_id):
     payload = existing["data"]
     payload.setdefault("workflow", {})
     payload.setdefault("restitution", {})
-    payload["workflow"]["status"] = patch.get("status", payload["workflow"].get("status", "active"))
     payload["restitution"]["returnedAt"] = patch.get("returnedAt", payload["restitution"].get("returnedAt"))
     payload["restitution"]["reason"] = patch.get("reason", payload["restitution"].get("reason"))
     payload["restitution"]["notes"] = patch.get("notes", payload["restitution"].get("notes"))
@@ -3428,6 +4176,13 @@ def update_restitution(form_id):
     payload["restitution"]["signatureReason"] = patch.get("signatureReason", payload["restitution"].get("signatureReason"))
     payload["restitution"]["signatureDataUrl"] = patch.get("signatureDataUrl", payload["restitution"].get("signatureDataUrl"))
     payload["restitution"]["signedAt"] = patch.get("signedAt", payload["restitution"].get("signedAt"))
+    payload["restitution"]["signataireDecision"] = patch.get("signataireDecision", payload["restitution"].get("signataireDecision"))
+    payload["restitution"]["signataireComment"] = patch.get("signataireComment", payload["restitution"].get("signataireComment"))
+    payload["workflow"]["status"] = derive_restitution_workflow_status(
+        payload["restitution"].get("items", {}),
+        payload["restitution"].get("signatureStatus") or "",
+        payload["restitution"].get("signatureDataUrl") or "",
+    )
 
     form_data = persist_form(payload, allow_locked_update=True)
     with get_db() as connection:
@@ -3490,6 +4245,109 @@ def session_route():
     return jsonify(current_user())
 
 
+@app.route("/api/settings/public", methods=["GET"])
+def public_settings_route():
+    return jsonify(build_public_settings_payload())
+
+
+@app.route("/api/admin/settings", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def admin_settings_route():
+    settings = get_app_settings()
+    payload = build_public_settings_payload(settings)
+    payload["raw"] = {
+        "org_name": settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"],
+        "app_name": settings.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
+        "dpo_email": get_dpo_email(settings),
+        "brand_logo_mode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
+        "brand_logo_url": settings.get("brand_logo_url") or DEFAULT_APP_SETTINGS["brand_logo_url"],
+        "brand_logo_file": settings.get("brand_logo_file") or "",
+        "theme_id": resolve_theme_id(settings),
+        "dark_mode_policy": resolve_dark_mode(settings),
+    }
+    payload["themeOptions"] = [
+        {"id": key, "label": value["label"]}
+        for key, value in THEME_PRESETS.items()
+    ]
+    return jsonify(payload)
+
+
+@app.route("/api/admin/settings", methods=["PUT"])
+@login_required
+@permission_required("users.manage")
+def update_admin_settings_route():
+    payload = request.get_json(silent=True) or {}
+    with get_db() as connection:
+        save_app_settings(connection, {
+            "org_name": payload.get("org_name"),
+            "app_name": payload.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
+            "dpo_email": payload.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"],
+            "brand_logo_mode": payload.get("brand_logo_mode"),
+            "brand_logo_url": payload.get("brand_logo_url"),
+            "theme_id": payload.get("theme_id"),
+            "dark_mode_policy": payload.get("dark_mode_policy"),
+        })
+        insert_app_log(
+            connection,
+            "admin",
+            "settings_updated",
+            "Parametres de personnalisation mis a jour",
+            "settings",
+            "branding",
+            {
+                "org_name": payload.get("org_name"),
+                "dpo_email": payload.get("dpo_email"),
+                "brand_logo_mode": payload.get("brand_logo_mode"),
+                "theme_id": payload.get("theme_id"),
+                "dark_mode_policy": payload.get("dark_mode_policy"),
+            },
+            actor=current_actor(),
+        )
+    return jsonify(build_public_settings_payload())
+
+
+@app.route("/api/admin/settings/logo-upload", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+def upload_admin_logo_route():
+    file = request.files.get("logo")
+    if not file or not file.filename:
+        return jsonify({"error": "logo_required"}), 400
+
+    extension = os.path.splitext(file.filename)[1].lower()
+    if extension not in {".png"}:
+        return jsonify({"error": "invalid_logo_type"}), 400
+
+    os.makedirs(CUSTOM_BRANDING_DIR, exist_ok=True)
+    file_name = f"brand_logo_{uuid.uuid4().hex}{extension}"
+    absolute_path = os.path.join(CUSTOM_BRANDING_DIR, file_name)
+    file.save(absolute_path)
+    relative_path = f"custom/{file_name}"
+
+    with get_db() as connection:
+        save_app_settings(connection, {
+            "brand_logo_mode": "file",
+            "brand_logo_file": relative_path,
+        })
+        insert_app_log(
+            connection,
+            "admin",
+            "branding_logo_uploaded",
+            "Logo personnalise televerse",
+            "settings",
+            "branding_logo",
+            {"file": relative_path},
+            actor=current_actor(),
+        )
+    settings = get_app_settings()
+    return jsonify({
+        "uploaded": True,
+        "logoUrl": get_brand_logo_public_url(settings),
+        "brand_logo_file": relative_path,
+    }), 201
+
+
 @app.route("/api/admin/groups", methods=["GET"])
 @login_required
 @permission_required("users.manage")
@@ -3510,6 +4368,20 @@ def reference_resources():
             """
         ).fetchall()
     return jsonify([normalize_reference_row(row) for row in rows])
+
+
+@app.route("/api/reference/services", methods=["GET"])
+@login_required
+def reference_services():
+    with get_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM service_catalog
+            WHERE is_active = 1
+            ORDER BY label COLLATE NOCASE ASC
+            """
+        ).fetchall()
+    return jsonify([normalize_service_row(row) for row in rows])
 
 
 @app.route("/api/admin/users", methods=["GET"])
@@ -3667,6 +4539,185 @@ def restore_trash_item(trash_id):
             {"label": item_label},
         )
     return jsonify({"restored": True, "item_type": item_type, "item_key": item_key, "data": form_data})
+
+
+@app.route("/api/admin/trash/<trash_id>", methods=["DELETE"])
+@admin_required
+def delete_trash_item(trash_id):
+    with get_db() as connection:
+        row = connection.execute(
+            "SELECT item_type, item_key, item_label FROM deleted_items WHERE id = ?",
+            (trash_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+
+        deleted = connection.execute(
+            "DELETE FROM deleted_items WHERE id = ?",
+            (trash_id,),
+        ).rowcount
+        if deleted:
+            insert_app_log(
+                connection,
+                "admin",
+                "trash_deleted",
+                "Element supprime definitivement depuis la corbeille",
+                row["item_type"],
+                row["item_key"],
+                {"label": row["item_label"] or row["item_key"]},
+            )
+
+    return jsonify({"deleted": bool(deleted)})
+
+
+@app.route("/api/admin/trash", methods=["DELETE"])
+@admin_required
+def empty_admin_trash():
+    with get_db() as connection:
+        deleted_count = connection.execute("SELECT COUNT(*) AS total FROM deleted_items").fetchone()["total"]
+        connection.execute("DELETE FROM deleted_items")
+        if deleted_count:
+            insert_app_log(
+                connection,
+                "admin",
+                "trash_emptied",
+                "Corbeille videe definitivement",
+                "trash",
+                "all",
+                {"deleted_count": deleted_count},
+            )
+
+    return jsonify({"deleted": True, "deleted_count": deleted_count})
+
+
+@app.route("/api/admin/services", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def admin_services():
+    with get_db() as connection:
+        rows = connection.execute(
+            "SELECT * FROM service_catalog ORDER BY is_active DESC, label COLLATE NOCASE ASC"
+        ).fetchall()
+    return jsonify([normalize_service_row(row) for row in rows])
+
+
+@app.route("/api/admin/services", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+def create_admin_service():
+    payload = request.get_json(silent=True) or {}
+    label = (payload.get("label") or "").strip()
+    is_active = bool(payload.get("is_active", True))
+    if not label:
+        return jsonify({"error": "label_required"}), 400
+
+    now = utc_now()
+    with get_db() as connection:
+        existing = connection.execute(
+            "SELECT id FROM service_catalog WHERE lower(label) = lower(?)",
+            (label,),
+        ).fetchone()
+        if existing:
+            return jsonify({"error": "service_exists"}), 409
+        service_id = generate_id("service")
+        connection.execute(
+            """
+            INSERT INTO service_catalog (
+                id, label, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, 0, ?, ?)
+            """,
+            (
+                service_id,
+                label,
+                bool_to_int(is_active),
+                now,
+                now,
+            ),
+        )
+        insert_app_log(
+            connection,
+            "admin",
+            "service_created",
+            "Service cree",
+            "service",
+            service_id,
+            {"label": label},
+        )
+    return jsonify({"created": True}), 201
+
+
+@app.route("/api/admin/services/<service_id>", methods=["PUT"])
+@login_required
+@permission_required("users.manage")
+def update_admin_service(service_id):
+    payload = request.get_json(silent=True) or {}
+    now = utc_now()
+    with get_db() as connection:
+        row = connection.execute("SELECT * FROM service_catalog WHERE id = ?", (service_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+
+        next_label = (payload.get("label") if payload.get("label") is not None else row["label"]).strip()
+        if not next_label:
+            return jsonify({"error": "label_required"}), 400
+
+        duplicate = connection.execute(
+            "SELECT id FROM service_catalog WHERE lower(label) = lower(?) AND id != ?",
+            (next_label, service_id),
+        ).fetchone()
+        if duplicate:
+            return jsonify({"error": "service_exists"}), 409
+
+        next_is_active = bool_to_int(payload.get("is_active", bool(row["is_active"])))
+        connection.execute(
+            """
+            UPDATE service_catalog
+            SET label = ?, is_active = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                next_label,
+                next_is_active,
+                now,
+                service_id,
+            ),
+        )
+        insert_app_log(
+            connection,
+            "admin",
+            "service_updated",
+            "Service mis a jour",
+            "service",
+            service_id,
+            {"label": next_label, "is_active": bool(next_is_active)},
+        )
+    return jsonify({"updated": True})
+
+
+@app.route("/api/admin/services/<service_id>", methods=["DELETE"])
+@login_required
+@permission_required("users.manage")
+def delete_admin_service(service_id):
+    with get_db() as connection:
+        row = connection.execute(
+            "SELECT * FROM service_catalog WHERE id = ?",
+            (service_id,),
+        ).fetchone()
+        deleted = connection.execute(
+            "DELETE FROM service_catalog WHERE id = ?",
+            (service_id,),
+        ).rowcount
+        if deleted:
+            insert_app_log(
+                connection,
+                "admin",
+                "service_deleted",
+                "Service supprime",
+                "service",
+                service_id,
+                {"label": row["label"] if row else ""},
+            )
+    return jsonify({"deleted": bool(deleted)})
 
 
 @app.route("/api/admin/resources", methods=["GET"])

@@ -4,19 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<title>Administration et référentiels</title>
+<link rel="preload" as="image" href="/api/settings/logo">
+<title>Portail administration</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<!-- En-tête du portail d'administration. -->
 <header class="app-header">
   <div class="container app-header__inner">
-    <div class="app-brand">
-      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
       <div>
         <p class="app-kicker">Administration</p>
-        <h1 class="app-title">Administration et référentiels</h1>
-        <p class="app-subtitle">Gestion des comptes et des ressources attribuables du projet.</p>
+        <h1 class="app-title">Portail d'administration</h1>
+        <p class="app-subtitle">Choisissez un espace dédié pour gérer les comptes, les services, les ressources ou les outils transverses.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -26,217 +28,81 @@
   </div>
 </header>
 
+<!-- Portail d'entrée admin : synthèse et accès rapides vers les sous-pages. -->
 <main class="container py-4 py-lg-5">
-  <section class="content-card mb-4">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Menu admin</p>
-        <h2 class="section-title">Outils d'administration</h2>
-        <p class="panel-text">Accédez aux fonctions transverses d'administration, de traçabilité et de restauration.</p>
-      </div>
-      <div class="header-actions">
-        <a class="btn btn-outline-primary" href="logs.html">Journal</a>
-        <a class="btn btn-outline-primary" href="trash.html">Corbeille</a>
-      </div>
-    </div>
-  </section>
+  <div id="adminFlashNotice" class="alert alert-info d-none mb-4" role="alert"></div>
 
-  <section class="content-card mb-4">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Comptes</p>
-        <h2 class="section-title" id="userFormTitle">Nouveau compte</h2>
+  <section class="hero-panel admin-hero mb-4">
+    <div>
+      <p class="panel-eyebrow">Vue d'ensemble</p>
+      <div class="panel-title-wrap">
+        <h2 class="panel-title">Pilotage de l'administration</h2>
+      </div>
+      <p class="panel-text">Le portail admin centralise les indicateurs utiles et distribue vers des sous-pages spécialisées. Chaque espace est centré sur une mission unique pour réduire la charge visuelle et rendre les actions plus rapides.</p>
+    </div>
+    <div class="admin-stats">
+      <div class="stat-card">
+        <span class="stat-card__label">Comptes</span>
+        <span class="stat-card__value" id="adminUsersCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">En attente</span>
+        <span class="stat-card__value" id="adminPendingCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Services</span>
+        <span class="stat-card__value" id="adminServicesCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Ressources</span>
+        <span class="stat-card__value" id="adminResourcesCount">0</span>
       </div>
     </div>
-    <div id="userEditNotice" class="alert alert-info d-none" role="alert"></div>
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label" for="admin_username">Identifiant</label>
-        <input class="form-control" id="admin_username" placeholder="Identifiant">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label" for="admin_password">Mot de passe</label>
-        <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
-        <div class="form-text">12 caracteres minimum, avec majuscule, minuscule, chiffre et caractere special.</div>
-        <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Generer un mot de passe</button>
-      </div>
-      <div class="col-md-4 d-flex align-items-end">
-        <label class="form-check">
-          <input class="form-check-input" type="checkbox" id="admin_active" checked>
-          <span class="form-check-label">Compte actif</span>
-        </label>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Groupes</label>
-        <div id="groupSelector" class="choice-group"></div>
-      </div>
-      <div class="col-12">
-        <div class="header-actions">
-          <button class="btn btn-primary" id="saveUserBtn" type="button">Créer l'utilisateur</button>
-          <button class="btn btn-outline-secondary d-none" id="cancelUserEditBtn" type="button">Annuler la modification</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="content-card mb-4">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Droits</p>
-        <h2 class="section-title">Groupes disponibles</h2>
-      </div>
-    </div>
-    <div id="groupCards" class="equipment-grid equipment-grid--compact"></div>
   </section>
 
   <section class="content-card">
     <div class="section-heading">
       <div>
-        <p class="panel-eyebrow">Comptes</p>
-        <h2 class="section-title">Utilisateurs existants</h2>
+        <p class="panel-eyebrow">Accès rapides</p>
+        <h2 class="section-title">Sous-pages d'administration</h2>
+        <p class="panel-text">Chaque entrée ouvre un espace de travail plus ciblé qu'une page unique.</p>
       </div>
     </div>
-    <div class="table-responsive">
-      <table class="table align-middle draft-table">
-        <thead>
-          <tr>
-            <th>Utilisateur</th>
-            <th>Groupes</th>
-            <th>État</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="userTableBody"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="content-card mt-4">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Référentiel</p>
-        <h2 class="section-title" id="resourceFormTitle">Ressources attribuables</h2>
-      </div>
-    </div>
-    <div id="resourceEditNotice" class="alert alert-info d-none" role="alert"></div>
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <label class="form-label" for="resource_code">Code</label>
-        <input class="form-control" id="resource_code" placeholder="badge_visiteur">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="resource_label">Libellé</label>
-        <input class="form-control" id="resource_label" placeholder="Badge visiteur">
-      </div>
-      <div class="col-md-2">
-        <label class="form-label" for="resource_category">Catégorie</label>
-        <select class="form-select" id="resource_category">
-          <option value="materiel">Matériel</option>
-          <option value="immateriel">Immatériel</option>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <label class="form-label" for="resource_issuer">Service émetteur</label>
-        <input class="form-control" id="resource_issuer" placeholder="DSI">
-      </div>
-      <div class="col-md-3 d-flex align-items-end">
-        <label class="form-check me-3">
-          <input class="form-check-input" type="checkbox" id="resource_requires_return" checked>
-          <span class="form-check-label">Restituable</span>
-        </label>
-        <label class="form-check">
-          <input class="form-check-input" type="checkbox" id="resource_active" checked>
-          <span class="form-check-label">Active</span>
-        </label>
-      </div>
-      <div class="col-12">
-        <div class="content-card">
-          <div class="section-heading mb-3">
-            <div>
-              <p class="panel-eyebrow">Champs</p>
-              <h3 class="section-title">Structure de la ressource</h3>
-              <p class="panel-text">Ajoutez les champs à afficher dans le dossier et indiquez simplement s'ils sont obligatoires.</p>
-            </div>
-            <div class="header-actions">
-              <button class="btn btn-outline-primary" id="addResourceFieldBtn" type="button">Ajouter un champ</button>
-            </div>
-          </div>
-          <div id="resourceFieldRows" class="resource-field-builder"></div>
-        </div>
-      </div>
-      <div class="col-12">
-        <div class="header-actions">
-          <button class="btn btn-primary" id="saveResourceBtn" type="button">Ajouter la ressource</button>
-          <button class="btn btn-outline-secondary d-none" id="cancelResourceEditBtn" type="button">Annuler la modification</button>
-        </div>
-      </div>
-    </div>
-    <div class="table-responsive">
-      <table class="table align-middle draft-table">
-        <thead>
-          <tr>
-            <th>Ressource</th>
-            <th>Catégorie</th>
-            <th>Service</th>
-            <th>Champs</th>
-            <th>État</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="resourceTableBody"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="content-card mt-4">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Journal</p>
-        <h2 class="section-title">Analyse et traçabilité</h2>
-        <p class="panel-text">Le journal applicatif dispose désormais de sa propre page, avec recherche dédiée pour faciliter le debug et le forensic.</p>
-      </div>
-      <div class="header-actions">
-        <a class="btn btn-outline-primary" href="logs.html">Ouvrir le journal</a>
-      </div>
+    <div class="equipment-grid">
+      <a class="equipment-item admin-entry-card" href="admin-comptes.html">
+        <div class="draft-title">Comptes</div>
+        <div class="draft-meta">Créer, modifier, valider et désactiver les comptes.</div>
+      </a>
+      <a class="equipment-item admin-entry-card" href="admin-services.html">
+        <div class="draft-title">Services</div>
+        <div class="draft-meta">Maintenir la liste des services proposés dans les formulaires.</div>
+      </a>
+      <a class="equipment-item admin-entry-card" href="admin-ressources.html">
+        <div class="draft-title">Ressources</div>
+        <div class="draft-meta">Définir les ressources attribuables et leur structure.</div>
+      </a>
+      <a class="equipment-item admin-entry-card" href="admin-personnalisation.html">
+        <div class="draft-title">Personnalisation</div>
+        <div class="draft-meta">Modifier le logo, les thèmes et le mode sombre de l'application.</div>
+      </a>
+      <a class="equipment-item admin-entry-card" href="logs.html">
+        <div class="draft-title">Journal</div>
+        <div class="draft-meta">Analyser l'activité applicative et faciliter le debug.</div>
+      </a>
+      <a class="equipment-item admin-entry-card" href="trash.html">
+        <div class="draft-title">Corbeille</div>
+        <div class="draft-meta">Restaurer des éléments supprimés par erreur.</div>
+      </a>
     </div>
   </section>
 </main>
 
-<div class="password-generator-modal d-none" id="passwordGeneratorModal" aria-hidden="true">
-  <div class="password-generator-modal__backdrop" data-password-modal-close="true"></div>
-  <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="passwordGeneratorTitle">
-    <div class="password-generator-modal__header">
-      <div>
-        <p class="panel-eyebrow">Generateur</p>
-        <h2 class="section-title" id="passwordGeneratorTitle">Mot de passe thematique</h2>
-      </div>
-      <button class="btn btn-outline-secondary btn-sm" type="button" data-password-modal-close="true">Fermer</button>
-    </div>
-    <div class="password-generator-modal__content">
-      <label class="form-label" for="passwordThemeSelect">Theme</label>
-      <select class="form-select" id="passwordThemeSelect">
-        <option value="licorne">Licorne</option>
-        <option value="starwars">StarWars</option>
-        <option value="marvel">Marvel</option>
-        <option value="film_francais">Film francais</option>
-        <option value="publier">Ville de Publier</option>
-      </select>
-
-      <div class="password-generator-modal__result">
-        <label class="form-label" for="generatedPasswordValue">Mot de passe genere</label>
-        <input class="form-control form-control-lg" id="generatedPasswordValue" type="text" readonly>
-      </div>
-
-      <div class="password-generator-modal__actions">
-        <button class="btn btn-outline-primary" id="refreshGeneratedPasswordBtn" type="button">Regenerer</button>
-        <button class="btn btn-outline-secondary" id="copyGeneratedPasswordBtn" type="button">Copier</button>
-        <button class="btn btn-primary" id="applyGeneratedPasswordBtn" type="button">Utiliser ce mot de passe</button>
-      </div>
-    </div>
-  </div>
-</div>
-
+<!-- Scripts du portail admin et du branding global. -->
+<script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/admin.js"></script>
+<script src="js/admin-home.js"></script>
 </body>
 </html>
+
+
+

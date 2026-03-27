@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.8.1` |
+| Version proposee | `2.9.0` |
 | Statut | `A valider` |
-| Date de mise a jour | `2026-03-26` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + lien de signature remise et restitution` |
+| Date de mise a jour | `2026-03-27` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + liens de signature remise et restitution + admin en sous-pages + services administrables + archivage documentaire` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
@@ -20,7 +20,7 @@
 - l'attribution de ressources
 - les changements de service
 - la restitution des ressources
-- l'administration des comptes et des referentiels
+- l'administration des comptes, des services et des referentiels
 - la tracabilite des actions
 
 L'application est utilisee depuis un navigateur web et s'appuie sur une base SQLite.
@@ -178,9 +178,29 @@ L'administration permet de :
 
 - gerer les comptes utilisateurs
 - modifier les mots de passe
+- gerer la liste des services proposes dans les formulaires
 - gerer les ressources attribuables
 - consulter le journal
 - acceder a la corbeille
+
+L'administration est organisee en sous-pages :
+
+- `admin.html` pour la vue d'ensemble
+- `admin-comptes.html` pour les comptes et les droits
+- `admin-services.html` pour les services
+- `admin-ressources.html` pour les ressources
+
+## Archivage documentaire
+
+Les versions documentaires sont archivees dans :
+
+- `administratif/versions/`
+
+Chaque version dispose de son propre dossier avec des fichiers nommes par version.
+Les anciennes versions archivees sont distinguees entre :
+
+- `archive reconstituee`
+- `snapshot courant`
 
 ## Journal
 

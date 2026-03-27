@@ -4,15 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
 <title>Corbeille administrateur</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<!-- En-tête de la corbeille applicative. -->
 <header class="app-header">
   <div class="container app-header__inner">
-    <div class="app-brand">
-      <img class="app-logo" src="https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png" alt="Logo Ville de Publier">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
       <div>
         <p class="app-kicker">Administration</p>
         <h1 class="app-title">Corbeille</h1>
@@ -28,6 +30,7 @@
   </div>
 </header>
 
+<!-- Corbeille : recherche, filtrage et restauration des éléments supprimés. -->
 <main class="container py-4 py-lg-5">
   <section class="hero-panel mb-4">
     <div>
@@ -39,6 +42,29 @@
       <div class="stat-card">
         <span class="stat-card__label">Éléments en corbeille</span>
         <strong class="stat-card__value" id="trashCount">0</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-card mb-4">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Mode d'emploi</p>
+        <h3 class="section-title">Restaurer sans se tromper</h3>
+      </div>
+    </div>
+    <div class="equipment-grid equipment-grid--compact">
+      <div class="equipment-item">
+        <div class="draft-title">Filtrer</div>
+        <div class="draft-meta">Utilisez le type et la recherche pour cibler rapidement le bon élément.</div>
+      </div>
+      <div class="equipment-item">
+        <div class="draft-title">Vérifier</div>
+        <div class="draft-meta">Contrôlez la date, le type et l'auteur de suppression avant de restaurer.</div>
+      </div>
+      <div class="equipment-item">
+        <div class="draft-title">Restaurer</div>
+        <div class="draft-meta">La restauration remet l'élément dans son flux normal sans avoir à le ressaisir.</div>
       </div>
     </div>
   </section>
@@ -62,6 +88,7 @@
       </div>
       <div class="filter-toolbar__actions">
         <button id="refreshTrashBtn" class="btn btn-outline-secondary" type="button">Rafraîchir</button>
+        <button id="emptyTrashBtn" class="btn btn-outline-danger" type="button">Vider la corbeille</button>
       </div>
     </div>
 
@@ -87,6 +114,8 @@
   </section>
 </main>
 
+<!-- Scripts du branding public et de la corbeille. -->
+<script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/trash.js"></script>
 </body>

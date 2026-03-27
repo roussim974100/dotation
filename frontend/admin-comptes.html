@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
+<title>Administration des comptes</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<!-- En-tête commun de l'espace d'administration. -->
+<header class="app-header">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
+      <div>
+        <p class="app-kicker">Administration</p>
+        <h1 class="app-title">Comptes et droits</h1>
+        <p class="app-subtitle">Gérez ici les comptes utilisateurs, les validations en attente et les groupes disponibles.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="admin.html">Accueil admin</a>
+      <a class="btn btn-outline-light" href="/logout">Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<!-- Mise en page en deux colonnes : navigation latérale + contenu métier. -->
+<main class="container py-4 py-lg-5">
+  <div class="admin-layout">
+    <aside class="content-card admin-sidebar">
+      <p class="panel-eyebrow">Navigation</p>
+      <nav class="admin-nav" aria-label="Navigation administration">
+        <a class="admin-nav__link" href="admin.html"><span>Accueil admin</span><small>Vue d'ensemble</small></a>
+        <a class="admin-nav__link" href="#admin-users-create"><span>Nouveau compte</span><small>Créer ou modifier</small></a>
+        <a class="admin-nav__link" href="#admin-users-list"><span>Utilisateurs existants</span><small>Actions de gestion</small></a>
+        <a class="admin-nav__link" href="#admin-groups"><span>Groupes disponibles</span><small>Permissions et rôles</small></a>
+        <a class="admin-nav__link" href="admin-services.html"><span>Services</span><small>Catalogue</small></a>
+        <a class="admin-nav__link" href="admin-ressources.html"><span>Ressources</span><small>Référentiel</small></a>
+        <a class="admin-nav__link" href="admin-personnalisation.html"><span>Personnalisation</span><small>Logo et thèmes</small></a>
+      </nav>
+    </aside>
+
+    <div class="admin-content">
+      <section class="hero-panel admin-hero">
+        <div>
+          <p class="panel-eyebrow">Comptes</p>
+          <div class="panel-title-wrap">
+            <h2 class="panel-title">Gestion des comptes</h2>
+          </div>
+          <p class="panel-text">Créez un compte, ajustez ses groupes, validez les demandes en attente et désactivez les accès sans quitter cette page.</p>
+        </div>
+        <div class="admin-stats">
+          <div class="stat-card">
+            <span class="stat-card__label">Comptes</span>
+            <span class="stat-card__value" id="adminUsersCount">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">En attente</span>
+            <span class="stat-card__value" id="adminPendingCount">0</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card mb-4" id="admin-users-create">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Comptes</p>
+            <h2 class="section-title" id="userFormTitle">Nouveau compte</h2>
+            <p class="panel-text">Créez un compte ou ajustez ses droits sans quitter cette zone.</p>
+          </div>
+        </div>
+        <div id="userEditNotice" class="alert alert-info d-none" role="alert"></div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="admin_username">Identifiant</label>
+            <input class="form-control" id="admin_username" placeholder="Identifiant">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_password">Mot de passe</label>
+            <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
+            <div class="form-text">12 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.</div>
+            <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Générer un mot de passe</button>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" id="admin_active" checked>
+              <span class="form-check-label">Compte actif</span>
+            </label>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Groupes</label>
+            <div id="groupSelector" class="choice-group"></div>
+          </div>
+          <div class="col-12">
+            <div class="header-actions">
+              <button class="btn btn-primary" id="saveUserBtn" type="button">Créer l'utilisateur</button>
+              <button class="btn btn-outline-secondary d-none" id="cancelUserEditBtn" type="button">Annuler la modification</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card mb-4" id="admin-groups">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Droits</p>
+            <h2 class="section-title">Groupes disponibles</h2>
+            <p class="panel-text">Référence rapide des groupes et de leurs permissions.</p>
+          </div>
+        </div>
+        <div id="groupCards" class="equipment-grid equipment-grid--compact"></div>
+      </section>
+
+      <section class="content-card" id="admin-users-list">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Comptes</p>
+            <h2 class="section-title">Utilisateurs existants</h2>
+            <p class="panel-text">Retrouvez ici les comptes déjà présents et leurs actions de gestion.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle draft-table">
+            <thead>
+              <tr>
+                <th>Utilisateur</th>
+                <th>Groupes</th>
+                <th>État</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div class="password-generator-modal d-none" id="passwordGeneratorModal" aria-hidden="true">
+  <div class="password-generator-modal__backdrop" data-password-modal-close="true"></div>
+  <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="passwordGeneratorTitle">
+    <div class="password-generator-modal__header">
+      <div>
+        <p class="panel-eyebrow">Generateur</p>
+        <h2 class="section-title" id="passwordGeneratorTitle">Mot de passe thematique</h2>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" type="button" data-password-modal-close="true">Fermer</button>
+    </div>
+    <div class="password-generator-modal__content">
+      <label class="form-label" for="passwordThemeSelect">Theme</label>
+      <select class="form-select" id="passwordThemeSelect">
+        <option value="licorne">Licorne</option>
+        <option value="starwars">StarWars</option>
+        <option value="marvel">Marvel</option>
+        <option value="film_francais">Film francais</option>
+        <option value="publier">Ville de Publier</option>
+      </select>
+      <div class="password-generator-modal__result">
+        <label class="form-label" for="generatedPasswordValue">Mot de passe genere</label>
+        <input class="form-control form-control-lg" id="generatedPasswordValue" type="text" readonly>
+      </div>
+      <div class="password-generator-modal__actions">
+        <button class="btn btn-outline-primary" id="refreshGeneratedPasswordBtn" type="button">Regenerer</button>
+        <button class="btn btn-outline-secondary" id="copyGeneratedPasswordBtn" type="button">Copier</button>
+        <button class="btn btn-primary" id="applyGeneratedPasswordBtn" type="button">Utiliser ce mot de passe</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts d'administration mutualisés pour l'ensemble des sous-pages admin. -->
+<script src="js/branding.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
+
+
+
+
+

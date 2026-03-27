@@ -4,6 +4,7 @@ const API_BASE = "/api/forms";
 const PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-pdf-batch";
 const RESTITUTION_PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-restitution-pdf-batch";
 const DASHBOARD_REFRESH_INTERVAL_MS = 20000;
+const DASHBOARD_SIGNATURE_LINK_NOTICE_KEY = "dashboardSignatureLinkNotice";
 let sessionInfo = null;
 let currentDraftRows = [];
 let dashboardRefreshTimer = null;
@@ -13,6 +14,7 @@ let dashboardKnownIds = new Set();
 let dashboardPendingNewIds = new Set();
 let dashboardSelectedIds = new Set();
 let exportProgressFallbackTimer = null;
+let exportProgressValue = 0;
 const dashboardFilters = {
   search: "",
   status: "",
@@ -52,6 +54,27 @@ function persistPendingDashboardUpdates() {
     );
   } catch (error) {
     // Rien de bloquant : le tableau de bord reste utilisable sans cette persistance.
+  }
+}
+
+function loadDashboardSignatureLinkNotice() {
+  try {
+    const raw = sessionStorage.getItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function persistDashboardSignatureLinkNotice(payload) {
+  try {
+    if (!payload) {
+      sessionStorage.removeItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY);
+      return;
+    }
+    sessionStorage.setItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    // Rien de bloquant.
   }
 }
 
@@ -114,6 +137,8 @@ function buildLocalSummary(payload) {
     createdAt: payload.meta.createdAt || now
   };
 
+  const progress = summarizeDraftProgressFromPayload(payload);
+
   return {
     id,
     title: buildDraftTitle(payload),
@@ -127,9 +152,136 @@ function buildLocalSummary(payload) {
     fonction: beneficiaire.fonction || "",
     mandat: beneficiaire.mandat || "",
     assignedAt: payload.meta.assignedAt || now,
+    startAt: payload.meta.startAt || "",
     returnedAt: payload.restitution.returnedAt || "",
-    updatedAt: now
+    updatedAt: now,
+    completedResources: progress.completed,
+    totalResources: progress.total,
+    resourceProgressRatio: progress.ratio,
+    timingStatus: progress.timingStatus,
+    timingLabel: progress.timingLabel
   };
+}
+
+function collectRequestedResourcesFromPayload(payload) {
+  const resources = [];
+  const pushIfSelected = (item, key) => {
+    if (item?.selected) {
+      resources.push({ key, assignedAt: item.assignedAt || "" });
+    }
+  };
+
+  const materiel = payload?.materiel || {};
+  const immateriel = payload?.immateriel || {};
+  Object.entries(materiel).forEach(([key, item]) => pushIfSelected(item, key));
+  Object.entries(immateriel).forEach(([key, item]) => pushIfSelected(item, key));
+  (payload?.resources?.additional || []).forEach((resource) => {
+    if (resource?.selected) {
+      resources.push({ key: resource.id || resource.code || "resource", assignedAt: resource.assignedAt || "" });
+    }
+  });
+  return resources;
+}
+
+function summarizeDraftProgressFromPayload(payload = {}) {
+  const requested = collectRequestedResourcesFromPayload(payload);
+  const total = requested.length;
+  const completed = requested.filter((resource) => resource.assignedAt).length;
+  const startAt = payload?.meta?.startAt || "";
+
+  if (total === 0) {
+    return { completed: 0, total: 0, ratio: 0, timingStatus: "neutral", timingLabel: "À planifier" };
+  }
+  if (completed >= total) {
+    return { completed, total, ratio: 1, timingStatus: "ok", timingLabel: "Prêt" };
+  }
+  if (!startAt) {
+    return { completed, total, ratio: completed / total, timingStatus: "neutral", timingLabel: "À planifier" };
+  }
+
+  const startDate = new Date(/^\d{4}-\d{2}-\d{2}$/.test(startAt) ? `${startAt}T00:00:00` : startAt);
+  if (Number.isNaN(startDate.getTime())) {
+    return { completed, total, ratio: completed / total, timingStatus: "neutral", timingLabel: "À planifier" };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  startDate.setHours(0, 0, 0, 0);
+  const daysUntilStart = Math.round((startDate - today) / 86400000);
+  if (daysUntilStart < 0) {
+    return { completed, total, ratio: completed / total, timingStatus: "late", timingLabel: "En retard" };
+  }
+  if (daysUntilStart <= 3) {
+    return { completed, total, ratio: completed / total, timingStatus: "warning", timingLabel: "En danger" };
+  }
+  return { completed, total, ratio: completed / total, timingStatus: "ok", timingLabel: "Dans les temps" };
+}
+
+function getDraftProgressMetrics(draft) {
+  if (Number.isFinite(draft.completedResources) && Number.isFinite(draft.totalResources)) {
+    return {
+      completed: draft.completedResources,
+      total: draft.totalResources,
+      ratio: Number.isFinite(draft.resourceProgressRatio) ? draft.resourceProgressRatio : (draft.totalResources ? draft.completedResources / draft.totalResources : 0),
+      timingStatus: draft.timingStatus || "neutral",
+      timingLabel: draft.timingLabel || "À planifier"
+    };
+  }
+  return summarizeDraftProgressFromPayload(draft.data || {});
+}
+
+function formatShortDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(date);
+}
+
+function buildDashboardRow(draft, permissions) {
+  const progress = getDraftProgressMetrics(draft);
+  const progressPercent = Math.max(0, Math.min(100, Math.round((progress.ratio || 0) * 100)));
+  const title = draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier");
+  const dossierTypeLabel = formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || "");
+  const startAtLabel = draft.startAt
+    ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
+    : "Prise de fonction non renseignée";
+
+  return `
+    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}">
+      <td class="draft-check-col">
+        ${(permissions.canExport || permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(title)}">` : ""}
+      </td>
+      <td data-label="Dossier">
+        <div class="draft-title">${escapeHtml(title)}</div>
+        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
+        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
+        <div class="draft-meta">${startAtLabel}</div>
+      </td>
+      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
+      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
+      <td data-label="Pilotage">
+        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}">${escapeHtml(progress.timingLabel)}</span>
+      </td>
+      <td data-label="Progression">
+        <div class="resource-progress">
+          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
+          <div class="resource-progress__track">
+            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
+          </div>
+        </div>
+      </td>
+      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
+      <td data-label="Actions" class="draft-actions-cell">
+        <div class="draft-actions">
+          ${buildDraftActionButtons(draft, permissions)}
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 function formatQualiteLabel(item) {
@@ -147,6 +299,7 @@ function formatStatusLabel(status) {
   const labels = {
     draft: "Brouillon",
     partial_assignment: "Attribution partielle",
+    awaiting_signature: "En attente de signature",
     active: "Attribution active",
     returned: "Restitution terminée",
     partial_return: "Restitution partielle",
@@ -169,38 +322,110 @@ function hasRestitutionData(draft) {
   );
 }
 
-function buildDraftActionButtons(draft, options) {
-  const actions = [];
-  actions.push(`<button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir</button>`);
+function canOpenRestitution(draft, options) {
+  if (!options.canRestitution) {
+    return false;
+  }
+  const status = draft.status || "draft";
+  if (["active", "partial_return", "returned"].includes(status)) {
+    return true;
+  }
+  return status === "awaiting_signature" && hasRestitutionData(draft);
+}
 
-  if (options.canRestitution && ["active", "partial_return"].includes(draft.status || "draft")) {
-    actions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Restitution</button>`);
+function renderDraftActionMenu(label, tone, actions) {
+  if (!actions.length) {
+    return "";
+  }
+  return `
+    <details class="draft-actions__menu" data-action-menu data-label="${escapeHtml(label)}" data-open-label="${escapeHtml(`${label} - moins d'actions`)}">
+      <summary class="btn btn-sm ${tone}"><span data-action-menu-label>${escapeHtml(label)}</span></summary>
+      <div class="draft-actions__menu-panel">
+        ${actions.map((action) => `<div class="draft-actions__menu-section">${action}</div>`).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function buildDraftActionButtons(draft, options) {
+  const openActions = [
+    `<button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir dossier</button>`
+  ];
+
+  if (canOpenRestitution(draft, options)) {
+    openActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Ouvrir restitution</button>`);
   }
 
-  if (options.canEdit && ["draft", "partial_assignment"].includes(draft.status || "draft")) {
-    actions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="shareSignatureLink('${draft.id}')">Lien signature</button>`);
+  const pdfActions = [];
+  if (options.canExport) {
+    pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">Télécharger le PDF dossier</button>`);
+    pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="prepareDraftPdfEmail('${draft.id}')">Envoyer le PDF dossier</button>`);
+  }
+  if (options.canExport && hasRestitutionData(draft)) {
+    pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportRestitutionPdf('${draft.id}')">Télécharger le PDF restitution</button>`);
+    pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="prepareRestitutionPdfEmail('${draft.id}')">Envoyer le PDF restitution</button>`);
+  }
+
+  const signatureActions = [];
+  if (
+    options.canEdit
+    && ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft")
+    && !hasRestitutionData(draft)
+  ) {
+    signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareAssignmentSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
+    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="shareSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
   }
 
   if (options.canRestitution && hasRestitutionData(draft)) {
-    actions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="shareRestitutionSignatureLink('${draft.id}')">Lien restitution</button>`);
+    signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareRestitutionSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
+    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyRestitutionSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
   }
 
-  const documentActions = [];
-  if (options.canExport) {
-    documentActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">PDF dossier</button>`);
-  }
-  if (options.canExport && hasRestitutionData(draft)) {
-    documentActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportRestitutionPdf('${draft.id}')">PDF restitution</button>`);
-  }
-  if (documentActions.length) {
-    actions.push(`<div class="draft-actions__group draft-actions__group--documents">${documentActions.join("")}</div>`);
-  }
-
+  const managementActions = [];
   if (options.canDelete) {
-    actions.push(`<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer</button>`);
+    managementActions.push(`<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer le dossier</button>`);
   }
 
-  return actions.join("");
+  return `
+    <div class="draft-actions__primary">
+      ${renderDraftActionMenu("Ouvrir", "btn-outline-primary", [openActions.join("")])}
+      ${renderDraftActionMenu("PDF", "btn-outline-success", [pdfActions.join("")])}
+      ${renderDraftActionMenu("Signature", "btn-outline-info", [signatureActions.join("")])}
+      ${renderDraftActionMenu("Gestion", "btn-outline-secondary", [managementActions.join("")])}
+    </div>
+  `;
+}
+
+function bindDraftActionMenus() {
+  document.querySelectorAll("[data-action-menu]").forEach((menu) => {
+    if (menu.dataset.boundActionMenu) {
+      return;
+    }
+
+    const labelNode = menu.querySelector("[data-action-menu-label]");
+    const defaultLabel = menu.dataset.label || "Actions";
+    const openLabel = menu.dataset.openLabel || "Moins d'actions";
+
+    const updateLabel = () => {
+      if (labelNode) {
+        labelNode.textContent = menu.open ? openLabel : defaultLabel;
+      }
+    };
+
+    menu.addEventListener("toggle", () => {
+      if (menu.open) {
+        menu.closest(".draft-actions")?.querySelectorAll("[data-action-menu]").forEach((otherMenu) => {
+          if (otherMenu !== menu) {
+            otherMenu.open = false;
+          }
+        });
+      }
+      updateLabel();
+    });
+
+    updateLabel();
+    menu.dataset.boundActionMenu = "true";
+  });
 }
 
 function normalizeText(value) {
@@ -501,7 +726,7 @@ async function renderDraftList() {
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
     const filteredDrafts = applyDashboardFilters(sortedDrafts);
-    const editableDrafts = filteredDrafts.filter((draft) => ["draft", "partial_assignment"].includes(draft.status || "draft"));
+    const editableDrafts = filteredDrafts.filter((draft) => ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft"));
 
     if (draftCount) {
       draftCount.textContent = editableDrafts.length.toString();
@@ -523,45 +748,20 @@ async function renderDraftList() {
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
-    draftList.innerHTML = filteredDrafts.map((draft) => `
-    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}">
-      <td class="draft-check-col">
-        ${(canExport || canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(draft.title || buildDraftTitle(draft.data))}">` : ""}
-      </td>
-      <td data-label="Dossier">
-        <div class="draft-title">${escapeHtml(draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier"))}</div>
-        <div class="draft-meta">${escapeHtml(formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || ""))}</div>
-        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-      </td>
-      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
-      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
-      <td data-label="Actions" class="draft-actions-cell">
-        <div class="draft-actions">
-            ${buildDraftActionButtons(draft, { canExport, canDelete, canRestitution, canEdit })}
-          </div>
-        </td>
-      </tr>
-    `).join("");
+    draftList.innerHTML = filteredDrafts
+      .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+      .join("");
 
     dashboardLastUpdatedAt = new Date().toISOString();
     updateDashboardRefreshInfo();
     setDashboardUpdateNotice();
     bindStatusPreviews();
+    bindDraftActionMenus();
     bindSelectionActions(canExport, canDelete);
     restoreDashboardSelection();
   } finally {
     dashboardRefreshInFlight = false;
   }
-}
-
-function triggerDownload(url) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 function saveBlob(blob, filename) {
@@ -578,59 +778,424 @@ function saveBlob(blob, filename) {
   }, 1500);
 }
 
+function parseDownloadFileName(response, fallback) {
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+  return fileNameMatch ? fileNameMatch[1] : fallback;
+}
+
+function getPdfEmailRecipient(draft) {
+  const payload = draft?.data || {};
+  return (
+    payload?.immateriel?.email?.adresse
+    || payload?.beneficiaire?.email
+    || ""
+  ).trim();
+}
+
+function toBase64(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return window.btoa(binary);
+}
+
+function wrapBase64Lines(value, lineLength = 76) {
+  const lines = [];
+  for (let index = 0; index < value.length; index += lineLength) {
+    lines.push(value.slice(index, index + lineLength));
+  }
+  return lines;
+}
+
+function buildPdfEmailContent({ recipientEmail, subject, bodyLines, attachmentName, attachmentBase64 }) {
+  const boundary = `----=_Dotation_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
+  return [
+    "X-Unsent: 1",
+    `Subject: ${subject}`,
+    `To: ${recipientEmail}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    ...bodyLines,
+    "",
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${attachmentName}"`,
+    "Content-Transfer-Encoding: base64",
+    `Content-Disposition: attachment; filename="${attachmentName}"`,
+    "",
+    ...wrapBase64Lines(attachmentBase64),
+    `--${boundary}--`
+  ].join("\r\n");
+}
+
+async function fetchPdfDocument(id, kind) {
+  const isRestitution = kind === "restitution";
+  const config = isRestitution
+    ? {
+        endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
+        title: "Préparation du PDF restitution",
+        text: "Le bon de restitution est en cours de génération.",
+        fallbackName: `restitution-${id}.pdf`
+      }
+    : {
+        endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
+        title: "Préparation du PDF dossier",
+        text: "Le document est en cours de génération.",
+        fallbackName: `dossier-${id}.pdf`
+      };
+
+  showExportLoader(config.title, config.text);
+  try {
+    const { response, blob } = await fetchDownloadWithProgress(config.endpoint, {
+      credentials: "same-origin"
+    });
+    return {
+      blob,
+      fileName: parseDownloadFileName(response, config.fallbackName)
+    };
+  } finally {
+    window.setTimeout(() => {
+      hideExportLoader();
+    }, 250);
+  }
+}
+
+async function preparePdfEmail(id, kind) {
+  try {
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    const { blob, fileName } = await fetchPdfDocument(id, kind);
+    const attachmentBase64 = toBase64(await blob.arrayBuffer());
+    const recipientEmail = getPdfEmailRecipient(draft);
+    const title = draft?.title || "Dossier";
+    const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+    const documentLabel = kind === "restitution" ? "PDF de restitution" : "PDF de dossier";
+    const emailContent = buildPdfEmailContent({
+      recipientEmail,
+      subject: `${documentLabel} - ${title}`,
+      bodyLines: [
+        "Bonjour,",
+        "",
+        `Vous trouverez en piece jointe le ${documentLabel.toLowerCase()}.`,
+        `Dossier : ${title}`,
+        fullName ? `Personne concernee : ${fullName}` : "",
+        "",
+        "Cordialement,"
+      ].filter(Boolean),
+      attachmentName: fileName,
+      attachmentBase64
+    });
+    const emailFileName = `${sanitizeDownloadFileName(`${kind}_pdf_email_${title}`, `${kind}_pdf_email`)}.eml`;
+    saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), emailFileName);
+  } catch (error) {
+    window.alert(
+      error.message || (kind === "restitution"
+        ? "Impossible de préparer l'e-mail du PDF restitution."
+        : "Impossible de préparer l'e-mail du PDF dossier.")
+    );
+  }
+}
+
+async function prepareDraftPdfEmail(id) {
+  await preparePdfEmail(id, "dossier");
+}
+
+async function prepareRestitutionPdfEmail(id) {
+  await preparePdfEmail(id, "restitution");
+}
+
 async function exportDraftPdf(id) {
-  // Export unitaire : téléchargement direct d'un PDF généré par le backend.
-  triggerDownload(`${API_BASE}/${encodeURIComponent(id)}/pdf`);
+  try {
+    const { blob, fileName } = await fetchPdfDocument(id, "dossier");
+    saveBlob(blob, fileName);
+  } catch (error) {
+    alert("Impossible de générer le PDF dossier.");
+  }
 }
 
 async function exportRestitutionPdf(id) {
-  triggerDownload(`${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`);
+  try {
+    const { blob, fileName } = await fetchPdfDocument(id, "restitution");
+    saveBlob(blob, fileName);
+  } catch (error) {
+    alert("Impossible de générer le PDF restitution.");
+  }
+}
+
+function findDraftSummary(id) {
+  return currentDraftRows.find((draft) => draft.id === id) || getCachedDrafts().find((draft) => draft.id === id) || null;
+}
+
+async function copyTextWithFallback(text, promptLabel) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    window.prompt(promptLabel, text);
+    return false;
+  }
+}
+
+function sanitizeDownloadFileName(value, fallback = "document") {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+  return normalized || fallback;
+}
+
+function getRestitutionRecipientEmail(draft) {
+  const payload = draft?.data || {};
+  return (
+    payload?.immateriel?.email?.adresse
+    || payload?.beneficiaire?.email
+    || ""
+  ).trim();
+}
+
+function buildRestitutionEmailContent(draft, absoluteUrl) {
+  const title = draft?.title || "Dossier";
+  const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+  const recipientEmail = getRestitutionRecipientEmail(draft);
+  const lines = [
+    "Bonjour,",
+    "",
+    "Vous trouverez ci-dessous le lien pour consulter et signer la restitution :",
+    absoluteUrl,
+    "",
+    `Dossier : ${title}`,
+    fullName ? `Personne concernee : ${fullName}` : "",
+    "",
+    "Cordialement,"
+  ].filter(Boolean);
+
+  return [
+    "X-Unsent: 1",
+    "Subject: Lien de signature de restitution",
+    `To: ${recipientEmail}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    ...lines
+  ].join("\r\n");
+}
+
+function buildAssignmentSignatureEmailContent(draft, absoluteUrl) {
+  const title = draft?.title || "Dossier";
+  const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+  const recipientEmail = getPdfEmailRecipient(draft);
+  const lines = [
+    "Bonjour,",
+    "",
+    "Vous trouverez ci-dessous le lien pour consulter et signer le dossier d'attribution :",
+    absoluteUrl,
+    "",
+    `Dossier : ${title}`,
+    fullName ? `Personne concernee : ${fullName}` : "",
+    "",
+    "Cordialement,"
+  ].filter(Boolean);
+
+  return [
+    "X-Unsent: 1",
+    "Subject: Lien de signature du dossier d'attribution",
+    `To: ${recipientEmail}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    ...lines
+  ].join("\r\n");
+}
+
+async function ensureAssignmentSignatureLink(id) {
+  let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`);
+  if (!result?.link || result.link.status !== "active" || !result.link.url) {
+    result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`, {
+      method: "POST"
+    });
+  }
+  return {
+    link: result.link,
+    absoluteUrl: new URL(result.link.url, window.location.origin).href
+  };
+}
+
+async function ensureRestitutionSignatureLink(id) {
+  let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
+  if (!result?.link || result.link.status !== "active" || !result.link.url) {
+    result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
+      method: "POST"
+    });
+  }
+  return {
+    link: result.link,
+    absoluteUrl: new URL(result.link.url, window.location.origin).href
+  };
 }
 
 async function shareSignatureLink(id) {
   try {
-    let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`);
-    if (!result?.link || result.link.status !== "active" || !result.link.url) {
-      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/signature-link`, {
-        method: "POST"
-      });
-    }
-
-    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
-    try {
-      await navigator.clipboard.writeText(absoluteUrl);
-      window.alert("Lien de signature copié dans le presse-papiers.");
-    } catch (error) {
-      window.prompt("Copiez ce lien de signature :", absoluteUrl);
-    }
+    const { absoluteUrl } = await ensureAssignmentSignatureLink(id);
+    const copied = await copyTextWithFallback(absoluteUrl, "Copiez ce lien de signature :");
+    window.alert(copied ? "Lien de signature copié dans le presse-papiers." : "Lien de signature prêt à être copié.");
   } catch (error) {
     window.alert(error.message || "Impossible de préparer le lien de signature.");
   }
 }
 
-async function shareRestitutionSignatureLink(id) {
+async function prepareAssignmentSignatureEmail(id) {
   try {
-    let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
-    if (!result?.link || result.link.status !== "active" || !result.link.url) {
-      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
-        method: "POST"
-      });
-    }
+    const { absoluteUrl } = await ensureAssignmentSignatureLink(id);
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    const emailContent = buildAssignmentSignatureEmailContent(draft, absoluteUrl);
+    const title = draft?.title || id;
+    const fileName = `${sanitizeDownloadFileName(`attribution_signature_${title}`, "attribution_signature")}.eml`;
+    saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer l'e-mail de signature.");
+  }
+}
 
-    const absoluteUrl = new URL(result.link.url, window.location.origin).href;
-    try {
-      await navigator.clipboard.writeText(absoluteUrl);
-      window.alert("Lien de signature de restitution copié dans le presse-papiers.");
-    } catch (error) {
-      window.prompt("Copiez ce lien de signature de restitution :", absoluteUrl);
-    }
+async function copyRestitutionSignatureLink(id) {
+  try {
+    const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
+    const copied = await copyTextWithFallback(absoluteUrl, "Copiez ce lien de signature de restitution :");
+    window.alert(copied ? "Lien de signature de restitution copié dans le presse-papiers." : "Lien de signature de restitution prêt à être copié.");
   } catch (error) {
     window.alert(error.message || "Impossible de préparer le lien de restitution.");
   }
 }
 
+async function prepareRestitutionSignatureEmail(id) {
+  try {
+    const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    const emailContent = buildRestitutionEmailContent(draft, absoluteUrl);
+    const title = draft?.title || id;
+    const fileName = `${sanitizeDownloadFileName(`restitution_email_${title}`, "restitution_email")}.eml`;
+    saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer l'e-mail de restitution.");
+  }
+}
+
+function bindSignatureLinkNotice() {
+  const notice = document.getElementById("signatureLinkNotice");
+  if (!notice) {
+    return;
+  }
+  const copyButton = notice.querySelector("[data-signature-link-copy]");
+  if (copyButton && !copyButton.dataset.boundCopyLink) {
+    copyButton.addEventListener("click", async () => {
+      const link = copyButton.dataset.link || "";
+      if (!link) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(link);
+        window.alert("Lien copié.");
+      } catch (error) {
+        window.prompt("Copiez ce lien :", link);
+      }
+    });
+    copyButton.dataset.boundCopyLink = "true";
+  }
+  const dismissButton = notice.querySelector("[data-signature-link-dismiss]");
+  if (dismissButton && !dismissButton.dataset.boundDismissLink) {
+    dismissButton.addEventListener("click", () => {
+      persistDashboardSignatureLinkNotice(null);
+      renderDashboardSignatureLinkNotice();
+    });
+    dismissButton.dataset.boundDismissLink = "true";
+  }
+  const revokeButton = notice.querySelector("[data-signature-link-revoke]");
+  if (revokeButton && !revokeButton.dataset.boundRevokeLink) {
+    revokeButton.addEventListener("click", async () => {
+      const linkId = revokeButton.dataset.linkId || "";
+      if (!linkId) {
+        return;
+      }
+      if (!window.confirm("Révoquer ce lien de signature ?")) {
+        return;
+      }
+      try {
+        await requestJson(`/api/signature-links/${encodeURIComponent(linkId)}`, {
+          method: "DELETE"
+        });
+        persistDashboardSignatureLinkNotice(null);
+        renderDashboardSignatureLinkNotice();
+        window.alert("Lien révoqué.");
+      } catch (error) {
+        window.alert(error.message || "Impossible de révoquer ce lien.");
+      }
+    });
+    revokeButton.dataset.boundRevokeLink = "true";
+  }
+}
+
+function renderDashboardSignatureLinkNotice() {
+  const notice = document.getElementById("signatureLinkNotice");
+  if (!notice) {
+    return;
+  }
+
+  const payload = loadDashboardSignatureLinkNotice();
+  if (!payload?.url) {
+    notice.classList.add("d-none");
+    notice.innerHTML = "";
+    return;
+  }
+
+  const label = payload.kind === "restitution" ? "Lien de signature de restitution prêt" : "Lien de signature prêt";
+  const canRevoke = Boolean(
+    payload.linkId
+    && (
+      sessionInfo?.permissions?.includes("*")
+      || sessionInfo?.permissions?.includes(payload.kind === "restitution" ? "forms.restitution" : "forms.edit")
+    )
+  );
+  notice.innerHTML = `
+    <div class="dashboard-update-notice__content">
+      <div>
+        <div>${escapeHtml(label)}</div>
+        <div class="panel-text mb-0">${escapeHtml(payload.title || "")}</div>
+        <div class="panel-text mb-0"><a href="${escapeHtml(payload.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.url)}</a></div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-outline-primary" data-signature-link-copy data-link="${escapeHtml(payload.url)}">Copier le lien</button>
+        ${canRevoke ? `<button type="button" class="btn btn-sm btn-outline-danger" data-signature-link-revoke data-link-id="${escapeHtml(payload.linkId)}">Révoquer</button>` : ""}
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-signature-link-dismiss>Masquer</button>
+      </div>
+    </div>
+  `;
+  notice.classList.remove("d-none");
+  bindSignatureLinkNotice();
+}
+
 function setExportLoaderProgress(value) {
   const normalized = Math.max(0, Math.min(100, Math.round(value)));
+  exportProgressValue = normalized;
   const bar = document.getElementById("exportLoaderBar");
   const percent = document.getElementById("exportLoaderPercent");
   if (bar) {
@@ -645,7 +1210,7 @@ function showExportLoader(title, text) {
   const overlay = document.getElementById("exportLoader");
   document.getElementById("exportLoaderTitle").textContent = title;
   document.getElementById("exportLoaderText").textContent = text;
-  setExportLoaderProgress(0);
+  startFallbackExportProgress({ start: 4, cap: 28, step: 3, interval: 220 });
   overlay?.classList.remove("is-hidden");
 }
 
@@ -654,22 +1219,30 @@ function hideExportLoader() {
     window.clearInterval(exportProgressFallbackTimer);
     exportProgressFallbackTimer = null;
   }
+  exportProgressValue = 0;
   document.getElementById("exportLoader")?.classList.add("is-hidden");
 }
 
-function startFallbackExportProgress() {
+function startFallbackExportProgress(options = {}) {
   if (exportProgressFallbackTimer) {
     window.clearInterval(exportProgressFallbackTimer);
   }
-  let value = 8;
+  const start = Number(options.start ?? Math.max(exportProgressValue, 8));
+  const cap = Number(options.cap ?? 90);
+  const step = Number(options.step ?? 6);
+  const interval = Number(options.interval ?? 350);
+  let value = start;
   setExportLoaderProgress(value);
   exportProgressFallbackTimer = window.setInterval(() => {
-    value = Math.min(value + 6, 90);
+    value = Math.min(value + step, cap);
     setExportLoaderProgress(value);
-  }, 350);
+  }, interval);
 }
 
 async function fetchDownloadWithProgress(url, options = {}) {
+  // Pipeline de téléchargement en deux temps :
+  // 1. une progression simulée pendant la préparation serveur
+  // 2. une progression réelle dès que le flux HTTP devient lisible.
   const response = await fetch(url, options);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -677,10 +1250,20 @@ async function fetchDownloadWithProgress(url, options = {}) {
 
   const contentLength = Number(response.headers.get("Content-Length") || 0);
   if (!response.body || !contentLength) {
-    startFallbackExportProgress();
+    startFallbackExportProgress({
+      start: Math.max(exportProgressValue, 32),
+      cap: 94,
+      step: 4,
+      interval: 260
+    });
     const blob = await response.blob();
     setExportLoaderProgress(100);
     return { response, blob };
+  }
+
+  if (exportProgressFallbackTimer) {
+    window.clearInterval(exportProgressFallbackTimer);
+    exportProgressFallbackTimer = null;
   }
 
   const reader = response.body.getReader();
@@ -694,7 +1277,8 @@ async function fetchDownloadWithProgress(url, options = {}) {
     }
     chunks.push(value);
     received += value.length;
-    setExportLoaderProgress((received / contentLength) * 100);
+    const downloadProgress = 35 + ((received / contentLength) * 65);
+    setExportLoaderProgress(Math.max(exportProgressValue, downloadProgress));
   }
 
   const blob = new Blob(chunks, { type: response.headers.get("Content-Type") || "application/octet-stream" });
@@ -1022,6 +1606,10 @@ function bindDashboardFilters() {
   const serviceFilter = document.getElementById("serviceFilter");
   const resetButton = document.getElementById("resetFiltersBtn");
 
+  if (!searchInput || !statusFilter || !qualiteFilter || !serviceFilter || !resetButton) {
+    return;
+  }
+
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();
     void renderDraftList();
@@ -1170,7 +1758,11 @@ function startDashboardAutoRefresh() {
 
 document.addEventListener("DOMContentLoaded", () => {
   // Initialisation d'accueil : session, liste et masquage du hover au scroll.
+  if (!document.getElementById("draftList")) {
+    return;
+  }
   dashboardPendingNewIds = loadPendingDashboardUpdates();
+  renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
     if (user && (user.permissions.includes("users.manage") || user.permissions.includes("*"))) {
       document.getElementById("adminLink").classList.remove("d-none");
@@ -1182,6 +1774,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("newFormBtn")?.classList.remove("d-none");
       document.getElementById("emptyStateNewFormBtn")?.classList.remove("d-none");
     }
+    renderDashboardSignatureLinkNotice();
   });
   bindDashboardFilters();
   void renderDraftList();
@@ -1193,3 +1786,6 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("focus", refreshDashboardIfVisible);
   document.addEventListener("scroll", hideStatusPreview, { passive: true });
 });
+
+// Module du tableau de bord :
+// listes, actions de lot, exports et caches de secours.

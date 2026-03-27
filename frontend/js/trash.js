@@ -84,6 +84,7 @@ function renderTrash() {
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
           <button class="btn btn-sm btn-outline-primary" type="button" onclick="restoreTrashItem('${escapeHtml(item.id)}')">Restaurer</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTrashItem('${escapeHtml(item.id)}')">Supprimer</button>
         </div>
       </td>
     </tr>
@@ -106,6 +107,35 @@ async function restoreTrashItem(trashId) {
   await loadTrash();
 }
 
+async function deleteTrashItem(trashId) {
+  const confirmed = window.confirm("Supprimer définitivement cet élément de la corbeille ? Cette action est irréversible.");
+  if (!confirmed) {
+    return;
+  }
+  await trashRequest(`/api/admin/trash/${encodeURIComponent(trashId)}`, {
+    method: "DELETE"
+  });
+  await loadTrash();
+}
+
+async function emptyTrash() {
+  if (!trashItems.length) {
+    window.alert("La corbeille est déjà vide.");
+    return;
+  }
+  const confirmed = window.confirm("Vider toute la corbeille ? Toutes les copies de restauration seront supprimées définitivement.");
+  if (!confirmed) {
+    return;
+  }
+  const result = await trashRequest("/api/admin/trash", {
+    method: "DELETE"
+  });
+  await loadTrash();
+  if (result.deleted_count) {
+    window.alert(`Corbeille vidée : ${result.deleted_count} élément(s) supprimé(s) définitivement.`);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await loadTrash();
@@ -122,4 +152,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       alert(`Impossible de rafraîchir la corbeille : ${error.message}`);
     }
   });
+  document.getElementById("emptyTrashBtn")?.addEventListener("click", async () => {
+    try {
+      await emptyTrash();
+    } catch (error) {
+      alert(`Impossible de vider la corbeille : ${error.message}`);
+    }
+  });
 });
+
+// Gère la corbeille applicative :
+// recherche, filtrage, restauration et suppression définitive des éléments supprimés.

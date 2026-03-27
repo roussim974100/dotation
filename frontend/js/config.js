@@ -1,3 +1,5 @@
+// Registre léger des libellés d'interface partagés
+// par les écrans d'authentification.
 window.APP_TEXT = {
   app: {
     name: "Parcours agents et elu(e)s",
