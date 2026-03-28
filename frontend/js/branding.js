@@ -2,6 +2,7 @@
 // Le logo reste masque jusqu'a ce que le bon visuel soit pret,
 // ce qui evite le flash du fallback local avant le vrai logo configure.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
+const APP_BUILD_VERSION = "2.9.0";
 const BRAND_THEME_PRESETS = {
   institutionnel: {
     light: {
@@ -159,6 +160,39 @@ function bindHomeBrandLinks() {
   });
 }
 
+function ensureAppFooter() {
+  if (document.querySelector("[data-app-footer]")) {
+    return;
+  }
+
+  const targetBody = document.body;
+  if (!targetBody) {
+    return;
+  }
+
+  const footer = document.createElement("footer");
+  footer.className = "app-footer no-print";
+  footer.setAttribute("data-app-footer", "true");
+  footer.innerHTML = `
+    <div class="container app-footer__inner">
+      <div class="app-footer__top">
+        <div class="app-footer__identity">
+          <strong class="app-footer__app" data-brand-app-name>Parcours agents et elu(e)s</strong>
+          <span class="app-footer__version">Version ${APP_BUILD_VERSION}</span>
+        </div>
+        <div class="app-footer__contact">
+          <span>Contact technique :</span>
+          <a href="mailto:computing.bs@gmail.com">computing.bs@gmail.com</a>
+        </div>
+      </div>
+      <div class="app-footer__bottom">
+        <span>&copy; <span data-app-year>${new Date().getFullYear()}</span> <span data-brand-org>Ville de Publier</span>. Application developpee en vibecoding par Samir BASSIM, DSI de la commune de Publier.</span>
+      </div>
+    </div>
+  `;
+  targetBody.appendChild(footer);
+}
+
 function revealBrandLogos() {
   // Le logo courant est deja charge directement par le HTML.
 }
@@ -299,6 +333,7 @@ async function loadBranding(options = {}) {
 }
 
 async function bootBranding() {
+  ensureAppFooter();
   bindHomeBrandLinks();
   const cached = readBrandingCache();
   if (cached) {
