@@ -45,8 +45,18 @@ function formatLogDetails(details) {
   if (!details || typeof details !== "object" || Object.keys(details).length === 0) {
     return "-";
   }
+  const labels = {
+    poste: "Poste",
+    ip: "IP",
+    ip_vue_serveur: "IP WAN",
+    ip_reelle_proxy: "IP WAN proxy",
+    ip_locale: "IP LAN",
+    reseau_local: "Réseau local",
+    navigateur: "Navigateur",
+    plateforme: "Plateforme"
+  };
   return Object.entries(details)
-    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : String(value ?? "")}`)
+    .map(([key, value]) => `${labels[key] || key}: ${Array.isArray(value) ? value.join(", ") : String(value ?? "")}`)
     .join(" | ");
 }
 

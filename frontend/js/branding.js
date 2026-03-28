@@ -3,6 +3,8 @@
 // ce qui evite le flash du fallback local avant le vrai logo configure.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 const APP_BUILD_VERSION = "2.9.0";
+const CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1";
+const COOKIE_CONSENT_COOKIE_NAME = "dotation_cookie_consent_v1";
 const BRAND_THEME_PRESETS = {
   institutionnel: {
     light: {
@@ -127,6 +129,7 @@ const BRAND_THEME_PRESETS = {
 };
 
 window.APP_BRANDING = null;
+let clientContextBootPromise = null;
 
 function getBrandLogos() {
   return Array.from(document.querySelectorAll(".app-logo[data-brand-logo]"));
@@ -193,6 +196,86 @@ function ensureAppFooter() {
   targetBody.appendChild(footer);
 }
 
+function readCookie(name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function writeCookie(name, value, maxAgeSeconds) {
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "SameSite=Lax"
+  ];
+  if (typeof maxAgeSeconds === "number") {
+    parts.push(`Max-Age=${maxAgeSeconds}`);
+  }
+  document.cookie = parts.join("; ");
+}
+
+function removeCookie(name) {
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function getCookieConsentState() {
+  return readCookie(COOKIE_CONSENT_COOKIE_NAME);
+}
+
+function hasAcceptedClientContextCookies() {
+  return getCookieConsentState() === "accepted";
+}
+
+function ensureCookieConsentBanner() {
+  if (document.querySelector("[data-cookie-consent]")) {
+    return;
+  }
+
+  const state = getCookieConsentState();
+  if (state === "accepted" || state === "rejected") {
+    return;
+  }
+
+  const banner = document.createElement("aside");
+  banner.className = "cookie-consent no-print";
+  banner.setAttribute("data-cookie-consent", "true");
+  banner.innerHTML = `
+    <div class="cookie-consent__content">
+      <div class="cookie-consent__copy">
+        <strong class="cookie-consent__title">Cookies techniques</strong>
+        <p class="cookie-consent__text">Nous utilisons les cookies indispensables à la session et, avec votre accord, un cookie technique pour enrichir le journal avec le poste client, l'IP LAN si disponible et l'IP WAN vue par le serveur.</p>
+        <button class="btn btn-link btn-sm cookie-consent__details-toggle" type="button" data-cookie-details-toggle>Détails</button>
+        <div class="cookie-consent__details d-none" data-cookie-details>
+          <p class="cookie-consent__details-text"><strong>Indispensable :</strong> cookie de session pour l'authentification et la sécurité.</p>
+          <p class="cookie-consent__details-text"><strong>Optionnel :</strong> cookie de contexte client pour mémoriser le type de poste, le navigateur, l'IP LAN si le navigateur l'expose, et l'IP WAN détectée côté serveur afin d'améliorer le journal d'activité.</p>
+        </div>
+      </div>
+      <div class="cookie-consent__actions">
+        <button class="btn btn-outline-secondary btn-sm" type="button" data-cookie-reject>Refuser</button>
+        <button class="btn btn-primary btn-sm" type="button" data-cookie-accept>Accepter</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(banner);
+
+  banner.querySelector("[data-cookie-details-toggle]")?.addEventListener("click", () => {
+    banner.querySelector("[data-cookie-details]")?.classList.toggle("d-none");
+  });
+
+  banner.querySelector("[data-cookie-reject]")?.addEventListener("click", () => {
+    writeCookie(COOKIE_CONSENT_COOKIE_NAME, "rejected", 60 * 60 * 24 * 180);
+    removeCookie(CLIENT_CONTEXT_COOKIE_NAME);
+    banner.remove();
+  });
+
+  banner.querySelector("[data-cookie-accept]")?.addEventListener("click", async () => {
+    writeCookie(COOKIE_CONSENT_COOKIE_NAME, "accepted", 60 * 60 * 24 * 180);
+    await bootClientContext();
+    banner.remove();
+  });
+}
+
 function revealBrandLogos() {
   // Le logo courant est deja charge directement par le HTML.
 }
@@ -217,6 +300,154 @@ function writeBrandingCache(settings) {
   } catch (error) {
     // Cache facultatif.
   }
+}
+
+function encodeCookiePayload(payload) {
+  try {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    let binary = "";
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  } catch (error) {
+    return "";
+  }
+}
+
+function persistClientContextCookie(payload) {
+  const encoded = encodeCookiePayload(payload);
+  if (!encoded) {
+    return;
+  }
+  writeCookie(CLIENT_CONTEXT_COOKIE_NAME, encoded, 60 * 60 * 24 * 7);
+}
+
+function detectBrowserName() {
+  const userAgent = navigator.userAgent || "";
+  if (/Edg\//.test(userAgent)) {
+    return "Microsoft Edge";
+  }
+  if (/Chrome\//.test(userAgent) && !/Edg\//.test(userAgent)) {
+    return "Google Chrome";
+  }
+  if (/Firefox\//.test(userAgent)) {
+    return "Mozilla Firefox";
+  }
+  if (/Safari\//.test(userAgent) && !/Chrome\//.test(userAgent)) {
+    return "Safari";
+  }
+  return "Navigateur";
+}
+
+function detectPlatformName() {
+  return navigator.userAgentData?.platform || navigator.platform || "Poste";
+}
+
+function buildClientDeviceLabel() {
+  return `${detectPlatformName()} - ${detectBrowserName()}`;
+}
+
+function isPrivateIpv4(value) {
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(value || "");
+}
+
+function extractIceCandidateAddress(candidate) {
+  const raw = String(candidate?.candidate || "");
+  const parts = raw.split(" ");
+  return parts[4] || "";
+}
+
+function resolveLocalNetworkHint(timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const RTCPeerConnectionCtor = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+    if (!RTCPeerConnectionCtor) {
+      resolve({ localIp: "", localHostHint: "" });
+      return;
+    }
+
+    const connection = new RTCPeerConnectionCtor({ iceServers: [] });
+    let settled = false;
+    let localIp = "";
+    let localHostHint = "";
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      connection.onicecandidate = null;
+      connection.close();
+      resolve({ localIp, localHostHint });
+    };
+
+    connection.onicecandidate = (event) => {
+      if (!event.candidate) {
+        finish();
+        return;
+      }
+      const address = extractIceCandidateAddress(event.candidate);
+      if (!address) {
+        return;
+      }
+      if (!localIp && isPrivateIpv4(address)) {
+        localIp = address;
+      }
+      if (!localHostHint && /\.local$/i.test(address)) {
+        localHostHint = address;
+      }
+    };
+
+    connection.createDataChannel("client-context");
+    connection.createOffer()
+      .then((offer) => connection.setLocalDescription(offer))
+      .catch(() => finish());
+
+    window.setTimeout(finish, timeoutMs);
+  });
+}
+
+async function fetchServerSeenClientContext() {
+  try {
+    const response = await fetch("/api/client-context", {
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      return {};
+    }
+    return await response.json();
+  } catch (error) {
+    return {};
+  }
+}
+
+async function bootClientContext() {
+  if (!hasAcceptedClientContextCookies()) {
+    return {};
+  }
+  if (clientContextBootPromise) {
+    return clientContextBootPromise;
+  }
+
+  clientContextBootPromise = Promise.all([
+    resolveLocalNetworkHint(),
+    fetchServerSeenClientContext()
+  ]).then(([localContext, serverContext]) => {
+    const payload = {
+      deviceLabel: buildClientDeviceLabel(),
+      browser: detectBrowserName(),
+      platform: detectPlatformName(),
+      localIp: localContext.localIp || "",
+      localHostHint: localContext.localHostHint || "",
+      serverSeenIp: serverContext.serverSeenIp || serverContext.realIp || "",
+      capturedAt: new Date().toISOString()
+    };
+    persistClientContextCookie(payload);
+    return payload;
+  }).catch(() => ({}));
+
+  return clientContextBootPromise;
 }
 
 function waitForImageLoad(image) {
@@ -334,7 +565,11 @@ async function loadBranding(options = {}) {
 
 async function bootBranding() {
   ensureAppFooter();
+  ensureCookieConsentBanner();
   bindHomeBrandLinks();
+  if (hasAcceptedClientContextCookies()) {
+    void bootClientContext();
+  }
   const cached = readBrandingCache();
   if (cached) {
     window.APP_BRANDING = cached;

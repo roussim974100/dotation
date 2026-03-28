@@ -1121,6 +1121,65 @@ body.login-shell {
   text-decoration: underline;
 }
 
+.cookie-consent {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 80;
+  width: min(420px, calc(100vw - 2rem));
+  border: 1px solid rgba(15, 91, 141, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 45px rgba(15, 55, 84, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.cookie-consent__content {
+  padding: 1rem 1rem 0.95rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.cookie-consent__copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cookie-consent__title {
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.cookie-consent__text,
+.cookie-consent__details-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.cookie-consent__details {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(212, 221, 230, 0.9);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-soft) 30%, white);
+}
+
+.cookie-consent__details-toggle {
+  justify-self: flex-start;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.cookie-consent__actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .draft-table {
   margin-bottom: 0;
 }
@@ -1663,6 +1722,21 @@ body.login-shell {
   .app-footer__identity,
   .app-footer__contact {
     align-items: flex-start;
+  }
+
+  .cookie-consent {
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+  }
+
+  .cookie-consent__actions {
+    justify-content: stretch;
+  }
+
+  .cookie-consent__actions .btn {
+    flex: 1 1 100%;
   }
 
   .app-brand {
