@@ -63,7 +63,7 @@
       </div>
       <div class="equipment-item">
         <div class="draft-title">Reprendre</div>
-        <div class="draft-meta">Les dossiers en brouillon ou en attribution partielle restent modifiables depuis cette page.</div>
+        <div class="draft-meta">Les dossiers à compléter ou en attribution partielle restent modifiables depuis cette page.</div>
       </div>
       <div class="equipment-item">
         <div class="draft-title">Clôturer</div>
@@ -86,7 +86,7 @@
           <label class="form-label" for="statusFilter">État</label>
           <select id="statusFilter" class="form-select">
             <option value="">Tous les états</option>
-            <option value="draft">Brouillon</option>
+            <option value="draft">À compléter</option>
             <option value="partial_assignment">Attribution partielle</option>
             <option value="awaiting_signature">En attente de signature</option>
             <option value="active">Attribution active</option>
@@ -152,7 +152,7 @@
 
     <div id="emptyState" class="empty-state d-none">
       <h3>Aucun dossier modifiable pour le moment</h3>
-      <p>Vous pouvez commencer un nouveau dossier d'attribution puis l'enregistrer pour le reprendre plus tard s'il reste en brouillon ou en attribution partielle.</p>
+      <p>Vous pouvez commencer un nouveau dossier d'attribution puis l'enregistrer pour le reprendre plus tard s'il reste à compléter ou en attribution partielle.</p>
       <button id="emptyStateNewFormBtn" class="btn btn-outline-primary d-none" type="button" onclick="newForm()">Créer un dossier</button>
     </div>
   </section>

@@ -2473,7 +2473,7 @@ def build_restitution_pdf_bytes(title, payload):
 
 def format_status_label(status):
     labels = {
-        "draft": "Brouillon",
+        "draft": "À compléter",
         "partial_assignment": "Attribution partielle",
         "awaiting_signature": "En attente de signature",
         "active": "Attribution active",
@@ -2481,7 +2481,7 @@ def format_status_label(status):
         "partial_return": "Restitution partielle",
         "cancelled": "Dossier annulé",
     }
-    return labels.get(status, "Brouillon")
+    return labels.get(status, "À compléter")
 
 
 def format_restitution_state_label(state):
