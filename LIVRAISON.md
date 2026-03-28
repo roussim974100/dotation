@@ -1,4 +1,4 @@
-# Projet Pret a Remise
+﻿# Projet Pret a Remise
 
 Ce document sert de point d'entree pour la remise du projet.
 
@@ -25,7 +25,7 @@ Ce document sert de point d'entree pour la remise du projet.
 - [GUIDE_UTILISATEUR.md](C:/www/dotation/GUIDE_UTILISATEUR.md)
 - [RECETTE_FONCTIONNELLE.md](C:/www/dotation/RECETTE_FONCTIONNELLE.md)
 - [wikijs.md](C:/www/dotation/wikijs.md)
-- [administratif/versions/README.md](C:/www/dotation/administratif/versions/README.md)
+- [version/versions/README.md](C:/www/dotation/version/versions/README.md)
 
 ## Lancement
 
@@ -52,3 +52,4 @@ http://127.0.0.1:5000/
 - definir une vraie valeur `APP_SECRET_KEY`
 - stabiliser la configuration `nginx + gunicorn` si necessaire
 - changer le mot de passe du compte administrateur initial
+

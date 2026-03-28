@@ -1,10 +1,10 @@
-# Archives documentaires
+﻿# Archives documentaires
 
 Ce dossier centralise les archives documentaires versionnees du projet.
 
 ## Convention retenue
 
-- un dossier par version : `administratif/versions/<version>/`
+- un dossier par version : `version/versions/<version>/`
 - des fichiers Markdown suffixes par la version
 - un fichier `VERSION-<version>.md` dans chaque dossier pour la cartouche de tracabilite
 
@@ -19,3 +19,4 @@ Ce dossier centralise les archives documentaires versionnees du projet.
 - `2.8.0` : archive reconstituee
 - `2.8.1` : archive reconstituee
 - `2.9.0` : snapshot courant
+
