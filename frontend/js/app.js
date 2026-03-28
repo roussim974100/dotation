@@ -1,4 +1,4 @@
-﻿const form = document.getElementById("dotationForm");
+const form = document.getElementById("dotationForm");
 const draftStatus = document.getElementById("draftStatus");
 const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");

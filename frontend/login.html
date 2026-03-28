@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connexion</title>
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<link rel="preload" as="image" href="/api/settings/logo">
+<link rel="preload" as="image" href="/assets/a-quai-hero.png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -15,20 +15,12 @@
 <main class="login-layout">
   <section class="login-brand-panel">
     <div class="login-brand-panel__content">
-      <div class="app-brand app-brand--login">
-        <img class="app-logo app-logo--login" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
-        <div>
-          <p class="app-kicker app-kicker--dark" data-text="app.kicker">Collectivité</p>
-          <h1 class="app-title app-title--dark" data-text="app.name">Parcours agents et élu(e)s</h1>
-          <p class="login-lead" data-text="app.subtitle">Application interne de suivi des arrivées, ressources attribuées et restitutions.</p>
-        </div>
-      </div>
+      <figure class="product-hero-card product-hero-card--login" aria-label="Illustration de l'application A quai">
+        <img class="product-hero-card__image" src="assets/a-quai-hero.png" alt="Illustration A quai">
+      </figure>
 
-      <div class="login-info-card">
-        <p class="panel-eyebrow">Accès</p>
-        <h2 class="section-title" data-text="login.heading">Accès à l'application</h2>
-        <p class="panel-text" data-text="login.intro">Connectez-vous pour accéder aux dossiers, aux attributions de ressources et au suivi des restitutions internes.</p>
-      </div>
+      <p class="login-lead" data-text="app.subtitle">Application interne de suivi des arrivées, ressources attribuées et restitutions.</p>
+
     </div>
   </section>
 

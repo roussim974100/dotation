@@ -58,7 +58,6 @@ async function brandingJson(url, options = {}) {
 function normalizeBrandingSettings(raw = {}) {
   return {
     org_name: raw.org_name || "",
-    app_name: raw.app_name || "",
     dpo_email: raw.dpo_email || "",
     brand_logo_mode: raw.brand_logo_mode || "url",
     brand_logo_url: raw.brand_logo_url || "",
@@ -70,7 +69,6 @@ function normalizeBrandingSettings(raw = {}) {
 function collectBrandingPayload() {
   return normalizeBrandingSettings({
     org_name: brandingById("brandingOrgName")?.value.trim(),
-    app_name: brandingById("brandingAppName")?.value.trim(),
     dpo_email: brandingById("brandingDpoEmail")?.value.trim(),
     brand_logo_mode: brandingById("brandingLogoMode")?.value,
     brand_logo_url: brandingById("brandingLogoUrl")?.value.trim(),
@@ -85,7 +83,7 @@ function updateBrandingPreview(url, orgName) {
     return;
   }
   preview.src = url || "assets/app-icon.svg";
-  preview.alt = `Logo ${orgName || "collectivité"}`;
+  preview.alt = `Logo ${orgName || "A quai"}`;
 }
 
 function toggleLogoFields(mode) {
@@ -134,12 +132,11 @@ function describeValueChange(label, previousValue, nextValue) {
 function describeBrandingChanges(previous, next) {
   const changes = [];
   const orgChange = describeValueChange("Nom de la collectivité", previous.org_name, next.org_name);
-  const appChange = describeValueChange("Nom de l'application", previous.app_name, next.app_name);
   const dpoChange = describeValueChange("E-mail du DPO", previous.dpo_email, next.dpo_email);
   const themeChange = describeValueChange("Thème", getThemeLabel(previous.theme_id), getThemeLabel(next.theme_id));
   const darkModeChange = describeValueChange("Mode sombre", BRANDING_DARK_MODE_LABELS[previous.dark_mode_policy], BRANDING_DARK_MODE_LABELS[next.dark_mode_policy]);
 
-  [orgChange, appChange, dpoChange, themeChange, darkModeChange].filter(Boolean).forEach((item) => {
+  [orgChange, dpoChange, themeChange, darkModeChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 
@@ -242,7 +239,6 @@ async function loadBrandingSettings() {
   brandingSettingsSnapshot = raw;
 
   brandingById("brandingOrgName").value = raw.org_name;
-  brandingById("brandingAppName").value = raw.app_name;
   brandingById("brandingDpoEmail").value = raw.dpo_email || payload.dpoEmail || "";
   brandingById("brandingLogoMode").value = raw.brand_logo_mode;
   brandingById("brandingLogoUrl").value = raw.brand_logo_url;
@@ -443,3 +439,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   brandingById("saveBrandingBtn")?.addEventListener("click", saveBrandingSettings);
   brandingById("uploadBrandingLogoBtn")?.addEventListener("click", uploadBrandingLogo);
 });
+

@@ -1,8 +1,10 @@
-﻿// Branding public partagÃ© par toutes les pages frontend.
-// Le logo reste masquÃ© jusqu'Ã  ce que le bon visuel soit prÃªt,
-// ce qui Ã©vite le flash du fallback local avant le vrai logo configurÃ©.
+// Branding public partagé par toutes les pages frontend.
+// Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
+// ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 const APP_BUILD_VERSION = "2.9.1";
+const APP_FIXED_NAME = "A quai";
+const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
 const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
 const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
@@ -139,6 +141,15 @@ function getBrandLogos() {
   return Array.from(document.querySelectorAll(".app-logo[data-brand-logo]"));
 }
 
+function syncBrandLogos(settings) {
+  getBrandLogos().forEach((logo) => {
+    logo.alt = `Logo ${APP_FIXED_NAME}`;
+    if (logo.getAttribute("src") !== APP_PRIMARY_LOGO_URL) {
+      logo.setAttribute("src", APP_PRIMARY_LOGO_URL);
+    }
+  });
+}
+
 function bindHomeBrandLinks() {
   document.querySelectorAll(".app-brand[data-home-link]").forEach((brand) => {
     if (brand.dataset.homeLinkBound) {
@@ -194,7 +205,7 @@ function ensureAppFooter() {
   const appName = document.createElement("strong");
   appName.className = "app-footer__app";
   appName.setAttribute("data-brand-app-name", "");
-  appName.textContent = "Parcours agents et elu(e)s";
+  appName.textContent = APP_FIXED_NAME;
   const version = document.createElement("span");
   version.className = "app-footer__version";
   version.textContent = `Version ${APP_BUILD_VERSION}`;
@@ -237,7 +248,13 @@ function ensureAppFooter() {
   const supportText = document.createElement("p");
   supportText.className = "app-footer__text";
   supportText.textContent = "Developpement et maintenance assures par Samir Bassim, DSI de la commune de Publier.";
+  const supportLogo = document.createElement("img");
+  supportLogo.className = "app-footer__org-logo";
+  supportLogo.setAttribute("data-brand-org-logo", "");
+  supportLogo.alt = "";
+  supportLogo.hidden = true;
   supportColumn.append(supportHeading, supportContact, supportText);
+  supportColumn.appendChild(supportLogo);
 
   grid.append(identityColumn, navigationColumn, supportColumn);
 
@@ -250,7 +267,7 @@ function ensureAppFooter() {
   year.textContent = String(new Date().getFullYear());
   const org = document.createElement("span");
   org.setAttribute("data-brand-org", "");
-  org.textContent = "Ville de Publier";
+  org.textContent = APP_FIXED_NAME;
   copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits reserves."));
   const cookiesButton = document.createElement("button");
   cookiesButton.className = "app-footer__cookies";
@@ -297,12 +314,12 @@ function ensureCookieConsentStylesheet() {
 }
 
 function revealBrandLogos() {
-  // Le logo courant est dÃ©jÃ  chargÃ© directement par le HTML.
+  // Le logo courant est déjà chargé directement par le HTML.
 }
 
 function hideBrandLogos() {
-  // Le masquage n'est plus nÃ©cessaire maintenant que le src HTML
-  // pointe dÃ©jÃ  vers le logo courant de l'application.
+  // Le masquage n'est plus nécessaire maintenant que le src HTML
+  // pointe déjà vers le logo courant de l'application.
 }
 
 function readBrandingCache() {
@@ -668,26 +685,26 @@ function applyBrandingTheme(settings) {
 }
 
 function applyBrandingContent(settings) {
-  const orgName = settings?.orgName || "CollectivitÃ©";
-  const appName = settings?.appName || "Parcours agents et Ã©lu(e)s";
+  const orgName = settings?.orgName || "Ville de Publier";
+  const appName = APP_FIXED_NAME;
   const dpoEmail = settings?.dpoEmail || "dpo@ville-publier.fr";
   const logoUrl = settings?.logoUrl;
   const logos = getBrandLogos();
 
   document.querySelectorAll("[data-brand-org]").forEach((node) => {
-    node.textContent = orgName;
+    node.textContent = APP_FIXED_NAME;
   });
   document.querySelectorAll("[data-brand-app-name]").forEach((node) => {
     node.textContent = appName;
   });
   document.querySelectorAll('[data-text="app.kicker"]').forEach((node) => {
-    node.textContent = orgName;
+    node.textContent = APP_FIXED_NAME;
   });
   document.querySelectorAll('[data-text="app.name"]').forEach((node) => {
     node.textContent = appName;
   });
   document.querySelectorAll("[data-rgpd-org-text]").forEach((node) => {
-    node.textContent = `Les donnÃ©es Ã  caractÃ¨re personnel renseignÃ©es dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas Ã©chÃ©ant, des restitutions.`;
+    node.textContent = `Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.`;
   });
   document.querySelectorAll("[data-brand-dpo-email-link]").forEach((node) => {
     node.setAttribute("href", `mailto:${dpoEmail}`);
@@ -697,15 +714,26 @@ function applyBrandingContent(settings) {
   });
 
   if (window.APP_TEXT?.app) {
-    window.APP_TEXT.app.kicker = orgName;
+    window.APP_TEXT.app.kicker = APP_FIXED_NAME;
     window.APP_TEXT.app.name = appName;
   }
 
-  logos.forEach((logo) => {
-    logo.alt = `Logo ${orgName}`;
-    if (logoUrl && logo.src !== logoUrl) {
-      logo.src = logoUrl;
+  syncBrandLogos(settings);
+  document.querySelectorAll("[data-brand-org-logo]").forEach((logo) => {
+    if (!(logo instanceof HTMLImageElement)) {
+      return;
     }
+    if (logoUrl) {
+      logo.hidden = false;
+      logo.alt = `Logo ${orgName}`;
+      if (logo.getAttribute("src") !== logoUrl) {
+        logo.setAttribute("src", logoUrl);
+      }
+      return;
+    }
+    logo.hidden = true;
+    logo.removeAttribute("src");
+    logo.alt = "";
   });
 
   revealBrandLogos();
