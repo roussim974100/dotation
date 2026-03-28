@@ -3,8 +3,10 @@
 // ce qui evite le flash du fallback local avant le vrai logo configure.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 const APP_BUILD_VERSION = "2.9.0";
+const COOKIECONSENT_VERSION = "3.1.0";
+const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
+const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
 const CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1";
-const COOKIE_CONSENT_COOKIE_NAME = "dotation_cookie_consent_v1";
 const BRAND_THEME_PRESETS = {
   institutionnel: {
     light: {
@@ -130,6 +132,7 @@ const BRAND_THEME_PRESETS = {
 
 window.APP_BRANDING = null;
 let clientContextBootPromise = null;
+let cookieConsentBootPromise = null;
 
 function getBrandLogos() {
   return Array.from(document.querySelectorAll(".app-logo[data-brand-logo]"));
@@ -190,16 +193,11 @@ function ensureAppFooter() {
       </div>
       <div class="app-footer__bottom">
         <span>&copy; <span data-app-year>${new Date().getFullYear()}</span> <span data-brand-org>Ville de Publier</span>. Application developpee en vibecoding par Samir BASSIM, DSI de la commune de Publier.</span>
+        <button class="app-footer__cookies" type="button" data-cc="show-preferencesModal">Cookies</button>
       </div>
     </div>
   `;
   targetBody.appendChild(footer);
-}
-
-function readCookie(name) {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : "";
 }
 
 function writeCookie(name, value, maxAgeSeconds) {
@@ -218,62 +216,15 @@ function removeCookie(name) {
   document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
-function getCookieConsentState() {
-  return readCookie(COOKIE_CONSENT_COOKIE_NAME);
-}
-
-function hasAcceptedClientContextCookies() {
-  return getCookieConsentState() === "accepted";
-}
-
-function ensureCookieConsentBanner() {
-  if (document.querySelector("[data-cookie-consent]")) {
+function ensureCookieConsentStylesheet() {
+  if (document.querySelector(`link[data-cookieconsent-css="${COOKIECONSENT_VERSION}"]`)) {
     return;
   }
-
-  const state = getCookieConsentState();
-  if (state === "accepted" || state === "rejected") {
-    return;
-  }
-
-  const banner = document.createElement("aside");
-  banner.className = "cookie-consent no-print";
-  banner.setAttribute("data-cookie-consent", "true");
-  banner.innerHTML = `
-    <div class="cookie-consent__content">
-      <div class="cookie-consent__copy">
-        <strong class="cookie-consent__title">Cookies techniques</strong>
-        <p class="cookie-consent__text">Nous utilisons les cookies indispensables à la session et, avec votre accord, un cookie technique pour enrichir le journal avec le poste client, l'IP LAN si disponible et l'IP WAN vue par le serveur.</p>
-        <button class="btn btn-link btn-sm cookie-consent__details-toggle" type="button" data-cookie-details-toggle>Détails</button>
-        <div class="cookie-consent__details d-none" data-cookie-details>
-          <p class="cookie-consent__details-text"><strong>Indispensable :</strong> cookie de session pour l'authentification et la sécurité.</p>
-          <p class="cookie-consent__details-text"><strong>Optionnel :</strong> cookie de contexte client pour mémoriser le type de poste, le navigateur, l'IP LAN si le navigateur l'expose, et l'IP WAN détectée côté serveur afin d'améliorer le journal d'activité.</p>
-        </div>
-      </div>
-      <div class="cookie-consent__actions">
-        <button class="btn btn-outline-secondary btn-sm" type="button" data-cookie-reject>Refuser</button>
-        <button class="btn btn-primary btn-sm" type="button" data-cookie-accept>Accepter</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(banner);
-
-  banner.querySelector("[data-cookie-details-toggle]")?.addEventListener("click", () => {
-    banner.querySelector("[data-cookie-details]")?.classList.toggle("d-none");
-  });
-
-  banner.querySelector("[data-cookie-reject]")?.addEventListener("click", () => {
-    writeCookie(COOKIE_CONSENT_COOKIE_NAME, "rejected", 60 * 60 * 24 * 180);
-    removeCookie(CLIENT_CONTEXT_COOKIE_NAME);
-    banner.remove();
-  });
-
-  banner.querySelector("[data-cookie-accept]")?.addEventListener("click", async () => {
-    writeCookie(COOKIE_CONSENT_COOKIE_NAME, "accepted", 60 * 60 * 24 * 180);
-    await bootClientContext();
-    banner.remove();
-  });
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = COOKIECONSENT_CSS_URL;
+  link.setAttribute("data-cookieconsent-css", COOKIECONSENT_VERSION);
+  document.head.appendChild(link);
 }
 
 function revealBrandLogos() {
@@ -423,7 +374,7 @@ async function fetchServerSeenClientContext() {
 }
 
 async function bootClientContext() {
-  if (!hasAcceptedClientContextCookies()) {
+  if (!window.CookieConsent?.acceptedCategory?.("client_context")) {
     return {};
   }
   if (clientContextBootPromise) {
@@ -448,6 +399,134 @@ async function bootClientContext() {
   }).catch(() => ({}));
 
   return clientContextBootPromise;
+}
+
+function clearClientContextCookie() {
+  clientContextBootPromise = null;
+  removeCookie(CLIENT_CONTEXT_COOKIE_NAME);
+}
+
+function syncClientContextConsent() {
+  if (window.CookieConsent?.acceptedCategory?.("client_context")) {
+    void bootClientContext();
+    return;
+  }
+  clearClientContextCookie();
+}
+
+function loadCookieConsentScript() {
+  if (window.CookieConsent?.run) {
+    return Promise.resolve(window.CookieConsent);
+  }
+
+  const existing = document.querySelector(`script[data-cookieconsent-js="${COOKIECONSENT_VERSION}"]`);
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener("load", () => resolve(window.CookieConsent), { once: true });
+      existing.addEventListener("error", () => reject(new Error("cookieconsent_load_failed")), { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = COOKIECONSENT_JS_URL;
+    script.defer = true;
+    script.setAttribute("data-cookieconsent-js", COOKIECONSENT_VERSION);
+    script.addEventListener("load", () => resolve(window.CookieConsent), { once: true });
+    script.addEventListener("error", () => reject(new Error("cookieconsent_load_failed")), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function bootCookieConsent() {
+  if (cookieConsentBootPromise) {
+    return cookieConsentBootPromise;
+  }
+
+  ensureCookieConsentStylesheet();
+  cookieConsentBootPromise = loadCookieConsentScript().then((CookieConsent) => {
+    if (!CookieConsent?.run) {
+      throw new Error("cookieconsent_unavailable");
+    }
+
+    CookieConsent.run({
+      root: document.body,
+      mode: "opt-in",
+      guiOptions: {
+        consentModal: {
+          layout: "cloud inline",
+          position: "bottom center",
+          equalWeightButtons: true,
+          flipButtons: false
+        },
+        preferencesModal: {
+          layout: "box",
+          equalWeightButtons: true,
+          flipButtons: false
+        }
+      },
+      categories: {
+        necessary: {
+          enabled: true,
+          readOnly: true
+        },
+        client_context: {}
+      },
+      onFirstConsent: syncClientContextConsent,
+      onConsent: syncClientContextConsent,
+      onChange: syncClientContextConsent,
+      language: {
+        default: "fr",
+        translations: {
+          fr: {
+            consentModal: {
+              title: "Cookies techniques",
+              description: "Nous utilisons les cookies indispensables à la session et, avec votre accord, un cookie technique pour enrichir le journal avec le poste client, l'IP LAN si disponible et l'IP WAN vue par le serveur.",
+              acceptAllBtn: "Accepter",
+              acceptNecessaryBtn: "Refuser",
+              showPreferencesBtn: "Détails"
+            },
+            preferencesModal: {
+              title: "Préférences cookies",
+              acceptAllBtn: "Accepter",
+              acceptNecessaryBtn: "Refuser",
+              savePreferencesBtn: "Enregistrer mes choix",
+              closeIconLabel: "Fermer",
+              serviceCounterLabel: "Service|Services",
+              sections: [
+                {
+                  title: "Votre choix",
+                  description: "Vous pouvez gérer ici les cookies utilisés par l'application. Les cookies strictement nécessaires restent actifs pour la connexion et la sécurité."
+                },
+                {
+                  title: "Cookies indispensables",
+                  description: "Ils maintiennent la session utilisateur, la sécurité et le bon fonctionnement de l'application. Ils ne peuvent pas être désactivés.",
+                  linkedCategory: "necessary"
+                },
+                {
+                  title: "Journal réseau et poste",
+                  description: "Avec votre accord, un cookie technique conserve le type de poste, le navigateur, l'IP LAN si le navigateur l'expose, et l'IP WAN détectée côté serveur pour enrichir le journal d'activité.",
+                  linkedCategory: "client_context"
+                },
+                {
+                  title: "Détails",
+                  description: "Le journal peut ensuite afficher des informations comme Poste, IP LAN, IP WAN, navigateur et plateforme pour faciliter le support et les investigations."
+                }
+              ]
+            }
+          }
+        }
+      }
+    });
+
+    syncClientContextConsent();
+    return CookieConsent;
+  }).catch((error) => {
+    console.error("cookieconsent_boot_failed", error);
+    return null;
+  });
+
+  return cookieConsentBootPromise;
 }
 
 function waitForImageLoad(image) {
@@ -565,11 +644,8 @@ async function loadBranding(options = {}) {
 
 async function bootBranding() {
   ensureAppFooter();
-  ensureCookieConsentBanner();
   bindHomeBrandLinks();
-  if (hasAcceptedClientContextCookies()) {
-    void bootClientContext();
-  }
+  void bootCookieConsent();
   const cached = readBrandingCache();
   if (cached) {
     window.APP_BRANDING = cached;
