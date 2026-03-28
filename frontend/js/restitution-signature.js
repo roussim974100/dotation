@@ -1,4 +1,4 @@
-﻿const publicRestitutionSignatureForm = document.getElementById("publicRestitutionSignatureForm");
+const publicRestitutionSignatureForm = document.getElementById("publicRestitutionSignatureForm");
 const restitutionSignatureLoader = document.getElementById("restitutionSignatureLoader");
 const restitutionSignatureErrorCard = document.getElementById("restitutionSignatureErrorCard");
 const restitutionSignatureSuccessCard = document.getElementById("restitutionSignatureSuccessCard");

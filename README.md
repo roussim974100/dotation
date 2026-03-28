@@ -1,6 +1,6 @@
-﻿# Parcours agents et elu(e)s
+# A quai
 
-Application interne de gestion des dossiers d'attribution et de restitution pour une collectivite.
+Application interne de gestion des dossiers d'attribution et de restitution.
 
 ## Ce que fait l'application
 
@@ -598,4 +598,5 @@ Controle minimal recommande apres modification :
 ```powershell
 python -m py_compile backend\app.py
 ```
+
 

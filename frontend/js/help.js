@@ -200,13 +200,13 @@ const HELP_CONTENT = {
   "admin-branding": {
     title: "Aide de la personnalisation",
     subtitle: "Ajustez l'identite visuelle et les informations institutionnelles sans modifier les fichiers de l'application.",
-    hero: "La personnalisation centralise le nom affiche, le logo, le theme, le mode sombre et l'adresse du DPO.",
+    hero: "La personnalisation centralise le logo, le theme, le mode sombre et l'adresse du DPO.",
     pill: "Admin personnalisation",
     returnHref: "admin-personnalisation.html",
     returnLabel: "Retour a la personnalisation",
     quickLinkLabel: "Ouvrir la personnalisation",
     summary: [
-      "Definir le nom de la collectivite et le nom visible de l'application.",
+      "Definir le nom de la collectivite pour les informations institutionnelles et le footer.",
       "Choisir le logo par defaut, une URL distante ou un fichier televerse.",
       "Ajuster le theme, les couleurs et le comportement du mode sombre.",
       "Mettre a jour l'adresse e-mail du DPO reprise dans les informations RGPD."
@@ -355,3 +355,4 @@ function initHelpPage() {
 }
 
 document.addEventListener("DOMContentLoaded", initHelpPage);
+

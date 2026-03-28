@@ -1,4 +1,4 @@
-﻿const publicSignatureForm = document.getElementById("publicSignatureForm");
+const publicSignatureForm = document.getElementById("publicSignatureForm");
 const signaturePageLoader = document.getElementById("signaturePageLoader");
 const signatureErrorCard = document.getElementById("signatureErrorCard");
 const signatureSuccessCard = document.getElementById("signatureSuccessCard");

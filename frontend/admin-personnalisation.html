@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<link rel="preload" as="image" href="/api/settings/logo">
+<link rel="preload" as="image" href="/assets/a-quai-hero.png">
 <title>Personnalisation de l'application</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
@@ -14,11 +14,11 @@
 <header class="app-header">
   <div class="container app-header__inner">
     <div class="app-brand" data-home-link>
-      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo A quai">
       <div>
         <p class="app-kicker">Administration</p>
         <h1 class="app-title">Personnalisation</h1>
-        <p class="app-subtitle">Ajustez ici l'identité visuelle de l'application, le logo affiché et le thème global.</p>
+        <p class="app-subtitle">Ajustez ici le logo, les informations institutionnelles et le theme global.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -30,7 +30,7 @@
   </div>
 </header>
 
-<!-- Page de personnalisation : identité visuelle, logo et thème. -->
+<!-- Page de personnalisation : Reglages visuels et institutionnels. -->
 <main class="container py-4 py-lg-5">
   <div class="admin-layout">
     <aside class="content-card admin-sidebar">
@@ -52,7 +52,7 @@
           <div class="panel-title-wrap">
             <h2 class="panel-title">Paramètres de personnalisation</h2>
           </div>
-          <p class="panel-text">Vous pouvez définir le nom affiché, le logo, le thème de couleurs et le comportement du mode sombre sans toucher au code.</p>
+          <p class="panel-text">Vous pouvez definir le logo, le theme de couleurs, l'adresse du DPO et le comportement du mode sombre sans toucher au code.</p>
         </div>
         <div class="branding-preview-card">
           <img id="brandingLogoPreview" class="app-logo" src="assets/app-icon.svg" alt="Aperçu du logo">
@@ -63,7 +63,7 @@
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Réglages</p>
-            <h2 class="section-title">Identité et thème</h2>
+            <h2 class="section-title">Reglages visuels et institutionnels</h2>
             <p class="panel-text">Le logo peut provenir d'une URL distante ou d'un fichier PNG local téléversé depuis l'explorateur.</p>
           </div>
         </div>
@@ -74,10 +74,6 @@
           <div class="col-md-6">
             <label class="form-label" for="brandingOrgName">Nom de la collectivité</label>
             <input class="form-control" id="brandingOrgName" placeholder="Exemple : Ville de Publier">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="brandingAppName">Nom de l'application</label>
-            <input class="form-control" id="brandingAppName" placeholder="Parcours agents et élu(e)s">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="brandingDpoEmail">Email du DPO</label>
@@ -145,3 +141,4 @@
 <script src="js/admin-branding.js"></script>
 </body>
 </html>
+

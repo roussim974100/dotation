@@ -69,10 +69,15 @@ app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0
 def disable_frontend_cache(response):
     content_type = (response.headers.get("Content-Type") or "").lower()
     if "text/html" in content_type:
+        if "charset=" not in content_type:
+            response.headers["Content-Type"] = "text/html; charset=utf-8"
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     elif any(token in content_type for token in ("application/javascript", "text/css")):
+        if "charset=" not in content_type:
+            mime = "application/javascript" if "application/javascript" in content_type else "text/css"
+            response.headers["Content-Type"] = f"{mime}; charset=utf-8"
         response.headers["Cache-Control"] = "public, no-cache, max-age=0, must-revalidate"
     elif response.status_code == 200 and request.path.startswith("/assets/"):
         response.headers["Cache-Control"] = "public, max-age=604800, immutable"
@@ -137,7 +142,7 @@ BRAND_LOGO_CACHE = {
 
 DEFAULT_APP_SETTINGS = {
     "org_name": "Ville de Publier",
-    "app_name": "Parcours agents et elu(e)s",
+    "app_name": "A quai",
     "dpo_email": "dpo@ville-publier.fr",
     "brand_logo_mode": "url",
     "brand_logo_url": CITY_LOGO_URL,
@@ -571,7 +576,7 @@ def build_public_settings_payload(settings=None):
     theme_id = resolve_theme_id(settings)
     return {
         "orgName": settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"],
-        "appName": settings.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
+        "appName": "A quai",
         "dpoEmail": get_dpo_email(settings),
         "logoUrl": "/api/settings/logo",
         "logoMode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
@@ -2179,7 +2184,7 @@ def build_pdf_bytes(title, payload):
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
         draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 68, "A quai", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
@@ -2189,7 +2194,7 @@ def build_pdf_bytes(title, payload):
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -2221,7 +2226,7 @@ def build_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (A quai) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -2522,7 +2527,7 @@ def build_restitution_pdf_bytes(title, payload):
             logo_height = round(logo_image["height"] * logo_ratio, 2)
             commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
         draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "Parcours agents et élu(e)s", font="F2", size=13, color=(0.92, 0.96, 0.99))
+        draw_text(commands, margin + 100, page_height - 68, "A quai", font="F2", size=13, color=(0.92, 0.96, 0.99))
         draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
         draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
 
@@ -2532,7 +2537,7 @@ def build_restitution_pdf_bytes(title, payload):
         commands.extend(page_commands)
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "Parcours agents et élu(e)s - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -2564,7 +2569,7 @@ def build_restitution_pdf_bytes(title, payload):
         objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
 
     info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (Parcours agents et élu(e)s) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
+        f"<< /Title ({pdf_escape(title)}) /Producer (A quai) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
     )
     catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
 
@@ -4406,7 +4411,6 @@ def admin_settings_route():
     payload = build_public_settings_payload(settings)
     payload["raw"] = {
         "org_name": settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"],
-        "app_name": settings.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
         "dpo_email": get_dpo_email(settings),
         "brand_logo_mode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
         "brand_logo_url": settings.get("brand_logo_url") or DEFAULT_APP_SETTINGS["brand_logo_url"],
@@ -4429,7 +4433,6 @@ def update_admin_settings_route():
     with get_db() as connection:
         save_app_settings(connection, {
             "org_name": payload.get("org_name"),
-            "app_name": payload.get("app_name") or DEFAULT_APP_SETTINGS["app_name"],
             "dpo_email": payload.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"],
             "brand_logo_mode": payload.get("brand_logo_mode"),
             "brand_logo_url": payload.get("brand_logo_url"),

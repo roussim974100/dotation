@@ -1,4 +1,4 @@
-﻿const STORAGE_KEY = "dotationDraftsCache";
+const STORAGE_KEY = "dotationDraftsCache";
 const DASHBOARD_PENDING_UPDATES_KEY = "dashboardPendingUpdates";
 const API_BASE = "/api/forms";
 const PDF_BATCH_EXPORT_ENDPOINT = "/api/forms/export-pdf-batch";
