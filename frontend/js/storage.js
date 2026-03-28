@@ -462,13 +462,19 @@ function normalizeText(value) {
 }
 
 function getDraftSearchText(draft) {
+  const status = draft.status || "draft";
+  const timingLabel = draft.timingLabel || draft.data?.timingLabel || "";
   return [
     draft.title || (draft.data ? buildDraftTitle(draft.data) : ""),
     draft.nom || draft.data?.beneficiaire?.nom || "",
     draft.prenom || draft.data?.beneficiaire?.prenom || "",
     draft.service || draft.data?.beneficiaire?.service || "",
     draft.fonction || draft.data?.beneficiaire?.fonction || "",
-    draft.mandat || draft.data?.beneficiaire?.mandat || ""
+    draft.mandat || draft.data?.beneficiaire?.mandat || "",
+    formatStatusLabel(status),
+    status,
+    timingLabel,
+    draft.timingStatus || ""
   ].join(" ");
 }
 
