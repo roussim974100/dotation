@@ -1635,7 +1635,7 @@ function validateFormData(formData, options = {}) {
 
 function formatStatusLabel(status) {
   const labels = {
-    draft: "Brouillon",
+    draft: "À compléter",
     partial_assignment: "Attribution partielle",
     awaiting_signature: "En attente de signature",
     active: "Attribution active",
@@ -1643,7 +1643,7 @@ function formatStatusLabel(status) {
     partial_return: "Restitution partielle",
     cancelled: "Dossier annulé"
   };
-  return labels[status] || "Brouillon";
+  return labels[status] || "À compléter";
 }
 
 function resolveSaveWorkflow(formData) {
