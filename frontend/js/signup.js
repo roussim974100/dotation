@@ -13,14 +13,14 @@ function applySignupError() {
 
   const messages = {
     missing_fields: "Tous les champs sont obligatoires.",
-    invalid_username: "L'identifiant doit contenir entre 3 et 64 caracteres et n'utiliser que des lettres, chiffres, points, tirets ou underscores.",
+    invalid_username: "L'identifiant doit contenir entre 3 et 64 caractères et n'utiliser que des lettres, chiffres, points, tirets ou underscores.",
     user_exists: "Cet identifiant existe deja.",
     password_mismatch: "La confirmation du mot de passe ne correspond pas.",
-    password_too_short: "Le mot de passe doit contenir au moins 12 caracteres.",
+    password_too_short: "Le mot de passe doit contenir au moins 12 caractères.",
     password_missing_upper: "Le mot de passe doit contenir au moins une majuscule.",
     password_missing_lower: "Le mot de passe doit contenir au moins une minuscule.",
     password_missing_digit: "Le mot de passe doit contenir au moins un chiffre.",
-    password_missing_special: "Le mot de passe doit contenir au moins un caractere special."
+    password_missing_special: "Le mot de passe doit contenir au moins un caractère spécial."
   };
 
   errorBox.textContent = messages[error] || "Impossible de traiter la demande d'inscription.";

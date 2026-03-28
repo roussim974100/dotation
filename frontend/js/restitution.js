@@ -208,7 +208,7 @@ function toggleSignatureMode() {
   const saveButton = document.getElementById("saveRestitutionBtn");
   if (saveButton) {
     saveButton.textContent = mode === "deferred"
-      ? "Enregistrer et generer le lien"
+      ? "Enregistrer et générer le lien"
       : "Enregistrer la restitution";
   }
 }
@@ -481,7 +481,7 @@ async function initRestitutionPage() {
         }));
         window.location.href = "index.html";
       } catch (error) {
-        window.alert(error.message || "Impossible de generer le lien de signature de restitution.");
+        window.alert(error.message || "Impossible de générer le lien de signature de restitution.");
       }
     }
 

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact</title>
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/api/settings/logo">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
+      <div>
+        <p class="app-kicker">Collectivité</p>
+        <h1 class="app-title" data-brand-app-name>Parcours agents et élu(e)s</h1>
+        <p class="app-subtitle">Contacts utiles pour l'assistance applicative et les questions de traitement.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline-light" type="button" onclick="window.history.back()">Retour</button>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5 info-page">
+  <section class="hero-panel mb-4 info-page__hero">
+    <div>
+      <p class="panel-eyebrow">Contact</p>
+      <h2 class="panel-title">Assistance et interlocuteurs</h2>
+      <p class="panel-text">Utilisez ces contacts pour toute question relative au fonctionnement de l'application, à son administration ou au traitement des données personnelles.</p>
+    </div>
+  </section>
+
+  <div class="info-page__grid">
+    <section class="content-card">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Support</p>
+          <h3 class="section-title">Assistance applicative</h3>
+        </div>
+      </div>
+      <p class="panel-text">Pour signaler une anomalie, demander une évolution ou obtenir de l'aide sur un usage de l'application :</p>
+      <p class="panel-text mb-0"><a href="mailto:s.bassim@ville-publier.fr">s.bassim@ville-publier.fr</a></p>
+    </section>
+
+    <section class="content-card">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">DSI</p>
+          <h3 class="section-title">Responsable de l'application</h3>
+        </div>
+      </div>
+      <p class="panel-text"><strong>Samir Bassim</strong><br>DSI de la commune de Publier</p>
+      <p class="panel-text mb-0">Le support peut demander des précisions sur le dossier concerné, le contexte d'usage et le navigateur utilisé afin de faciliter le diagnostic.</p>
+    </section>
+
+    <section class="content-card">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Protection des données</p>
+          <h3 class="section-title">DPO</h3>
+        </div>
+      </div>
+      <p class="panel-text">Pour toute question relative au traitement des données personnelles ou à l'exercice des droits :</p>
+      <p class="panel-text mb-0"><a data-brand-dpo-email-link href="mailto:dpo@ville-publier.fr"><span data-brand-dpo-email-text>dpo@ville-publier.fr</span></a></p>
+    </section>
+
+    <section class="content-card">
+      <div class="section-heading">
+        <div>
+          <p class="panel-eyebrow">Bonnes pratiques</p>
+          <h3 class="section-title">Pour un traitement rapide</h3>
+        </div>
+      </div>
+      <ul class="info-page__list">
+        <li>indiquez l'écran concerné et le dossier si possible ;</li>
+        <li>décrivez le résultat attendu et le résultat observé ;</li>
+        <li>joignez une capture si l'anomalie est visuelle ;</li>
+        <li>précisez la date et l'heure de l'incident.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<script src="js/branding.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
