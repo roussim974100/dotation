@@ -15,6 +15,7 @@ Thumbs.db
 
 # users
 backend/users.json
+backend/.app_secret_key
 
 # Cache / logs
 backend/__pycache__/

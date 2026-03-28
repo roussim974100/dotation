@@ -1,8 +1,8 @@
-// Branding public partagé par toutes les pages frontend.
-// Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
-// ce qui évite le flash du fallback local avant le vrai logo configuré.
+﻿// Branding public partagÃ© par toutes les pages frontend.
+// Le logo reste masquÃ© jusqu'Ã  ce que le bon visuel soit prÃªt,
+// ce qui Ã©vite le flash du fallback local avant le vrai logo configurÃ©.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-const APP_BUILD_VERSION = "2.9.0";
+const APP_BUILD_VERSION = "2.9.1";
 const COOKIECONSENT_VERSION = "3.1.0";
 const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
 const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
@@ -180,42 +180,87 @@ function ensureAppFooter() {
   const footer = document.createElement("footer");
   footer.className = "app-footer no-print";
   footer.setAttribute("data-app-footer", "true");
-  footer.innerHTML = `
-    <div class="container app-footer__inner">
-      <div class="app-footer__grid">
-        <div class="app-footer__column">
-          <div class="app-footer__identity">
-            <strong class="app-footer__app" data-brand-app-name>Parcours agents et élu(e)s</strong>
-            <span class="app-footer__version">Version ${APP_BUILD_VERSION}</span>
-          </div>
-          <p class="app-footer__text">
-            Application métier dédiée au suivi des attributions de ressources et des restitutions au sein de la commune.
-          </p>
-        </div>
-        <div class="app-footer__column">
-          <span class="app-footer__heading">Navigation</span>
-          <nav class="app-footer__links" aria-label="Navigation de pied de page">
-            <a href="/about.html">À propos</a>
-            <a href="/contact.html">Contact</a>
-          </nav>
-        </div>
-        <div class="app-footer__column">
-          <span class="app-footer__heading">Support</span>
-          <div class="app-footer__contact">
-            <span>Assistance applicative :</span>
-            <a href="mailto:s.bassim@ville-publier.fr">s.bassim@ville-publier.fr</a>
-          </div>
-          <p class="app-footer__text">
-            Développement et maintenance assurés par Samir Bassim, DSI de la commune de Publier.
-          </p>
-        </div>
-      </div>
-      <div class="app-footer__bottom">
-        <span>&copy; <span data-app-year>${new Date().getFullYear()}</span> <span data-brand-org>Ville de Publier</span>. Tous droits réservés.</span>
-        <button class="app-footer__cookies" type="button" data-cc="show-preferencesModal">Cookies</button>
-      </div>
-    </div>
-  `;
+
+  const container = document.createElement("div");
+  container.className = "container app-footer__inner";
+
+  const grid = document.createElement("div");
+  grid.className = "app-footer__grid";
+
+  const identityColumn = document.createElement("div");
+  identityColumn.className = "app-footer__column";
+  const identityWrap = document.createElement("div");
+  identityWrap.className = "app-footer__identity";
+  const appName = document.createElement("strong");
+  appName.className = "app-footer__app";
+  appName.setAttribute("data-brand-app-name", "");
+  appName.textContent = "Parcours agents et elu(e)s";
+  const version = document.createElement("span");
+  version.className = "app-footer__version";
+  version.textContent = `Version ${APP_BUILD_VERSION}`;
+  identityWrap.append(appName, version);
+  const identityText = document.createElement("p");
+  identityText.className = "app-footer__text";
+  identityText.textContent = "Application metier dediee au suivi des attributions de ressources et des restitutions au sein de la commune.";
+  identityColumn.append(identityWrap, identityText);
+
+  const navigationColumn = document.createElement("div");
+  navigationColumn.className = "app-footer__column";
+  const navigationHeading = document.createElement("span");
+  navigationHeading.className = "app-footer__heading";
+  navigationHeading.textContent = "Navigation";
+  const navigation = document.createElement("nav");
+  navigation.className = "app-footer__links";
+  navigation.setAttribute("aria-label", "Navigation de pied de page");
+  const aboutLink = document.createElement("a");
+  aboutLink.href = "/about.html";
+  aboutLink.textContent = "A propos";
+  const contactLink = document.createElement("a");
+  contactLink.href = "/contact.html";
+  contactLink.textContent = "Contact";
+  navigation.append(aboutLink, contactLink);
+  navigationColumn.append(navigationHeading, navigation);
+
+  const supportColumn = document.createElement("div");
+  supportColumn.className = "app-footer__column";
+  const supportHeading = document.createElement("span");
+  supportHeading.className = "app-footer__heading";
+  supportHeading.textContent = "Support";
+  const supportContact = document.createElement("div");
+  supportContact.className = "app-footer__contact";
+  const supportLabel = document.createElement("span");
+  supportLabel.textContent = "Assistance applicative :";
+  const supportMail = document.createElement("a");
+  supportMail.href = "mailto:s.bassim@ville-publier.fr";
+  supportMail.textContent = "s.bassim@ville-publier.fr";
+  supportContact.append(supportLabel, supportMail);
+  const supportText = document.createElement("p");
+  supportText.className = "app-footer__text";
+  supportText.textContent = "Developpement et maintenance assures par Samir Bassim, DSI de la commune de Publier.";
+  supportColumn.append(supportHeading, supportContact, supportText);
+
+  grid.append(identityColumn, navigationColumn, supportColumn);
+
+  const bottom = document.createElement("div");
+  bottom.className = "app-footer__bottom";
+  const copyright = document.createElement("span");
+  copyright.append(document.createTextNode("\u00A9 "));
+  const year = document.createElement("span");
+  year.setAttribute("data-app-year", "");
+  year.textContent = String(new Date().getFullYear());
+  const org = document.createElement("span");
+  org.setAttribute("data-brand-org", "");
+  org.textContent = "Ville de Publier";
+  copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits reserves."));
+  const cookiesButton = document.createElement("button");
+  cookiesButton.className = "app-footer__cookies";
+  cookiesButton.type = "button";
+  cookiesButton.setAttribute("data-cc", "show-preferencesModal");
+  cookiesButton.textContent = "Cookies";
+  bottom.append(copyright, cookiesButton);
+
+  container.append(grid, bottom);
+  footer.appendChild(container);
   targetBody.appendChild(footer);
 
   footer.querySelector(".app-footer__cookies")?.addEventListener("click", async () => {
@@ -252,12 +297,12 @@ function ensureCookieConsentStylesheet() {
 }
 
 function revealBrandLogos() {
-  // Le logo courant est déjà chargé directement par le HTML.
+  // Le logo courant est dÃ©jÃ  chargÃ© directement par le HTML.
 }
 
 function hideBrandLogos() {
-  // Le masquage n'est plus nécessaire maintenant que le src HTML
-  // pointe déjà vers le logo courant de l'application.
+  // Le masquage n'est plus nÃ©cessaire maintenant que le src HTML
+  // pointe dÃ©jÃ  vers le logo courant de l'application.
 }
 
 function readBrandingCache() {
@@ -509,13 +554,13 @@ async function bootCookieConsent() {
           fr: {
             consentModal: {
               title: "Cookies techniques",
-              description: "Nous utilisons les cookies indispensables à la session et, avec votre accord, un cookie technique pour enrichir le journal avec le poste client, l'IP LAN si disponible et l'IP WAN vue par le serveur.",
+              description: "Nous utilisons des cookies indispensables au fonctionnement de l'application. Vous pouvez afficher les d\u00e9tails pour consulter les finalit\u00e9s et les dur\u00e9es de conservation.",
               acceptAllBtn: "Accepter",
               acceptNecessaryBtn: "Refuser",
-              showPreferencesBtn: "Détails"
+              showPreferencesBtn: "D\u00e9tails"
             },
             preferencesModal: {
-              title: "Préférences cookies",
+              title: "Pr\u00e9f\u00e9rences cookies",
               acceptAllBtn: "Accepter",
               acceptNecessaryBtn: "Refuser",
               savePreferencesBtn: "Enregistrer mes choix",
@@ -524,21 +569,21 @@ async function bootCookieConsent() {
               sections: [
                 {
                   title: "Votre choix",
-                  description: "Vous pouvez gérer ici les cookies utilisés par l'application. Les cookies strictement nécessaires restent actifs pour la connexion et la sécurité."
+                  description: "Vous pouvez g\u00e9rer ici les cookies utilis\u00e9s par l'application. Les cookies strictement n\u00e9cessaires restent actifs pour la connexion et la s\u00e9curit\u00e9."
                 },
                 {
                   title: "Cookies indispensables",
-                  description: "Ils maintiennent la session utilisateur, la sécurité et le bon fonctionnement de l'application. Ils ne peuvent pas être désactivés.",
+                  description: "Ils maintiennent la session utilisateur, la s\u00e9curit\u00e9 et le bon fonctionnement de l'application. Ils ne peuvent pas \u00eatre d\u00e9sactiv\u00e9s.",
                   linkedCategory: "necessary"
                 },
                 {
-                  title: "Journal réseau et poste",
-                  description: "Avec votre accord, un cookie technique conserve le type de poste, le navigateur, l'IP LAN si le navigateur l'expose, et l'IP WAN détectée côté serveur pour enrichir le journal d'activité.",
+                  title: "Journal r\u00e9seau et poste",
+                  description: "Avec votre accord, un cookie technique conserve le type de poste, le navigateur, l'IP LAN si le navigateur l'expose, et l'IP WAN d\u00e9tect\u00e9e c\u00f4t\u00e9 serveur pour enrichir le journal d'activit\u00e9.",
                   linkedCategory: "client_context"
                 },
                 {
-                  title: "Détails techniques",
-                  description: "<ul class=\"cc-cookie-details\"><li><strong>publier_session</strong> : cookie indispensable pour l'authentification et la sécurité. Durée : session navigateur.</li><li><strong>dotation_cookie_preferences</strong> : mémorise votre choix de consentement. Durée : 180 jours.</li><li><strong>dotation_client_context_v1</strong> : mémorise, avec votre accord, le type de poste, le navigateur, l'IP LAN si disponible et l'IP WAN vue par le serveur. Durée : 7 jours.</li></ul>"
+                  title: "D\u00e9tails techniques",
+                  description: "<ul class=\"cc-cookie-details\"><li><strong>publier_session</strong> : cookie indispensable pour l'authentification et la s\u00e9curit\u00e9. Dur\u00e9e : session navigateur.</li><li><strong>dotation_cookie_preferences</strong> : m\u00e9morise votre choix de consentement. Dur\u00e9e : 180 jours.</li><li><strong>dotation_client_context_v1</strong> : m\u00e9morise, avec votre accord, le type de poste, le navigateur, l'IP LAN si disponible et l'IP WAN vue par le serveur. Dur\u00e9e : 7 jours.</li></ul>"
                 }
               ]
             }
@@ -622,25 +667,12 @@ function applyBrandingTheme(settings) {
   root.style.setProperty("--border", palette.border);
 }
 
-async function applyBrandingContent(settings) {
-  const orgName = settings?.orgName || "Collectivité";
-  const appName = settings?.appName || "Parcours agents et élu(e)s";
+function applyBrandingContent(settings) {
+  const orgName = settings?.orgName || "CollectivitÃ©";
+  const appName = settings?.appName || "Parcours agents et Ã©lu(e)s";
   const dpoEmail = settings?.dpoEmail || "dpo@ville-publier.fr";
   const logoUrl = settings?.logoUrl;
   const logos = getBrandLogos();
-
-  if (logoUrl && logos.length) {
-    const loads = logos.map((logo) => {
-      logo.src = logoUrl;
-      logo.alt = `Logo ${orgName}`;
-      return waitForImageLoad(logo);
-    });
-    await Promise.all(loads);
-  } else {
-    logos.forEach((logo) => {
-      logo.alt = `Logo ${orgName}`;
-    });
-  }
 
   document.querySelectorAll("[data-brand-org]").forEach((node) => {
     node.textContent = orgName;
@@ -655,7 +687,7 @@ async function applyBrandingContent(settings) {
     node.textContent = appName;
   });
   document.querySelectorAll("[data-rgpd-org-text]").forEach((node) => {
-    node.textContent = `Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.`;
+    node.textContent = `Les donnÃ©es Ã  caractÃ¨re personnel renseignÃ©es dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas Ã©chÃ©ant, des restitutions.`;
   });
   document.querySelectorAll("[data-brand-dpo-email-link]").forEach((node) => {
     node.setAttribute("href", `mailto:${dpoEmail}`);
@@ -669,6 +701,13 @@ async function applyBrandingContent(settings) {
     window.APP_TEXT.app.name = appName;
   }
 
+  logos.forEach((logo) => {
+    logo.alt = `Logo ${orgName}`;
+    if (logoUrl && logo.src !== logoUrl) {
+      logo.src = logoUrl;
+    }
+  });
+
   revealBrandLogos();
 }
 
@@ -678,7 +717,10 @@ async function loadBranding(options = {}) {
     hideBrandLogos();
   }
   try {
-    const response = await fetch("/api/settings/public", { credentials: "same-origin" });
+    const response = await fetch("/api/settings/public", {
+      credentials: "same-origin",
+      cache: "no-store"
+    });
     if (!response.ok) {
       if (!preserveVisible) {
         revealBrandLogos();
@@ -720,4 +762,5 @@ if (document.readyState === "loading") {
 } else {
   void bootBranding();
 }
+
 

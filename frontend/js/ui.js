@@ -41,6 +41,22 @@ function initBackToTop() {
   updateButtonPosition();
 }
 
+function initContextualHelpLinks() {
+  const currentRelativeUrl = `${window.location.pathname.split("/").pop() || "index.html"}${window.location.search || ""}${window.location.hash || ""}`;
+
+  document.querySelectorAll("a[data-help-page]").forEach((link) => {
+    const page = link.dataset.helpPage;
+    if (!page) {
+      return;
+    }
+
+    const targetUrl = new URL(link.getAttribute("href") || "help.html", window.location.href);
+    targetUrl.searchParams.set("page", page);
+    targetUrl.searchParams.set("return", currentRelativeUrl);
+    link.setAttribute("href", `${targetUrl.pathname}${targetUrl.search}`);
+  });
+}
+
 function repairMojibakeText(value) {
   const text = String(value || "");
   if (!/(?:�.|�.|�.|?)/.test(text)) {
@@ -126,5 +142,6 @@ window.repairMojibakeInNode = repairMojibakeInNode;
 
 document.addEventListener("DOMContentLoaded", () => {
   initBackToTop();
+  initContextualHelpLinks();
   initMojibakeRepair();
 });

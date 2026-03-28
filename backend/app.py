@@ -25,14 +25,39 @@ FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
 CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
+APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
 CITY_LOGO_URL = os.environ.get(
     "CITY_LOGO_URL",
     "https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png",
 )
 CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
 
+
+def get_app_secret_key():
+    env_secret = os.environ.get("APP_SECRET_KEY", "").strip()
+    if env_secret:
+        return env_secret
+
+    try:
+        if os.path.exists(APP_SECRET_PATH):
+            with open(APP_SECRET_PATH, "r", encoding="utf-8") as secret_file:
+                stored_secret = secret_file.read().strip()
+                if stored_secret:
+                    return stored_secret
+    except OSError:
+        pass
+
+    generated_secret = secrets.token_hex(32)
+    try:
+        with open(APP_SECRET_PATH, "w", encoding="utf-8") as secret_file:
+            secret_file.write(generated_secret)
+    except OSError:
+        pass
+    return generated_secret
+
+
 app = Flask(__name__, static_folder=None)
-app.secret_key = os.environ.get("APP_SECRET_KEY", "publier-parcours-2026-session-key")
+app.secret_key = get_app_secret_key()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -43,10 +68,14 @@ app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0
 @app.after_request
 def disable_frontend_cache(response):
     content_type = (response.headers.get("Content-Type") or "").lower()
-    if any(token in content_type for token in ("text/html", "application/javascript", "text/css")):
+    if "text/html" in content_type:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    elif any(token in content_type for token in ("application/javascript", "text/css")):
+        response.headers["Cache-Control"] = "public, no-cache, max-age=0, must-revalidate"
+    elif response.status_code == 200 and request.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=604800, immutable"
     return response
 
 CORE_RESOURCE_CODES = {
@@ -3393,6 +3422,12 @@ def contact_page():
     return send_from_directory(FRONTEND_DIR, "contact.html")
 
 
+@app.route("/help.html")
+@login_required
+def help_page():
+    return send_from_directory(FRONTEND_DIR, "help.html")
+
+
 @app.route("/signature/<token>")
 def signature_page(token):
     response = make_response(send_from_directory(FRONTEND_DIR, "signature.html"))
@@ -3480,7 +3515,6 @@ def send_assets(path):
 def public_logo_route():
     settings = get_app_settings()
     logo_mode = settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"]
-    load_brand_logo_image()
 
     if logo_mode == "file":
         relative_path = (settings.get("brand_logo_file") or "").replace("\\", "/").lstrip("/")
@@ -4357,7 +4391,11 @@ def session_route():
 
 @app.route("/api/settings/public", methods=["GET"])
 def public_settings_route():
-    return jsonify(build_public_settings_payload())
+    response = jsonify(build_public_settings_payload())
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/api/admin/settings", methods=["GET"])

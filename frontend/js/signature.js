@@ -141,18 +141,42 @@ function renderResourceList(targetId, items = []) {
   if (!target) {
     return;
   }
+  target.replaceChildren();
   if (!items.length) {
-    target.innerHTML = "<p class=\"panel-text mb-0\">Aucune ressource renseignée.</p>";
+    const emptyText = document.createElement("p");
+    emptyText.className = "panel-text mb-0";
+    emptyText.textContent = "Aucune ressource renseignée.";
+    target.appendChild(emptyText);
     return;
   }
-  target.innerHTML = items.map((item) => `
-    <div class="status-card">
-      <span class="status-card__label">${item.service || "Service"}</span>
-      <strong>${item.label}</strong>
-      <div class="panel-text mb-0">${item.details || "Sans détail complémentaire"}</div>
-      ${item.assignmentSummary ? `<div class="panel-text mb-0 mt-2"><strong>${item.assignmentSummary}</strong></div>` : ""}
-    </div>
-  `).join("");
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "status-card";
+
+    const label = document.createElement("span");
+    label.className = "status-card__label";
+    label.textContent = item.service || "Service";
+
+    const title = document.createElement("strong");
+    title.textContent = item.label || "-";
+
+    const details = document.createElement("div");
+    details.className = "panel-text mb-0";
+    details.textContent = item.details || "Sans détail complémentaire";
+
+    card.append(label, title, details);
+
+    if (item.assignmentSummary) {
+      const summary = document.createElement("div");
+      summary.className = "panel-text mb-0 mt-2";
+      const summaryStrong = document.createElement("strong");
+      summaryStrong.textContent = item.assignmentSummary;
+      summary.appendChild(summaryStrong);
+      card.appendChild(summary);
+    }
+
+    target.appendChild(card);
+  });
 }
 
 function populatePublicForm(payload) {
@@ -166,7 +190,14 @@ function populatePublicForm(payload) {
   document.getElementById("publicMandat").textContent = formData.beneficiaire.mandat || "-";
   renderResourceList("publicMaterialResources", formData.resources.materiel || []);
   renderResourceList("publicImmaterialResources", formData.resources.immateriel || []);
-  document.getElementById("publicRgpdText").innerHTML = (formData.rgpdText || []).map((line) => `<p class="rgpd-text">${line}</p>`).join("");
+  const rgpdTarget = document.getElementById("publicRgpdText");
+  rgpdTarget.replaceChildren();
+  (formData.rgpdText || []).forEach((line) => {
+    const paragraph = document.createElement("p");
+    paragraph.className = "rgpd-text";
+    paragraph.textContent = line;
+    rgpdTarget.appendChild(paragraph);
+  });
 }
 
 async function submitPublicSignature(signaturePad) {
