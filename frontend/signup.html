@@ -17,9 +17,9 @@
       <div class="app-brand app-brand--login">
         <img class="app-logo app-logo--login" data-brand-logo src="/api/settings/logo" alt="Logo collectivité">
         <div>
-          <p class="app-kicker app-kicker--dark" data-brand-org>Collectivite</p>
-          <h1 class="app-title app-title--dark" data-brand-app-name>Parcours agents et elu(e)s</h1>
-          <p class="login-lead">Demandez la creation d'un compte. L'acces restera en attente jusqu'a validation par un administrateur.</p>
+          <p class="app-kicker app-kicker--dark" data-brand-org>Collectivité</p>
+          <h1 class="app-title app-title--dark" data-brand-app-name>Parcours agents et élu(e)s</h1>
+          <p class="login-lead">Demandez la création d'un compte. L'accès restera en attente jusqu'à validation par un administrateur.</p>
         </div>
       </div>
     </div>
@@ -29,7 +29,7 @@
     <div class="login-card">
       <div class="login-card__header">
         <p class="panel-eyebrow">Inscription</p>
-        <h2 class="panel-title">Creer une demande de compte</h2>
+        <h2 class="panel-title">Créer une demande de compte</h2>
       </div>
 
       <div id="signupError" class="alert alert-danger d-none" role="alert"></div>
@@ -43,7 +43,7 @@
           <label class="form-label" for="signup_password">Mot de passe</label>
           <input id="signup_password" class="form-control form-control-lg" type="password" name="password" autocomplete="new-password" placeholder="Mot de passe" required>
           <div class="d-flex flex-wrap gap-2 mt-2">
-            <button class="btn btn-outline-primary btn-sm" id="generateSignupPasswordBtn" type="button">Generer un mot de passe</button>
+            <button class="btn btn-outline-primary btn-sm" id="generateSignupPasswordBtn" type="button">Générer un mot de passe</button>
             <button class="btn btn-outline-secondary btn-sm" id="copySignupPasswordBtn" type="button">Copier le mot de passe</button>
           </div>
         </div>
@@ -52,11 +52,11 @@
           <input id="signup_password_confirm" class="form-control form-control-lg" type="password" name="password_confirm" autocomplete="new-password" placeholder="Confirmation du mot de passe" required>
         </div>
         <div class="login-footnote">
-          <h3 class="login-footnote__title">Regles de mot de passe</h3>
-          <p class="login-footnote__text">12 caracteres minimum, avec au moins une majuscule, une minuscule, un chiffre et un caractere special.</p>
+          <h3 class="login-footnote__title">Règles de mot de passe</h3>
+          <p class="login-footnote__text">12 caractères minimum, avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial.</p>
         </div>
         <button class="btn btn-primary btn-lg w-100" type="submit">Envoyer la demande</button>
-        <a class="btn btn-outline-primary btn-lg w-100" href="/login">Retour a la connexion</a>
+        <a class="btn btn-outline-primary btn-lg w-100" href="/login">Retour à la connexion</a>
       </form>
     </div>
   </section>
@@ -67,37 +67,36 @@
   <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="passwordGeneratorTitle">
     <div class="password-generator-modal__header">
       <div>
-        <p class="panel-eyebrow">Generateur</p>
-        <h2 class="section-title" id="passwordGeneratorTitle">Mot de passe thematique</h2>
+        <p class="panel-eyebrow">Générateur</p>
+        <h2 class="section-title" id="passwordGeneratorTitle">Mot de passe thématique</h2>
       </div>
       <button class="btn btn-outline-secondary btn-sm" type="button" data-password-modal-close="true">Fermer</button>
     </div>
     <div class="password-generator-modal__content">
-      <label class="form-label" for="passwordThemeSelect">Theme</label>
+      <label class="form-label" for="passwordThemeSelect">Thème</label>
       <select class="form-select" id="passwordThemeSelect">
         <option value="licorne">Licorne</option>
         <option value="starwars">StarWars</option>
         <option value="marvel">Marvel</option>
-        <option value="film_francais">Film francais</option>
+        <option value="film_francais">Film français</option>
         <option value="publier">Ville de Publier</option>
       </select>
 
       <div class="password-generator-modal__result">
-        <label class="form-label" for="generatedPasswordValue">Mot de passe genere</label>
+        <label class="form-label" for="generatedPasswordValue">Mot de passe généré</label>
         <input class="form-control form-control-lg" id="generatedPasswordValue" type="text" readonly>
       </div>
 
       <div class="password-generator-modal__actions">
-        <button class="btn btn-outline-primary" id="refreshGeneratedPasswordBtn" type="button">Regenerer</button>
+        <button class="btn btn-outline-primary" id="refreshGeneratedPasswordBtn" type="button">Régénérer</button>
         <button class="btn btn-outline-secondary" id="copyGeneratedPasswordBtn" type="button">Copier</button>
         <button class="btn btn-primary" id="applyGeneratedPasswordBtn" type="button">Utiliser ce mot de passe</button>
       </div>
     </div>
   </div>
 </div>
-<!-- Scripts de branding et d'aide à la création de mot de passe. -->
+
 <script src="js/branding.js"></script>
 <script src="js/signup.js"></script>
 </body>
 </html>
-

@@ -322,6 +322,35 @@ function hasRestitutionData(draft) {
   );
 }
 
+function hasAssignmentSignature(draft) {
+  return Boolean(draft.data?.validation?.signatureDataUrl);
+}
+
+function hasRestitutionSignature(draft) {
+  return Boolean(draft.data?.restitution?.signatureDataUrl);
+}
+
+function canRequestAssignmentSignature(draft, options) {
+  return Boolean(
+    options.canEdit
+    && !hasRestitutionData(draft)
+    && !hasAssignmentSignature(draft)
+    && ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft")
+  );
+}
+
+function canRequestRestitutionSignature(draft, options) {
+  const restitution = draft.data?.restitution || {};
+  const signatureStatus = restitution.signatureStatus || "";
+  return Boolean(
+    options.canRestitution
+    && hasRestitutionData(draft)
+    && !hasRestitutionSignature(draft)
+    && signatureStatus !== "impossible"
+    && ["active", "partial_return", "awaiting_signature"].includes(draft.status || "draft")
+  );
+}
+
 function canOpenRestitution(draft, options) {
   if (!options.canRestitution) {
     return false;
@@ -334,14 +363,15 @@ function canOpenRestitution(draft, options) {
 }
 
 function renderDraftActionMenu(label, tone, actions) {
-  if (!actions.length) {
+  const sections = actions.filter((action) => String(action || "").trim());
+  if (!sections.length) {
     return "";
   }
   return `
     <details class="draft-actions__menu" data-action-menu data-label="${escapeHtml(label)}" data-open-label="${escapeHtml(`${label} - moins d'actions`)}">
       <summary class="btn btn-sm ${tone}"><span data-action-menu-label>${escapeHtml(label)}</span></summary>
       <div class="draft-actions__menu-panel">
-        ${actions.map((action) => `<div class="draft-actions__menu-section">${action}</div>`).join("")}
+        ${sections.map((action) => `<div class="draft-actions__menu-section">${action}</div>`).join("")}
       </div>
     </details>
   `;
@@ -367,16 +397,12 @@ function buildDraftActionButtons(draft, options) {
   }
 
   const signatureActions = [];
-  if (
-    options.canEdit
-    && ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft")
-    && !hasRestitutionData(draft)
-  ) {
+  if (canRequestAssignmentSignature(draft, options)) {
     signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareAssignmentSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
     signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="shareSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
   }
 
-  if (options.canRestitution && hasRestitutionData(draft)) {
+  if (canRequestRestitutionSignature(draft, options)) {
     signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareRestitutionSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
     signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyRestitutionSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
   }
@@ -888,7 +914,7 @@ async function preparePdfEmail(id, kind) {
         "",
         `Vous trouverez en piece jointe le ${documentLabel.toLowerCase()}.`,
         `Dossier : ${title}`,
-        fullName ? `Personne concernee : ${fullName}` : "",
+        fullName ? `Personne concernée : ${fullName}` : "",
         "",
         "Cordialement,"
       ].filter(Boolean),
@@ -977,7 +1003,7 @@ function buildRestitutionEmailContent(draft, absoluteUrl) {
     absoluteUrl,
     "",
     `Dossier : ${title}`,
-    fullName ? `Personne concernee : ${fullName}` : "",
+    fullName ? `Personne concernée : ${fullName}` : "",
     "",
     "Cordialement,"
   ].filter(Boolean);
@@ -1005,7 +1031,7 @@ function buildAssignmentSignatureEmailContent(draft, absoluteUrl) {
     absoluteUrl,
     "",
     `Dossier : ${title}`,
-    fullName ? `Personne concernee : ${fullName}` : "",
+    fullName ? `Personne concernée : ${fullName}` : "",
     "",
     "Cordialement,"
   ].filter(Boolean);

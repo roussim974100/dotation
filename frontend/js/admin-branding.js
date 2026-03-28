@@ -99,7 +99,7 @@ async function saveBrandingSettings() {
       await window.loadBranding();
     }
 
-    showBrandingNotice("Personnalisation enregistree. Retour au portail admin...");
+    showBrandingNotice("Personnalisation enregistrée. Retour au portail admin...");
 
     try {
       sessionStorage.setItem(ADMIN_FLASH_NOTICE_KEY, "Personnalisation enregistree avec succes.");

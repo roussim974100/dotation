@@ -3383,6 +3383,16 @@ def restitution_page():
     return send_from_directory(FRONTEND_DIR, "restitution.html")
 
 
+@app.route("/about.html")
+def about_page():
+    return send_from_directory(FRONTEND_DIR, "about.html")
+
+
+@app.route("/contact.html")
+def contact_page():
+    return send_from_directory(FRONTEND_DIR, "contact.html")
+
+
 @app.route("/signature/<token>")
 def signature_page(token):
     response = make_response(send_from_directory(FRONTEND_DIR, "signature.html"))

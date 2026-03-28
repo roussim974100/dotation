@@ -33,9 +33,9 @@ function applyLoginMessages() {
 
   const errorMessages = {
     invalid: getAppText("login.errorInvalid", "Identifiants invalides."),
-    session: getAppText("login.errorSession", "La session n'a pas pu etre conservee. Verifiez les cookies du navigateur puis reconnectez-vous."),
+    session: getAppText("login.errorSession", "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous."),
     pending: getAppText("login.errorPending", "Votre compte est en attente de validation par un administrateur."),
-    disabled: getAppText("login.errorDisabled", "Votre compte est desactive. Rapprochez-vous d'un administrateur.")
+    disabled: getAppText("login.errorDisabled", "Votre compte est désactivé. Rapprochez-vous d'un administrateur.")
   };
 
   const noticeMessages = {
