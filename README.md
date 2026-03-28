@@ -38,6 +38,378 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - `frontend/` : interface HTML, CSS et JavaScript servie par Flask
 - `backend/` : API Flask, authentification et persistance SQLite
 
+## Prerequis avant lancement
+
+Pour un nouveau deploiement dans une collectivite ou une entreprise, prevoir :
+
+- `Python 3.11` ou plus recent
+- `pip`
+- un systeme capable d'executer Flask en service
+- un reverse proxy pour la production
+  - par exemple `nginx` + `gunicorn`
+- un stockage local rapide pour la base SQLite
+  - eviter de placer la base sur un partage reseau SMB
+- un certificat TLS si l'application est exposee en HTTPS
+
+Dependances Python du projet :
+
+- `flask`
+- `bcrypt`
+
+Installation recommandee sous Windows :
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+```
+
+Installation recommandee sous Linux `VM` ou `LXC` :
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+```
+
+## Premier deploiement
+
+### 1. Copier le projet
+
+Placer le projet dans un dossier applicatif, par exemple :
+
+Sous Windows :
+
+```text
+C:\www\dotation
+```
+
+Sous Linux :
+
+```text
+/opt/dotation
+```
+
+### 2. Preparer les variables d'environnement
+
+Variables recommandees avant le lancement :
+
+- `APP_SECRET_KEY`
+- `SESSION_COOKIE_SECURE=1` en production HTTPS
+
+Exemple Windows PowerShell :
+
+```powershell
+$env:APP_SECRET_KEY="une-cle-longue-et-aleatoire"
+$env:SESSION_COOKIE_SECURE="1"
+python backend\app.py
+```
+
+Exemple Linux bash :
+
+```bash
+export APP_SECRET_KEY="une-cle-longue-et-aleatoire"
+export SESSION_COOKIE_SECURE="1"
+python3 backend/app.py
+```
+
+### 3. Creer le fichier des utilisateurs
+
+L'authentification repose sur :
+
+- `backend/users.json`
+
+Ce fichier contient :
+
+- les groupes
+- les permissions
+- les comptes applicatifs
+- les mots de passe sous forme de hash `bcrypt`
+
+Le projet charge ce fichier via `backend/app.py` avec :
+
+- `USERS_FILE = os.path.join(BASE_DIR, "users.json")`
+
+### 4. Generer un hash bcrypt pour le premier administrateur
+
+Avant de creer le fichier, generer un hash pour le mot de passe admin :
+
+Sous Windows :
+
+```powershell
+python -c "import bcrypt; print(bcrypt.hashpw('ChangezMoi123!'.encode(), bcrypt.gensalt()).decode())"
+```
+
+Sous Linux :
+
+```bash
+python3 -c "import bcrypt; print(bcrypt.hashpw('ChangezMoi123!'.encode(), bcrypt.gensalt()).decode())"
+```
+
+Remplacer ensuite `ChangezMoi123!` par un mot de passe fort propre au client.
+
+### 5. Exemple minimal de `backend/users.json`
+
+Pour un nouveau deploiement, vous pouvez partir de ce modele minimal :
+
+```json
+{
+  "_comment": "Configuration locale des groupes et comptes applicatifs. Les mots de passe sont stockes haches avec bcrypt.",
+  "groups": {
+    "lecture": {
+      "label": "Lecture",
+      "description": "Consultation seule, sans possibilite de saisie.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "redaction": {
+      "label": "Redaction",
+      "description": "Creation et modification des fiches en cours.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "gestion": {
+      "label": "Gestion",
+      "description": "Gestion avancee avec restitution et export.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "admin": {
+      "label": "Administration",
+      "description": "Controle total et gestion des utilisateurs.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete",
+        "users.manage",
+        "*"
+      ],
+      "data_scope": "full"
+    }
+  },
+  "users": [
+    {
+      "username": "admin",
+      "password_hash": "COLLER_ICI_LE_HASH_BCRYPT",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    }
+  ]
+}
+```
+
+### 6. Premier lancement
+
+Depuis la racine du projet :
+
+Sous Windows :
+
+```powershell
+python backend\app.py
+```
+
+Sous Linux :
+
+```bash
+python3 backend/app.py
+```
+
+Puis ouvrir :
+
+```text
+http://127.0.0.1:5000/
+```
+
+Au premier lancement, l'application initialise automatiquement la base SQLite et les tables necessaires.
+
+### 7. Verification minimale avant mise en service
+
+- connexion avec le compte `admin`
+- acces au tableau de bord
+- acces au menu `Administration`
+- creation d'un dossier test
+- export PDF test
+- verification de l'ecriture dans la base SQLite
+- verification des droits sur `backend/users.json`
+
+## Deploiement Linux VM ou LXC
+
+Pour une `VM Linux` ou un conteneur `LXC`, la base recommandee est :
+
+- `Debian 12` ou `Ubuntu 22.04/24.04`
+- un utilisateur applicatif dedie
+- `nginx` en frontal
+- `gunicorn` pour servir Flask
+- un repertoire applicatif local
+  - par exemple `/opt/dotation`
+
+### Paquets systeme recommandes
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip nginx
+```
+
+### Preparation du projet
+
+```bash
+sudo mkdir -p /opt/dotation
+sudo chown -R $USER:$USER /opt/dotation
+cd /opt/dotation
+```
+
+Puis copier les fichiers du projet dans ce repertoire, creer le venv et installer les dependances :
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+```
+
+### Lancement de verification
+
+```bash
+source /opt/dotation/.venv/bin/activate
+export APP_SECRET_KEY="une-cle-longue-et-aleatoire"
+python3 /opt/dotation/backend/app.py
+```
+
+### Service `gunicorn` conseille
+
+Exemple de service systemd :
+
+```ini
+[Unit]
+Description=Dotation Flask via Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/dotation
+Environment="APP_SECRET_KEY=une-cle-longue-et-aleatoire"
+Environment="SESSION_COOKIE_SECURE=1"
+ExecStart=/opt/dotation/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 backend.app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Exemple de fichier :
+
+```text
+/etc/systemd/system/dotation.service
+```
+
+Activation :
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now dotation
+sudo systemctl status dotation
+```
+
+### Proxy `nginx` conseille
+
+Exemple de virtual host :
+
+```nginx
+server {
+    listen 80;
+    server_name dotation.exemple.local;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name dotation.exemple.local;
+
+    ssl_certificate /etc/ssl/certs/dotation.crt;
+    ssl_certificate_key /etc/ssl/private/dotation.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+}
+```
+
+Puis :
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Points d'attention LXC
+
+Dans un conteneur `LXC` :
+
+- conserver la base SQLite sur le disque local du conteneur
+- eviter les montages reseau pour la base
+- verifier les droits d'ecriture sur :
+  - `backend/users.json`
+  - le fichier SQLite cree par l'application
+  - les assets de branding personnalises si le televersement de logo est utilise
+- si un reverse proxy externe termine deja le HTTPS, conserver tout de meme les bons headers `X-Forwarded-*`
+
+## Capacite SQLite
+
+L'application utilise `SQLite`, ce qui convient bien a un usage interne modere.
+
+En pratique :
+
+- quelques dizaines d'utilisateurs sont generalement supportes sans difficulte
+- autour de `10 a 30 utilisateurs simultanes`, le fonctionnement reste en general confortable
+- entre `30 et 80 utilisateurs simultanes`, cela peut encore tenir selon le serveur et le volume d'ecritures
+- au-dela, le point de vigilance principal devient la concurrence en ecriture
+
+Important :
+
+- `SQLite` gere bien les lectures concurrentes
+- `SQLite` serialise les ecritures
+- si beaucoup d'utilisateurs enregistrent en meme temps, des attentes ou verrous peuvent apparaitre
+
+Pour une petite ou moyenne collectivite, cette architecture peut suffire.
+
+Si l'application doit supporter :
+
+- beaucoup d'utilisateurs simultanes
+- de fortes ecritures concurrentes
+- plusieurs services actifs en permanence
+- une volumetrie croissante sur plusieurs annees
+
+alors il faut envisager a terme une migration vers `PostgreSQL`.
+
 ## Fichiers principaux
 
 - `frontend/index.html` : tableau de bord des dossiers
@@ -76,6 +448,13 @@ En environnement proxy `nginx + gunicorn`, il est recommande de definir :
 
 - `APP_SECRET_KEY`
 - `SESSION_COOKIE_SECURE=1` si le contexte HTTPS est stabilise
+
+Et de transmettre correctement au backend :
+
+- `X-Forwarded-For`
+- `X-Real-IP`
+- `X-Forwarded-Proto`
+- `Host`
 
 ## Tableau de bord
 

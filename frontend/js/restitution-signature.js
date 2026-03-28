@@ -1,4 +1,4 @@
-const publicRestitutionSignatureForm = document.getElementById("publicRestitutionSignatureForm");
+﻿const publicRestitutionSignatureForm = document.getElementById("publicRestitutionSignatureForm");
 const restitutionSignatureLoader = document.getElementById("restitutionSignatureLoader");
 const restitutionSignatureErrorCard = document.getElementById("restitutionSignatureErrorCard");
 const restitutionSignatureSuccessCard = document.getElementById("restitutionSignatureSuccessCard");
@@ -155,19 +155,51 @@ function renderPublicRestitutionItems(items = []) {
   if (!target) {
     return;
   }
+  target.replaceChildren();
   if (!items.length) {
-    target.innerHTML = '<p class="panel-text mb-0">Aucun matériel n\'a été renseigné pour cette restitution.</p>';
+    const emptyText = document.createElement("p");
+    emptyText.className = "panel-text mb-0";
+    emptyText.textContent = "Aucun materiel n'a ete renseigne pour cette restitution.";
+    target.appendChild(emptyText);
     return;
   }
-  target.innerHTML = items.map((item) => `
-    <div class="status-card">
-      <span class="status-card__label">${item.label}</span>
-      <strong>${item.stateLabel}</strong>
-      <div class="panel-text mb-0">${item.details || "Sans détail complémentaire"}</div>
-      ${item.assignmentSummary ? `<div class="panel-text mb-0 mt-2"><strong>${item.assignmentSummary}</strong></div>` : ""}
-      ${item.notes ? `<div class="panel-text mb-0 mt-2"><strong>Commentaire :</strong> ${item.notes}</div>` : ""}
-    </div>
-  `).join("");
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "status-card";
+
+    const label = document.createElement("span");
+    label.className = "status-card__label";
+    label.textContent = item.label || "-";
+
+    const stateLabel = document.createElement("strong");
+    stateLabel.textContent = item.stateLabel || "-";
+
+    const details = document.createElement("div");
+    details.className = "panel-text mb-0";
+    details.textContent = item.details || "Sans detail complementaire";
+
+    card.append(label, stateLabel, details);
+
+    if (item.assignmentSummary) {
+      const summary = document.createElement("div");
+      summary.className = "panel-text mb-0 mt-2";
+      const summaryStrong = document.createElement("strong");
+      summaryStrong.textContent = item.assignmentSummary;
+      summary.appendChild(summaryStrong);
+      card.appendChild(summary);
+    }
+
+    if (item.notes) {
+      const notes = document.createElement("div");
+      notes.className = "panel-text mb-0 mt-2";
+      const prefix = document.createElement("strong");
+      prefix.textContent = "Commentaire : ";
+      notes.append(prefix, document.createTextNode(item.notes));
+      card.appendChild(notes);
+    }
+
+    target.appendChild(card);
+  });
 }
 
 function populatePublicRestitutionForm(payload) {
@@ -178,7 +210,7 @@ function populatePublicRestitutionForm(payload) {
   document.getElementById("publicRestitutionExpiresAt").textContent = formatPublicRestitutionDateTime(payload?.link?.expiresAt);
   document.getElementById("publicRestitutionNom").textContent = beneficiaire.nom || "-";
   document.getElementById("publicRestitutionPrenom").textContent = beneficiaire.prenom || "-";
-  document.getElementById("publicRestitutionQualite").textContent = beneficiaire.qualite === "elu" ? "Élu(e)" : "Agent";
+  document.getElementById("publicRestitutionQualite").textContent = beneficiaire.qualite === "elu" ? "Elu(e)" : "Agent";
   document.getElementById("publicRestitutionService").textContent = beneficiaire.service || beneficiaire.fonction || "-";
   document.getElementById("publicRestitutionMandat").textContent = beneficiaire.mandat || "-";
   document.getElementById("publicRestitutionReturnedAt").textContent = formatPublicRestitutionDateTime(restitution.returnedAt);
@@ -207,7 +239,7 @@ async function submitPublicRestitutionSignature(signaturePad) {
     return;
   }
   if (signataireDecision === "with_reservation" && !signataireComment) {
-    window.alert("Merci de préciser votre réserve ou votre réclamation avant validation.");
+    window.alert("Merci de preciser votre reserve ou votre reclamation avant validation.");
     return;
   }
 
@@ -221,10 +253,10 @@ async function submitPublicRestitutionSignature(signaturePad) {
   } catch (error) {
     const messages = {
       invalid_link: "Ce lien de signature n'est plus valide.",
-      expired: "Ce lien de signature a expiré.",
-      used: "Cette restitution a déjà été signée.",
-      revoked: "Ce lien de signature a été révoqué.",
-      reservation_comment_required: "Merci de renseigner votre réclamation avant validation."
+      expired: "Ce lien de signature a expire.",
+      used: "Cette restitution a deja ete signee.",
+      revoked: "Ce lien de signature a ete revoque.",
+      reservation_comment_required: "Merci de renseigner votre reclamation avant validation."
     };
     showRestitutionSignatureError(messages[error.message] || "Impossible de valider la signature de restitution.");
   }
@@ -239,7 +271,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.setTimeout(() => {
     if (!restitutionSignatureBooted) {
-      showRestitutionSignatureError("Le chargement de la page de signature de restitution a échoué. Rechargez la page si le problème persiste.");
+      showRestitutionSignatureError("Le chargement de la page de signature de restitution a Ã©chouÃ©. Rechargez la page si le problÃ¨me persiste.");
     }
   }, 8000);
 
@@ -261,9 +293,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     const messages = {
       invalid_link: "Ce lien de signature de restitution n'est pas reconnu.",
-      expired: "Ce lien de signature de restitution a expiré.",
-      used: "Cette restitution a déjà été signée.",
-      revoked: "Ce lien de signature de restitution a été révoqué."
+      expired: "Ce lien de signature de restitution a expire.",
+      used: "Cette restitution a deja ete signee.",
+      revoked: "Ce lien de signature de restitution a ete revoque."
     };
     showRestitutionSignatureError(messages[error.message] || "Impossible de charger ce lien de signature de restitution.");
   }
@@ -278,10 +310,11 @@ window.addEventListener("error", (event) => {
 window.addEventListener("unhandledrejection", (event) => {
   if (!restitutionSignatureBooted) {
     failRestitutionSignatureBoot(
-      event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Promesse rejetée"))
+      event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Promesse rejetee"))
     );
   }
 });
 
 // Page publique de signature de restitution :
-// consultation, réserve éventuelle et validation finale.
+// consultation, reserve eventuelle et validation finale.
+
