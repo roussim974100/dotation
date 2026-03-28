@@ -18,6 +18,7 @@ let exportProgressValue = 0;
 const dashboardFilters = {
   search: "",
   status: "",
+  timing: "",
   qualite: "",
   service: ""
 };
@@ -491,9 +492,10 @@ function applyDashboardFilters(drafts) {
     const matchesSearch = !dashboardFilters.search
       || normalizeText(getDraftSearchText(draft)).includes(normalizeText(dashboardFilters.search));
     const matchesStatus = !dashboardFilters.status || (draft.status || "draft") === dashboardFilters.status;
+    const matchesTiming = !dashboardFilters.timing || (draft.timingStatus || "") === dashboardFilters.timing;
     const matchesQualite = !dashboardFilters.qualite || getDraftQualiteValue(draft) === dashboardFilters.qualite;
     const matchesService = !dashboardFilters.service || getDraftServiceValue(draft) === dashboardFilters.service;
-    return matchesSearch && matchesStatus && matchesQualite && matchesService;
+    return matchesSearch && matchesStatus && matchesTiming && matchesQualite && matchesService;
   });
 }
 
@@ -1634,11 +1636,12 @@ function bindStatusPreviews() {
 function bindDashboardFilters() {
   const searchInput = document.getElementById("searchInput");
   const statusFilter = document.getElementById("statusFilter");
+  const timingFilter = document.getElementById("timingFilter");
   const qualiteFilter = document.getElementById("qualiteFilter");
   const serviceFilter = document.getElementById("serviceFilter");
   const resetButton = document.getElementById("resetFiltersBtn");
 
-  if (!searchInput || !statusFilter || !qualiteFilter || !serviceFilter || !resetButton) {
+  if (!searchInput || !statusFilter || !timingFilter || !qualiteFilter || !serviceFilter || !resetButton) {
     return;
   }
 
@@ -1649,6 +1652,11 @@ function bindDashboardFilters() {
 
   statusFilter.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
+    void renderDraftList();
+  });
+
+  timingFilter.addEventListener("change", (event) => {
+    dashboardFilters.timing = event.target.value;
     void renderDraftList();
   });
 
@@ -1665,6 +1673,7 @@ function bindDashboardFilters() {
   resetButton.addEventListener("click", () => {
     dashboardFilters.search = "";
     dashboardFilters.status = "";
+    dashboardFilters.timing = "";
     dashboardFilters.qualite = "";
     dashboardFilters.service = "";
     if (searchInput) {
@@ -1672,6 +1681,9 @@ function bindDashboardFilters() {
     }
     if (statusFilter) {
       statusFilter.value = "";
+    }
+    if (timingFilter) {
+      timingFilter.value = "";
     }
     if (qualiteFilter) {
       qualiteFilter.value = "";

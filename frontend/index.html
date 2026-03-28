@@ -54,41 +54,55 @@
     <div id="dashboardUpdateNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
 
     <div class="filter-toolbar">
-      <div class="filter-toolbar__grid">
+      <div class="filter-toolbar__search">
         <div>
           <label class="form-label" for="searchInput">Recherche</label>
           <input id="searchInput" class="form-control" type="search" placeholder="Nom, prénom, service, titre...">
         </div>
-        <div>
-          <label class="form-label" for="statusFilter">État</label>
-          <select id="statusFilter" class="form-select">
-            <option value="">Tous les états</option>
-            <option value="draft">À compléter</option>
-            <option value="partial_assignment">Attribution partielle</option>
-            <option value="awaiting_signature">En attente de signature</option>
-            <option value="active">Attribution active</option>
-            <option value="returned">Restitution terminée</option>
-            <option value="partial_return">Restitution partielle</option>
-            <option value="cancelled">Dossier annulé</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label" for="qualiteFilter">Qualité</label>
-          <select id="qualiteFilter" class="form-select">
-            <option value="">Toutes</option>
-            <option value="agent">Agent</option>
-            <option value="elu">Élu(e)</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label" for="serviceFilter">Service</label>
-          <select id="serviceFilter" class="form-select">
-            <option value="">Tous les services</option>
-          </select>
-        </div>
       </div>
-      <div class="filter-toolbar__actions">
-        <button id="resetFiltersBtn" class="btn btn-outline-secondary" type="button">Réinitialiser</button>
+      <div class="filter-toolbar__filters">
+        <div class="filter-toolbar__grid">
+          <div>
+            <label class="form-label" for="statusFilter">État</label>
+            <select id="statusFilter" class="form-select">
+              <option value="">Tous les états</option>
+              <option value="draft">À compléter</option>
+              <option value="partial_assignment">Attribution partielle</option>
+              <option value="awaiting_signature">En attente de signature</option>
+              <option value="active">Attribution active</option>
+              <option value="returned">Restitution terminée</option>
+              <option value="partial_return">Restitution partielle</option>
+              <option value="cancelled">Dossier annulé</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="timingFilter">Pilotage</label>
+            <select id="timingFilter" class="form-select">
+              <option value="">Tous les pilotages</option>
+              <option value="ok">Prêt / Dans les temps</option>
+              <option value="warning">En danger</option>
+              <option value="late">En retard</option>
+              <option value="neutral">À planifier</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="qualiteFilter">Qualité</label>
+            <select id="qualiteFilter" class="form-select">
+              <option value="">Toutes</option>
+              <option value="agent">Agent</option>
+              <option value="elu">Élu(e)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="serviceFilter">Service</label>
+            <select id="serviceFilter" class="form-select">
+              <option value="">Tous les services</option>
+            </select>
+          </div>
+        </div>
+        <div class="filter-toolbar__actions">
+          <button id="resetFiltersBtn" class="btn btn-outline-secondary" type="button">Réinitialiser</button>
+        </div>
       </div>
     </div>
 

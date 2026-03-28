@@ -660,10 +660,8 @@ body.login-shell {
 }
 
 .filter-toolbar {
-  display: flex;
+  display: grid;
   gap: 1rem;
-  align-items: end;
-  justify-content: space-between;
   margin-bottom: 1.25rem;
   padding: 1rem;
   border: 1px solid var(--border);
@@ -671,11 +669,22 @@ body.login-shell {
   background: linear-gradient(180deg, #fbfdff, #f4f8fb);
 }
 
+.filter-toolbar__search {
+  display: block;
+}
+
+.filter-toolbar__filters {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  justify-content: space-between;
+}
+
 .filter-toolbar__grid {
   flex: 1;
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
 }
 
 .filter-toolbar__actions {
@@ -1901,6 +1910,10 @@ body.login-shell {
   }
 
   .filter-toolbar {
+    gap: 0.85rem;
+  }
+
+  .filter-toolbar__filters {
     flex-direction: column;
     align-items: stretch;
   }
