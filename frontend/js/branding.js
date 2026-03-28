@@ -212,7 +212,7 @@ function ensureAppFooter() {
   identityWrap.append(appName, version);
   const identityText = document.createElement("p");
   identityText.className = "app-footer__text";
-  identityText.textContent = "Application metier dediee au suivi des attributions de ressources et des restitutions au sein de la commune.";
+  identityText.textContent = "Application métier dédiée au suivi des attributions de ressources et des restitutions au sein de la commune.";
   identityColumn.append(identityWrap, identityText);
 
   const navigationColumn = document.createElement("div");
@@ -225,7 +225,7 @@ function ensureAppFooter() {
   navigation.setAttribute("aria-label", "Navigation de pied de page");
   const aboutLink = document.createElement("a");
   aboutLink.href = "/about.html";
-  aboutLink.textContent = "A propos";
+  aboutLink.textContent = "À propos";
   const contactLink = document.createElement("a");
   contactLink.href = "/contact.html";
   contactLink.textContent = "Contact";
@@ -247,7 +247,7 @@ function ensureAppFooter() {
   supportContact.append(supportLabel, supportMail);
   const supportText = document.createElement("p");
   supportText.className = "app-footer__text";
-  supportText.textContent = "Developpement et maintenance assures par Samir Bassim, DSI de la commune de Publier.";
+  supportText.textContent = "Développement et maintenance assurés par Samir Bassim, DSI de la commune de Publier.";
   const supportLogo = document.createElement("img");
   supportLogo.className = "app-footer__org-logo";
   supportLogo.setAttribute("data-brand-org-logo", "");
@@ -268,7 +268,7 @@ function ensureAppFooter() {
   const org = document.createElement("span");
   org.setAttribute("data-brand-org", "");
   org.textContent = APP_FIXED_NAME;
-  copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits reserves."));
+  copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits réservés."));
   const cookiesButton = document.createElement("button");
   cookiesButton.className = "app-footer__cookies";
   cookiesButton.type = "button";
