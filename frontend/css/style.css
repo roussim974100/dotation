@@ -471,7 +471,20 @@ body.login-shell {
 .hero-panel__meta {
   display: flex;
   gap: 1rem;
-  align-items: center;
+  align-items: stretch;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.hero-panel__actions {
+  display: flex;
+  align-items: flex-start;
+}
+
+.hero-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(10.5rem, 1fr));
+  gap: 0.85rem;
 }
 
 .panel-eyebrow {
@@ -518,7 +531,7 @@ body.login-shell {
 }
 
 .stat-card {
-  min-width: 8rem;
+  min-width: 0;
   padding: 0.85rem 1rem;
 }
 
@@ -1502,6 +1515,44 @@ body.login-shell {
   width: 100%;
 }
 
+.dashboard-groups {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.dashboard-group {
+  padding: 1rem;
+  border: 1px solid rgba(212, 221, 230, 0.88);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(245, 248, 251, 0.92));
+}
+
+.dashboard-group__header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.dashboard-group__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 91, 141, 0.14);
+  background: rgba(219, 234, 243, 0.72);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.dashboard-group__empty {
+  padding: 1rem 0.25rem 0.1rem;
+  color: var(--muted);
+}
+
 .dashboard-toolbar {
   display: flex;
   gap: 1rem;
@@ -1949,6 +2000,20 @@ body.login-shell {
 
   .hero-panel__meta {
     justify-content: flex-start;
+    flex-direction: column;
+  }
+
+  .hero-panel__stats {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-panel__actions {
+    width: 100%;
+  }
+
+  .hero-panel__actions .btn {
+    width: 100%;
   }
 
   .subgrid {
@@ -2002,6 +2067,10 @@ body.login-shell {
   .content-card,
   .hero-panel {
     padding: 1.15rem;
+  }
+
+  .hero-panel__stats {
+    grid-template-columns: 1fr;
   }
 
   .product-hero-card--about {
@@ -2137,6 +2206,10 @@ body.login-shell {
   .draft-table tbody {
     display: grid;
     gap: 0.9rem;
+  }
+
+  .dashboard-group {
+    padding: 0.9rem;
   }
 
   .draft-row {

@@ -363,6 +363,11 @@ function canOpenRestitution(draft, options) {
   return status === "awaiting_signature" && hasRestitutionData(draft);
 }
 
+function isRestitutionDashboardDraft(draft) {
+  const status = draft.status || "draft";
+  return hasRestitutionData(draft) || ["partial_return", "returned"].includes(status);
+}
+
 function renderDraftActionMenu(label, tone, actions) {
   const sections = actions.filter((action) => String(action || "").trim());
   if (!sections.length) {
@@ -730,13 +735,20 @@ async function renderDraftList() {
   dashboardRefreshInFlight = true;
   // Écran principal :
   // - liste toutes les fiches
-  // - calcule le compteur des fiches encore modifiables
+  // - sépare les attributions et les restitutions
+  // - calcule le compteur des fiches encore à compléter
   // - affiche les actions selon les droits de l'utilisateur
   const draftList = document.getElementById("draftList");
-  const draftCount = document.getElementById("draftCount");
+  const restitutionList = document.getElementById("restitutionList");
+  const assignmentDraftCount = document.getElementById("assignmentDraftCount");
+  const restitutionDraftCount = document.getElementById("restitutionDraftCount");
   const emptyState = document.getElementById("emptyState");
+  const assignmentEmptyState = document.getElementById("assignmentEmptyState");
+  const restitutionEmptyState = document.getElementById("restitutionEmptyState");
+  const assignmentCountBadge = document.getElementById("assignmentCountBadge");
+  const restitutionCountBadge = document.getElementById("restitutionCountBadge");
 
-  if (!draftList) {
+  if (!draftList || !restitutionList) {
     dashboardRefreshInFlight = false;
     return;
   }
@@ -760,16 +772,31 @@ async function renderDraftList() {
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
     const filteredDrafts = applyDashboardFilters(sortedDrafts);
-    const editableDrafts = filteredDrafts.filter((draft) => ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft"));
+    const assignmentDrafts = filteredDrafts.filter((draft) => !isRestitutionDashboardDraft(draft));
+    const restitutionDrafts = filteredDrafts.filter((draft) => isRestitutionDashboardDraft(draft));
+    const completableAssignmentDrafts = assignmentDrafts.filter((draft) => ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft"));
+    const completableRestitutionDrafts = restitutionDrafts.filter((draft) => ["partial_return", "awaiting_signature"].includes(draft.status || "draft"));
 
-    if (draftCount) {
-      draftCount.textContent = editableDrafts.length.toString();
+    if (assignmentDraftCount) {
+      assignmentDraftCount.textContent = completableAssignmentDrafts.length.toString();
+    }
+    if (restitutionDraftCount) {
+      restitutionDraftCount.textContent = completableRestitutionDrafts.length.toString();
+    }
+    if (assignmentCountBadge) {
+      assignmentCountBadge.textContent = assignmentDrafts.length.toString();
+    }
+    if (restitutionCountBadge) {
+      restitutionCountBadge.textContent = restitutionDrafts.length.toString();
     }
 
     if (filteredDrafts.length === 0) {
       draftList.innerHTML = "";
+      restitutionList.innerHTML = "";
       dashboardSelectedIds = new Set();
       emptyState.classList.remove("d-none");
+      assignmentEmptyState?.classList.add("d-none");
+      restitutionEmptyState?.classList.add("d-none");
       updateDashboardRefreshInfo();
       setDashboardUpdateNotice();
       updateExportSelectedState();
@@ -782,9 +809,14 @@ async function renderDraftList() {
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
-    draftList.innerHTML = filteredDrafts
+    draftList.innerHTML = assignmentDrafts
       .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
       .join("");
+    restitutionList.innerHTML = restitutionDrafts
+      .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+      .join("");
+    assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
+    restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
 
     dashboardLastUpdatedAt = new Date().toISOString();
     updateDashboardRefreshInfo();

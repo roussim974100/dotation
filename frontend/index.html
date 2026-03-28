@@ -36,13 +36,21 @@
         <h2 class="panel-title">Dossiers d'attribution</h2>
         <span id="dashboardPendingBadge" class="dashboard-pending-badge d-none" aria-live="polite"></span>
       </div>
-      <p class="panel-text">Retrouvez un dossier, reprenez les parcours encore modifiables, exportez les bons utiles et supprimez une saisie inutile.</p>
+      <p class="panel-text">Retrouvez vos dossiers à compléter, distinguez les attributions des restitutions et accédez rapidement aux actions utiles.</p>
     </div>
     <div class="hero-panel__meta">
-      <button id="newFormBtn" class="btn btn-primary btn-lg d-none" type="button" onclick="newForm()">Nouveau dossier</button>
-      <div class="stat-card">
-        <span class="stat-card__label">Dossiers modifiables</span>
-        <strong class="stat-card__value" id="draftCount">0</strong>
+      <div class="hero-panel__actions">
+        <button id="newFormBtn" class="btn btn-primary btn-lg d-none" type="button" onclick="newForm()">Nouveau dossier</button>
+      </div>
+      <div class="hero-panel__stats">
+        <div class="stat-card">
+          <span class="stat-card__label">Dossiers à compléter</span>
+          <strong class="stat-card__value" id="assignmentDraftCount">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__label">Restitutions à compléter</span>
+          <strong class="stat-card__value" id="restitutionDraftCount">0</strong>
+        </div>
       </div>
     </div>
   </section>
@@ -119,28 +127,72 @@
       </div>
     </div>
 
-    <div class="table-responsive">
-      <table class="table align-middle draft-table">
-        <thead>
-          <tr>
-            <th class="draft-check-col">
-              <input id="selectAllDrafts" class="form-check-input" type="checkbox" aria-label="Tout sélectionner">
-            </th>
-            <th>Dossier</th>
-            <th>Qualité</th>
-            <th>État</th>
-            <th>Pilotage</th>
-            <th>Progression</th>
-            <th>Dernière modification</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="draftList"></tbody>
-      </table>
+    <div class="dashboard-groups">
+      <section class="dashboard-group">
+        <div class="dashboard-group__header">
+          <div>
+            <p class="panel-eyebrow">Attributions</p>
+            <h3 class="section-title">Dossiers en cours</h3>
+          </div>
+          <span id="assignmentCountBadge" class="dashboard-group__badge">0</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle draft-table">
+            <thead>
+              <tr>
+                <th class="draft-check-col">
+                  <input id="selectAllDrafts" class="form-check-input" type="checkbox" aria-label="Tout sélectionner">
+                </th>
+                <th>Dossier</th>
+                <th>Qualité</th>
+                <th>État</th>
+                <th>Pilotage</th>
+                <th>Progression</th>
+                <th>Dernière modification</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="draftList"></tbody>
+          </table>
+        </div>
+        <div id="assignmentEmptyState" class="dashboard-group__empty d-none">
+          <p class="mb-0">Aucun dossier d'attribution ne correspond aux filtres actuels.</p>
+        </div>
+      </section>
+
+      <section class="dashboard-group">
+        <div class="dashboard-group__header">
+          <div>
+            <p class="panel-eyebrow">Restitutions</p>
+            <h3 class="section-title">Dossiers avec restitution</h3>
+          </div>
+          <span id="restitutionCountBadge" class="dashboard-group__badge">0</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle draft-table">
+            <thead>
+              <tr>
+                <th class="draft-check-col"></th>
+                <th>Dossier</th>
+                <th>Qualité</th>
+                <th>État</th>
+                <th>Pilotage</th>
+                <th>Progression</th>
+                <th>Dernière modification</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="restitutionList"></tbody>
+          </table>
+        </div>
+        <div id="restitutionEmptyState" class="dashboard-group__empty d-none">
+          <p class="mb-0">Aucun dossier en restitution ne correspond aux filtres actuels.</p>
+        </div>
+      </section>
     </div>
 
     <div id="emptyState" class="empty-state d-none">
-      <h3>Aucun dossier modifiable pour le moment</h3>
+      <h3>Aucun dossier pour le moment</h3>
       <p>Vous pouvez commencer un nouveau dossier d'attribution puis l'enregistrer pour le reprendre plus tard s'il reste à compléter ou en attribution partielle.</p>
       <button id="emptyStateNewFormBtn" class="btn btn-outline-primary d-none" type="button" onclick="newForm()">Créer un dossier</button>
     </div>
@@ -168,5 +220,3 @@
 <script src="js/storage.js"></script>
 </body>
 </html>
-
-
