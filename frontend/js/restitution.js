@@ -460,6 +460,27 @@ async function initRestitutionPage() {
       return response;
     }
 
+    function createRestitutionWorkflowSteps(labels, activeIndex = 0) {
+      return labels.map((label, index) => ({
+        label,
+        status: index < activeIndex ? "done" : index === activeIndex ? "active" : "pending"
+      }));
+    }
+
+    async function showRestitutionInfoDialog(title, text, items = []) {
+      const steps = items.length
+        ? items.map((label) => ({ label, status: "error" }))
+        : [{ label: text, status: "error" }];
+      await window.askWorkflowDialog({
+        title,
+        text,
+        steps,
+        hideSpinner: true,
+        showConfirm: true,
+        confirmLabel: "OK"
+      });
+    }
+
     async function shareRestitutionSignatureLink() {
       try {
         await saveRestitution(buildRestitutionPayload(true));
@@ -479,24 +500,87 @@ async function initRestitutionPage() {
           title: `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`.trim(),
           url: absoluteUrl
         }));
+        await window.playCompletionCelebration("boat");
+        await window.askWorkflowDialog({
+          title: "Lien de signature prêt",
+          text: "La restitution est enregistrée et le lien de signature à distance est prêt depuis le tableau de bord.",
+          steps: [
+            { label: "Restitution enregistrée", status: "done" },
+            { label: "Lien de signature préparé", status: "done" }
+          ],
+          hideSpinner: true,
+          showConfirm: true,
+          confirmLabel: "OK"
+        });
         window.location.href = "index.html";
       } catch (error) {
-        window.alert(error.message || "Impossible de générer le lien de signature de restitution.");
+        window.closeWorkflowDialog();
+        await showRestitutionInfoDialog(
+          "Erreur de restitution",
+          error.message || "Impossible de générer le lien de signature de restitution."
+        );
       }
     }
 
     document.getElementById("saveRestitutionBtn")?.addEventListener("click", async () => {
+      const workflowLabels = [
+        "Préparation des éléments de restitution",
+        "Vérification des états et de la signature",
+        "Enregistrement de la restitution",
+        "Finalisation du retour au tableau de bord"
+      ];
       try {
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "La restitution est en cours de préparation.",
+          steps: createRestitutionWorkflowSteps(workflowLabels, 0)
+        });
+
         const selectedSignatureMode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "La cohérence des états et du mode de signature est en cours de vérification.",
+          steps: createRestitutionWorkflowSteps(workflowLabels, 1)
+        });
         if (selectedSignatureMode === "deferred") {
+          window.showWorkflowDialog({
+            title: "Enregistrement de la restitution",
+            text: "La restitution est enregistrée et le lien de signature va être préparé.",
+            steps: createRestitutionWorkflowSteps(workflowLabels, 2)
+          });
           await shareRestitutionSignatureLink();
           return;
         }
-        await saveRestitution(buildRestitutionPayload(false));
-        alert("Restitution enregistree.");
+
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "Les informations sont en cours d'enregistrement.",
+          steps: createRestitutionWorkflowSteps(workflowLabels, 2)
+        });
+        const response = await saveRestitution(buildRestitutionPayload(false));
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
+          steps: workflowLabels.map((label) => ({ label, status: "done" }))
+        });
+        if (["returned", "awaiting_signature"].includes(response?.summary?.status || "")) {
+          await window.playCompletionCelebration("boat");
+        }
+        await window.askWorkflowDialog({
+          title: "Restitution enregistrée",
+          text: "La restitution est maintenant à jour.",
+          steps: workflowLabels.map((label) => ({ label, status: "done" })),
+          hideSpinner: true,
+          showConfirm: true,
+          confirmLabel: "OK"
+        });
         window.location.href = "index.html";
       } catch (error) {
-        alert(error.message || "Impossible d'enregistrer la restitution.");
+        window.closeWorkflowDialog();
+        await showRestitutionInfoDialog(
+          "Erreur de restitution",
+          error.message || "Impossible d'enregistrer la restitution."
+        );
       }
     });
 

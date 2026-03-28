@@ -1135,11 +1135,6 @@ function validateFixedResourceSelection() {
         issues.push(`${rule.label} manquant`);
         return;
       }
-      if (value && !matchesPattern(value, rule.pattern)) {
-        const message = rule.hint ? `${rule.label} invalide (${rule.hint}).` : `${rule.label} invalide.`;
-        setFieldError(field, message);
-        issues.push(`${rule.label} invalide`);
-      }
     });
   });
 
@@ -1967,6 +1962,213 @@ async function saveDraft(signaturePad) {
   } catch (error) {
     console.error("Erreur lors de l'enregistrement du dossier", error);
     alert(
+      error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
+        ? error.message
+        : "Impossible d'enregistrer la fiche."
+    );
+  }
+}
+
+function validateFormData(formData, options = {}) {
+  if (!formData.beneficiaire.nom || !formData.beneficiaire.prenom) {
+    return "Le nom et le prénom sont obligatoires.";
+  }
+
+  if (!formData.beneficiaire.qualite) {
+    return "Veuillez sélectionner la qualité du bénéficiaire.";
+  }
+
+  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat) {
+    return "Veuillez renseigner le mandat de l'élu.";
+  }
+
+  if (options.requireRgpd && !formData.validation.rgpdAccepted) {
+    return "La validation RGPD est obligatoire avant l'export PDF.";
+  }
+
+  const resourceIssues = collectResourceValidationIssues();
+  formData.meta.resourceValidationErrors = resourceIssues;
+  return null;
+}
+
+function createWorkflowSteps(labels, activeIndex = 0) {
+  return labels.map((label, index) => ({
+    label,
+    status: index < activeIndex ? "done" : index === activeIndex ? "active" : "pending"
+  }));
+}
+
+async function showSaveInfoDialog(title, text, items = []) {
+  const steps = items.length
+    ? items.map((label) => ({ label, status: "error" }))
+    : [{ label: text, status: "error" }];
+  await window.askWorkflowDialog({
+    title,
+    text,
+    steps,
+    hideSpinner: true,
+    showConfirm: true,
+    confirmLabel: "OK"
+  });
+}
+
+async function resolveSaveWorkflow(formData) {
+  const hasSignature = Boolean(formData.validation.signatureDataUrl);
+  const rgpdAccepted = Boolean(formData.validation.rgpdAccepted);
+  const currentStatus = formData.workflow.status;
+  const resourceIssues = formData.meta.resourceValidationErrors || [];
+  const resourceCompletion = summarizeRequestedResourceCompletion(formData);
+
+  if (["returned", "partial_return", "cancelled"].includes(currentStatus)) {
+    return formData;
+  }
+
+  if (!hasSignature || !rgpdAccepted) {
+    formData.workflow.status = "draft";
+    formData.meta.lockedAt = "";
+    return formData;
+  }
+
+  if (resourceIssues.length > 0) {
+    formData.workflow.status = "partial_assignment";
+    formData.meta.lockedAt = "";
+    await showSaveInfoDialog(
+      "Attribution partielle",
+      "Certaines ressources cochées ne sont pas complètement renseignées. Le dossier reste modifiable.",
+      resourceIssues
+    );
+    return formData;
+  }
+
+  if (resourceCompletion.completed < resourceCompletion.total) {
+    formData.workflow.status = "partial_assignment";
+    formData.meta.lockedAt = "";
+    const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : date d'attribution manquante`);
+    await showSaveInfoDialog(
+      "Attribution partielle",
+      `L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuées.`,
+      missingDetails
+    );
+    return formData;
+  }
+
+  if (!hasSignature) {
+    formData.workflow.status = "awaiting_signature";
+    formData.meta.lockedAt = "";
+    await showSaveInfoDialog(
+      "En attente de signature",
+      "Le dossier est complet et n'attend plus que la signature finale."
+    );
+    return formData;
+  }
+
+  const choice = await window.askWorkflowDialog({
+    title: "Finalisation du dossier",
+    text: "Toutes les informations sont présentes. Souhaitez-vous verrouiller ce dossier comme attribution complète ?",
+    steps: [
+      { label: "Bénéficiaire, ressources et validation sont complets", status: "done" },
+      { label: "Choisissez entre finalisation complète ou poursuite en mode partiel", status: "active" }
+    ],
+    hideSpinner: true,
+    showConfirm: true,
+    confirmLabel: "Finaliser le dossier",
+    secondaryLabel: "Laisser partiel"
+  });
+
+  if (choice === "confirm") {
+    formData.workflow.status = "active";
+    formData.meta.lockedAt = formData.meta.lockedAt || new Date().toISOString();
+    return formData;
+  }
+
+  formData.workflow.status = "partial_assignment";
+  formData.meta.lockedAt = "";
+  return formData;
+}
+
+async function saveDraft(signaturePad) {
+  const workflowLabels = [
+    "Préparation des informations du dossier",
+    "Analyse de complétude et du workflow",
+    "Enregistrement sécurisé du dossier",
+    "Finalisation de l'interface"
+  ];
+
+  try {
+    window.showWorkflowDialog({
+      title: "Enregistrement du dossier",
+      text: "Le dossier est en cours de préparation avant sauvegarde.",
+      steps: createWorkflowSteps(workflowLabels, 0)
+    });
+
+    const formData = getFormData(signaturePad);
+    const validationError = validateFormData(formData);
+    if (validationError) {
+      window.closeWorkflowDialog();
+      await showSaveInfoDialog("Enregistrement impossible", validationError);
+      return;
+    }
+
+    window.showWorkflowDialog({
+      title: "Enregistrement du dossier",
+      text: "Le dossier est en cours d'analyse pour déterminer son état métier.",
+      steps: createWorkflowSteps(workflowLabels, 1)
+    });
+    await resolveSaveWorkflow(formData);
+
+    window.showWorkflowDialog({
+      title: "Enregistrement du dossier",
+      text: "Les informations sont en cours d'enregistrement.",
+      steps: createWorkflowSteps(workflowLabels, 2)
+    });
+
+    const result = await saveFormData(formData);
+    form.dataset.draftId = result.summary.id;
+    form.dataset.lockedAt = result.data.meta.lockedAt || formData.meta.lockedAt || "";
+    updateDraftUi(result.summary.updatedAt, false, result.summary.status);
+    await loadSignatureLinkState();
+    if (form.dataset.lockedAt) {
+      applyLockState(true);
+    }
+
+    window.showWorkflowDialog({
+      title: "Enregistrement du dossier",
+      text: "La fiche a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
+      steps: workflowLabels.map((label) => ({ label, status: "done" }))
+    });
+
+    if (["active", "awaiting_signature"].includes(result.summary.status || "")) {
+      await window.playCompletionCelebration("confetti");
+    }
+
+    if (result.offline) {
+      resumeHint.textContent = "Le dossier a été conservé localement et pourra être repris depuis cet appareil.";
+      await window.askWorkflowDialog({
+        title: "Dossier enregistré localement",
+        text: `La fiche « ${result.summary.title} » a été conservée sur cet appareil.`,
+        steps: workflowLabels.map((label) => ({ label, status: "done" })),
+        hideSpinner: true,
+        showConfirm: true,
+        confirmLabel: "OK"
+      });
+      window.location.href = "index.html";
+      return;
+    }
+
+    await window.askWorkflowDialog({
+      title: "Dossier enregistré",
+      text: `La fiche « ${result.summary.title} » est maintenant à jour.`,
+      steps: workflowLabels.map((label) => ({ label, status: "done" })),
+      hideSpinner: true,
+      showConfirm: true,
+      confirmLabel: "OK"
+    });
+    window.location.href = "index.html";
+  } catch (error) {
+    console.error("Erreur lors de l'enregistrement du dossier", error);
+    window.closeWorkflowDialog();
+    await showSaveInfoDialog(
+      "Erreur d'enregistrement",
       error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
         ? error.message
         : "Impossible d'enregistrer la fiche."

@@ -2858,45 +2858,45 @@ def collect_resource_validation_errors(payload):
 
     fixed_rules = [
         ("ordinateur", materiel.get("ordinateur", {}), [
-            ("Marque ordinateur", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle ordinateur", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("Numéro de série ordinateur", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("Marque ordinateur", "marque"),
+            ("Modèle ordinateur", "modele"),
+            ("Numéro de série ordinateur", "numeroSerie"),
         ]),
         ("ecran", materiel.get("ecran", {}), [
-            ("Marque écran", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle écran", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("Numéro de série écran", "numeroSerie", r"^[A-Za-z0-9-]{5,40}$"),
+            ("Marque écran", "marque"),
+            ("Modèle écran", "modele"),
+            ("Numéro de série écran", "numeroSerie"),
         ]),
         ("telephone", materiel.get("telephone", {}), [
-            ("Marque téléphone", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle téléphone", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("IMEI", "imei", r"^\d{15}$"),
+            ("Marque téléphone", "marque"),
+            ("Modèle téléphone", "modele"),
+            ("IMEI", "imei"),
         ]),
         ("tablette", materiel.get("tablette", {}), [
-            ("Marque tablette", "marque", r".+"),
-            ("Modèle tablette", "modele", r".+"),
-            ("Numéro de série tablette", "numeroSerie", r".+"),
+            ("Marque tablette", "marque"),
+            ("Modèle tablette", "modele"),
+            ("Numéro de série tablette", "numeroSerie"),
         ]),
         ("vehicule", materiel.get("vehicule", {}), [
-            ("Marque véhicule", "marque", r"^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$"),
-            ("Modèle véhicule", "modele", r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$"),
-            ("Immatriculation", "immatriculation", r"^[A-Z]{2}-\d{3}-[A-Z]{2}$"),
+            ("Marque véhicule", "marque"),
+            ("Modèle véhicule", "modele"),
+            ("Immatriculation", "immatriculation"),
         ]),
         ("badge", materiel.get("badge", {}), [
-            ("Numéro de badge", "numero", r"^[A-Za-z0-9-]{3,30}$"),
+            ("Numéro de badge", "numero"),
         ]),
         ("autre", materiel.get("autre", {}), [
-            ("Description autre matériel", "description", r"^.{3,120}$"),
+            ("Description autre matériel", "description"),
         ]),
         ("email", immateriel.get("email", {}), [
-            ("Adresse email", "adresse", r"^[^\s@]+@[^\s@]+\.[^\s@]+$"),
+            ("Adresse email", "adresse"),
         ]),
     ]
 
     for _, resource, rules in fixed_rules:
         if not resource.get("selected"):
             continue
-        for label, key, _pattern in rules:
+        for label, key in rules:
             value = str(resource.get(key) or "").strip()
             if not value:
                 errors.append(f"{label} manquant")
