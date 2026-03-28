@@ -117,6 +117,8 @@ DEFAULT_APP_SETTINGS = {
     "dark_mode_policy": "disabled",
 }
 
+CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1"
+
 THEME_PRESETS = {
     "institutionnel": {
         "label": "Institutionnel bleu",
@@ -973,6 +975,95 @@ def insert_audit_event(connection, dossier_id, event_type, event_label, details=
     )
 
 
+def extract_first_forwarded_ip(value):
+    for part in str(value or "").split(","):
+        candidate = part.strip()
+        if candidate:
+            return candidate
+    return ""
+
+
+def get_request_client_ip():
+    if not has_request_context():
+        return ""
+    forwarded_ip = extract_first_forwarded_ip(request.headers.get("X-Forwarded-For"))
+    if forwarded_ip:
+        return forwarded_ip
+    real_ip = str(request.headers.get("X-Real-IP") or "").strip()
+    if real_ip:
+        return real_ip
+    access_route = getattr(request, "access_route", None) or []
+    for candidate in access_route:
+        candidate = str(candidate or "").strip()
+        if candidate:
+            return candidate
+    return str(request.remote_addr or "").strip()
+
+
+def read_client_context_cookie():
+    if not has_request_context():
+        return {}
+    raw_value = request.cookies.get(CLIENT_CONTEXT_COOKIE_NAME)
+    if not raw_value:
+        return {}
+    try:
+        padded = raw_value + ("=" * (-len(raw_value) % 4))
+        decoded = base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
+        payload = json.loads(decoded)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    sanitized = {}
+    for key, value in payload.items():
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            sanitized[str(key)] = text[:255]
+    return sanitized
+
+
+def build_request_client_log_details():
+    if not has_request_context():
+        return {}
+    client_context = read_client_context_cookie()
+    details = {}
+    device_label = client_context.get("deviceLabel") or ""
+    local_ip = client_context.get("localIp") or ""
+    local_network_hint = client_context.get("localHostHint") or ""
+    browser_name = client_context.get("browser") or ""
+    platform_name = client_context.get("platform") or ""
+    server_seen_ip = client_context.get("serverSeenIp") or get_request_client_ip()
+    real_ip = str(request.headers.get("X-Real-IP") or "").strip()
+
+    if device_label:
+        details["poste"] = device_label
+    if local_ip:
+        details["ip_locale"] = local_ip
+    if local_network_hint and local_network_hint != local_ip:
+        details["reseau_local"] = local_network_hint
+    if server_seen_ip:
+        details["ip_vue_serveur"] = server_seen_ip
+    if real_ip and real_ip != server_seen_ip:
+        details["ip_reelle_proxy"] = real_ip
+    if browser_name:
+        details["navigateur"] = browser_name
+    if platform_name:
+        details["plateforme"] = platform_name
+    return details
+
+
+def merge_app_log_details(details=None):
+    merged = dict(details or {})
+    request_details = build_request_client_log_details()
+    for key, value in request_details.items():
+        merged.setdefault(key, value)
+    if merged.get("ip") and not merged.get("ip_vue_serveur"):
+        merged["ip_vue_serveur"] = merged["ip"]
+    return merged
+
+
 def insert_app_log(connection, scope, action_type, action_label, target_type=None, target_id=None, details=None, actor=None):
     connection.execute(
         """
@@ -987,7 +1078,7 @@ def insert_app_log(connection, scope, action_type, action_label, target_type=Non
             action_label,
             target_type,
             target_id,
-            json.dumps(details or {}, ensure_ascii=False),
+            json.dumps(merge_app_log_details(details), ensure_ascii=False),
             utc_now(),
         ),
     )
@@ -3196,7 +3287,7 @@ def login():
                     "Connexion reussie",
                     "user",
                     username,
-                    {"ip": request.remote_addr},
+                    {"ip": get_request_client_ip()},
                     actor=username,
                 )
             return redirect("/")
@@ -3261,7 +3352,7 @@ def logout():
                 "Deconnexion",
                 "user",
                 username,
-                {"ip": request.remote_addr},
+                {"ip": get_request_client_ip()},
                 actor=username,
             )
     session.clear()
@@ -3408,6 +3499,15 @@ def public_logo_route():
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+@app.route("/api/client-context", methods=["GET"])
+def client_context_route():
+    return jsonify({
+        "serverSeenIp": get_request_client_ip(),
+        "forwardedFor": extract_first_forwarded_ip(request.headers.get("X-Forwarded-For")),
+        "realIp": str(request.headers.get("X-Real-IP") or "").strip(),
+    })
 
 
 @app.route("/api/forms", methods=["GET"])
@@ -3850,7 +3950,7 @@ def get_signature_token_route(token):
         now = utc_now()
         connection.execute(
             "UPDATE signature_links SET last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
-            (now, request.remote_addr or "", link_row["id"]),
+            (now, get_request_client_ip(), link_row["id"]),
         )
         form_row = connection.execute(
             "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
@@ -3866,7 +3966,7 @@ def get_signature_token_route(token):
                 f"{link_label} ouvert",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr, "link_type": link_row["link_type"]},
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": link_row["link_type"]},
                 actor=signature_link_public_actor(link_row["link_type"]),
             )
 
@@ -3920,7 +4020,7 @@ def submit_signature_token_route(token):
     with get_db() as connection:
         connection.execute(
             "UPDATE signature_links SET status = 'used', used_at = ?, last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
-            (utc_now(), utc_now(), request.remote_addr or "", link_row["id"]),
+            (utc_now(), utc_now(), get_request_client_ip(), link_row["id"]),
         )
         current_link = get_signature_link_by_id(connection, link_row["id"])
         form_row = connection.execute(
@@ -3944,7 +4044,7 @@ def submit_signature_token_route(token):
                 f"{link_label} utilise",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr, "link_type": link_row["link_type"]},
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": link_row["link_type"]},
                 actor=signature_link_public_actor(link_row["link_type"]),
             )
 
@@ -3967,7 +4067,7 @@ def get_restitution_signature_token_route(token):
         now = utc_now()
         connection.execute(
             "UPDATE signature_links SET last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
-            (now, request.remote_addr or "", link_row["id"]),
+            (now, get_request_client_ip(), link_row["id"]),
         )
         form_row = connection.execute(
             "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
@@ -3981,7 +4081,7 @@ def get_restitution_signature_token_route(token):
                 "Lien de signature de restitution ouvert",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr, "link_type": "restitution"},
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "restitution"},
                 actor=signature_link_public_actor("restitution"),
             )
 
@@ -4040,7 +4140,7 @@ def submit_restitution_signature_token_route(token):
     with get_db() as connection:
         connection.execute(
             "UPDATE signature_links SET status = 'used', used_at = ?, last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
-            (utc_now(), utc_now(), request.remote_addr or "", link_row["id"]),
+            (utc_now(), utc_now(), get_request_client_ip(), link_row["id"]),
         )
         current_link = get_signature_link_by_id(connection, link_row["id"])
         form_row = connection.execute(
@@ -4062,7 +4162,7 @@ def submit_restitution_signature_token_route(token):
                 "Lien de signature de restitution utilise",
                 "form",
                 link_row["form_id"],
-                {"title": form_row["title"], "ip": request.remote_addr, "link_type": "restitution"},
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "restitution"},
                 actor=signature_link_public_actor("restitution"),
             )
 
