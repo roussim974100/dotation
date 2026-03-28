@@ -39,7 +39,7 @@ function applyLoginMessages() {
   };
 
   const noticeMessages = {
-    signup_pending: getAppText("login.noticeSignupPending", "Votre demande d'inscription a ete enregistree. Un administrateur doit maintenant valider votre compte.")
+    signup_pending: getAppText("login.noticeSignupPending", "Votre demande d'inscription a été enregistrée. Un administrateur doit maintenant valider votre compte.")
   };
 
   if (error && errorMessages[error]) {
@@ -53,9 +53,147 @@ function applyLoginMessages() {
   }
 }
 
+function detectBrowserName() {
+  const userAgent = navigator.userAgent || "";
+  if (/Edg\//.test(userAgent)) {
+    return "Microsoft Edge";
+  }
+  if (/Chrome\//.test(userAgent) && !/Edg\//.test(userAgent)) {
+    return "Google Chrome";
+  }
+  if (/Firefox\//.test(userAgent)) {
+    return "Mozilla Firefox";
+  }
+  if (/Safari\//.test(userAgent) && !/Chrome\//.test(userAgent) && !/Edg\//.test(userAgent)) {
+    return "Safari";
+  }
+  return "Navigateur inconnu";
+}
+
+function detectPlatformName() {
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+  const source = `${platform} ${userAgent}`;
+  if (/Windows/i.test(source)) {
+    return "Windows";
+  }
+  if (/Mac/i.test(source)) {
+    return "macOS";
+  }
+  if (/Linux/i.test(source)) {
+    return "Linux";
+  }
+  if (/Android/i.test(source)) {
+    return "Android";
+  }
+  if (/iPhone|iPad|iPod/i.test(source)) {
+    return "iOS";
+  }
+  return platform || "Plateforme inconnue";
+}
+
+function buildClientDeviceLabel() {
+  return `${detectPlatformName()} - ${detectBrowserName()}`;
+}
+
+function isPrivateIpv4(value) {
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(value || "");
+}
+
+function extractIceCandidateAddress(candidate) {
+  const raw = String(candidate?.candidate || "");
+  const match = raw.match(/([a-f0-9:.]+)\s\d+\styp/i);
+  return match ? match[1] : "";
+}
+
+function resolveLocalNetworkHint() {
+  return new Promise((resolve) => {
+    const RTCPeerConnectionCtor = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+    if (!RTCPeerConnectionCtor) {
+      resolve({ localIp: "", localHostHint: "" });
+      return;
+    }
+
+    const connection = new RTCPeerConnectionCtor({ iceServers: [] });
+    let settled = false;
+    let localIp = "";
+    let localHostHint = "";
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      connection.onicecandidate = null;
+      connection.close();
+      resolve({ localIp, localHostHint });
+    };
+
+    connection.onicecandidate = (event) => {
+      if (!event.candidate) {
+        finish();
+        return;
+      }
+      const address = extractIceCandidateAddress(event.candidate);
+      if (!address) {
+        return;
+      }
+      if (!localIp && isPrivateIpv4(address)) {
+        localIp = address;
+      }
+      if (!localHostHint && /\.local$/i.test(address)) {
+        localHostHint = address;
+      }
+    };
+
+    connection.createDataChannel("login-client-context");
+    connection.createOffer()
+      .then((offer) => connection.setLocalDescription(offer))
+      .catch(() => finish());
+
+    window.setTimeout(finish, 1200);
+  });
+}
+
+function setHiddenValue(id, value) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.value = value || "";
+  }
+}
+
+async function hydrateLoginClientContext() {
+  setHiddenValue("clientDeviceLabel", buildClientDeviceLabel());
+  setHiddenValue("clientBrowser", detectBrowserName());
+  setHiddenValue("clientPlatform", detectPlatformName());
+  setHiddenValue("clientUserAgent", navigator.userAgent || "");
+  setHiddenValue("clientLanguage", navigator.language || "");
+  setHiddenValue("clientLanguages", Array.isArray(navigator.languages) ? navigator.languages.join(", ") : "");
+  setHiddenValue("clientTimezone", Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+  setHiddenValue("clientScreen", window.screen ? `${window.screen.width}x${window.screen.height}` : "");
+  setHiddenValue("clientViewport", `${window.innerWidth || 0}x${window.innerHeight || 0}`);
+  setHiddenValue("clientCookieEnabled", String(Boolean(navigator.cookieEnabled)));
+  setHiddenValue("clientPageUrl", window.location.href);
+
+  const localContext = await resolveLocalNetworkHint().catch(() => ({ localIp: "", localHostHint: "" }));
+  setHiddenValue("clientLocalIp", localContext.localIp || "");
+  setHiddenValue("clientLocalHostHint", localContext.localHostHint || "");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyLoginTexts();
   applyLoginMessages();
+
+  const loginForm = document.querySelector(".login-form");
+  let contextPromise = hydrateLoginClientContext();
+
+  loginForm?.addEventListener("submit", async (event) => {
+    if (contextPromise) {
+      event.preventDefault();
+      const pending = contextPromise;
+      contextPromise = null;
+      await pending.catch(() => undefined);
+      loginForm.submit();
+    }
+  });
 });
-// Enrichit l'écran de connexion avec les libellés configurables
-// et les messages d'état issus des paramètres d'URL.

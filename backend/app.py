@@ -1058,16 +1058,63 @@ def read_client_context_cookie():
     return sanitized
 
 
+def read_login_attempt_context():
+    if not has_request_context():
+        return {}
+    allowed_fields = {
+        "client_device_label": "poste",
+        "client_browser": "navigateur",
+        "client_platform": "plateforme",
+        "client_local_ip": "ip_locale",
+        "client_local_host_hint": "reseau_local",
+        "client_user_agent": "user_agent",
+        "client_language": "langue",
+        "client_languages": "langues",
+        "client_timezone": "fuseau_horaire",
+        "client_screen": "ecran",
+        "client_viewport": "fenetre",
+        "client_cookie_enabled": "cookies_actifs",
+        "client_page_url": "page_connexion",
+    }
+    sanitized = {}
+    for field_name, output_key in allowed_fields.items():
+        value = str(request.form.get(field_name) or "").strip()
+        if value:
+            sanitized[output_key] = value[:512]
+    return sanitized
+
+
+def build_login_forensic_details(username, auth_state):
+    details = {
+        "etat_authentification": auth_state,
+        "identifiant_tente": username or "(vide)",
+        "methode": request.method,
+        "chemin": request.path,
+        "hote": request.host,
+        "ip": get_request_client_ip(),
+        "ip_distante_socket": str(request.remote_addr or "").strip(),
+        "ip_proxy_reelle": str(request.headers.get("X-Real-IP") or "").strip(),
+        "ip_wan_proxy": extract_first_forwarded_ip(request.headers.get("X-Forwarded-For")),
+        "chaine_proxy": str(request.headers.get("X-Forwarded-For") or "").strip(),
+        "origine": str(request.headers.get("Origin") or "").strip(),
+        "referer": str(request.headers.get("Referer") or "").strip(),
+        "accept_language": str(request.headers.get("Accept-Language") or "").strip(),
+    }
+    details.update(read_login_attempt_context())
+    return {key: value for key, value in details.items() if value not in {"", None}}
+
+
 def build_request_client_log_details():
     if not has_request_context():
         return {}
     client_context = read_client_context_cookie()
+    login_attempt_context = read_login_attempt_context()
     details = {}
-    device_label = client_context.get("deviceLabel") or ""
-    local_ip = client_context.get("localIp") or ""
-    local_network_hint = client_context.get("localHostHint") or ""
-    browser_name = client_context.get("browser") or ""
-    platform_name = client_context.get("platform") or ""
+    device_label = login_attempt_context.get("poste") or client_context.get("deviceLabel") or ""
+    local_ip = login_attempt_context.get("ip_locale") or client_context.get("localIp") or ""
+    local_network_hint = login_attempt_context.get("reseau_local") or client_context.get("localHostHint") or ""
+    browser_name = login_attempt_context.get("navigateur") or client_context.get("browser") or ""
+    platform_name = login_attempt_context.get("plateforme") or client_context.get("platform") or ""
     server_seen_ip = client_context.get("serverSeenIp") or get_request_client_ip()
     real_ip = str(request.headers.get("X-Real-IP") or "").strip()
 
@@ -3325,6 +3372,17 @@ def login():
                     actor=username,
                 )
             return redirect("/")
+        with get_db() as connection:
+            insert_app_log(
+                connection,
+                "security",
+                "login_failed",
+                "Échec de connexion",
+                "user",
+                username or "(vide)",
+                build_login_forensic_details(username, auth_state),
+                actor="anonymous",
+            )
         return redirect(f"/login?error={auth_state}")
 
     return send_from_directory(FRONTEND_DIR, "login.html")

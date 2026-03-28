@@ -53,7 +53,27 @@ function formatLogDetails(details) {
     ip_locale: "IP LAN",
     reseau_local: "Réseau local",
     navigateur: "Navigateur",
-    plateforme: "Plateforme"
+    plateforme: "Plateforme",
+    user_agent: "User-Agent",
+    langue: "Langue",
+    langues: "Langues",
+    fuseau_horaire: "Fuseau horaire",
+    ecran: "Écran",
+    fenetre: "Fenêtre",
+    cookies_actifs: "Cookies actifs",
+    page_connexion: "Page",
+    etat_authentification: "Résultat",
+    identifiant_tente: "Identifiant tenté",
+    methode: "Méthode",
+    chemin: "Chemin",
+    hote: "Hôte",
+    ip_distante_socket: "IP socket",
+    ip_proxy_reelle: "IP proxy réelle",
+    ip_wan_proxy: "IP WAN proxy",
+    chaine_proxy: "Chaîne proxy",
+    origine: "Origin",
+    referer: "Referer",
+    accept_language: "Accept-Language"
   };
   return Object.entries(details)
     .map(([key, value]) => `${labels[key] || key}: ${Array.isArray(value) ? value.join(", ") : String(value ?? "")}`)

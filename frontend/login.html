@@ -35,6 +35,19 @@
       <div id="loginError" class="alert alert-danger d-none" role="alert"></div>
 
       <form method="post" class="login-form" novalidate>
+        <input type="hidden" name="client_device_label" id="clientDeviceLabel">
+        <input type="hidden" name="client_browser" id="clientBrowser">
+        <input type="hidden" name="client_platform" id="clientPlatform">
+        <input type="hidden" name="client_local_ip" id="clientLocalIp">
+        <input type="hidden" name="client_local_host_hint" id="clientLocalHostHint">
+        <input type="hidden" name="client_user_agent" id="clientUserAgent">
+        <input type="hidden" name="client_language" id="clientLanguage">
+        <input type="hidden" name="client_languages" id="clientLanguages">
+        <input type="hidden" name="client_timezone" id="clientTimezone">
+        <input type="hidden" name="client_screen" id="clientScreen">
+        <input type="hidden" name="client_viewport" id="clientViewport">
+        <input type="hidden" name="client_cookie_enabled" id="clientCookieEnabled">
+        <input type="hidden" name="client_page_url" id="clientPageUrl">
         <div>
           <label class="form-label" for="username" data-text="login.usernameLabel">Identifiant</label>
           <input id="username" class="form-control form-control-lg" name="username" autocomplete="username" data-placeholder="login.usernamePlaceholder" placeholder="Identifiant" required>
