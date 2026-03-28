@@ -1,16 +1,16 @@
-const form = document.getElementById("dotationForm");
+﻿const form = document.getElementById("dotationForm");
 const draftStatus = document.getElementById("draftStatus");
 const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 const DOSSIER_TYPE_LABELS = {
-  arrivee: "Nouvelle arrivée",
+  arrivee: "Nouvelle arrivÃ©e",
   changement_service: "Changement de service",
-  mise_a_jour: "Mise à jour de ressources",
+  mise_a_jour: "Mise Ã  jour de ressources",
   sortie: "Sortie / restitution"
 };
 const DEFAULT_SERVICE_OPTIONS = [
   "Affaires juridiques / Commande publique",
-  "Bâtiment",
+  "BÃ¢timent",
   "Cabinet du Maire",
   "CCAS",
   "Communication",
@@ -24,7 +24,7 @@ const DEFAULT_SERVICE_OPTIONS = [
   "PM",
   "Population",
   "SEJE",
-  "Secrétariat service technique",
+  "SecrÃ©tariat service technique",
   "Sports",
   "Subvention",
   "Urbanisme",
@@ -40,8 +40,8 @@ let currentRestitutionData = {
 };
 let currentSignatureLink = null;
 
-// Mapping central des équipements :
-// on s'en sert pour générer la restitution, les résumés et certaines validations.
+// Mapping central des Ã©quipements :
+// on s'en sert pour gÃ©nÃ©rer la restitution, les rÃ©sumÃ©s et certaines validations.
 const EQUIPMENT_CONFIG = [
   {
     key: "ordinateur",
@@ -52,14 +52,14 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "ecran",
-    label: "Écran",
+    label: "Ã‰cran",
     category: "materiel",
     checkboxId: "has_screen",
     detail: () => [getFieldValue("screen_marque"), getFieldValue("screen_modele"), getFieldValue("screen_sn")].filter(Boolean).join(" - ")
   },
   {
     key: "telephone",
-    label: "Téléphone",
+    label: "TÃ©lÃ©phone",
     category: "materiel",
     checkboxId: "has_phone",
     detail: () => [getFieldValue("tel_nom"), getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
@@ -73,21 +73,21 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "vehicule",
-    label: "Véhicule",
+    label: "VÃ©hicule",
     category: "materiel",
     checkboxId: "has_vehicule",
     detail: () => [getFieldValue("vehicule_marque"), getFieldValue("vehicule_modele"), getFieldValue("vehicule_plaque")].filter(Boolean).join(" - ")
   },
   {
     key: "badge",
-    label: "Badge d'accès",
+    label: "Badge d'accÃ¨s",
     category: "materiel",
     checkboxId: "has_badge",
     detail: () => getFieldValue("badge_numero")
   },
   {
     key: "cles",
-    label: "Clé(s)",
+    label: "ClÃ©(s)",
     category: "materiel",
     checkboxId: "has_cles",
     detail: () => getRepeatableValues("clesRows").join(" - ")
@@ -101,14 +101,14 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "chaussuresSecurite",
-    label: "Chaussures de sécurité",
+    label: "Chaussures de sÃ©curitÃ©",
     category: "materiel",
     checkboxId: "chaussure",
     detail: () => ""
   },
   {
     key: "autre",
-    label: "Autre matériel",
+    label: "Autre matÃ©riel",
     category: "materiel",
     checkboxId: "has_autre",
     detail: () => getFieldValue("autre_materiel")
@@ -139,37 +139,37 @@ const EQUIPMENT_CONFIG = [
 const CORE_RESOURCE_RULES = {
   ordinateur: [
     { fieldId: "pc_nom", label: "Nom du poste", required: false, pattern: ".*", hint: "" },
-    { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "pc_modele", label: "Modèle ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "pc_sn", label: "Numéro de série ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
+    { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
+    { fieldId: "pc_modele", label: "ModÃ¨le ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
+    { fieldId: "pc_sn", label: "NumÃ©ro de sÃ©rie ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 Ã  40 caractÃ¨res alphanumÃ©riques" }
   ],
   ecran: [
-    { fieldId: "screen_marque", label: "Marque écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "screen_modele", label: "Modèle écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "screen_sn", label: "Numéro de série écran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
+    { fieldId: "screen_marque", label: "Marque Ã©cran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
+    { fieldId: "screen_modele", label: "ModÃ¨le Ã©cran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
+    { fieldId: "screen_sn", label: "NumÃ©ro de sÃ©rie Ã©cran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 Ã  40 caractÃ¨res alphanumÃ©riques" }
   ],
   telephone: [
-    { fieldId: "tel_nom", label: "Nom du téléphone", required: false, pattern: ".*", hint: "" },
-    { fieldId: "tel_marque", label: "Marque téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "tel_modele", label: "Modèle téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
+    { fieldId: "tel_nom", label: "Nom du tÃ©lÃ©phone", required: false, pattern: ".*", hint: "" },
+    { fieldId: "tel_marque", label: "Marque tÃ©lÃ©phone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
+    { fieldId: "tel_modele", label: "ModÃ¨le tÃ©lÃ©phone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
     { fieldId: "tel_imei", label: "IMEI", required: true, pattern: "^\\d{15}$", hint: "15 chiffres" }
   ],
   tablette: [
     { fieldId: "tablette_nom", label: "Nom de la tablette", required: false, pattern: ".*", hint: "" },
     { fieldId: "tablette_marque", label: "Marque tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_modele", label: "Modèle tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_sn", label: "Numéro de série tablette", required: true, pattern: ".*", hint: "" }
+    { fieldId: "tablette_modele", label: "ModÃ¨le tablette", required: true, pattern: ".*", hint: "" },
+    { fieldId: "tablette_sn", label: "NumÃ©ro de sÃ©rie tablette", required: true, pattern: ".*", hint: "" }
   ],
   vehicule: [
-    { fieldId: "vehicule_marque", label: "Marque véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "vehicule_modele", label: "Modèle véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
+    { fieldId: "vehicule_marque", label: "Marque vÃ©hicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
+    { fieldId: "vehicule_modele", label: "ModÃ¨le vÃ©hicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
     { fieldId: "vehicule_plaque", label: "Immatriculation", required: true, pattern: "^[A-Z]{2}-\\d{3}-[A-Z]{2}$", hint: "Format AA-123-AA" }
   ],
   badge: [
-    { fieldId: "badge_numero", label: "Numéro de badge", required: true, pattern: "^[A-Za-z0-9-]{3,30}$", hint: "3 à 30 caractères" }
+    { fieldId: "badge_numero", label: "NumÃ©ro de badge", required: true, pattern: "^[A-Za-z0-9-]{3,30}$", hint: "3 Ã  30 caractÃ¨res" }
   ],
   autre: [
-    { fieldId: "autre_materiel", label: "Description autre matériel", required: true, pattern: "^.{3,120}$", hint: "3 à 120 caractères" }
+    { fieldId: "autre_materiel", label: "Description autre matÃ©riel", required: true, pattern: "^.{3,120}$", hint: "3 Ã  120 caractÃ¨res" }
   ],
   email: [
     { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", hint: "Format de type nom@domaine.fr" }
@@ -178,22 +178,22 @@ const CORE_RESOURCE_RULES = {
 
 const restitutionStateLabels = {
   pending: "En attente",
-  returned: "Restitué",
-  returned_damaged: "Restitué abîmé",
-  missing: "Non restitué",
-  transferred: "Transféré",
+  returned: "RestituÃ©",
+  returned_damaged: "RestituÃ© abÃ®mÃ©",
+  missing: "Non restituÃ©",
+  transferred: "TransfÃ©rÃ©",
   conforme: "Conforme",
-  degrade: "Dégradé",
-  non_restitue: "Non restitué",
+  degrade: "DÃ©gradÃ©",
+  non_restitue: "Non restituÃ©",
   perdu: "Perdu",
   autre: "Autre"
 };
 
 const ASSIGNMENT_CONDITION_LABELS = {
   neuf: "Neuf",
-  bon_etat: "Bon état",
-  etat_usage: "État d'usage",
-  degrade: "Dégradé"
+  bon_etat: "Bon Ã©tat",
+  etat_usage: "Ã‰tat d'usage",
+  degrade: "DÃ©gradÃ©"
 };
 
 const ASSIGNMENT_CONDITION_CONFIG = [
@@ -288,7 +288,7 @@ function buildAssignmentConditionSummary(item) {
   const parts = [];
   const conditionLabel = formatAssignmentConditionLabel(item.conditionAttribution);
   if (conditionLabel) {
-    parts.push(`État à la remise : ${conditionLabel}`);
+    parts.push(`Ã‰tat Ã  la remise : ${conditionLabel}`);
   }
   if (item.assignedAt) {
     parts.push(`Date d'attribution : ${formatDisplayDate(item.assignedAt)}`);
@@ -309,11 +309,11 @@ function buildAssignmentConditionFieldsHtml(prefix, stacked = false, dateOnly = 
   return `
       <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
       <select class="form-select${marginClass}" id="${prefix}_condition">
-        <option value="">État à la remise</option>
+        <option value="">Ã‰tat Ã  la remise</option>
       <option value="neuf">Neuf</option>
-      <option value="bon_etat">Bon état</option>
-      <option value="etat_usage">État d'usage</option>
-      <option value="degrade">Dégradé</option>
+      <option value="bon_etat">Bon Ã©tat</option>
+      <option value="etat_usage">Ã‰tat d'usage</option>
+      <option value="degrade">DÃ©gradÃ©</option>
     </select>
     <input class="form-control${marginClass}" placeholder="Observation de remise" id="${prefix}_condition_notes">
   `;
@@ -402,7 +402,7 @@ function matchesPattern(value, pattern) {
     return new RegExp(pattern).test(String(value || ""));
   } catch (error) {
     // Une expression invalide ne doit pas bloquer la saisie;
-    // on considère alors la règle comme non bloquante.
+    // on considÃ¨re alors la rÃ¨gle comme non bloquante.
     return true;
   }
 }
@@ -569,7 +569,7 @@ function renderServiceOptions(options = []) {
   const currentDestinationValue = getServiceDestinationValue();
   serviceOptions = options.length ? [...options] : [...DEFAULT_SERVICE_OPTIONS];
   const optionsMarkup = `
-    <option value="">Sélectionner un service</option>
+    <option value="">SÃ©lectionner un service</option>
     ${serviceOptions.map((option) => `<option value="${escapeAttribute(option)}">${escapeHtml(option)}</option>`).join("")}
     <option value="__custom__">Autre...</option>
   `;
@@ -650,7 +650,7 @@ async function loadDynamicResourceReferences() {
       ? `<div class="subgrid mt-3">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
       : `
         <div class="single-field mt-3">
-          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="Détails ou précision de l'attribution">
+          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="DÃ©tails ou prÃ©cision de l'attribution">
         </div>
       `;
 
@@ -664,7 +664,7 @@ async function loadDynamicResourceReferences() {
         <div class="single-field mt-3">
           <input class="form-control dynamic-resource-assigned-at" type="date" id="dynamic_resource_assigned_at_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
         </div>
-        <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</p>
+        <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseignÃ©")} Â· ${escapeHtml(resource.category || "Ressource")}</p>
       </div>
     `;
   };
@@ -732,7 +732,7 @@ async function loadDynamicResourceReferences() {
         </div>
         <div class="resource-kind-block">
           <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+            <h4 class="resource-kind-block__title">Ressources matÃ©rielles</h4>
           </div>
           <div class="equipment-grid equipment-grid--compact">
             ${group.materiel.map(buildResourceCard).join("")}
@@ -741,7 +741,7 @@ async function loadDynamicResourceReferences() {
         ${group.immateriel.length ? `
         <div class="resource-kind-block mt-4">
           <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+            <h4 class="resource-kind-block__title">Ressources immatÃ©rielles</h4>
           </div>
           <div class="equipment-grid equipment-grid--compact">
             ${group.immateriel.map(buildResourceCard).join("")}
@@ -825,7 +825,7 @@ function hasCurrentDsiResources() {
 }
 
 function applyLockState(locked) {
-  // Une fiche signée complète passe en lecture seule.
+  // Une fiche signÃ©e complÃ¨te passe en lecture seule.
   // L'utilisateur peut encore consulter / imprimer, mais plus modifier.
   currentLockState = locked;
   form.classList.toggle("form-locked", locked);
@@ -843,7 +843,7 @@ function applyLockState(locked) {
   });
 
   if (resumeHint && locked) {
-    resumeHint.textContent = "Fiche signée : elle est maintenant verrouillée et disponible uniquement en consultation et impression.";
+    resumeHint.textContent = "Fiche signÃ©e : elle est maintenant verrouillÃ©e et disponible uniquement en consultation et impression.";
   }
 }
 
@@ -884,10 +884,10 @@ function renderPrintSummary(formData) {
     pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ordinateur));
   }
   if (formData.materiel.ecran.selected) {
-    pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
+    pushItem(dsiItems, "Ã‰cran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
   }
   if (formData.materiel.telephone.selected) {
-    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
+    pushItem(dsiItems, "TÃ©lÃ©phone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
   }
   if (formData.materiel.tablette?.selected) {
     pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.tablette));
@@ -900,26 +900,26 @@ function renderPrintSummary(formData) {
   }
 
   if (formData.materiel.badge.selected) {
-    pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
+    pushItem(batimentItems, "Badge d'accÃ¨s", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
   }
   if (formData.materiel.cles?.selected) {
-    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
+    pushItem(batimentItems, "ClÃ©(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
   }
   if (formData.materiel.veste.selected) {
     pushItem(batimentItems, "Veste", "", buildAssignmentConditionSummary(formData.materiel.veste));
   }
   if (formData.materiel.chaussuresSecurite.selected) {
-    pushItem(batimentItems, "Chaussures de sécurité", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
+    pushItem(batimentItems, "Chaussures de sÃ©curitÃ©", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
   }
   if (formData.immateriel.zoneAlarme?.selected) {
     pushItem(batimentItems, "Zone alarme", (formData.immateriel.zoneAlarme.zones || []).join(" - "));
   }
 
   if (formData.materiel.vehicule.selected) {
-    pushItem(otherItems, "Véhicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
+    pushItem(otherItems, "VÃ©hicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
   }
   if (formData.materiel.autre.selected) {
-    pushItem(otherItems, "Autre matériel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
+    pushItem(otherItems, "Autre matÃ©riel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
   }
 
   const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
@@ -937,11 +937,11 @@ function renderPrintSummary(formData) {
       </div>
 
       <section class="print-block">
-        <h3>Bénéficiaire</h3>
+        <h3>BÃ©nÃ©ficiaire</h3>
         <div class="print-grid">
           <div class="print-line"><strong>Nom</strong><span>${escapeHtml(formData.beneficiaire.nom || "-")}</span></div>
-          <div class="print-line"><strong>Prénom</strong><span>${escapeHtml(formData.beneficiaire.prenom || "-")}</span></div>
-          <div class="print-line"><strong>Qualité</strong><span>${escapeHtml(formData.beneficiaire.qualite || "-")}</span></div>
+          <div class="print-line"><strong>PrÃ©nom</strong><span>${escapeHtml(formData.beneficiaire.prenom || "-")}</span></div>
+          <div class="print-line"><strong>QualitÃ©</strong><span>${escapeHtml(formData.beneficiaire.qualite || "-")}</span></div>
           <div class="print-line"><strong>Mandat / Service</strong><span>${escapeHtml(formData.beneficiaire.mandat || formData.beneficiaire.service || "-")}</span></div>
           <div class="print-line"><strong>Fonction</strong><span>${escapeHtml(formData.beneficiaire.fonction || "-")}</span></div>
           <div class="print-line"><strong>Date de remise</strong><span>${escapeHtml(formData.meta.assignedAt || "-")}</span></div>
@@ -955,13 +955,13 @@ function renderPrintSummary(formData) {
       </section>
 
       <section class="print-block">
-        <h3>Ressources service bâtiment</h3>
-        ${batimentItems.length ? `<ul class="print-list">${batimentItems.join("")}</ul>` : "<p>Aucune ressource bâtiment.</p>"}
+        <h3>Ressources service bÃ¢timent</h3>
+        ${batimentItems.length ? `<ul class="print-list">${batimentItems.join("")}</ul>` : "<p>Aucune ressource bÃ¢timent.</p>"}
       </section>
 
       <section class="print-block">
-        <h3>Autres ressources attribuées</h3>
-        ${otherItems.length ? `<ul class="print-list">${otherItems.join("")}</ul>` : "<p>Aucune autre ressource attribuée.</p>"}
+        <h3>Autres ressources attribuÃ©es</h3>
+        ${otherItems.length ? `<ul class="print-list">${otherItems.join("")}</ul>` : "<p>Aucune autre ressource attribuÃ©e.</p>"}
       </section>
 
       <section class="print-block">
@@ -972,14 +972,14 @@ function renderPrintSummary(formData) {
         </div>
         <div class="print-line" style="margin-top:0.8rem;"><strong>Observations</strong><span>${escapeHtml(formData.restitution.notes || "-")}</span></div>
         <div style="margin-top:0.8rem;">
-          ${restitutionItems.length ? `<ul class="print-list">${restitutionItems.join("")}</ul>` : "<p>Aucun détail de restitution.</p>"}
+          ${restitutionItems.length ? `<ul class="print-list">${restitutionItems.join("")}</ul>` : "<p>Aucun dÃ©tail de restitution.</p>"}
         </div>
       </section>
 
       <section class="print-block">
         <h3>Conformite et signature</h3>
         <div class="print-grid">
-          <div class="print-line"><strong>RGPD</strong><span>${formData.validation.rgpdAccepted ? "Validation effectuée" : "Non validée"}</span></div>
+          <div class="print-line"><strong>RGPD</strong><span>${formData.validation.rgpdAccepted ? "Validation effectuÃ©e" : "Non validÃ©e"}</span></div>
         </div>
         ${formData.validation.signatureDataUrl ? `<div class="print-signature" style="margin-top:0.9rem;"><img src="${formData.validation.signatureDataUrl}" alt="Signature"></div>` : "<p style='margin-top:0.9rem;'>Aucune signature.</p>"}
       </section>
@@ -1001,7 +1001,7 @@ function initConditionalBlocks() {
     const sync = () => {
       toggleField(checkbox.dataset.target, checkbox.checked);
       if (checkbox.checked && checkbox.id === "has_cles") {
-        ensureRepeatableRow("clesRows", "Référence ou libellé de clé");
+        ensureRepeatableRow("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©");
       }
       if (checkbox.checked && checkbox.id === "has_zone_alarme") {
         ensureRepeatableRow("zoneAlarmeRows", "Zone alarme");
@@ -1021,7 +1021,7 @@ function initRepeatableResourceLists() {
 
   if (clesButton && !clesButton.dataset.boundRepeatable) {
     clesButton.addEventListener("click", () => {
-      createRepeatableRow("clesRows", "Référence ou libellé de clé");
+      createRepeatableRow("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©");
     });
     clesButton.dataset.boundRepeatable = "true";
   }
@@ -1113,8 +1113,8 @@ function initQualite() {
 }
 
 function validateFixedResourceSelection() {
-  // Valide uniquement les ressources effectivement cochées
-  // pour éviter les faux positifs sur les blocs masqués.
+  // Valide uniquement les ressources effectivement cochÃ©es
+  // pour Ã©viter les faux positifs sur les blocs masquÃ©s.
   const issues = [];
   Object.values(CORE_RESOURCE_RULES).flat().forEach((rule) => {
     clearFieldError(document.getElementById(rule.fieldId));
@@ -1139,11 +1139,11 @@ function validateFixedResourceSelection() {
   });
 
   if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
-    issues.push("Au moins une clé doit être renseignée");
+    issues.push("Au moins une clÃ© doit Ãªtre renseignÃ©e");
   }
 
   if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
-    issues.push("Au moins une zone alarme doit être renseignée");
+    issues.push("Au moins une zone alarme doit Ãªtre renseignÃ©e");
   }
 
   return issues;
@@ -1163,8 +1163,8 @@ function validateDynamicResourceSelection() {
       const detailsField = document.getElementById(`dynamic_resource_details_${resource.id}`);
       const detailsValue = detailsField ? detailsField.value.trim() || "" : "";
       if (!detailsValue) {
-        setFieldError(detailsField, `Complétez ${resource.label.toLowerCase()}.`);
-        issues.push(`${resource.label} incomplète`);
+        setFieldError(detailsField, `ComplÃ©tez ${resource.label.toLowerCase()}.`);
+        issues.push(`${resource.label} incomplÃ¨te`);
       }
       return;
     }
@@ -1201,13 +1201,13 @@ function updateStatusInfo(status = "draft") {
   }
 
   const hints = {
-    draft: "Le dossier reste modifiable tant qu'il n'est pas signé et validé.",
-    partial_assignment: "Le dossier reste modifiable car l'attribution est partielle ou parce qu'au moins une ressource cochée reste incomplète.",
-    awaiting_signature: "Le dossier est prêt et n'attend plus que la signature finale.",
-    active: "Le dossier est verrouillé et la restitution se gère depuis la page dédiée.",
-    returned: "Le dossier a été restitué. Les détails restent consultables depuis la restitution.",
-    partial_return: "Une partie des ressources a été restituée. Le détail est visible dans la page de restitution.",
-    cancelled: "Le dossier a été annulé et n'entre plus dans le flux normal d'attribution."
+    draft: "Le dossier reste modifiable tant qu'il n'est pas signÃ© et validÃ©.",
+    partial_assignment: "Le dossier reste modifiable car l'attribution est partielle ou parce qu'au moins une ressource cochÃ©e reste incomplÃ¨te.",
+    awaiting_signature: "Le dossier est prÃªt et n'attend plus que la signature finale.",
+    active: "Le dossier est verrouillÃ© et la restitution se gÃ¨re depuis la page dÃ©diÃ©e.",
+    returned: "Le dossier a Ã©tÃ© restituÃ©. Les dÃ©tails restent consultables depuis la restitution.",
+    partial_return: "Une partie des ressources a Ã©tÃ© restituÃ©e. Le dÃ©tail est visible dans la page de restitution.",
+    cancelled: "Le dossier a Ã©tÃ© annulÃ© et n'entre plus dans le flux normal d'attribution."
   };
   statusHint.textContent = hints[status] || hints.draft;
 }
@@ -1227,14 +1227,14 @@ function renderRestitutionSummary() {
   if (!hasGlobalInfo && !hasItems) {
     summary.classList.add("d-none");
     summary.innerHTML = "";
-    hint.textContent = "La restitution ne se renseigne plus dans ce formulaire. Elle se gère depuis la page dédiée accessible depuis l'accueil sur les attributions actives.";
+    hint.textContent = "La restitution ne se renseigne plus dans ce formulaire. Elle se gÃ¨re depuis la page dÃ©diÃ©e accessible depuis l'accueil sur les attributions actives.";
     return;
   }
 
   hint.textContent = "Les informations ci-dessous proviennent du formulaire de restitution et restent consultables ici en lecture seule.";
   const reasonLabels = {
     fin_de_fonction: "Fin de fonction",
-    demission: "Démission",
+    demission: "DÃ©mission",
     mutation: "Mutation",
     fin_de_mandat: "Fin de mandat",
     autre: "Autre"
@@ -1244,7 +1244,7 @@ function renderRestitutionSummary() {
     const config = EQUIPMENT_CONFIG.find((item) => item.key === key);
     const label = config.label || key;
     const parts = [
-      restitutionStateLabels[state.state] || state.state || "État non renseigné",
+      restitutionStateLabels[state.state] || state.state || "Ã‰tat non renseignÃ©",
       state.notes || ""
     ].filter(Boolean);
     return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`;
@@ -1257,7 +1257,7 @@ function renderRestitutionSummary() {
     </div>
     <div class="print-line mt-3"><strong>Observations</strong><span>${escapeHtml(restitution.notes || "-")}</span></div>
     <div class="mt-3">
-      ${hasItems ? `<ul class="print-list">${itemLines}</ul>` : "<p class='rgpd-text mb-0'>Aucun détail par ressource n'a été saisi.</p>"}
+      ${hasItems ? `<ul class="print-list">${itemLines}</ul>` : "<p class='rgpd-text mb-0'>Aucun dÃ©tail par ressource n'a Ã©tÃ© saisi.</p>"}
     </div>
   `;
   summary.classList.remove("d-none");
@@ -1413,7 +1413,7 @@ function collectRequestedResourcesFromFormData(formData) {
     if (resource?.selected) {
       resources.push({
         key: resource.id || resource.code || "resource",
-        label: resource.label || "Ressource complémentaire",
+        label: resource.label || "Ressource complÃ©mentaire",
         assignedAt: resource.assignedAt || ""
       });
     }
@@ -1432,7 +1432,7 @@ function summarizeRequestedResourceCompletion(formData) {
 }
 
 function getFormData(signaturePad) {
-  // Produit le payload métier complet qui sera envoyé à l'API.
+  // Produit le payload mÃ©tier complet qui sera envoyÃ© Ã  l'API.
   const now = new Date().toISOString();
   const currentDraftId = form.dataset.draftId || "";
   const signatureDataUrl = signaturePad.toDataUrl();
@@ -1581,7 +1581,7 @@ function populateForm(data, signaturePad) {
   document.getElementById("vpn_assigned_at").value = normalizeDateInputValue(data.immateriel.vpn.assignedAt || "");
   document.getElementById("email_assigned_at").value = normalizeDateInputValue(data.immateriel.email.assignedAt || "");
   document.getElementById("zoneAlarme_assigned_at").value = normalizeDateInputValue(data.immateriel.zoneAlarme?.assignedAt || "");
-  populateRepeatableRows("clesRows", "Référence ou libellé de clé", data.materiel.cles?.values || []);
+  populateRepeatableRows("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©", data.materiel.cles?.values || []);
   populateRepeatableRows("zoneAlarmeRows", "Zone alarme", data.immateriel.zoneAlarme?.zones || []);
 
   document.getElementById("veste").checked = Boolean(data.materiel.veste.selected);
@@ -1601,100 +1601,17 @@ function populateForm(data, signaturePad) {
   applyLockState(Boolean(data.meta.lockedAt));
 }
 
-function validateFormData(formData, options = {}) {
-  if (!formData.beneficiaire.nom || !formData.beneficiaire.prenom) {
-    alert("Le nom et le prénom sont obligatoires.");
-    return false;
-  }
-
-  if (!formData.beneficiaire.qualite) {
-    alert("Veuillez sélectionner la qualité du bénéficiaire.");
-    return false;
-  }
-
-  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat) {
-    alert("Veuillez renseigner le mandat de l'élu.");
-    return false;
-  }
-
-  if (options.requireRgpd && !formData.validation.rgpdAccepted) {
-    alert("La validation RGPD est obligatoire avant l'export PDF.");
-    return false;
-  }
-
-  const resourceIssues = collectResourceValidationIssues();
-  formData.meta.resourceValidationErrors = resourceIssues;
-
-  return true;
-}
-
 function formatStatusLabel(status) {
   const labels = {
-    draft: "À compléter",
+    draft: "Ã€ complÃ©ter",
     partial_assignment: "Attribution partielle",
     awaiting_signature: "En attente de signature",
     active: "Attribution active",
-    returned: "Restitution terminée",
+    returned: "Restitution terminÃ©e",
     partial_return: "Restitution partielle",
-    cancelled: "Dossier annulé"
+    cancelled: "Dossier annulÃ©"
   };
-  return labels[status] || "À compléter";
-}
-
-function resolveSaveWorkflow(formData) {
-  // Règle métier :
-  // - sans signature ou sans RGPD => brouillon
-  // - si signature + RGPD mais ressources incomplètes => attribution partielle
-  // - si signature + RGPD + ressources cohérentes => on demande complète ou partielle
-  const hasSignature = Boolean(formData.validation.signatureDataUrl);
-  const rgpdAccepted = Boolean(formData.validation.rgpdAccepted);
-  const currentStatus = formData.workflow.status;
-  const resourceIssues = formData.meta.resourceValidationErrors || [];
-  const resourceCompletion = summarizeRequestedResourceCompletion(formData);
-
-  if (["returned", "partial_return", "cancelled"].includes(currentStatus)) {
-    return formData;
-  }
-
-  if (!hasSignature || !rgpdAccepted) {
-    formData.workflow.status = "draft";
-    formData.meta.lockedAt = "";
-    return formData;
-  }
-
-  if (resourceIssues.length > 0) {
-    formData.workflow.status = "partial_assignment";
-    formData.meta.lockedAt = "";
-    const details = resourceIssues.map((issue) => `- ${issue}`).join("\n");
-    alert(`Certaines ressources cochées ne sont pas complètement renseignées.\n\n${details}\n\nLe dossier sera conservé comme attribution partielle et restera modifiable.`);
-    return formData;
-  }
-
-  if (resourceCompletion.completed < resourceCompletion.total) {
-    formData.workflow.status = "partial_assignment";
-    formData.meta.lockedAt = "";
-    const missingDetails = resourceCompletion.missing.map((resource) => `- ${resource.label} : date d'attribution manquante`).join("\n");
-    alert(`L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) sont attribuées.\n\n${missingDetails}\n\nLe dossier sera conservé comme attribution partielle et restera modifiable.`);
-    return formData;
-  }
-
-  if (!hasSignature) {
-    formData.workflow.status = "awaiting_signature";
-    formData.meta.lockedAt = "";
-    alert("Le dossier est complet et n'attend plus que la signature finale.");
-    return formData;
-  }
-
-  const isComplete = window.confirm("L'attribution est-elle complète \n\nOK = Complète et verrouillée\nAnnuler = Partielle et modifiable plus tard");
-  if (isComplete) {
-    formData.workflow.status = "active";
-    formData.meta.lockedAt = formData.meta.lockedAt || new Date().toISOString();
-    return formData;
-  }
-
-  formData.workflow.status = "partial_assignment";
-  formData.meta.lockedAt = "";
-  return formData;
+  return labels[status] || "Ã€ complÃ©ter";
 }
 
 function updateDraftUi(savedAt, isLoaded = false, status = "draft") {
@@ -1715,10 +1632,10 @@ function updateDraftUi(savedAt, isLoaded = false, status = "draft") {
     timeStyle: "short"
   }).format(new Date(savedAt));
 
-  draftStatus.textContent = isLoaded ? `${label} chargé le ${formatted}` : `${label} enregistré le ${formatted}`;
+  draftStatus.textContent = isLoaded ? `${label} chargÃ© le ${formatted}` : `${label} enregistrÃ© le ${formatted}`;
   updateStatusInfo(status);
   if (!currentLockState) {
-    resumeHint.textContent = "Vous pouvez rouvrir ce dossier depuis l'accueil pour le mettre à jour ou lancer une restitution dédiée.";
+    resumeHint.textContent = "Vous pouvez rouvrir ce dossier depuis l'accueil pour le mettre Ã  jour ou lancer une restitution dÃ©diÃ©e.";
   }
 }
 
@@ -1738,11 +1655,11 @@ function renderReopenInfo(meta = {}) {
 
   const lastReopenedAt = meta.lastReopenedAt
     ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(meta.lastReopenedAt))
-    : "date non renseignée";
-  const lastReopenedBy = meta.lastReopenedBy || "utilisateur non renseigné";
+    : "date non renseignÃ©e";
+  const lastReopenedBy = meta.lastReopenedBy || "utilisateur non renseignÃ©";
   text.textContent = reopenCount === 1
-    ? `Ce dossier a déjà été rouvert 1 fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`
-    : `Ce dossier a déjà été rouvert ${reopenCount} fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`;
+    ? `Ce dossier a dÃ©jÃ  Ã©tÃ© rouvert 1 fois. DerniÃ¨re rÃ©ouverture le ${lastReopenedAt} par ${lastReopenedBy}.`
+    : `Ce dossier a dÃ©jÃ  Ã©tÃ© rouvert ${reopenCount} fois. DerniÃ¨re rÃ©ouverture le ${lastReopenedAt} par ${lastReopenedBy}.`;
   notice.classList.remove("d-none");
 }
 
@@ -1784,23 +1701,23 @@ function updateSignatureLinkUi(link) {
 
   const hasCollectedSignature = Boolean(form.dataset.lockedAt || document.getElementById("signature")?.dataset.signed === "true");
   if (!link) {
-    status.textContent = hasCollectedSignature ? "Dossier signé" : "Aucun lien";
+    status.textContent = hasCollectedSignature ? "Dossier signÃ©" : "Aucun lien";
     emptyState.classList.remove("d-none");
     details.classList.add("d-none");
     if (createBtn) {
       createBtn.disabled = hasCollectedSignature || !form.dataset.draftId;
     }
     if (hasCollectedSignature) {
-      emptyState.innerHTML = "<p class=\"panel-text mb-0\">La signature a déjà été recueillie pour ce dossier. Le lien à distance n'est plus nécessaire.</p>";
+      emptyState.innerHTML = "<p class=\"panel-text mb-0\">La signature a dÃ©jÃ  Ã©tÃ© recueillie pour ce dossier. Le lien Ã  distance n'est plus nÃ©cessaire.</p>";
     }
     return;
   }
 
   const statusLabels = {
     active: "Lien actif",
-    used: "Lien utilisé",
-    revoked: "Lien révoqué",
-    expired: "Lien expiré"
+    used: "Lien utilisÃ©",
+    revoked: "Lien rÃ©voquÃ©",
+    expired: "Lien expirÃ©"
   };
   status.textContent = statusLabels[link.status] || "Lien";
   emptyState.classList.add("d-none");
@@ -1835,7 +1752,7 @@ async function loadSignatureLinkState() {
 
 async function createSignatureLink() {
   if (!form.dataset.draftId) {
-    window.alert("Enregistrez d'abord le dossier avant de générer un lien.");
+    window.alert("Enregistrez d'abord le dossier avant de gÃ©nÃ©rer un lien.");
     return;
   }
   try {
@@ -1843,9 +1760,9 @@ async function createSignatureLink() {
       method: "POST"
     });
     updateSignatureLinkUi(result.link);
-    window.alert("Le lien de signature a été généré.");
+    window.alert("Le lien de signature a Ã©tÃ© gÃ©nÃ©rÃ©.");
   } catch (error) {
-    window.alert(error.message || "Impossible de générer le lien de signature.");
+    window.alert(error.message || "Impossible de gÃ©nÃ©rer le lien de signature.");
   }
 }
 
@@ -1853,7 +1770,7 @@ async function revokeSignatureLink() {
   if (!currentSignatureLink?.id) {
     return;
   }
-  if (!window.confirm("Révoquer le lien de signature actif ?")) {
+  if (!window.confirm("RÃ©voquer le lien de signature actif ?")) {
     return;
   }
   try {
@@ -1862,7 +1779,7 @@ async function revokeSignatureLink() {
     });
     updateSignatureLinkUi(result.link);
   } catch (error) {
-    window.alert(error.message || "Impossible de révoquer ce lien.");
+    window.alert(error.message || "Impossible de rÃ©voquer ce lien.");
   }
 }
 
@@ -1873,7 +1790,7 @@ async function copySignatureLink() {
   const absoluteUrl = new URL(currentSignatureLink.url, window.location.origin).href;
   try {
     await navigator.clipboard.writeText(absoluteUrl);
-    window.alert("Lien de signature copié.");
+    window.alert("Lien de signature copiÃ©.");
   } catch (error) {
     window.prompt("Copiez ce lien :", absoluteUrl);
   }
@@ -1899,7 +1816,7 @@ async function loadDraftFromUrl(signaturePad) {
     return;
   }
 
-  showPageLoader("Récupération des informations de la fiche en cours...");
+  showPageLoader("RÃ©cupÃ©ration des informations de la fiche en cours...");
   const result = await getDraftById(id);
   if (!result) {
     alert("La fiche demandee est introuvable.");
@@ -1919,7 +1836,7 @@ async function loadDraftFromUrl(signaturePad) {
         result.data.meta = { ...(result.data.meta || {}), ...reopenResult.meta };
       }
     } catch (error) {
-      console.error("Impossible de tracer la réouverture du dossier", error);
+      console.error("Impossible de tracer la rÃ©ouverture du dossier", error);
     }
   }
 
@@ -1931,55 +1848,20 @@ async function loadDraftFromUrl(signaturePad) {
 }
 
 async function exportPDF(signaturePad) {
-  alert("L'export PDF est disponible depuis la page d'accueil une fois la fiche enregistrée.");
-}
-
-async function saveDraft(signaturePad) {
-  // Sauvegarde principale de la fiche depuis l'Écran de saisie.
-  try {
-    const formData = getFormData(signaturePad);
-    if (!validateFormData(formData)) {
-      return;
-    }
-    resolveSaveWorkflow(formData);
-
-    const result = await saveFormData(formData);
-    form.dataset.draftId = result.summary.id;
-    form.dataset.lockedAt = result.data.meta.lockedAt || formData.meta.lockedAt || "";
-    updateDraftUi(result.summary.updatedAt, false, result.summary.status);
-    await loadSignatureLinkState();
-    if (form.dataset.lockedAt) {
-      applyLockState(true);
-    }
-    if (result.offline) {
-      alert(`Fiche enregistrée localement : ${result.summary.title}`);
-      resumeHint.textContent = "Le dossier a été conservé localement et pourra être repris depuis cet appareil.";
-      window.location.href = "index.html";
-      return;
-    }
-    alert(`Fiche enregistrée en base : ${result.summary.title}`);
-    window.location.href = "index.html";
-  } catch (error) {
-    console.error("Erreur lors de l'enregistrement du dossier", error);
-    alert(
-      error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
-        ? error.message
-        : "Impossible d'enregistrer la fiche."
-    );
-  }
+  alert("L'export PDF est disponible depuis la page d'accueil une fois la fiche enregistrÃ©e.");
 }
 
 function validateFormData(formData, options = {}) {
   if (!formData.beneficiaire.nom || !formData.beneficiaire.prenom) {
-    return "Le nom et le prénom sont obligatoires.";
+    return "Le nom et le prÃ©nom sont obligatoires.";
   }
 
   if (!formData.beneficiaire.qualite) {
-    return "Veuillez sélectionner la qualité du bénéficiaire.";
+    return "Veuillez sÃ©lectionner la qualitÃ© du bÃ©nÃ©ficiaire.";
   }
 
   if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat) {
-    return "Veuillez renseigner le mandat de l'élu.";
+    return "Veuillez renseigner le mandat de l'Ã©lu.";
   }
 
   if (options.requireRgpd && !formData.validation.rgpdAccepted) {
@@ -1989,6 +1871,45 @@ function validateFormData(formData, options = {}) {
   const resourceIssues = collectResourceValidationIssues();
   formData.meta.resourceValidationErrors = resourceIssues;
   return null;
+}
+
+function updateSaveProgress(options = {}) {
+  if (typeof window.showWorkflowDialog === "function") {
+    window.showWorkflowDialog(options);
+    return;
+  }
+
+  showPageLoader(options.text || options.title || "Traitement en cours...");
+}
+
+function closeSaveProgress() {
+  if (typeof window.closeWorkflowDialog === "function") {
+    window.closeWorkflowDialog();
+  }
+  hidePageLoader();
+}
+
+async function requestSaveDecision(options = {}) {
+  if (typeof window.askWorkflowDialog === "function") {
+    return window.askWorkflowDialog(options);
+  }
+
+  hidePageLoader();
+  const title = options.title || "Confirmation";
+  const text = options.text || "";
+  const lines = [title, text].filter(Boolean);
+  const message = lines.join("\n\n");
+
+  if (options.secondaryLabel) {
+    return window.confirm(message) ? "confirm" : "secondary";
+  }
+
+  if (options.showConfirm) {
+    window.alert(message);
+    return "confirm";
+  }
+
+  return "secondary";
 }
 
 function createWorkflowSteps(labels, activeIndex = 0) {
@@ -2002,7 +1923,7 @@ async function showSaveInfoDialog(title, text, items = []) {
   const steps = items.length
     ? items.map((label) => ({ label, status: "error" }))
     : [{ label: text, status: "error" }];
-  await window.askWorkflowDialog({
+  await requestSaveDecision({
     title,
     text,
     steps,
@@ -2034,7 +1955,7 @@ async function resolveSaveWorkflow(formData) {
     formData.meta.lockedAt = "";
     await showSaveInfoDialog(
       "Attribution partielle",
-      "Certaines ressources cochées ne sont pas complètement renseignées. Le dossier reste modifiable.",
+      "Certaines ressources cochÃ©es ne sont pas complÃ¨tement renseignÃ©es. Le dossier reste modifiable.",
       resourceIssues
     );
     return formData;
@@ -2046,7 +1967,7 @@ async function resolveSaveWorkflow(formData) {
     const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : date d'attribution manquante`);
     await showSaveInfoDialog(
       "Attribution partielle",
-      `L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuées.`,
+      `L'attribution n'est pas encore complÃ¨te : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuÃ©es.`,
       missingDetails
     );
     return formData;
@@ -2062,12 +1983,12 @@ async function resolveSaveWorkflow(formData) {
     return formData;
   }
 
-  const choice = await window.askWorkflowDialog({
+  const choice = await requestSaveDecision({
     title: "Finalisation du dossier",
-    text: "Toutes les informations sont présentes. Souhaitez-vous verrouiller ce dossier comme attribution complète ?",
+    text: "Toutes les informations sont prÃ©sentes. Souhaitez-vous verrouiller ce dossier comme attribution complÃ¨te ?",
     steps: [
-      { label: "Bénéficiaire, ressources et validation sont complets", status: "done" },
-      { label: "Choisissez entre finalisation complète ou poursuite en mode partiel", status: "active" }
+      { label: "BÃ©nÃ©ficiaire, ressources et validation sont complets", status: "done" },
+      { label: "Choisissez entre finalisation complÃ¨te ou poursuite en mode partiel", status: "active" }
     ],
     hideSpinner: true,
     showConfirm: true,
@@ -2088,35 +2009,35 @@ async function resolveSaveWorkflow(formData) {
 
 async function saveDraft(signaturePad) {
   const workflowLabels = [
-    "Préparation des informations du dossier",
-    "Analyse de complétude et du workflow",
-    "Enregistrement sécurisé du dossier",
+    "PrÃ©paration des informations du dossier",
+    "Analyse de complÃ©tude et du workflow",
+    "Enregistrement sÃ©curisÃ© du dossier",
     "Finalisation de l'interface"
   ];
 
   try {
-    window.showWorkflowDialog({
+    updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "Le dossier est en cours de préparation avant sauvegarde.",
+      text: "Le dossier est en cours de prÃ©paration avant sauvegarde.",
       steps: createWorkflowSteps(workflowLabels, 0)
     });
 
     const formData = getFormData(signaturePad);
     const validationError = validateFormData(formData);
     if (validationError) {
-      window.closeWorkflowDialog();
+      closeSaveProgress();
       await showSaveInfoDialog("Enregistrement impossible", validationError);
       return;
     }
 
-    window.showWorkflowDialog({
+    updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "Le dossier est en cours d'analyse pour déterminer son état métier.",
+      text: "Le dossier est en cours d'analyse pour dÃ©terminer son Ã©tat mÃ©tier.",
       steps: createWorkflowSteps(workflowLabels, 1)
     });
     await resolveSaveWorkflow(formData);
 
-    window.showWorkflowDialog({
+    updateSaveProgress({
       title: "Enregistrement du dossier",
       text: "Les informations sont en cours d'enregistrement.",
       steps: createWorkflowSteps(workflowLabels, 2)
@@ -2131,21 +2052,21 @@ async function saveDraft(signaturePad) {
       applyLockState(true);
     }
 
-    window.showWorkflowDialog({
+    updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "La fiche a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
+      text: "La fiche a Ã©tÃ© enregistrÃ©e. L'application finalise maintenant le retour vers le tableau de bord.",
       steps: workflowLabels.map((label) => ({ label, status: "done" }))
     });
 
-    if (["active", "awaiting_signature"].includes(result.summary.status || "")) {
+    if (["active", "awaiting_signature"].includes(result.summary.status || "") && typeof window.playCompletionCelebration === "function") {
       await window.playCompletionCelebration("confetti");
     }
 
     if (result.offline) {
-      resumeHint.textContent = "Le dossier a été conservé localement et pourra être repris depuis cet appareil.";
-      await window.askWorkflowDialog({
-        title: "Dossier enregistré localement",
-        text: `La fiche « ${result.summary.title} » a été conservée sur cet appareil.`,
+      resumeHint.textContent = "Le dossier a Ã©tÃ© conservÃ© localement et pourra Ãªtre repris depuis cet appareil.";
+      await requestSaveDecision({
+        title: "Dossier enregistrÃ© localement",
+        text: `La fiche Â« ${result.summary.title} Â» a Ã©tÃ© conservÃ©e sur cet appareil.`,
         steps: workflowLabels.map((label) => ({ label, status: "done" })),
         hideSpinner: true,
         showConfirm: true,
@@ -2155,9 +2076,9 @@ async function saveDraft(signaturePad) {
       return;
     }
 
-    await window.askWorkflowDialog({
-      title: "Dossier enregistré",
-      text: `La fiche « ${result.summary.title} » est maintenant à jour.`,
+    await requestSaveDecision({
+      title: "Dossier enregistrÃ©",
+      text: `La fiche Â« ${result.summary.title} Â» est maintenant Ã  jour.`,
       steps: workflowLabels.map((label) => ({ label, status: "done" })),
       hideSpinner: true,
       showConfirm: true,
@@ -2166,10 +2087,10 @@ async function saveDraft(signaturePad) {
     window.location.href = "index.html";
   } catch (error) {
     console.error("Erreur lors de l'enregistrement du dossier", error);
-    window.closeWorkflowDialog();
+    closeSaveProgress();
     await showSaveInfoDialog(
       "Erreur d'enregistrement",
-      error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
+      error.message === "Cette fiche est signÃ©e et verrouillÃ©e. Elle ne peut plus Ãªtre modifiÃ©e."
         ? error.message
         : "Impossible d'enregistrer la fiche."
     );
@@ -2230,6 +2151,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadDynamicResourceReferences();
     await getSessionInfo();
     const signaturePad = initSignaturePad();
+    document.getElementById("saveDraftBtn").addEventListener("click", () => {
+      void saveDraft(signaturePad);
+    });
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();
     initConditionalBlocks();
@@ -2242,9 +2166,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    document.getElementById("saveDraftBtn").addEventListener("click", () => {
-      void saveDraft(signaturePad);
-    });
     document.getElementById("createSignatureLinkBtn")?.addEventListener("click", () => {
       void createSignatureLink();
     });
@@ -2287,7 +2208,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
   } catch (error) {
     console.error("Erreur de chargement du formulaire", error);
-    alert("Impossible de charger correctement le formulaire. La page a été débloquée pour permettre un nouveau test.");
+    alert("Impossible de charger correctement le formulaire. La page a Ã©tÃ© dÃ©bloquÃ©e pour permettre un nouveau test.");
     hidePageLoader();
   }
 });
@@ -2309,4 +2230,6 @@ function normalizeDossierType(value) {
 
 
 // Module principal de la fiche d'attribution :
-// collecte métier, validation locale et sérialisation du payload.
+// collecte mÃ©tier, validation locale et sÃ©rialisation du payload.
+
+

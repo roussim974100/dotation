@@ -1,4 +1,4 @@
-function initBackToTop() {
+﻿function initBackToTop() {
   if (!document.body.classList.contains("app-shell")) {
     return;
   }
@@ -59,7 +59,8 @@ function initContextualHelpLinks() {
 
 function repairMojibakeText(value) {
   const text = String(value || "");
-  if (!/(?:�.|�.|�.|?)/.test(text)) {
+  const mojibakeMarkers = ["Ã", "Â", "ï¿½", "�"];
+  if (!mojibakeMarkers.some((marker) => text.includes(marker))) {
     return text;
   }
 
@@ -79,7 +80,7 @@ function repairMojibakeText(value) {
       break;
     }
     repaired = candidate;
-    if (!/(?:�.|�.|�.|?)/.test(repaired)) {
+    if (!mojibakeMarkers.some((marker) => repaired.includes(marker))) {
       break;
     }
   }
@@ -201,12 +202,12 @@ function getWorkflowStepStateLabel(status) {
     return "En cours";
   }
   if (status === "done") {
-    return "Terminé";
+    return "TerminÃ©";
   }
   if (status === "error") {
     return "Erreur";
   }
-  return "À traiter";
+  return "Ã€ traiter";
 }
 
 function renderWorkflowDialog(options = {}) {
@@ -336,3 +337,4 @@ document.addEventListener("DOMContentLoaded", () => {
   initContextualHelpLinks();
   initMojibakeRepair();
 });
+
