@@ -1877,6 +1877,236 @@ body.login-shell {
   margin-top: 1.2rem;
 }
 
+.workflow-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.workflow-dialog.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.workflow-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 28, 40, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.workflow-dialog__panel {
+  position: relative;
+  width: min(100%, 38rem);
+  padding: 1.35rem;
+  border: 1px solid rgba(212, 221, 230, 0.9);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 56px rgba(15, 55, 84, 0.22);
+}
+
+.workflow-dialog__header {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.workflow-dialog__header p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+.workflow-dialog__spinner {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 2.6rem;
+  border: 4px solid #d8e4ec;
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: loader-spin 0.8s linear infinite;
+}
+
+.workflow-dialog__list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(15, 91, 141, 0.10);
+}
+
+.workflow-dialog__item {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(15, 91, 141, 0.08);
+}
+
+.workflow-dialog__item:last-child {
+  border-bottom: 0;
+}
+
+.workflow-dialog__bullet {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 0.9rem;
+  margin-top: 0.18rem;
+  border-radius: 50%;
+  border: 2px solid #c6d5df;
+  background: #eef4f8;
+}
+
+.workflow-dialog__content {
+  min-width: 0;
+}
+
+.workflow-dialog__label {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.workflow-dialog__state {
+  display: block;
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.workflow-dialog__item.is-active .workflow-dialog__bullet {
+  border-color: var(--brand);
+  background: rgba(15, 91, 141, 0.18);
+  box-shadow: 0 0 0 6px rgba(15, 91, 141, 0.10);
+}
+
+.workflow-dialog__item.is-done .workflow-dialog__bullet {
+  border-color: #1f8f59;
+  background: #1f8f59;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.workflow-dialog__item.is-error .workflow-dialog__bullet {
+  border-color: #b84a4a;
+  background: #b84a4a;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.workflow-dialog__item.is-active .workflow-dialog__state {
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
+.workflow-dialog__item.is-done .workflow-dialog__state {
+  color: #1f8f59;
+}
+
+.workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #b84a4a;
+  font-weight: 600;
+}
+
+.workflow-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+}
+
+.completion-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 1085;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.completion-celebration__piece {
+  position: absolute;
+  top: -10vh;
+  width: 0.7rem;
+  height: 1.1rem;
+  border-radius: 0.2rem;
+  opacity: 0.96;
+  animation: confetti-fall linear forwards;
+}
+
+.boat-departure {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2rem;
+  height: 8rem;
+}
+
+.boat-departure__waves {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  bottom: 0;
+  height: 1.6rem;
+  background:
+    radial-gradient(circle at 1rem 1.1rem, rgba(100, 167, 217, 0) 0.75rem, rgba(100, 167, 217, 0.82) 0.78rem, rgba(100, 167, 217, 0.82) 1rem, rgba(100, 167, 217, 0) 1.03rem) 0 0 / 3rem 100% repeat-x;
+  opacity: 0.92;
+}
+
+.boat-departure__boat {
+  position: absolute;
+  left: -8rem;
+  bottom: 1.2rem;
+  width: 8.5rem;
+  height: 4.4rem;
+  animation: boat-departure 2.6s ease-in forwards;
+}
+
+.boat-departure__flag {
+  position: absolute;
+  right: 1.8rem;
+  top: 0.1rem;
+  width: 0.85rem;
+  height: 1.35rem;
+  border-left: 2px solid #0f5b8d;
+}
+
+.boat-departure__flag::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.1rem;
+  width: 0;
+  height: 0;
+  border-top: 0.32rem solid transparent;
+  border-bottom: 0.32rem solid transparent;
+  border-left: 0.65rem solid #d9a441;
+}
+
+.boat-departure__cabin {
+  position: absolute;
+  right: 1.6rem;
+  bottom: 1.35rem;
+  width: 2rem;
+  height: 1.3rem;
+  border-radius: 0.3rem 0.3rem 0.1rem 0.1rem;
+  background: #f9fbfd;
+  border: 2px solid #0f5b8d;
+}
+
+.boat-departure__hull {
+  position: absolute;
+  left: 0.8rem;
+  right: 0.2rem;
+  bottom: 0.5rem;
+  height: 1.55rem;
+  background: linear-gradient(180deg, #1c5884, #0f3f63);
+  clip-path: polygon(4% 18%, 100% 18%, 82% 100%, 14% 100%);
+  border-radius: 0.25rem;
+  box-shadow: 0 14px 28px rgba(15, 55, 84, 0.18);
+}
+
 .export-progress {
   margin-top: 1rem;
 }
@@ -1907,6 +2137,37 @@ body.login-shell {
 @keyframes loader-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(1.5rem, 105vh, 0) rotate(420deg);
+    opacity: 0;
+  }
+}
+
+@keyframes boat-departure {
+  0% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(calc(50vw - 4rem)) translateY(-0.2rem) rotate(-1.2deg);
+  }
+  100% {
+    transform: translateX(calc(100vw + 8rem)) translateY(-0.45rem) rotate(1deg);
+    opacity: 0;
   }
 }
 
