@@ -1,4 +1,4 @@
-# Recette Fonctionnelle
+﻿# Recette Fonctionnelle
 
 ## Preparation
 
@@ -36,7 +36,7 @@ python backend\app.py
 - l'administration des ressources est accessible
 - la page `Journal` est accessible
 - la page `Corbeille` est accessible pour un admin
-- le dossier `administratif/versions/` est present
+- le dossier `version/versions/` est present
 - la deconnexion fonctionne
 
 ## Scenarios de test
@@ -177,3 +177,4 @@ Attendu :
 - le header reste lisible
 - pas de scroll lateral parasite
 - le bouton `Haut` reste utilisable
+

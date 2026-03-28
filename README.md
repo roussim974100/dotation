@@ -1,4 +1,4 @@
-# Parcours agents et elu(e)s
+﻿# Parcours agents et elu(e)s
 
 Application interne de gestion des dossiers d'attribution et de restitution pour une collectivite.
 
@@ -31,7 +31,7 @@ Application interne de gestion des dossiers d'attribution et de restitution pour
 - `GUIDE_UTILISATEUR.md` : guide d'usage rapide
 - `RECETTE_FONCTIONNELLE.md` : checklist et scenarios de test
 - `wikijs.md` : documentation prete a integrer dans Wiki.js
-- `administratif/versions/` : archives documentaires par version
+- `version/versions/` : archives documentaires par version
 
 ## Architecture
 
@@ -219,3 +219,4 @@ Controle minimal recommande apres modification :
 ```powershell
 python -m py_compile backend\app.py
 ```
+

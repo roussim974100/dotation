@@ -1,4 +1,4 @@
-# Guide Utilisateur 2.9.0
+﻿# Guide Utilisateur 2.9.0
 
 ## Objet
 
@@ -26,4 +26,5 @@ La liste des services proposes dans les formulaires est maintenant administrable
 
 ## Documentation
 
-Les versions documentaires sont archivees dans `administratif/versions/`.
+Les versions documentaires sont archivees dans `version/versions/`.
+

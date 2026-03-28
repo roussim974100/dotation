@@ -1,4 +1,4 @@
-# Guide Utilisateur
+﻿# Guide Utilisateur
 
 ## Objet
 
@@ -159,5 +159,6 @@ Elle permet de restaurer :
 
 ## Archives documentaires
 
-Les versions documentaires sont archivees dans `administratif/versions/`.
+Les versions documentaires sont archivees dans `version/versions/`.
 Chaque version dispose de son propre dossier et de fichiers suffixes par la version.
+

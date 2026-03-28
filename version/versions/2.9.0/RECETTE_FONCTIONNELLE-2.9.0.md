@@ -1,4 +1,4 @@
-# Recette Fonctionnelle 2.9.0
+﻿# Recette Fonctionnelle 2.9.0
 
 ## Controle rapide
 
@@ -14,6 +14,7 @@
 
 ## Controle documentaire
 
-- dossier `administratif/versions/` present
+- dossier `version/versions/` present
 - version `2.9.0` documentee
 - archives plus anciennes presentes
+

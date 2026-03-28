@@ -1,4 +1,4 @@
-# Parcours agents et elu(e)s
+﻿# Parcours agents et elu(e)s
 
 ## Cartouche de version
 
@@ -194,7 +194,7 @@ L'administration est organisee en sous-pages :
 
 Les versions documentaires sont archivees dans :
 
-- `administratif/versions/`
+- `version/versions/`
 
 Chaque version dispose de son propre dossier avec des fichiers nommes par version.
 Les anciennes versions archivees sont distinguees entre :
@@ -253,3 +253,4 @@ Elle permet de restaurer :
 - vue personne consolidee
 - audit encore plus detaille
 - parametrage plus avance des restitutions
+
