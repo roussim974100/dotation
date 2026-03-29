@@ -1,5 +1,7 @@
 ﻿# Guide Utilisateur
 
+Version de reference : `2.10.0`
+
 ## Objet
 
 L'application permet de gerer :
@@ -9,6 +11,7 @@ L'application permet de gerer :
 - la validation RGPD
 - la restitution des ressources materielles
 - l'administration des comptes, des services et des ressources
+- la creation de ressources personnalisees avec leurs propres champs
 - le journal des actions pour la tracabilite
 - la restauration d'elements supprimes via la corbeille admin
 
@@ -47,9 +50,10 @@ Les profils en consultation seule peuvent exporter les PDF, mais sans affichage 
 3. Choisir la qualite `Agent` ou `Elu(e)`
 4. Choisir le type de dossier
 5. Renseigner les ressources attribuees
-6. Saisir la signature de remise si necessaire
-7. Cocher la validation RGPD
-8. Cliquer sur `Enregistrer`
+6. Completer les ressources personnalisees si elles ont ete definies dans le referentiel
+7. Saisir la signature de remise si necessaire
+8. Cocher la validation RGPD
+9. Cliquer sur `Enregistrer`
 
 Un dossier incomplet reste modifiable.
 

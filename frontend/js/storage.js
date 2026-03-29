@@ -20,7 +20,8 @@ const dashboardFilters = {
   status: "",
   timing: "",
   qualite: "",
-  service: ""
+  service: "",
+  sort: "recent"
 };
 
 // Cache navigateur de secours : utile hors backend ou en cas de coupure réseau.
@@ -164,11 +165,49 @@ function buildLocalSummary(payload) {
   };
 }
 
+function usesDynamicResourceAssignmentDate(resource) {
+  if (resource && (Object.prototype.hasOwnProperty.call(resource, "hasAssignmentDate") || Object.prototype.hasOwnProperty.call(resource, "has_assignment_date"))) {
+    return Boolean(resource.hasAssignmentDate ?? resource.has_assignment_date);
+  }
+  return true;
+}
+
+function summarizeDynamicResource(resource) {
+  const fields = resource?.fields || {};
+  const values = Object.values(fields).map((value) => String(value || "").trim()).filter(Boolean);
+  if (values.length) {
+    return values.join(" - ");
+  }
+  return String(resource?.details || "").trim();
+}
+
+function isDynamicResourceComplete(resource) {
+  if (!resource?.selected) {
+    return false;
+  }
+  const fieldSchema = Array.isArray(resource.fieldSchema)
+    ? resource.fieldSchema
+    : (Array.isArray(resource.field_schema) ? resource.field_schema : []);
+  const fieldValues = resource.fields || {};
+  if (fieldSchema.length) {
+    const hasMissingRequiredField = fieldSchema.some((field) => field.required && !String(fieldValues[field.key] || "").trim());
+    if (hasMissingRequiredField) {
+      return false;
+    }
+  } else if (!summarizeDynamicResource(resource)) {
+    return false;
+  }
+  if (usesDynamicResourceAssignmentDate(resource) && !String(resource.assignedAt || "").trim()) {
+    return false;
+  }
+  return true;
+}
+
 function collectRequestedResourcesFromPayload(payload) {
   const resources = [];
   const pushIfSelected = (item, key) => {
     if (item?.selected) {
-      resources.push({ key, assignedAt: item.assignedAt || "" });
+      resources.push({ key, isCompleted: Boolean(item.assignedAt) });
     }
   };
 
@@ -178,7 +217,10 @@ function collectRequestedResourcesFromPayload(payload) {
   Object.entries(immateriel).forEach(([key, item]) => pushIfSelected(item, key));
   (payload?.resources?.additional || []).forEach((resource) => {
     if (resource?.selected) {
-      resources.push({ key: resource.id || resource.code || "resource", assignedAt: resource.assignedAt || "" });
+      resources.push({
+        key: resource.id || resource.code || "resource",
+        isCompleted: isDynamicResourceComplete(resource)
+      });
     }
   });
   return resources;
@@ -187,7 +229,7 @@ function collectRequestedResourcesFromPayload(payload) {
 function summarizeDraftProgressFromPayload(payload = {}) {
   const requested = collectRequestedResourcesFromPayload(payload);
   const total = requested.length;
-  const completed = requested.filter((resource) => resource.assignedAt).length;
+  const completed = requested.filter((resource) => resource.isCompleted).length;
   const startAt = payload?.meta?.startAt || "";
 
   if (total === 0) {
@@ -368,6 +410,41 @@ function isRestitutionDashboardDraft(draft) {
   return hasRestitutionData(draft) || ["partial_return", "returned"].includes(status);
 }
 
+function isOperationalAssignmentDraft(draft) {
+  return !isRestitutionDashboardDraft(draft)
+    && ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft");
+}
+
+function isOperationalRestitutionDraft(draft) {
+  return hasRestitutionData(draft)
+    && ["active", "partial_return", "awaiting_signature"].includes(draft.status || "draft");
+}
+
+function isCompletedAssignmentDraft(draft) {
+  return !hasRestitutionData(draft) && (draft.status || "draft") === "active";
+}
+
+function isCompletedRestitutionDraft(draft) {
+  return (draft.status || "draft") === "returned";
+}
+
+function getDashboardViewMode() {
+  return document.body?.dataset?.dashboardView || "active";
+}
+
+function sortDraftsForDisplay(drafts) {
+  const sorted = [...drafts];
+  sorted.sort((left, right) => {
+    const leftDate = new Date(left.updatedAt || left.assignedAt || 0).getTime();
+    const rightDate = new Date(right.updatedAt || right.assignedAt || 0).getTime();
+    if (dashboardFilters.sort === "oldest") {
+      return leftDate - rightDate;
+    }
+    return rightDate - leftDate;
+  });
+  return sorted;
+}
+
 function renderDraftActionMenu(label, tone, actions) {
   const sections = actions.filter((action) => String(action || "").trim());
   if (!sections.length) {
@@ -502,6 +579,20 @@ function applyDashboardFilters(drafts) {
     const matchesService = !dashboardFilters.service || getDraftServiceValue(draft) === dashboardFilters.service;
     return matchesSearch && matchesStatus && matchesTiming && matchesQualite && matchesService;
   });
+}
+
+function filterDraftsForCurrentView(drafts) {
+  const viewMode = getDashboardViewMode();
+
+  if (viewMode === "history_assignments") {
+    return drafts.filter((draft) => isCompletedAssignmentDraft(draft));
+  }
+
+  if (viewMode === "history_restitutions") {
+    return drafts.filter((draft) => isCompletedRestitutionDraft(draft));
+  }
+
+  return drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));
 }
 
 function hydrateServiceFilterOptions(drafts) {
@@ -733,22 +824,26 @@ async function renderDraftList() {
     return;
   }
   dashboardRefreshInFlight = true;
-  // Écran principal :
-  // - liste toutes les fiches
-  // - sépare les attributions et les restitutions
-  // - calcule le compteur des fiches encore à compléter
-  // - affiche les actions selon les droits de l'utilisateur
+  // Le rendu est partagé entre :
+  // - le tableau de bord opérationnel
+  // - l'historique des dossiers terminés
+  // - l'historique des restitutions terminées
   const draftList = document.getElementById("draftList");
   const restitutionList = document.getElementById("restitutionList");
+  const historyList = document.getElementById("historyList");
   const assignmentDraftCount = document.getElementById("assignmentDraftCount");
   const restitutionDraftCount = document.getElementById("restitutionDraftCount");
+  const historyCountValue = document.getElementById("historyCountValue");
   const emptyState = document.getElementById("emptyState");
   const assignmentEmptyState = document.getElementById("assignmentEmptyState");
   const restitutionEmptyState = document.getElementById("restitutionEmptyState");
   const assignmentCountBadge = document.getElementById("assignmentCountBadge");
   const restitutionCountBadge = document.getElementById("restitutionCountBadge");
+  const historyCountBadge = document.getElementById("historyCountBadge");
+  const historyEmptyState = document.getElementById("historyEmptyState");
+  const viewMode = getDashboardViewMode();
 
-  if (!draftList || !restitutionList) {
+  if (!draftList && !restitutionList && !historyList) {
     dashboardRefreshInFlight = false;
     return;
   }
@@ -756,7 +851,7 @@ async function renderDraftList() {
   try {
     captureDashboardSelection();
     const drafts = await listForms();
-    const sortedDrafts = [...drafts].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    const sortedDrafts = sortDraftsForDisplay(drafts);
     const previousIds = new Set(dashboardKnownIds);
     const newDraftIds = previousIds.size === 0
       ? []
@@ -771,11 +866,12 @@ async function renderDraftList() {
     persistPendingDashboardUpdates();
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
-    const filteredDrafts = applyDashboardFilters(sortedDrafts);
-    const assignmentDrafts = filteredDrafts.filter((draft) => !isRestitutionDashboardDraft(draft));
-    const restitutionDrafts = filteredDrafts.filter((draft) => isRestitutionDashboardDraft(draft));
-    const completableAssignmentDrafts = assignmentDrafts.filter((draft) => ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft"));
-    const completableRestitutionDrafts = restitutionDrafts.filter((draft) => ["partial_return", "awaiting_signature"].includes(draft.status || "draft"));
+    const filteredDrafts = filterDraftsForCurrentView(applyDashboardFilters(sortedDrafts));
+    const assignmentDrafts = filteredDrafts.filter((draft) => isOperationalAssignmentDraft(draft));
+    const restitutionDrafts = filteredDrafts.filter((draft) => isOperationalRestitutionDraft(draft));
+    const historyDrafts = filteredDrafts;
+    const completableAssignmentDrafts = sortedDrafts.filter((draft) => isOperationalAssignmentDraft(draft));
+    const completableRestitutionDrafts = sortedDrafts.filter((draft) => isOperationalRestitutionDraft(draft));
 
     if (assignmentDraftCount) {
       assignmentDraftCount.textContent = completableAssignmentDrafts.length.toString();
@@ -789,41 +885,70 @@ async function renderDraftList() {
     if (restitutionCountBadge) {
       restitutionCountBadge.textContent = restitutionDrafts.length.toString();
     }
+    if (historyCountValue) {
+      historyCountValue.textContent = historyDrafts.length.toString();
+    }
+    if (historyCountBadge) {
+      historyCountBadge.textContent = historyDrafts.length.toString();
+    }
 
     if (filteredDrafts.length === 0) {
-      draftList.innerHTML = "";
-      restitutionList.innerHTML = "";
+      if (draftList) {
+        draftList.innerHTML = "";
+      }
+      if (restitutionList) {
+        restitutionList.innerHTML = "";
+      }
+      if (historyList) {
+        historyList.innerHTML = "";
+      }
       dashboardSelectedIds = new Set();
-      emptyState.classList.remove("d-none");
+      emptyState?.classList.toggle("d-none", viewMode !== "active");
       assignmentEmptyState?.classList.add("d-none");
       restitutionEmptyState?.classList.add("d-none");
+      historyEmptyState?.classList.toggle("d-none", viewMode === "active");
       updateDashboardRefreshInfo();
       setDashboardUpdateNotice();
       updateExportSelectedState();
       return;
     }
 
-    emptyState.classList.add("d-none");
+    emptyState?.classList.add("d-none");
+    historyEmptyState?.classList.add("d-none");
     const user = await getSessionInfo();
     const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
-    draftList.innerHTML = assignmentDrafts
-      .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
-      .join("");
-    restitutionList.innerHTML = restitutionDrafts
-      .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
-      .join("");
-    assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
-    restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
+
+    if (viewMode === "active") {
+      if (draftList) {
+        draftList.innerHTML = assignmentDrafts
+          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+          .join("");
+      }
+      if (restitutionList) {
+        restitutionList.innerHTML = restitutionDrafts
+          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+          .join("");
+      }
+      assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
+      restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
+    } else if (historyList) {
+      historyList.innerHTML = historyDrafts
+        .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+        .join("");
+      historyEmptyState?.classList.toggle("d-none", historyDrafts.length > 0);
+    }
 
     dashboardLastUpdatedAt = new Date().toISOString();
     updateDashboardRefreshInfo();
-    setDashboardUpdateNotice();
+    if (viewMode === "active") {
+      setDashboardUpdateNotice();
+    }
     bindStatusPreviews();
     bindDraftActionMenus();
-    bindSelectionActions(canExport, canDelete);
+    bindSelectionActions(viewMode === "active" && canExport, viewMode === "active" && canDelete);
     restoreDashboardSelection();
   } finally {
     dashboardRefreshInFlight = false;
@@ -1671,9 +1796,10 @@ function bindDashboardFilters() {
   const timingFilter = document.getElementById("timingFilter");
   const qualiteFilter = document.getElementById("qualiteFilter");
   const serviceFilter = document.getElementById("serviceFilter");
+  const sortFilter = document.getElementById("sortFilter");
   const resetButton = document.getElementById("resetFiltersBtn");
 
-  if (!searchInput || !statusFilter || !timingFilter || !qualiteFilter || !serviceFilter || !resetButton) {
+  if (!searchInput || !statusFilter || !timingFilter || !qualiteFilter || !serviceFilter || !sortFilter || !resetButton) {
     return;
   }
 
@@ -1702,12 +1828,18 @@ function bindDashboardFilters() {
     void renderDraftList();
   });
 
+  sortFilter.addEventListener("change", (event) => {
+    dashboardFilters.sort = event.target.value || "recent";
+    void renderDraftList();
+  });
+
   resetButton.addEventListener("click", () => {
     dashboardFilters.search = "";
     dashboardFilters.status = "";
     dashboardFilters.timing = "";
     dashboardFilters.qualite = "";
     dashboardFilters.service = "";
+    dashboardFilters.sort = "recent";
     if (searchInput) {
       searchInput.value = "";
     }
@@ -1722,6 +1854,9 @@ function bindDashboardFilters() {
     }
     if (serviceFilter) {
       serviceFilter.value = "";
+    }
+    if (sortFilter) {
+      sortFilter.value = "recent";
     }
     void renderDraftList();
   });
@@ -1834,7 +1969,7 @@ function startDashboardAutoRefresh() {
 
 document.addEventListener("DOMContentLoaded", () => {
   // Initialisation d'accueil : session, liste et masquage du hover au scroll.
-  if (!document.getElementById("draftList")) {
+  if (!document.getElementById("draftList") && !document.getElementById("historyList")) {
     return;
   }
   dashboardPendingNewIds = loadPendingDashboardUpdates();

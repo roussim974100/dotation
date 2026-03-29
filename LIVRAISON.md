@@ -2,6 +2,8 @@
 
 Ce document sert de point d'entree pour la remise du projet.
 
+Version de reference : `2.10.0`
+
 ## Contenu livre
 
 - application web interne de gestion des dossiers d'attribution
@@ -9,6 +11,8 @@ Ce document sert de point d'entree pour la remise du projet.
 - gestion des utilisateurs et des groupes
 - workflow d'attribution, signature de remise, RGPD et restitution
 - gestion des ressources attribuables
+- ressources personnalisables avec schema de champs, suivi d'attribution configurable et restitution eventuelle
+- page de reorganisation de l'ordre des ressources par service
 - gestion administrable des services proposes dans les formulaires
 - journal applicatif dedie
 - corbeille administrateur avec restauration

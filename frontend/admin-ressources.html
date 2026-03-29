@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -40,6 +40,7 @@
         <a class="admin-nav__link" href="admin-comptes.html"><span>Comptes</span><small>Utilisateurs et groupes</small></a>
         <a class="admin-nav__link" href="admin-services.html"><span>Services</span><small>Catalogue</small></a>
         <a class="admin-nav__link" href="#admin-resources"><span>Ressources</span><small>Référentiel principal</small></a>
+        <a class="admin-nav__link" href="admin-ressources-ordre.html"><span>Ordre des ressources</span><small>Réorganisation visuelle</small></a>
         <a class="admin-nav__link" href="logs.html"><span>Journal</span><small>Traçabilité</small></a>
         <a class="admin-nav__link" href="admin-personnalisation.html"><span>Personnalisation</span><small>Logo et thèmes</small></a>
       </nav>
@@ -69,29 +70,31 @@
             <h2 class="section-title" id="resourceFormTitle">Ressources attribuables</h2>
             <p class="panel-text">Définissez ce qui peut être attribué et les champs qui devront être saisis dans les dossiers.</p>
           </div>
+          <div class="header-actions">
+            <a class="btn btn-outline-primary" href="admin-ressources-ordre.html">Réorganiser l'ordre</a>
+          </div>
         </div>
         <div id="resourceEditNotice" class="alert alert-info d-none" role="alert"></div>
         <div class="row g-3 mb-4">
-          <div class="col-md-3">
-            <label class="form-label" for="resource_code">Code</label>
-            <input class="form-control" id="resource_code" placeholder="badge_visiteur">
-          </div>
-          <div class="col-md-3">
+          <input id="resource_code" type="hidden">
+          <div class="col-md-4">
             <label class="form-label" for="resource_label">Libellé</label>
             <input class="form-control" id="resource_label" placeholder="Badge visiteur">
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label" for="resource_category">Catégorie</label>
             <select class="form-select" id="resource_category">
               <option value="materiel">Matériel</option>
               <option value="immateriel">Immatériel</option>
             </select>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label" for="resource_issuer">Service émetteur</label>
-            <input class="form-control" id="resource_issuer" placeholder="DSI">
+            <select class="form-select" id="resource_issuer">
+              <option value="">Sélectionner un service</option>
+            </select>
           </div>
-          <div class="col-md-3 d-flex align-items-end">
+          <div class="col-md-2 d-flex align-items-end">
             <label class="form-check me-3">
               <input class="form-check-input" type="checkbox" id="resource_requires_return" checked>
               <span class="form-check-label">Restituable</span>
@@ -102,6 +105,46 @@
             </label>
           </div>
           <div class="col-12">
+            <label class="form-label" for="resource_description">Description</label>
+            <textarea class="form-control" id="resource_description" rows="2" placeholder="Résumé court de la ressource et de son usage"></textarea>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="resource_display_order">Position dans la liste</label>
+            <select class="form-select" id="resource_display_order">
+              <option value="10">Tout en haut</option>
+              <option value="30">Début de liste</option>
+              <option value="60" selected>Position standard</option>
+              <option value="90">Plus bas</option>
+              <option value="120">Fin de liste</option>
+            </select>
+            <p class="panel-text mt-2 mb-0">Pour un ordre précis, utilisez la page de réorganisation par glisser-déposer.</p>
+          </div>
+          <div class="col-md-9">
+            <div class="content-card admin-inner-card h-100">
+              <div class="section-heading mb-3">
+                <div>
+                  <p class="panel-eyebrow">Suivi</p>
+                  <h3 class="section-title">Suivi à l'attribution</h3>
+                  <p class="panel-text">Choisissez les informations à afficher dans le dossier pour cette ressource.</p>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-3">
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="resource_has_assignment_date" checked>
+                  <span class="form-check-label">Afficher la date d'attribution</span>
+                </label>
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="resource_has_assignment_condition">
+                  <span class="form-check-label">Afficher l'état à la remise</span>
+                </label>
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="resource_has_assignment_notes" checked>
+                  <span class="form-check-label">Afficher l'observation de remise</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
             <div class="content-card admin-inner-card">
               <div class="section-heading mb-3">
                 <div>
@@ -110,6 +153,7 @@
                   <p class="panel-text">Ajoutez les champs à afficher dans le dossier et indiquez simplement s'ils sont obligatoires.</p>
                 </div>
                 <div class="header-actions">
+                  <a class="btn btn-outline-secondary" data-help-page="admin-resources-create" href="help.html?page=admin-resources-create">Aide à l'ajout</a>
                   <button class="btn btn-outline-primary" id="addResourceFieldBtn" type="button">Ajouter un champ</button>
                 </div>
               </div>
@@ -130,6 +174,7 @@
                 <th>Ressource</th>
                 <th>Catégorie</th>
                 <th>Service</th>
+                <th>Suivi</th>
                 <th>Champs</th>
                 <th>État</th>
                 <th class="text-end">Actions</th>
@@ -149,6 +194,10 @@
 <script src="js/admin.js"></script>
 </body>
 </html>
+
+
+
+
 
 
 

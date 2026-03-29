@@ -437,13 +437,103 @@ function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
   const placeholder = field.placeholder || field.label;
   const requiredAttribute = field.required ? " required" : "";
-  const type = ["email", "tel"].includes(field.type) ? field.type : "text";
+  const fieldType = field.type || "text";
+  if (fieldType === "textarea") {
+    return `
+      <div>
+        <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
+        <textarea class="form-control dynamic-resource-field" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="textarea"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}"></textarea>
+      </div>
+    `;
+  }
+  if (fieldType === "select") {
+    const options = Array.isArray(field.options) ? field.options : [];
+    return `
+      <div>
+        <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
+        <select class="form-select dynamic-resource-field" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="select"${requiredAttribute}>
+          <option value="">Sélectionner</option>
+          ${options.map((option) => `<option value="${escapeAttribute(option)}">${escapeHtml(option)}</option>`).join("")}
+        </select>
+      </div>
+    `;
+  }
+  if (fieldType === "checkbox") {
+    return `
+      <div class="pt-2">
+        <label class="form-check">
+          <input class="form-check-input dynamic-resource-field" type="checkbox" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="checkbox">
+          <span class="form-check-label">${escapeHtml(field.label)}</span>
+        </label>
+      </div>
+    `;
+  }
+  const type = ["date", "number"].includes(fieldType) ? fieldType : "text";
   return `
     <div>
       <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
-      <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}">
+      <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}">
     </div>
   `;
+}
+
+function usesDynamicResourceAssignmentDate(resource) {
+  if (resource && (Object.prototype.hasOwnProperty.call(resource, "hasAssignmentDate") || Object.prototype.hasOwnProperty.call(resource, "has_assignment_date"))) {
+    return Boolean(resource.hasAssignmentDate ?? resource.has_assignment_date);
+  }
+  return true;
+}
+
+function usesDynamicResourceAssignmentCondition(resource) {
+  if (resource && (Object.prototype.hasOwnProperty.call(resource, "hasAssignmentCondition") || Object.prototype.hasOwnProperty.call(resource, "has_assignment_condition"))) {
+    return Boolean(resource.hasAssignmentCondition ?? resource.has_assignment_condition);
+  }
+  return false;
+}
+
+function usesDynamicResourceAssignmentNotes(resource) {
+  if (resource && (Object.prototype.hasOwnProperty.call(resource, "hasAssignmentNotes") || Object.prototype.hasOwnProperty.call(resource, "has_assignment_notes"))) {
+    return Boolean(resource.hasAssignmentNotes ?? resource.has_assignment_notes);
+  }
+  return false;
+}
+
+function buildDynamicResourceTrackingFields(resource) {
+  const inputBlocks = [];
+  if (usesDynamicResourceAssignmentDate(resource)) {
+    inputBlocks.push(`
+      <div>
+        <label class="form-label" for="dynamic_resource_assigned_at_${escapeAttribute(resource.id)}">Date d'attribution</label>
+        <input class="form-control dynamic-resource-field dynamic-resource-assigned-at" type="date" id="dynamic_resource_assigned_at_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
+      </div>
+    `);
+  }
+  if (usesDynamicResourceAssignmentCondition(resource)) {
+    inputBlocks.push(`
+      <div>
+        <label class="form-label" for="dynamic_resource_condition_${escapeAttribute(resource.id)}">État à la remise</label>
+        <select class="form-select dynamic-resource-field dynamic-resource-condition" id="dynamic_resource_condition_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
+          <option value="">Sélectionner</option>
+          <option value="neuf">Neuf</option>
+          <option value="bon_etat">Bon état</option>
+          <option value="etat_usage">État d'usage</option>
+          <option value="degrade">Dégradé</option>
+        </select>
+      </div>
+    `);
+  }
+  if (usesDynamicResourceAssignmentNotes(resource)) {
+    inputBlocks.push(`
+      <div>
+        <label class="form-label" for="dynamic_resource_condition_notes_${escapeAttribute(resource.id)}">Observation de remise</label>
+        <input class="form-control dynamic-resource-field dynamic-resource-condition-notes" id="dynamic_resource_condition_notes_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" placeholder="Observation de remise">
+      </div>
+    `);
+  }
+  if (!inputBlocks.length) {
+    return "";
+  }
+  return `<div class="subgrid mt-3">${inputBlocks.join("")}</div>`;
 }
 
 function summarizeDynamicResource(resource) {
@@ -456,7 +546,44 @@ function summarizeDynamicResource(resource) {
 }
 
 function getDynamicResourceFieldValue(resourceId, fieldKey) {
-  return getFieldValue(`dynamic_resource_${resourceId}_${fieldKey}`);
+  const field = document.getElementById(`dynamic_resource_${resourceId}_${fieldKey}`);
+  if (!field) {
+    return "";
+  }
+  if (field.type === "checkbox") {
+    return field.checked ? "Oui" : "";
+  }
+  return typeof field.value === "string" ? field.value.trim() : "";
+}
+
+function getDynamicResourceAssignmentData(resourceId) {
+  return {
+    assignedAt: getFieldValue(`dynamic_resource_assigned_at_${resourceId}`),
+    conditionAttribution: getFieldValue(`dynamic_resource_condition_${resourceId}`),
+    conditionNotes: getFieldValue(`dynamic_resource_condition_notes_${resourceId}`)
+  };
+}
+
+function isDynamicResourceComplete(resource) {
+  if (!resource?.selected) {
+    return false;
+  }
+  const fieldSchema = Array.isArray(resource.fieldSchema)
+    ? resource.fieldSchema
+    : (Array.isArray(resource.field_schema) ? resource.field_schema : []);
+  const fieldValues = resource.fields || {};
+  if (fieldSchema.length) {
+    const hasMissingRequiredField = fieldSchema.some((field) => field.required && !String(fieldValues[field.key] || "").trim());
+    if (hasMissingRequiredField) {
+      return false;
+    }
+  } else if (!String(resource.details || "").trim()) {
+    return false;
+  }
+  if (usesDynamicResourceAssignmentDate(resource) && !String(resource.assignedAt || "").trim()) {
+    return false;
+  }
+  return true;
 }
 
 function getCurrentDateTimeLocal() {
@@ -650,9 +777,13 @@ async function loadDynamicResourceReferences() {
       ? `<div class="subgrid mt-3">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
       : `
         <div class="single-field mt-3">
-          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="DÃ©tails ou prÃ©cision de l'attribution">
+          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="Détails ou précision de l'attribution">
         </div>
       `;
+    const trackingMarkup = buildDynamicResourceTrackingFields(resource);
+    const descriptionMarkup = resource.description
+      ? `<p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.description)}</p>`
+      : "";
 
     return `
       <div class="equipment-item">
@@ -660,11 +791,10 @@ async function loadDynamicResourceReferences() {
           <input type="checkbox" id="dynamic_resource_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-resource-trigger="${escapeAttribute(resource.trigger_key || "")}">
           <span>${escapeHtml(resource.label)}</span>
         </label>
+        ${descriptionMarkup}
         ${fieldsMarkup}
-        <div class="single-field mt-3">
-          <input class="form-control dynamic-resource-assigned-at" type="date" id="dynamic_resource_assigned_at_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
-        </div>
-        <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseignÃ©")} Â· ${escapeHtml(resource.category || "Ressource")}</p>
+        ${trackingMarkup}
+        <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</p>
       </div>
     `;
   };
@@ -763,10 +893,15 @@ function getAdditionalResourcesData() {
     id: resource.id,
     code: resource.code,
     label: resource.label,
+    description: resource.description || "",
     category: resource.category,
     issuerService: resource.issuer_service,
     triggerKey: resource.trigger_key || "",
     requiresReturn: Boolean(resource.requires_return),
+    hasAssignmentDate: usesDynamicResourceAssignmentDate(resource),
+    hasAssignmentCondition: usesDynamicResourceAssignmentCondition(resource),
+    hasAssignmentNotes: usesDynamicResourceAssignmentNotes(resource),
+    displayOrder: Number(resource.display_order || 100),
     selected: Boolean(document.getElementById(`dynamic_resource_${resource.id}`)?.checked),
     fieldSchema: Array.isArray(resource.field_schema) ? resource.field_schema : [],
     fields: Object.fromEntries(
@@ -775,11 +910,18 @@ function getAdditionalResourcesData() {
         .filter(([, value]) => value)
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
-    assignedAt: getFieldValue(`dynamic_resource_assigned_at_${resource.id}`)
+    ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
     ...resource,
     details: resource.details || summarizeDynamicResource(resource)
-  })).filter((resource) => resource.selected || resource.details || Object.keys(resource.fields).length);
+  })).filter((resource) => (
+    resource.selected
+    || resource.details
+    || Object.keys(resource.fields).length
+    || resource.assignedAt
+    || resource.conditionAttribution
+    || resource.conditionNotes
+  ));
 }
 
 function populateAdditionalResources(data = {}) {
@@ -797,10 +939,22 @@ function populateAdditionalResources(data = {}) {
     if (assignedAtField) {
       assignedAtField.value = normalizeDateInputValue(resource.assignedAt || "");
     }
+    const conditionField = document.getElementById(`dynamic_resource_condition_${resource.id}`);
+    if (conditionField) {
+      conditionField.value = resource.conditionAttribution || "";
+    }
+    const notesField = document.getElementById(`dynamic_resource_condition_notes_${resource.id}`);
+    if (notesField) {
+      notesField.value = resource.conditionNotes || "";
+    }
     Object.entries(resource.fields || {}).forEach(([fieldKey, value]) => {
       const field = document.getElementById(`dynamic_resource_${resource.id}_${fieldKey}`);
       if (field) {
-        field.value = value || "";
+        if (field.type === "checkbox") {
+          field.checked = value === true || value === "true" || value === "Oui" || value === "on";
+        } else {
+          field.value = value || "";
+        }
       }
     });
   });
@@ -1163,21 +1317,29 @@ function validateDynamicResourceSelection() {
       const detailsField = document.getElementById(`dynamic_resource_details_${resource.id}`);
       const detailsValue = detailsField ? detailsField.value.trim() || "" : "";
       if (!detailsValue) {
-        setFieldError(detailsField, `ComplÃ©tez ${resource.label.toLowerCase()}.`);
-        issues.push(`${resource.label} incomplÃ¨te`);
+        setFieldError(detailsField, "Précision obligatoire.");
+        issues.push(`${resource.label} : précision manquante`);
       }
       return;
     }
 
     fieldSchema.forEach((fieldDef) => {
       const field = document.getElementById(`dynamic_resource_${resource.id}_${fieldDef.key}`);
-      const value = field ? field.value.trim() || "" : "";
+      const value = getDynamicResourceFieldValue(resource.id, fieldDef.key);
       if (fieldDef.required && !value) {
         setFieldError(field, `${fieldDef.label} obligatoire.`);
         issues.push(`${resource.label} : ${fieldDef.label} manquant`);
         return;
       }
     });
+
+    if (usesDynamicResourceAssignmentDate(resource)) {
+      const assignedAtField = document.getElementById(`dynamic_resource_assigned_at_${resource.id}`);
+      if (!getFieldValue(`dynamic_resource_assigned_at_${resource.id}`)) {
+        setFieldError(assignedAtField, "Date d'attribution obligatoire.");
+        issues.push(`${resource.label} : date d'attribution manquante`);
+      }
+    }
   });
 
   return issues;
@@ -1396,7 +1558,7 @@ function collectRequestedResourcesFromFormData(formData) {
       resources.push({
         key,
         label,
-        assignedAt: item.assignedAt || ""
+        isCompleted: Boolean(item.assignedAt)
       });
     }
   };
@@ -1414,7 +1576,7 @@ function collectRequestedResourcesFromFormData(formData) {
       resources.push({
         key: resource.id || resource.code || "resource",
         label: resource.label || "Ressource complÃ©mentaire",
-        assignedAt: resource.assignedAt || ""
+        isCompleted: isDynamicResourceComplete(resource)
       });
     }
   });
@@ -1426,8 +1588,8 @@ function summarizeRequestedResourceCompletion(formData) {
   const requested = collectRequestedResourcesFromFormData(formData);
   return {
     total: requested.length,
-    completed: requested.filter((resource) => resource.assignedAt).length,
-    missing: requested.filter((resource) => !resource.assignedAt)
+    completed: requested.filter((resource) => resource.isCompleted).length,
+    missing: requested.filter((resource) => !resource.isCompleted)
   };
 }
 
@@ -1964,7 +2126,7 @@ async function resolveSaveWorkflow(formData) {
   if (resourceCompletion.completed < resourceCompletion.total) {
     formData.workflow.status = "partial_assignment";
     formData.meta.lockedAt = "";
-    const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : date d'attribution manquante`);
+    const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : ressource encore à compléter`);
     await showSaveInfoDialog(
       "Attribution partielle",
       `L'attribution n'est pas encore complÃ¨te : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuÃ©es.`,
