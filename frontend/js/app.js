@@ -727,6 +727,7 @@ async function loadServiceOptions() {
 async function loadDynamicResourceReferences() {
   const genericMaterialContainer = document.getElementById("dynamicResourcesMaterialGrid");
   const genericImmaterialContainer = document.getElementById("dynamicResourcesImmaterialGrid");
+  const genericSection = document.getElementById("dynamicResourcesGenericSection");
   const genericMaterialWrap = document.getElementById("dynamicResourcesGenericMaterialWrap");
   const genericImmaterialWrap = document.getElementById("dynamicResourcesGenericImmaterialWrap");
   const dsiMaterialContainer = document.getElementById("dynamicResourcesDsiMaterialGrid");
@@ -740,7 +741,7 @@ async function loadDynamicResourceReferences() {
   const dynamicSectionsContainer = document.getElementById("dynamicServiceSections");
   const emptyState = document.getElementById("dynamicResourcesEmpty");
   if (
-    !genericMaterialContainer || !genericImmaterialContainer
+    !genericMaterialContainer || !genericImmaterialContainer || !genericSection
     || !dsiMaterialContainer || !dsiImmaterialContainer
     || !batimentMaterialContainer || !batimentImmaterialContainer
     || !otherMaterialContainer || !otherImmaterialContainer
@@ -767,6 +768,7 @@ async function loadDynamicResourceReferences() {
     otherImmaterialContainer.innerHTML = "";
     dynamicSectionsContainer.innerHTML = "";
     emptyState.classList.remove("d-none");
+    genericSection.classList.add("d-none");
     genericMaterialWrap?.classList.add("d-none");
     genericImmaterialWrap?.classList.add("d-none");
     otherImmaterialWrap?.classList.add("d-none");
@@ -887,7 +889,9 @@ async function loadDynamicResourceReferences() {
       </section>
     `)
     .join("");
-  emptyState.classList.toggle("d-none", (grouped.generic.materiel.length + grouped.generic.immateriel.length) > 0);
+  const hasGenericResources = (grouped.generic.materiel.length + grouped.generic.immateriel.length) > 0;
+  genericSection.classList.toggle("d-none", !hasGenericResources);
+  emptyState.classList.toggle("d-none", hasGenericResources);
 }
 
 function getAdditionalResourcesData() {

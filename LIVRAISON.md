@@ -2,7 +2,7 @@
 
 Ce document sert de point d'entree pour la remise du projet.
 
-Version de reference : `2.11.2`
+Version de reference : `2.11.3`
 
 ## Contenu livre
 

@@ -27,3 +27,4 @@ browser_audit.json
 chrome-*.png
 debug-appjs-check*.png
 login-*.png
+chromedriver/

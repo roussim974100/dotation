@@ -1,6 +1,6 @@
 ﻿# Recette Fonctionnelle
 
-Version de reference : `2.11.2`
+Version de reference : `2.11.3`
 
 ## Preparation
 
