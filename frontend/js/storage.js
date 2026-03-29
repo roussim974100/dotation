@@ -62,7 +62,15 @@ function persistPendingDashboardUpdates() {
 function loadDashboardSignatureLinkNotice() {
   try {
     const raw = sessionStorage.getItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) {
+      return null;
+    }
+    const payload = JSON.parse(raw);
+    if (payload?.kind === "restitution") {
+      sessionStorage.removeItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY);
+      return null;
+    }
+    return payload;
   } catch (error) {
     return null;
   }
@@ -303,8 +311,8 @@ function buildDashboardRow(draft, permissions) {
         <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
         <div class="draft-meta">${startAtLabel}</div>
       </td>
-      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
+      <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
+      <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
       <td data-label="Pilotage">
         <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}">${escapeHtml(progress.timingLabel)}</span>
       </td>
@@ -329,10 +337,10 @@ function buildDashboardRow(draft, permissions) {
 function formatQualiteLabel(item) {
   const qualite = item.beneficiaryType || item.data?.beneficiaire?.qualite;
   if (qualite === "elu") {
-    return item.mandat || item.data?.beneficiaire?.mandat || "Élu";
+    return "Élu(e)";
   }
   if (qualite === "agent") {
-    return item.service || item.data?.beneficiaire?.service || "Agent";
+    return "Agent";
   }
   return "Non renseigné";
 }
@@ -1062,6 +1070,18 @@ function escapeHtmlForEmail(value) {
     .replace(/'/g, "&#39;");
 }
 
+function renderEmailLine(line) {
+  const rawLine = String(line ?? "").trim();
+  if (!rawLine) {
+    return "";
+  }
+  if (/^https?:\/\/\S+$/i.test(rawLine)) {
+    const safeUrl = escapeHtmlForEmail(rawLine);
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:#0f5b8d;font-weight:600;text-decoration:underline;word-break:break-word;">${safeUrl}</a>`;
+  }
+  return escapeHtmlForEmail(rawLine);
+}
+
 function renderEmailParagraphs(bodyLines = []) {
   return bodyLines
     .map((line) => String(line ?? ""))
@@ -1070,7 +1090,7 @@ function renderEmailParagraphs(bodyLines = []) {
         blocks.push("");
         return blocks;
       }
-      const safeLine = escapeHtmlForEmail(line);
+      const safeLine = renderEmailLine(line);
       const lastIndex = blocks.length - 1;
       if (lastIndex >= 0 && blocks[lastIndex] !== "") {
         blocks[lastIndex] = `${blocks[lastIndex]}<br>${safeLine}`;

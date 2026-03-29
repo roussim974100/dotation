@@ -538,6 +538,29 @@ function buildDynamicResourceTrackingFields(resource) {
   return `<div class="subgrid mt-3">${inputBlocks.join("")}</div>`;
 }
 
+function syncDynamicResourceCard(resourceId) {
+  const checkbox = document.getElementById(`dynamic_resource_${resourceId}`);
+  const fieldsWrap = document.getElementById(`dynamic_resource_fields_wrap_${resourceId}`);
+  if (!checkbox || !fieldsWrap) {
+    return;
+  }
+  fieldsWrap.classList.toggle("d-none", !checkbox.checked);
+}
+
+function bindDynamicResourceToggles() {
+  dynamicResourceReferences.forEach((resource) => {
+    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+    if (!checkbox) {
+      return;
+    }
+    if (!checkbox.dataset.boundDynamicToggle) {
+      checkbox.addEventListener("change", () => syncDynamicResourceCard(resource.id));
+      checkbox.dataset.boundDynamicToggle = "true";
+    }
+    syncDynamicResourceCard(resource.id);
+  });
+}
+
 function summarizeDynamicResource(resource) {
   const fields = resource.fields || {};
   const values = Object.values(fields).map((value) => String(value || "").trim()).filter(Boolean);
@@ -796,8 +819,10 @@ async function loadDynamicResourceReferences() {
           <span>${escapeHtml(resource.label)}</span>
         </label>
         ${descriptionMarkup}
-        ${fieldsMarkup}
-        ${trackingMarkup}
+        <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none">
+          ${fieldsMarkup}
+          ${trackingMarkup}
+        </div>
         <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</p>
       </div>
     `;
@@ -892,6 +917,7 @@ async function loadDynamicResourceReferences() {
   const hasGenericResources = (grouped.generic.materiel.length + grouped.generic.immateriel.length) > 0;
   genericSection.classList.toggle("d-none", !hasGenericResources);
   emptyState.classList.toggle("d-none", hasGenericResources);
+  bindDynamicResourceToggles();
 }
 
 function getAdditionalResourcesData() {
@@ -964,6 +990,7 @@ function populateAdditionalResources(data = {}) {
       }
     });
   });
+  bindDynamicResourceToggles();
 }
 
 function syncDossierTypeUi() {

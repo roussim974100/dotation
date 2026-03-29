@@ -547,18 +547,10 @@ async function initRestitutionPage() {
           })
         });
 
-        const absoluteUrl = new URL(linkResult.link.url, window.location.origin).href;
-        sessionStorage.setItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY, JSON.stringify({
-          kind: "restitution",
-          formId: id,
-          linkId: linkResult.link.id,
-          title: `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`.trim(),
-          url: absoluteUrl
-        }));
         await window.playCompletionCelebration("boat");
         await window.askWorkflowDialog({
           title: "Lien de signature prêt",
-          text: "La restitution est enregistrée et le lien de signature à distance est prêt depuis le tableau de bord.",
+          text: "La restitution est enregistrée et le lien de signature à distance est désormais disponible pour l'envoi par e-mail ou la copie du lien.",
           steps: [
             { label: "Restitution enregistrée", status: "done" },
             { label: "Lien de signature préparé", status: "done" }
