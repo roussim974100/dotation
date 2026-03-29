@@ -1,20 +1,20 @@
-﻿# Parcours agents et elu(e)s
+# A quai
 
 ## Cartouche de version
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.10.0` |
+| Version proposee | `2.11.2` |
 | Statut | `A valider` |
 | Date de mise a jour | `2026-03-29` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + liens de signature remise et restitution + admin en sous-pages + services administrables + ressources personnalisables avec schema de champs + reorganisation visuelle de l'ordre des ressources + archivage documentaire` |
+| Perimetre | `stabilisation du chargement des fiches + corrections d encodage et de typographie + ressources personnalisables et ordre par service + historiques dedies + harmonisation des e-mails prepares et PDF + archivage documentaire` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.
 
 ## Presentation
 
-`Parcours agents et elu(e)s` est une application interne destinee a la commune pour suivre :
+`A quai` est une application interne destinee a la commune pour suivre :
 
 - l'arrivee d'un nouvel agent ou d'un(e) nouvel(le) elu(e)
 - l'attribution de ressources
@@ -43,29 +43,21 @@ En cas d'erreur :
 
 ## Tableau de bord
 
-Le tableau de bord centralise les dossiers et permet de :
+Le tableau de bord centralise les dossiers en cours et permet de :
 
 - rechercher un dossier
-- filtrer par etat, qualite et service
+- filtrer par etat, qualite, service et pilotage
 - ouvrir un dossier
-- lancer une restitution
+- ouvrir une restitution
 - exporter un `PDF dossier`
 - exporter un `PDF restitution`
-- exporter plusieurs `PDF dossier`
-- exporter plusieurs `PDF restitution`
+- preparer des e-mails
 - supprimer plusieurs dossiers si le profil le permet
 
-Depuis la fiche, un profil autorise peut aussi generer un lien unique de signature a distance.
-Depuis la restitution et le tableau de bord, un profil autorise peut aussi generer un lien unique de signature de restitution.
+Des historiques dedies permettent maintenant de consulter :
 
-Les profils en consultation seule peuvent exporter les PDF, mais les signatures y sont masquees.
-
-Un rafraichissement automatique est present, avec :
-
-- signal visuel des nouveaux dossiers
-- badge de nouveaux dossiers
-- acquittement utilisateur `J'ai vu`
-- conservation de la selection pendant le refresh
+- les dossiers termines
+- les restitutions terminees
 
 ## Dossiers
 
@@ -86,37 +78,15 @@ Un dossier peut contenir :
 - la validation RGPD
 - un lien de signature a distance
 
-## Tracabilite de reouverture
+## Ressources personnalisables
 
-Quand un dossier encore modifiable est rouvert :
+L'administration des ressources permet de :
 
-- la reouverture est comptee
-- la date de derniere reouverture est memorisee
-- l'utilisateur qui a rouvert le dossier est memorise
-
-Ces informations sont visibles dans la fiche et tracees cote backend.
-
-## Signature a distance
-
-Depuis la fiche dossier, un utilisateur autorise peut :
-
-- generer un lien de signature
-- copier le lien
-- revoquer le lien
-- regenerer un lien
-
-Le lien permet a la personne concernee de :
-
-- consulter les ressources remises
-- prendre connaissance du RGPD
-- signer sans compte applicatif
-
-Regles de base :
-
-- un seul lien actif par dossier
-- lien a usage unique
-- expiration automatique
-- revocation manuelle possible
+- definir une ressource materielle ou immaterielle
+- choisir son service emetteur
+- ajouter des champs personnalises
+- regler son suivi a l'attribution
+- la reordonner par service
 
 ## Restitution
 
@@ -125,92 +95,56 @@ La restitution est geree dans une page dediee.
 Le flux permet de :
 
 - choisir rapidement l'etat de chaque materiel
-- utiliser les etats `Conforme`, `Endommage`, `Non restitue`, `Perdu`, `Autre`
-- ajouter un commentaire seulement si necessaire
 - saisir une date de restitution
-- ajouter une signature de restitution
-- ou indiquer qu'elle est impossible ou differee avec motif
-
-La restitution reste modifiable tant qu'un materiel est `Non restitue`.
+- signer ou documenter l'absence de signature
+- exporter un `PDF restitution`
 
 ## Exports
 
 ### PDF dossier
 
-Le `PDF dossier` sert de document de remise.
-
-Il contient :
+Le `PDF dossier` contient :
 
 - les informations de la personne
 - les ressources attribuees
 - la validation RGPD
 - la signature de remise
-- la date de signature
-
-Pour un profil non autorise a consulter les signatures, le PDF reste exportable mais la signature est masquee et remplacee par une mention reservee aux personnes autorisees.
 
 ### PDF restitution
 
-Le `PDF restitution` est un document distinct.
-
-Il contient :
+Le `PDF restitution` contient :
 
 - les informations de la personne
 - la date de restitution
 - l'etat de chaque materiel restitue
-- les commentaires d'anomalie
 - la signature de restitution ou le motif d'absence
 
-Pour un profil non autorise a consulter les signatures, la signature de restitution est masquee dans le document exporte.
+### E-mails prepares
 
-### Export multiple
+L'application peut preparer :
 
-Les exports multiples produisent des ZIP :
-
-- `PDF dossiers selectionnes`
-- `PDF restitutions selectionnees`
-
-Une fenetre de chargement avec progression est affichee pendant la preparation.
+- des e-mails d'information
+- des e-mails de signature
+- des e-mails d'envoi de PDF
 
 ## Administration
 
 L'administration permet de :
 
 - gerer les comptes utilisateurs
-- modifier les mots de passe
-- gerer la liste des services proposes dans les formulaires
-- gerer les ressources attribuables
+- gerer les services
+- gerer les ressources
 - consulter le journal
 - acceder a la corbeille
-
-L'administration est organisee en sous-pages :
-
-- `admin.html` pour la vue d'ensemble
-- `admin-comptes.html` pour les comptes et les droits
-- `admin-services.html` pour les services
-- `admin-ressources.html` pour les ressources
-
-## Archivage documentaire
-
-Les versions documentaires sont archivees dans :
-
-- `version/versions/`
-
-Chaque version dispose de son propre dossier avec des fichiers nommes par version.
-Les anciennes versions archivees sont distinguees entre :
-
-- `archive reconstituee`
-- `snapshot courant`
+- personnaliser l'application
 
 ## Journal
 
-Le journal est disponible dans une page dediee.
-
-Il permet de :
+Le journal permet de :
 
 - consulter les actions systeme et utilisateur
-- rechercher un element precis
-- faciliter le debug ou le forensic
+- retrouver rapidement un dossier, un acteur ou une ressource
+- faciliter le debug et le forensic
 
 ## Corbeille
 
@@ -236,21 +170,10 @@ Elle permet de restaurer :
 - consultation uniquement
 - export PDF autorise
 - aucune saisie
-- aucune restitution
-- aucun enregistrement
-- aucune suppression
 - signatures masquees dans les PDF
 
 ## Points d'attention
 
 - definir une vraie valeur `APP_SECRET_KEY` en environnement de deploiement
-- verifier le comportement mobile sur les terminaux reels
-- effectuer une recette complete apres toute evolution importante
-
-## Evolutions possibles
-
-- regles plus fines sur les ressources par service
-- vue personne consolidee
-- audit encore plus detaille
-- parametrage plus avance des restitutions
-
+- verifier les comportements critiques apres chaque evolution frontend
+- maintenir a jour `version/versions/` et les fichiers Markdown racine a chaque release

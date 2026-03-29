@@ -1,6 +1,6 @@
 ﻿# Recette Fonctionnelle
 
-Version de reference : `2.10.0`
+Version de reference : `2.11.2`
 
 ## Preparation
 
@@ -20,6 +20,7 @@ python backend\app.py
 - le tableau de bord se charge
 - un nouveau dossier peut etre cree
 - un dossier brouillon peut etre enregistre et rouvert
+- l'ouverture d'une fiche existante depuis le tableau de bord fonctionne sans blocage
 - la reouverture du dossier est tracee dans la fiche
 - un dossier signe complet passe en `Attribution active`
 - un dossier `Attribution partielle` reste modifiable
@@ -40,6 +41,7 @@ python backend\app.py
 - la page d'ordre des ressources est accessible et l'enregistrement du glisser-deposer fonctionne
 - la page `Journal` est accessible
 - la page `Corbeille` est accessible pour un admin
+- les pages d'aide affichent un texte correctement accentue
 - le dossier `version/versions/` est present
 - la deconnexion fonctionne
 
