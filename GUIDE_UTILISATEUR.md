@@ -1,6 +1,6 @@
 ﻿# Guide Utilisateur
 
-Version de reference : `2.10.0`
+Version de reference : `2.11.2`
 
 ## Objet
 
@@ -14,6 +14,7 @@ L'application permet de gerer :
 - la creation de ressources personnalisees avec leurs propres champs
 - le journal des actions pour la tracabilite
 - la restauration d'elements supprimes via la corbeille admin
+- les historiques dedies pour les dossiers et restitutions termines
 
 ## Connexion
 

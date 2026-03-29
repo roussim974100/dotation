@@ -2,7 +2,7 @@
 
 Ce document sert de point d'entree pour la remise du projet.
 
-Version de reference : `2.10.0`
+Version de reference : `2.11.2`
 
 ## Contenu livre
 
@@ -21,6 +21,7 @@ Version de reference : `2.10.0`
 - masquage des signatures dans les PDF pour les profils non autorises
 - export Excel lisible en deux feuilles
 - tracabilite de la reouverture des dossiers modifiables
+- stabilisation du chargement des fiches et correction des textes visibles
 - archivage documentaire par version
 
 ## Documents a consulter
