@@ -271,7 +271,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.setTimeout(() => {
     if (!restitutionSignatureBooted) {
-      showRestitutionSignatureError("Le chargement de la page de signature de restitution a Ã©chouÃ©. Rechargez la page si le problÃ¨me persiste.");
+      showRestitutionSignatureError("Le chargement de la page de signature de restitution a échoué. Rechargez la page si le problème persiste.");
     }
   }, 8000);
 

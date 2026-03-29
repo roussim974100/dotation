@@ -271,7 +271,6 @@ function getDraftProgressMetrics(draft) {
   }
   return summarizeDraftProgressFromPayload(draft.data || {});
 }
-
 function formatShortDate(value) {
   if (!value) {
     return "-";
@@ -350,7 +349,6 @@ function formatStatusLabel(status) {
   };
   return labels[status] || "À compléter";
 }
-
 function hasRestitutionData(draft) {
   const restitution = draft.data?.restitution || {};
   return Boolean(
@@ -472,22 +470,36 @@ function buildDraftActionButtons(draft, options) {
   const pdfActions = [];
   if (options.canExport) {
     pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">Télécharger le PDF dossier</button>`);
-    pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="prepareDraftPdfEmail('${draft.id}')">Envoyer le PDF dossier</button>`);
   }
   if (options.canExport && hasRestitutionData(draft)) {
     pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportRestitutionPdf('${draft.id}')">Télécharger le PDF restitution</button>`);
-    pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="prepareRestitutionPdfEmail('${draft.id}')">Envoyer le PDF restitution</button>`);
   }
 
   const signatureActions = [];
   if (canRequestAssignmentSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareAssignmentSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
     signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="shareSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
   }
 
   if (canRequestRestitutionSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareRestitutionSignatureEmail('${draft.id}')">Préparer l'e-mail de signature</button>`);
     signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyRestitutionSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
+  }
+
+  const emailActions = [];
+  emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="prepareAssignmentInfoEmail('${draft.id}')">Informer de la création du dossier</button>`);
+  if (hasRestitutionData(draft) || ["active", "partial_return", "awaiting_signature", "returned"].includes(draft.status || "draft")) {
+    emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="prepareRestitutionInfoEmail('${draft.id}')">Informer de la restitution</button>`);
+  }
+  if (options.canExport) {
+    emailActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="prepareDraftPdfEmail('${draft.id}')">Envoyer le PDF dossier</button>`);
+  }
+  if (options.canExport && hasRestitutionData(draft)) {
+    emailActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="prepareRestitutionPdfEmail('${draft.id}')">Envoyer le PDF restitution</button>`);
+  }
+  if (canRequestAssignmentSignature(draft, options)) {
+    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareAssignmentSignatureEmail('${draft.id}')">Envoyer le lien de signature du dossier</button>`);
+  }
+  if (canRequestRestitutionSignature(draft, options)) {
+    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareRestitutionSignatureEmail('${draft.id}')">Envoyer le lien de signature de restitution</button>`);
   }
 
   const managementActions = [];
@@ -499,12 +511,12 @@ function buildDraftActionButtons(draft, options) {
     <div class="draft-actions__primary">
       ${renderDraftActionMenu("Ouvrir", "btn-outline-primary", [openActions.join("")])}
       ${renderDraftActionMenu("PDF", "btn-outline-success", [pdfActions.join("")])}
+      ${renderDraftActionMenu("E-mail", "btn-outline-primary", [emailActions.join("")])}
       ${renderDraftActionMenu("Signature", "btn-outline-info", [signatureActions.join("")])}
       ${renderDraftActionMenu("Gestion", "btn-outline-secondary", [managementActions.join("")])}
     </div>
   `;
 }
-
 function bindDraftActionMenus() {
   document.querySelectorAll("[data-action-menu]").forEach((menu) => {
     if (menu.dataset.boundActionMenu) {
@@ -696,41 +708,60 @@ async function requestJson(url, options = {}) {
   // Wrapper fetch centralisé :
   // - JSON par défaut
   // - propagation d'un code d'erreur exploitable par le frontend
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    credentials: "same-origin",
-    ...options
-  });
+  const {
+    headers = {},
+    timeoutMs = 15000,
+    signal,
+    ...fetchOptions
+  } = options;
+  const controller = !signal && typeof AbortController !== "undefined" ? new AbortController() : null;
+  const activeSignal = signal || controller?.signal;
+  let timeoutId = null;
+
+  if (controller && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  }
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...headers
+      },
+      credentials: "same-origin",
+      signal: activeSignal,
+      ...fetchOptions
+    });
+  } catch (error) {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
+    if (error?.name === "AbortError") {
+      const timeoutError = new Error("Le serveur ne répond pas.");
+      timeoutError.status = 0;
+      timeoutError.code = "request_timeout";
+      throw timeoutError;
+    }
+    throw error;
+  }
+
+  if (timeoutId) {
+    window.clearTimeout(timeoutId);
+  }
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch (error) {
-      payload = null;
-    }
-    const requestError = new Error(payload.error || `HTTP ${response.status}`);
-    requestError.status = response.status;
-    throw requestError;
+    const message = payload?.error || `HTTP ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
 
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
-}
-
-async function listForms() {
-  try {
-    const forms = await requestJson(API_BASE);
-    return forms;
-  } catch (error) {
-    return getCachedDrafts();
-  }
+  return payload;
 }
 
 async function getSessionInfo() {
@@ -744,6 +775,22 @@ async function getSessionInfo() {
     sessionInfo = null;
   }
   return sessionInfo;
+}
+
+async function listForms() {
+  try {
+    const items = await requestJson(API_BASE);
+    const summaries = Array.isArray(items) ? items : [];
+    const cachedById = new Map(getCachedDrafts().map((draft) => [draft.id, draft]));
+    const merged = summaries.map((summary) => ({
+      ...(cachedById.get(summary.id) || {}),
+      ...summary
+    }));
+    setCachedDrafts(merged);
+    return merged;
+  } catch (error) {
+    return getCachedDrafts();
+  }
 }
 
 async function getDraftById(id) {
@@ -984,6 +1031,10 @@ function getPdfEmailRecipient(draft) {
   ).trim();
 }
 
+function getDraftRecipientEmail(draft) {
+  return getPdfEmailRecipient(draft);
+}
+
 function toBase64(arrayBuffer) {
   const bytes = new Uint8Array(arrayBuffer);
   const chunkSize = 0x8000;
@@ -1002,7 +1053,108 @@ function wrapBase64Lines(value, lineLength = 76) {
   return lines;
 }
 
-function buildPdfEmailContent({ recipientEmail, subject, bodyLines, attachmentName, attachmentBase64 }) {
+function escapeHtmlForEmail(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderEmailParagraphs(bodyLines = []) {
+  return bodyLines
+    .map((line) => String(line ?? ""))
+    .reduce((blocks, line) => {
+      if (!line.trim()) {
+        blocks.push("");
+        return blocks;
+      }
+      const safeLine = escapeHtmlForEmail(line);
+      const lastIndex = blocks.length - 1;
+      if (lastIndex >= 0 && blocks[lastIndex] !== "") {
+        blocks[lastIndex] = `${blocks[lastIndex]}<br>${safeLine}`;
+      } else {
+        blocks.push(safeLine);
+      }
+      return blocks;
+    }, [])
+    .filter((block) => block !== "")
+    .map((block) => `<p style="margin:0 0 14px;color:#233547;font-size:15px;line-height:1.65;">${block}</p>`)
+    .join("");
+}
+
+async function buildHtmlEmailDocument({ title, eyebrow = "A quai", bodyLines, metaLines = [] }) {
+  const metaHtml = metaLines.length
+    ? `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;border-collapse:collapse;">
+        ${metaLines.map((line) => `
+          <tr>
+            <td style="padding:0 0 6px;color:#5f7388;font-size:13px;line-height:1.5;">${escapeHtmlForEmail(line)}</td>
+          </tr>
+        `).join("")}
+      </table>
+    `
+    : "";
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtmlForEmail(title)}</title>
+</head>
+<body style="margin:0;padding:24px 12px;background:#eef4f8;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;border-collapse:collapse;">
+          <tr>
+            <td style="padding:0 0 14px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                <tr>
+                  <td style="color:#0f5b8d;font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;">
+                    ${escapeHtmlForEmail(eyebrow)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#ffffff;border:1px solid #d4dde6;border-radius:20px;padding:24px 28px;box-shadow:0 12px 26px rgba(15,55,84,.08);">
+              <h1 style="margin:0 0 14px;color:#17344f;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtmlForEmail(title)}</h1>
+              ${metaHtml}
+              ${renderEmailParagraphs(bodyLines)}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 8px 0;color:#607080;font-size:12px;line-height:1.6;">
+              <p style="margin:0;">Message préparé depuis A quai, application interne de suivi des attributions et restitutions.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+function buildRelatedHtmlEmailContent({ recipientEmail, subject, htmlBody }) {
+  return [
+    "X-Unsent: 1",
+    `Subject: ${subject}`,
+    `To: ${recipientEmail}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/html; charset="utf-8"',
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    htmlBody
+  ].join("\r\n");
+}
+
+function buildPdfEmailContent({ recipientEmail, subject, bodyLines, htmlBody, attachmentName, attachmentBase64 }) {
   const boundary = `----=_Dotation_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
   return [
     "X-Unsent: 1",
@@ -1012,10 +1164,10 @@ function buildPdfEmailContent({ recipientEmail, subject, bodyLines, attachmentNa
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     "",
     `--${boundary}`,
-    "Content-Type: text/plain; charset=utf-8",
+    'Content-Type: text/html; charset="utf-8"',
     "Content-Transfer-Encoding: 8bit",
     "",
-    ...bodyLines,
+    htmlBody || renderEmailParagraphs(bodyLines),
     "",
     `--${boundary}`,
     `Content-Type: application/pdf; name="${attachmentName}"`,
@@ -1025,6 +1177,21 @@ function buildPdfEmailContent({ recipientEmail, subject, bodyLines, attachmentNa
     ...wrapBase64Lines(attachmentBase64),
     `--${boundary}--`
   ].join("\r\n");
+}
+
+async function saveSimpleEmailDraft({ recipientEmail, subject, title, bodyLines, metaLines = [] }, fileNameBase) {
+  const emailContent = buildRelatedHtmlEmailContent({
+    recipientEmail,
+    subject,
+    htmlBody: await buildHtmlEmailDocument({
+      title,
+      eyebrow: "A quai",
+      metaLines,
+      bodyLines
+    })
+  });
+  const fileName = `${sanitizeDownloadFileName(fileNameBase, "email")}.eml`;
+  saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
 }
 
 async function fetchPdfDocument(id, kind) {
@@ -1071,18 +1238,25 @@ async function preparePdfEmail(id, kind) {
     const title = draft?.title || "Dossier";
     const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
     const documentLabel = kind === "restitution" ? "PDF de restitution" : "PDF de dossier";
+    const bodyLines = [
+      "Bonjour,",
+      "",
+      `Vous trouverez en pièce jointe le ${documentLabel.toLowerCase()}.`,
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      "",
+      "Cordialement,"
+    ].filter(Boolean);
     const emailContent = buildPdfEmailContent({
       recipientEmail,
       subject: `${documentLabel} - ${title}`,
-      bodyLines: [
-        "Bonjour,",
-        "",
-        `Vous trouverez en piece jointe le ${documentLabel.toLowerCase()}.`,
-        `Dossier : ${title}`,
-        fullName ? `Personne concernée : ${fullName}` : "",
-        "",
-        "Cordialement,"
-      ].filter(Boolean),
+      bodyLines,
+      htmlBody: await buildHtmlEmailDocument({
+        title: documentLabel,
+        eyebrow: "A quai",
+        metaLines: [title, fullName].filter(Boolean),
+        bodyLines
+      }),
       attachmentName: fileName,
       attachmentBase64
     });
@@ -1122,7 +1296,6 @@ async function exportRestitutionPdf(id) {
     alert("Impossible de générer le PDF restitution.");
   }
 }
-
 function findDraftSummary(id) {
   return currentDraftRows.find((draft) => draft.id === id) || getCachedDrafts().find((draft) => draft.id === id) || null;
 }
@@ -1161,56 +1334,98 @@ function buildRestitutionEmailContent(draft, absoluteUrl) {
   const title = draft?.title || "Dossier";
   const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
   const recipientEmail = getRestitutionRecipientEmail(draft);
-  const lines = [
-    "Bonjour,",
-    "",
-    "Vous trouverez ci-dessous le lien pour consulter et signer la restitution :",
-    absoluteUrl,
-    "",
-    `Dossier : ${title}`,
-    fullName ? `Personne concernée : ${fullName}` : "",
-    "",
-    "Cordialement,"
-  ].filter(Boolean);
-
-  return [
-    "X-Unsent: 1",
-    "Subject: Lien de signature de restitution",
-    `To: ${recipientEmail}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    ...lines
-  ].join("\r\n");
+  return {
+    recipientEmail,
+    subject: "Lien de signature de restitution",
+    title: "Signature de restitution",
+    metaLines: [title, fullName].filter(Boolean),
+    bodyLines: [
+      "Bonjour,",
+      "",
+      "Vous trouverez ci-dessous le lien pour consulter et signer la restitution :",
+      absoluteUrl,
+      "",
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      "",
+      "Cordialement,"
+    ].filter(Boolean)
+  };
 }
 
 function buildAssignmentSignatureEmailContent(draft, absoluteUrl) {
   const title = draft?.title || "Dossier";
   const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
   const recipientEmail = getPdfEmailRecipient(draft);
-  const lines = [
-    "Bonjour,",
-    "",
-    "Vous trouverez ci-dessous le lien pour consulter et signer le dossier d'attribution :",
-    absoluteUrl,
-    "",
-    `Dossier : ${title}`,
-    fullName ? `Personne concernée : ${fullName}` : "",
-    "",
-    "Cordialement,"
-  ].filter(Boolean);
+  return {
+    recipientEmail,
+    subject: "Lien de signature du dossier d'attribution",
+    title: "Signature du dossier",
+    metaLines: [title, fullName].filter(Boolean),
+    bodyLines: [
+      "Bonjour,",
+      "",
+      "Vous trouverez ci-dessous le lien pour consulter et signer le dossier d'attribution :",
+      absoluteUrl,
+      "",
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      "",
+      "Cordialement,"
+    ].filter(Boolean)
+  };
+}
 
-  return [
-    "X-Unsent: 1",
-    "Subject: Lien de signature du dossier d'attribution",
-    `To: ${recipientEmail}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    ...lines
-  ].join("\r\n");
+function buildAssignmentInfoEmailContent(draft) {
+  const title = draft?.title || "Dossier";
+  const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+  const recipientEmail = getDraftRecipientEmail(draft);
+  const service = draft?.service || draft?.data?.beneficiaire?.service || "";
+  const startAt = draft?.startAt ? formatShortDate(draft.startAt) : "";
+  return {
+    recipientEmail,
+    subject: `Information sur votre dossier - ${title}`,
+    title: "Nouveau dossier créé",
+    metaLines: [title, fullName, service ? `Service : ${service}` : "", startAt ? `Prise de fonction : ${startAt}` : ""].filter(Boolean),
+    bodyLines: [
+      "Bonjour,",
+      "",
+      "Nous vous informons qu'un nouveau dossier de dotation a été créé pour préparer vos ressources et accès.",
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      service ? `Service : ${service}` : "",
+      startAt ? `Date de prise de fonction : ${startAt}` : "",
+      "",
+      "Les services concernés poursuivent désormais le traitement de votre dossier.",
+      "",
+      "Cordialement,"
+    ].filter(Boolean)
+  };
+}
+
+function buildRestitutionInfoEmailContent(draft) {
+  const title = draft?.title || "Dossier";
+  const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+  const recipientEmail = getDraftRecipientEmail(draft);
+  const returnedAt = draft?.returnedAt ? formatShortDate(draft.returnedAt) : "";
+  return {
+    recipientEmail,
+    subject: `Information sur votre restitution - ${title}`,
+    title: "Restitution engagée",
+    metaLines: [title, fullName, returnedAt ? `Date de restitution : ${returnedAt}` : ""].filter(Boolean),
+    bodyLines: [
+      "Bonjour,",
+      "",
+      "Nous vous informons qu'une restitution de ressources est engagée sur votre dossier.",
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      returnedAt ? `Date de restitution renseignée : ${returnedAt}` : "",
+      "",
+      "Si une signature ou une action complémentaire est attendue, vous recevrez un message dédié.",
+      "",
+      "Cordialement,"
+    ].filter(Boolean)
+  };
 }
 
 async function ensureAssignmentSignatureLink(id) {
@@ -1256,12 +1471,26 @@ async function prepareAssignmentSignatureEmail(id) {
     const draft = result
       ? { ...result.summary, data: result.data }
       : findDraftSummary(id);
-    const emailContent = buildAssignmentSignatureEmailContent(draft, absoluteUrl);
-    const title = draft?.title || id;
-    const fileName = `${sanitizeDownloadFileName(`attribution_signature_${title}`, "attribution_signature")}.eml`;
-    saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
+    const emailDraft = buildAssignmentSignatureEmailContent(draft, absoluteUrl);
+    await saveSimpleEmailDraft(emailDraft, `signature_dossier_${draft?.title || id}`);
   } catch (error) {
     window.alert(error.message || "Impossible de préparer l'e-mail de signature.");
+  }
+}
+
+async function prepareAssignmentInfoEmail(id) {
+  try {
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    if (!draft) {
+      throw new Error("Impossible de retrouver le dossier.");
+    }
+    const emailDraft = buildAssignmentInfoEmailContent(draft);
+    await saveSimpleEmailDraft(emailDraft, `information_dossier_${draft?.title || id}`);
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer l'e-mail d'information du dossier.");
   }
 }
 
@@ -1282,15 +1511,28 @@ async function prepareRestitutionSignatureEmail(id) {
     const draft = result
       ? { ...result.summary, data: result.data }
       : findDraftSummary(id);
-    const emailContent = buildRestitutionEmailContent(draft, absoluteUrl);
-    const title = draft?.title || id;
-    const fileName = `${sanitizeDownloadFileName(`restitution_email_${title}`, "restitution_email")}.eml`;
-    saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
+    const emailDraft = buildRestitutionEmailContent(draft, absoluteUrl);
+    await saveSimpleEmailDraft(emailDraft, `signature_restitution_${draft?.title || id}`);
   } catch (error) {
     window.alert(error.message || "Impossible de préparer l'e-mail de restitution.");
   }
 }
 
+async function prepareRestitutionInfoEmail(id) {
+  try {
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    if (!draft) {
+      throw new Error("Impossible de retrouver le dossier.");
+    }
+    const emailDraft = buildRestitutionInfoEmailContent(draft);
+    await saveSimpleEmailDraft(emailDraft, `information_restitution_${draft?.title || id}`);
+  } catch (error) {
+    window.alert(error.message || "Impossible de préparer l'e-mail d'information de restitution.");
+  }
+}
 function bindSignatureLinkNotice() {
   const notice = document.getElementById("signatureLinkNotice");
   if (!notice) {
@@ -1530,9 +1772,6 @@ function updateExportSelectedState() {
 }
 
 async function exportSelectedPdfs() {
-  // Export groupe :
-  // - 1 fiche => PDF direct
-  // - plusieurs fiches => ZIP de PDF
   const ids = getSelectedDraftIds();
   if (ids.length === 0) {
     alert("Sélectionnez au moins une fiche à exporter.");
@@ -1625,7 +1864,6 @@ async function deleteSelectedDrafts() {
   }
   await renderDraftList();
 }
-
 function bindSelectionActions(canExport, canDelete) {
   // Branche le "tout sélectionner" et les actions groupées.
   const exportButton = document.getElementById("exportSelectedPdfBtn");
@@ -1950,7 +2188,6 @@ function setDashboardUpdateNotice() {
   notice.classList.add("is-highlighted");
   bindDashboardUpdateNotice();
 }
-
 function refreshDashboardIfVisible() {
   if (document.hidden) {
     return;

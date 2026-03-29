@@ -80,6 +80,15 @@ function formatLogDetails(details) {
     .join(" | ");
 }
 
+function normalizeLogLabel(value) {
+  const label = String(value || "").trim();
+  const legacyMap = {
+    "Connexion reussie": "Connexion réussie",
+    "Deconnexion": "Déconnexion"
+  };
+  return legacyMap[label] || label || "-";
+}
+
 async function loadLogs() {
   const search = document.getElementById("logSearchInput")?.value.trim() || "";
   const limit = document.getElementById("logLimitSelect")?.value || "200";
@@ -109,7 +118,7 @@ async function loadLogs() {
       <td data-label="Date">${escapeHtml(formatDateTime(log.created_at))}</td>
       <td data-label="Acteur">${escapeHtml(log.actor || "system")}</td>
       <td data-label="Périmètre">${escapeHtml(log.scope || "-")}</td>
-      <td data-label="Action">${escapeHtml(log.action_label || log.action_type || "-")}</td>
+      <td data-label="Action">${escapeHtml(normalizeLogLabel(log.action_label || log.action_type || "-"))}</td>
       <td data-label="Cible">${escapeHtml([log.target_type, log.target_id].filter(Boolean).join(" / ") || "-")}</td>
       <td data-label="Détail">${escapeHtml(formatLogDetails(log.details))}</td>
     </tr>

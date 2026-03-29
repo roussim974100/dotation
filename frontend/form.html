@@ -458,35 +458,6 @@
           </div>
         </div>
 
-        <div id="signatureLinkCard" class="signature-link-card mt-4 d-none no-print">
-          <div class="signature-link-card__header">
-            <div>
-              <h4 class="rgpd-card__title mb-1">Signature à distance</h4>
-              <p class="panel-text mb-0">Générez un lien unique pour permettre à la personne de consulter son dossier, valider le RGPD et signer sans compte.</p>
-            </div>
-            <span id="signatureLinkStatus" class="status-pill">Aucun lien</span>
-          </div>
-          <div id="signatureLinkEmptyState" class="signature-link-card__body">
-            <p class="panel-text mb-3">Aucun lien de signature n'est actif pour ce dossier.</p>
-            <button class="btn btn-outline-primary" type="button" id="createSignatureLinkBtn">Générer un lien de signature</button>
-          </div>
-          <div id="signatureLinkDetails" class="signature-link-card__body d-none">
-            <div class="signature-link-card__meta">
-              <div><strong>Expiration</strong><span id="signatureLinkExpiresAt">-</span></div>
-              <div><strong>Créé par</strong><span id="signatureLinkCreatedBy">-</span></div>
-              <div><strong>Dernière ouverture</strong><span id="signatureLinkLastOpenedAt">-</span></div>
-            </div>
-            <label class="form-label mt-3" for="signatureLinkUrl">Lien de signature</label>
-            <div class="input-group">
-              <input class="form-control" id="signatureLinkUrl" type="text" readonly>
-              <button class="btn btn-outline-secondary" type="button" id="copySignatureLinkBtn">Copier</button>
-            </div>
-            <div class="d-flex flex-wrap gap-2 mt-3">
-              <button class="btn btn-outline-primary" type="button" id="refreshSignatureLinkBtn">Régénérer</button>
-              <button class="btn btn-outline-danger" type="button" id="revokeSignatureLinkBtn">Révoquer</button>
-            </div>
-          </div>
-        </div>
       </section>
     </div>
 
@@ -495,6 +466,7 @@
       <div class="action-bar__buttons">
         <button class="btn btn-outline-secondary" type="button" onclick="window.location.href='index.html'">Retour</button>
         <button class="btn btn-warning" type="button" id="saveDraftBtn">Enregistrer</button>
+        <button class="btn btn-primary" type="button" id="saveAndCreateSignatureLinkBtn">Enregistrer et g&eacute;n&eacute;rer le lien</button>
       </div>
     </div>
   </form>
@@ -509,7 +481,5 @@
 <script src="js/app.js"></script>
 </body>
 </html>
-
-
 
 

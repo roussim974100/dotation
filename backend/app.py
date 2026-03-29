@@ -1,6 +1,7 @@
 ﻿from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
 import base64
 import bcrypt
+import hashlib
 import io
 import json
 import os
@@ -8,6 +9,7 @@ import secrets
 import sqlite3
 import struct
 import textwrap
+import unicodedata
 import urllib.request
 import uuid
 import zipfile
@@ -24,6 +26,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
 CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
+A_QUAI_PDF_LOGO_PATH = os.path.join(FRONTEND_ASSETS_DIR, "a-quai-email-mark.png")
+PDF_CACHE_DIR = os.path.join(BASE_DIR, "pdf_cache")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
 APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
 CITY_LOGO_URL = os.environ.get(
@@ -255,7 +259,7 @@ THEME_PRESETS = {
         },
     },
     "foret": {
-        "label": "For?t",
+        "label": "Forêt",
         "light": {
             "brand": "#2f6d4f",
             "brandDark": "#24513b",
@@ -1867,6 +1871,96 @@ def load_brand_logo_image():
     return image
 
 
+def load_a_quai_pdf_logo_image():
+    if not A_QUAI_PDF_LOGO_PATH or not os.path.exists(A_QUAI_PDF_LOGO_PATH):
+        return None
+
+    try:
+        with open(A_QUAI_PDF_LOGO_PATH, "rb") as file:
+            return extract_png_image(file.read())
+    except OSError:
+        return None
+
+
+def get_file_signature(path):
+    if not path or not os.path.exists(path):
+        return {"exists": False}
+
+    try:
+        stats = os.stat(path)
+        with open(path, "rb") as file:
+            digest = hashlib.sha256(file.read()).hexdigest()
+    except OSError:
+        return {"exists": False}
+
+    return {
+        "exists": True,
+        "size": stats.st_size,
+        "mtime_ns": stats.st_mtime_ns,
+        "sha256": digest,
+    }
+
+
+def build_pdf_cache_key(pdf_kind, title, payload):
+    settings = get_app_settings()
+    local_candidates, remote_url = get_brand_logo_candidates(settings)
+    source = {
+        "kind": pdf_kind,
+        "title": title,
+        "payload": payload,
+        "settings": settings,
+        "app_file": get_file_signature(__file__),
+        "brand_logo_candidates": [get_file_signature(candidate) for candidate in local_candidates],
+        "brand_logo_remote_url": remote_url,
+        "a_quai_logo": get_file_signature(A_QUAI_PDF_LOGO_PATH),
+    }
+    serialized = json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def cleanup_cached_pdf_versions(cache_dir, keep_name):
+    if not os.path.isdir(cache_dir):
+        return
+
+    try:
+        for entry in os.listdir(cache_dir):
+            if not entry.lower().endswith(".pdf") or entry == keep_name:
+                continue
+            try:
+                os.remove(os.path.join(cache_dir, entry))
+            except OSError:
+                continue
+    except OSError:
+        return
+
+
+def get_or_build_cached_pdf(form_id, pdf_kind, title, payload, generator):
+    cache_key = build_pdf_cache_key(pdf_kind, title, payload)
+    cache_dir = os.path.join(PDF_CACHE_DIR, pdf_kind, slugify_field_key(form_id) or "form")
+    cache_name = f"{cache_key}.pdf"
+    cache_path = os.path.join(cache_dir, cache_name)
+
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "rb") as file:
+                return file.read()
+        except OSError:
+            pass
+
+    pdf_bytes = generator(title, payload)
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        temp_path = os.path.join(cache_dir, f"{cache_key}.tmp")
+        with open(temp_path, "wb") as file:
+            file.write(pdf_bytes)
+        os.replace(temp_path, cache_path)
+        cleanup_cached_pdf_versions(cache_dir, cache_name)
+    except OSError:
+        return pdf_bytes
+
+    return pdf_bytes
+
+
 def format_export_datetime(value):
     if not value:
         return "-"
@@ -2270,6 +2364,16 @@ def build_pdf_bytes(title, payload):
             f"stream\n{logo_stream.decode('latin-1')}\nendstream"
         )
 
+    a_quai_logo_image = load_a_quai_pdf_logo_image()
+    a_quai_logo_image_id = None
+    if a_quai_logo_image:
+        a_quai_logo_stream = a_quai_logo_image["data"]
+        a_quai_logo_image_id = add_object(
+            f"<< /Type /XObject /Subtype /Image /Width {a_quai_logo_image['width']} /Height {a_quai_logo_image['height']} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(a_quai_logo_stream)} >>\n"
+            f"stream\n{a_quai_logo_stream.decode('latin-1')}\nendstream"
+        )
+
     signature_image = extract_signature_image(validation.get("signatureDataUrl")) if signature_export_allowed else None
     signature_image_id = None
     if signature_image:
@@ -2387,7 +2491,14 @@ def build_pdf_bytes(title, payload):
         commands = []
         draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
         draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
-        if logo_image_id:
+        if a_quai_logo_image_id:
+            a_quai_ratio = min(88 / a_quai_logo_image["width"], 52 / a_quai_logo_image["height"])
+            a_quai_width = round(a_quai_logo_image["width"] * a_quai_ratio, 2)
+            a_quai_height = round(a_quai_logo_image["height"] * a_quai_ratio, 2)
+            commands.append(
+                f"q {a_quai_width} 0 0 {a_quai_height} {margin} {page_height - 76} cm /AQLOGO Do Q"
+            )
+        elif logo_image_id:
             logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
             logo_width = round(logo_image["width"] * logo_ratio, 2)
             logo_height = round(logo_image["height"] * logo_ratio, 2)
@@ -2404,6 +2515,13 @@ def build_pdf_bytes(title, payload):
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
         draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        if logo_image_id:
+            footer_logo_ratio = min(54 / logo_image["width"], 18 / logo_image["height"])
+            footer_logo_width = round(logo_image["width"] * footer_logo_ratio, 2)
+            footer_logo_height = round(logo_image["height"] * footer_logo_ratio, 2)
+            commands.append(
+                f"q {footer_logo_width} 0 0 {footer_logo_height} {page_width - 160} {13} cm /LOGO Do Q"
+            )
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -2417,6 +2535,8 @@ def build_pdf_bytes(title, payload):
         xobjects = []
         if logo_image_id:
             xobjects.append(f"/LOGO {logo_image_id} 0 R")
+        if a_quai_logo_image_id:
+            xobjects.append(f"/AQLOGO {a_quai_logo_image_id} 0 R")
         if signature_image_id:
             xobjects.append(f"/SIG1 {signature_image_id} 0 R")
         if xobjects:
@@ -2615,6 +2735,16 @@ def build_restitution_pdf_bytes(title, payload):
             f"stream\n{logo_stream.decode('latin-1')}\nendstream"
         )
 
+    a_quai_logo_image = load_a_quai_pdf_logo_image()
+    a_quai_logo_image_id = None
+    if a_quai_logo_image:
+        a_quai_logo_stream = a_quai_logo_image["data"]
+        a_quai_logo_image_id = add_object(
+            f"<< /Type /XObject /Subtype /Image /Width {a_quai_logo_image['width']} /Height {a_quai_logo_image['height']} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(a_quai_logo_stream)} >>\n"
+            f"stream\n{a_quai_logo_stream.decode('latin-1')}\nendstream"
+        )
+
     signature_image = extract_signature_image(restitution.get("signatureDataUrl")) if signature_export_allowed else None
     signature_image_id = None
     if signature_image:
@@ -2740,7 +2870,14 @@ def build_restitution_pdf_bytes(title, payload):
         commands = []
         draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
         draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
-        if logo_image_id:
+        if a_quai_logo_image_id:
+            a_quai_ratio = min(88 / a_quai_logo_image["width"], 52 / a_quai_logo_image["height"])
+            a_quai_width = round(a_quai_logo_image["width"] * a_quai_ratio, 2)
+            a_quai_height = round(a_quai_logo_image["height"] * a_quai_ratio, 2)
+            commands.append(
+                f"q {a_quai_width} 0 0 {a_quai_height} {margin} {page_height - 76} cm /AQLOGO Do Q"
+            )
+        elif logo_image_id:
             logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
             logo_width = round(logo_image["width"] * logo_ratio, 2)
             logo_height = round(logo_image["height"] * logo_ratio, 2)
@@ -2757,6 +2894,13 @@ def build_restitution_pdf_bytes(title, payload):
 
         draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
         draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
+        if logo_image_id:
+            footer_logo_ratio = min(54 / logo_image["width"], 18 / logo_image["height"])
+            footer_logo_width = round(logo_image["width"] * footer_logo_ratio, 2)
+            footer_logo_height = round(logo_image["height"] * footer_logo_ratio, 2)
+            commands.append(
+                f"q {footer_logo_width} 0 0 {footer_logo_height} {page_width - 160} {13} cm /LOGO Do Q"
+            )
         draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
 
         stream = "\n".join(commands).encode("latin-1", "replace")
@@ -2770,6 +2914,8 @@ def build_restitution_pdf_bytes(title, payload):
         xobjects = []
         if logo_image_id:
             xobjects.append(f"/LOGO {logo_image_id} 0 R")
+        if a_quai_logo_image_id:
+            xobjects.append(f"/AQLOGO {a_quai_logo_image_id} 0 R")
         if signature_image_id:
             xobjects.append(f"/SIG1 {signature_image_id} 0 R")
         if xobjects:
@@ -3552,7 +3698,7 @@ def login():
                     connection,
                     "security",
                     "login",
-                    "Connexion reussie",
+                    "Connexion réussie",
                     "user",
                     username,
                     {"ip": get_request_client_ip()},
@@ -3628,7 +3774,7 @@ def logout():
                 connection,
                 "security",
                 "logout",
-                "Deconnexion",
+                "Déconnexion",
                 "user",
                 username,
                 {"ip": get_request_client_ip()},
@@ -3898,7 +4044,7 @@ def export_form_pdf(form_id):
         return jsonify({"error": "not_found"}), 404
 
     title = form_data["summary"]["title"]
-    pdf_bytes = build_pdf_bytes(title, form_data["data"])
+    pdf_bytes = get_or_build_cached_pdf(form_id, "attribution", title, form_data["data"], build_pdf_bytes)
     filename = f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf"
     return download_response(pdf_bytes, filename, "application/pdf")
 
@@ -3924,7 +4070,7 @@ def export_restitution_pdf(form_id):
         return jsonify({"error": "restitution_not_ready"}), 400
 
     title = f"Restitution - {form_data['summary']['title']}"
-    pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
+    pdf_bytes = get_or_build_cached_pdf(form_id, "restitution", title, form_data["data"], build_restitution_pdf_bytes)
     filename = f"{slugify_filename(title, 'restitution')}.pdf"
     return download_response(pdf_bytes, filename, "application/pdf")
 
@@ -3948,7 +4094,7 @@ def export_forms_pdf_batch():
             if not form_data:
                 continue
             title = form_data["summary"]["title"]
-            pdf_bytes = build_pdf_bytes(title, form_data["data"])
+            pdf_bytes = get_or_build_cached_pdf(str(form_id), "attribution", title, form_data["data"], build_pdf_bytes)
             zip_file.writestr(f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf", pdf_bytes)
             exported_count += 1
 
@@ -3988,7 +4134,7 @@ def export_restitution_forms_pdf_batch():
             ):
                 continue
             title = f"Restitution - {form_data['summary']['title']}"
-            pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
+            pdf_bytes = get_or_build_cached_pdf(str(form_id), "restitution", title, form_data["data"], build_restitution_pdf_bytes)
             zip_file.writestr(f"{slugify_filename(title, 'restitution')}.pdf", pdf_bytes)
             exported_count += 1
 
@@ -4189,9 +4335,23 @@ def get_form_signature_link_route(form_id):
 def create_form_signature_link_route(form_id):
     if not has_permission("forms.edit"):
         return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json(silent=True) or {}
+    validity_days = payload.get("validityDays", 7)
+    try:
+        validity_days = int(validity_days)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_validity_days"}), 400
+    if validity_days < 1 or validity_days > 30:
+        return jsonify({"error": "invalid_validity_days"}), 400
     try:
         with get_db() as connection:
-            link_row = create_signature_link(connection, form_id, actor=current_actor(), link_type="assignment")
+            link_row = create_signature_link(
+                connection,
+                form_id,
+                actor=current_actor(),
+                expires_in_hours=validity_days * 24,
+                link_type="assignment",
+            )
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     return jsonify({"link": serialize_signature_link(link_row)}), 201
@@ -4220,7 +4380,7 @@ def create_form_restitution_signature_link_route(form_id):
         validity_days = int(validity_days)
     except (TypeError, ValueError):
         return jsonify({"error": "invalid_validity_days"}), 400
-    if validity_days < 1 or validity_days > 60:
+    if validity_days < 1 or validity_days > 30:
         return jsonify({"error": "invalid_validity_days"}), 400
     try:
         with get_db() as connection:
