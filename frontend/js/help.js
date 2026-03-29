@@ -1,205 +1,205 @@
-﻿const HELP_CONTENT = {
+const HELP_CONTENT = {
   dashboard: {
     title: "Aide du tableau de bord",
     subtitle: "Retrouvez vos dossiers, suivez leur avancement et lancez les actions utiles sans quitter la liste.",
-    hero: "Le tableau de bord centralise les dossiers d'attribution et de restitution, leur etat et les actions disponibles.",
+    hero: "Le tableau de bord centralise les dossiers d'attribution et de restitution, leur état et les actions disponibles.",
     pill: "Tableau de bord",
     returnHref: "index.html",
     returnLabel: "Retour au tableau de bord",
     quickLinkLabel: "",
     summary: [
-      "Creer un nouveau dossier quand vous demarrez une arrivee, une mobilite interne ou une mise a jour.",
-      "Retrouver rapidement une fiche grace a la recherche, aux filtres et aux etats metier.",
-      "Ouvrir le dossier ou la restitution pour consulter et completer les informations.",
-      "Utiliser les menus d'actions pour les PDF, la signature et les operations de gestion.",
-      "Selectionner plusieurs lignes pour lancer des exports groupes ou une suppression multiple."
+      "Créer un nouveau dossier quand vous démarrez une arrivée, une mobilité interne ou une mise à jour.",
+      "Retrouver rapidement une fiche grâce à la recherche, aux filtres et aux états métier.",
+      "Ouvrir le dossier ou la restitution pour consulter et compléter les informations.",
+      "Utiliser les menus d'actions pour les PDF, la signature et les opérations de gestion.",
+      "Sélectionner plusieurs lignes pour lancer des exports groupés ou une suppression multiple."
     ],
     sections: [
       {
-        title: "Reperer les priorites",
-        text: "La colonne Pilotage vous aide a savoir si le dossier est dans les temps, en danger ou en retard par rapport a la date de prise de fonction."
+        title: "Repérer les priorités",
+        text: "La colonne Pilotage vous aide à savoir si le dossier est dans les temps, en danger ou en retard par rapport à la date de prise de fonction."
       },
       {
         title: "Comprendre la progression",
-        text: "La fraction et la barre de progression comparent les ressources deja attribuees a l'ensemble des ressources demandees sur la fiche."
+        text: "La fraction et la barre de progression comparent les ressources déjà attribuées à l'ensemble des ressources demandées sur la fiche."
       },
       {
         title: "Choisir la bonne action",
-        text: "Le groupe Ouvrir sert a consulter la fiche, le groupe PDF aux exports et le groupe Signature aux liens ou courriels de signature lorsqu'ils sont encore utiles."
+        text: "Le groupe Ouvrir sert à consulter la fiche, le groupe PDF aux exports et le groupe Signature aux liens ou courriels de signature lorsqu'ils sont encore utiles."
       }
     ]
   },
   form: {
     title: "Aide du dossier d'attribution",
-    subtitle: "Completez la fiche de maniere progressive, puis finalisez-la lorsque toutes les informations utiles sont presentes.",
-    hero: "La fiche d'attribution regroupe l'identite de la personne, les ressources demandees, leur attribution et la validation finale.",
+    subtitle: "Complétez la fiche de manière progressive, puis finalisez-la lorsque toutes les informations utiles sont présentes.",
+    hero: "La fiche d'attribution regroupe l'identité de la personne, les ressources demandées, leur attribution et la validation finale.",
     pill: "Dossier d'attribution",
     returnHref: "form.html",
-    returnLabel: "Retour a la fiche",
+    returnLabel: "Retour à la fiche",
     quickLinkLabel: "Ouvrir la fiche",
     summary: [
       "Renseigner d'abord la personne, le type de dossier et le contexte RH.",
-      "Cocher uniquement les ressources reellement demandees pour les missions de la personne.",
-      "Ajouter les dates d'attribution au fur et a mesure pour materialiser les actions deja realisees.",
-      "Utiliser la signature sur place ou a distance selon le mode de validation choisi.",
-      "Enregistrer regulierement si le dossier doit etre repris plus tard."
+      "Cocher uniquement les ressources réellement demandées pour les missions de la personne.",
+      "Ajouter les dates d'attribution au fur et à mesure pour matérialiser les actions déjà réalisées.",
+      "Utiliser la signature sur place ou à distance selon le mode de validation choisi.",
+      "Enregistrer régulièrement si le dossier doit être repris plus tard."
     ],
     sections: [
       {
         title: "Personne et contexte",
-        text: "La premiere section definit le cadre du dossier : identite, service, qualite, date de prise de fonction et eventuel changement de service."
+        text: "La première section définit le cadre du dossier : identité, service, qualité, date de prise de fonction et éventuel changement de service."
       },
       {
-        title: "Ressources a attribuer",
-        text: "Chaque case cochee represente une ressource attendue. Les details demandes servent ensuite a suivre precisement ce qui a ete remis."
+        title: "Ressources à attribuer",
+        text: "Chaque case cochée représente une ressource attendue. Les détails demandés servent ensuite à suivre précisément ce qui a été remis."
       },
       {
         title: "Validation finale",
-        text: "La derniere section regroupe la signature et l'information RGPD. Tant qu'un element obligatoire manque, le dossier reste a completer ou en attribution partielle."
+        text: "La dernière section regroupe la signature et l'information RGPD. Tant qu'un élément obligatoire manque, le dossier reste à compléter ou en attribution partielle."
       }
     ]
   },
   restitution: {
     title: "Aide de la restitution",
-    subtitle: "Preparez la restitution, qualifiez l'etat du materiel et choisissez le bon mode de signature.",
-    hero: "La restitution sert a tracer le retour des ressources materielles et a finaliser leur validation par signature sur place ou a distance.",
+    subtitle: "Préparez la restitution, qualifiez l'état du matériel et choisissez le bon mode de signature.",
+    hero: "La restitution sert à tracer le retour des ressources matérielles et à finaliser leur validation par signature sur place ou à distance.",
     pill: "Restitution",
     returnHref: "restitution.html",
-    returnLabel: "Retour a la restitution",
+    returnLabel: "Retour à la restitution",
     quickLinkLabel: "Ouvrir la restitution",
     summary: [
-      "Renseigner le contexte general de restitution avant de passer au materiel.",
-      "Choisir un etat clair pour chaque ressource materielle restituee.",
-      "Ajouter un commentaire seulement lorsqu'un ecart ou une anomalie doit etre explique.",
-      "Utiliser la signature sur place, impossible ou a distance selon la situation rencontree.",
-      "Enregistrer la restitution une fois toutes les lignes materielles renseignees."
+      "Renseigner le contexte général de restitution avant de passer au matériel.",
+      "Choisir un état clair pour chaque ressource matérielle restituée.",
+      "Ajouter un commentaire seulement lorsqu'un écart ou une anomalie doit être expliqué.",
+      "Utiliser la signature sur place, impossible ou à distance selon la situation rencontrée.",
+      "Enregistrer la restitution une fois toutes les lignes matérielles renseignées."
     ],
     sections: [
       {
         title: "Contexte de restitution",
-        text: "Commencez par la date, le motif et les observations generales pour cadrer le retour du materiel."
+        text: "Commencez par la date, le motif et les observations générales pour cadrer le retour du matériel."
       },
       {
-        title: "Etat du materiel",
-        text: "Chaque ligne de materiel doit recevoir un etat visible. Cette etape sert au suivi des ecarts et a la tracabilite du retour."
+        title: "État du matériel",
+        text: "Chaque ligne de matériel doit recevoir un état visible. Cette étape sert au suivi des écarts et à la traçabilité du retour."
       },
       {
         title: "Signature de restitution",
-        text: "Quand tout est pret, choisissez le mode de signature adapte. La restitution ne passe en terminee qu'apres la vraie validation finale."
+        text: "Quand tout est prêt, choisissez le mode de signature adapté. La restitution ne passe en terminée qu'après la vraie validation finale."
       }
     ]
   },
   admin: {
     title: "Aide du portail d'administration",
-    subtitle: "Utilisez les sous-pages d'administration pour gerer separement les comptes, les referentiels et les parametres.",
-    hero: "Le portail admin sert d'entree vers les espaces specialises de gestion de l'application.",
+    subtitle: "Utilisez les sous-pages d'administration pour gérer séparément les comptes, les référentiels et les paramètres.",
+    hero: "Le portail admin sert d'entrée vers les espaces spécialisés de gestion de l'application.",
     pill: "Administration",
     returnHref: "admin.html",
     returnLabel: "Retour au portail admin",
     quickLinkLabel: "Ouvrir le portail admin",
     summary: [
-      "Acceder a la gestion des comptes et aux validations en attente.",
-      "Maintenir les services et les ressources proposes dans les formulaires.",
+      "Accéder à la gestion des comptes et aux validations en attente.",
+      "Maintenir les services et les ressources proposés dans les formulaires.",
       "Personnaliser l'application avec le logo, les couleurs et les informations institutionnelles.",
-      "Consulter le journal et la corbeille depuis des pages dediees."
+      "Consulter le journal et la corbeille depuis des pages dédiées."
     ],
     sections: [
       {
         title: "Travailler par sous-page",
-        text: "Chaque carte ouvre un ecran dedie afin d'eviter de concentrer trop d'actions sur une seule page."
+        text: "Chaque carte ouvre un écran dédié afin d'éviter de concentrer trop d'actions sur une seule page."
       },
       {
-        title: "Securiser les reglages",
-        text: "Les modifications de personnalisation et de referentiels ont un impact global. Elles doivent etre faites avec un compte habilite."
+        title: "Sécuriser les réglages",
+        text: "Les modifications de personnalisation et de référentiels ont un impact global. Elles doivent être faites avec un compte habilité."
       }
     ]
   },
   "admin-accounts": {
     title: "Aide des comptes et droits",
-    subtitle: "Gerez les utilisateurs, les groupes et les validations en attente depuis une seule page.",
-    hero: "Cette page permet de creer des comptes, d'ajuster leurs groupes et de suivre les demandes de validation.",
+    subtitle: "Gérez les utilisateurs, les groupes et les validations en attente depuis une seule page.",
+    hero: "Cette page permet de créer des comptes, d'ajuster leurs groupes et de suivre les demandes de validation.",
     pill: "Admin comptes",
     returnHref: "admin-comptes.html",
     returnLabel: "Retour aux comptes",
     quickLinkLabel: "Ouvrir les comptes",
     summary: [
-      "Creer un utilisateur avec un mot de passe provisoire conforme a la politique affichee.",
-      "Affecter les groupes qui pilotent les droits d'acces dans l'application.",
-      "Modifier ou desactiver un compte existant sans le recreer.",
+      "Créer un utilisateur avec un mot de passe provisoire conforme à la politique affichée.",
+      "Affecter les groupes qui pilotent les droits d'accès dans l'application.",
+      "Modifier ou désactiver un compte existant sans le recréer.",
       "Traiter les validations en attente directement depuis la liste des utilisateurs."
     ],
     sections: [
       {
-        title: "Creer ou modifier un compte",
-        text: "Le formulaire du haut sert a creer un nouvel utilisateur ou a mettre a jour un compte existant lorsque vous passez en mode edition."
+        title: "Créer ou modifier un compte",
+        text: "Le formulaire du haut sert à créer un nouvel utilisateur ou à mettre à jour un compte existant lorsque vous passez en mode édition."
       },
       {
         title: "Affecter les groupes",
-        text: "Les groupes determinent les autorisations. Verifiez-les avant d'enregistrer pour eviter de donner trop ou trop peu de droits."
+        text: "Les groupes déterminent les autorisations. Vérifiez-les avant d'enregistrer pour éviter de donner trop ou trop peu de droits."
       },
       {
         title: "Suivre les validations",
-        text: "La liste des utilisateurs sert aussi a identifier les comptes en attente et a traiter rapidement les actions de gestion."
+        text: "La liste des utilisateurs sert aussi à identifier les comptes en attente et à traiter rapidement les actions de gestion."
       }
     ]
   },
   "admin-services": {
     title: "Aide du catalogue des services",
-    subtitle: "Maintenez la liste des services proposee dans les dossiers sans modifier le code.",
-    hero: "La page services sert a garder un referentiel propre pour les listes deroulantes et le classement des dossiers.",
+    subtitle: "Maintenez la liste des services proposée dans les dossiers sans modifier le code.",
+    hero: "La page services sert à garder un référentiel propre pour les listes déroulantes et le classement des dossiers.",
     pill: "Admin services",
     returnHref: "admin-services.html",
     returnLabel: "Retour aux services",
     quickLinkLabel: "Ouvrir les services",
     summary: [
       "Ajouter un nouveau service pour le rendre disponible dans les formulaires.",
-      "Mettre a jour un libelle existant sans recreer toute la liste.",
-      "Desactiver un service pour le masquer sans perdre son historique.",
-      "Controler rapidement l'etat global du catalogue."
+      "Mettre à jour un libellé existant sans recréer toute la liste.",
+      "Désactiver un service pour le masquer sans perdre son historique.",
+      "Contrôler rapidement l'état global du catalogue."
     ],
     sections: [
       {
         title: "Construire le catalogue",
-        text: "Chaque ligne du tableau correspond a un service utilisable dans les dossiers. Le formulaire du haut permet de l'ajouter ou de le modifier."
+        text: "Chaque ligne du tableau correspond à un service utilisable dans les dossiers. Le formulaire du haut permet de l'ajouter ou de le modifier."
       },
       {
-        title: "Gerer l'activation",
-        text: "Un service inactif n'est plus propose dans les nouvelles saisies, mais les anciennes fiches conservent leur historique."
+        title: "Gérer l'activation",
+        text: "Un service inactif n'est plus proposé dans les nouvelles saisies, mais les anciennes fiches conservent leur historique."
       }
     ]
   },
   "admin-resources": {
     title: "Aide des ressources attribuables",
-    subtitle: "Definissez les ressources et les champs demandes dans les dossiers d'attribution.",
-    hero: "Cette page sert a piloter le referentiel des ressources materielles et immaterielles utilisees dans l'application.",
+    subtitle: "Définissez les ressources et les champs demandés dans les dossiers d'attribution.",
+    hero: "Cette page sert à piloter le référentiel des ressources matérielles et immatérielles utilisées dans l'application.",
     pill: "Admin ressources",
     returnHref: "admin-ressources.html",
     returnLabel: "Retour aux ressources",
     quickLinkLabel: "Ouvrir les ressources",
     summary: [
-      "Creer une ressource avec son libelle, sa categorie et son service emetteur choisi dans la liste des services existants.",
-      "Le code technique est genere automatiquement a partir du libelle et ne demande pas de saisie manuelle.",
+      "Créer une ressource avec son libellé, sa catégorie et son service émetteur choisi dans la liste des services existants.",
+      "Le code technique est généré automatiquement à partir du libellé et ne demande pas de saisie manuelle.",
       "Ajouter uniquement les champs utiles dans la ressource, au moment voulu, avec le bouton Ajouter un champ.",
-      "Choisir les informations de suivi a afficher dans le dossier : date d'attribution, etat a la remise et observation de remise.",
+      "Choisir les informations de suivi à afficher dans le dossier : date d'attribution, état à la remise et observation de remise.",
       "Choisir si la ressource est restituable ou non selon son cycle de vie.",
-      "Desactiver une ressource sans casser l'historique des fiches existantes."
+      "Désactiver une ressource sans casser l'historique des fiches existantes."
     ],
     sections: [
       {
-        title: "Decrire la ressource",
-        text: "Le formulaire principal definit le libelle visible, la categorie, le service emetteur, une description et un placement simple dans la liste. Le code interne est fabrique automatiquement pour garantir une denomination propre et homogène."
+        title: "Décrire la ressource",
+        text: "Le formulaire principal définit le libellé visible, la catégorie, le service émetteur, une description et un placement simple dans la liste. Le code interne est fabriqué automatiquement pour garantir une dénomination propre et homogène."
       },
       {
         title: "Structurer les champs",
-        text: "Le bloc Structure de la ressource sert a declarer les champs a saisir dans les dossiers. Aucune ligne n'apparait tant que vous n'avez pas clique sur Ajouter un champ."
+        text: "Le bloc Structure de la ressource sert à déclarer les champs à saisir dans les dossiers. Aucune ligne n'apparaît tant que vous n'avez pas cliqué sur Ajouter un champ."
       },
       {
-        title: "Definir le suivi a l'attribution",
-        text: "Le bloc Suivi a l'attribution permet d'afficher ou non la date d'attribution, l'etat a la remise et l'observation de remise. Pour une ressource immaterielle, l'etat a la remise est automatiquement desactive."
+        title: "Définir le suivi à l'attribution",
+        text: "Le bloc Suivi à l'attribution permet d'afficher ou non la date d'attribution, l'état à la remise et l'observation de remise. Pour une ressource immatérielle, l'état à la remise est automatiquement désactivé."
       },
       {
-        title: "Maitriser l'impact metier",
-        text: "Toute modification du referentiel influence les nouvelles fiches. Faites evoluer les ressources avec prudence quand elles sont deja utilisees."
+        title: "Maîtriser l'impact métier",
+        text: "Toute modification du référentiel influence les nouvelles fiches. Faites évoluer les ressources avec prudence quand elles sont déjà utilisées."
       }
     ]
   },
@@ -272,74 +272,74 @@
   },
   "admin-branding": {
     title: "Aide de la personnalisation",
-    subtitle: "Ajustez l'identite visuelle et les informations institutionnelles sans modifier les fichiers de l'application.",
-    hero: "La personnalisation centralise le logo, le theme, le mode sombre et l'adresse du DPO.",
+    subtitle: "Ajustez l'identité visuelle et les informations institutionnelles sans modifier les fichiers de l'application.",
+    hero: "La personnalisation centralise le logo, le thème, le mode sombre et l'adresse du DPO.",
     pill: "Admin personnalisation",
     returnHref: "admin-personnalisation.html",
-    returnLabel: "Retour a la personnalisation",
+    returnLabel: "Retour à la personnalisation",
     quickLinkLabel: "Ouvrir la personnalisation",
     summary: [
-      "Definir le nom de la collectivite pour les informations institutionnelles et le footer.",
-      "Choisir le logo par defaut, une URL distante ou un fichier televerse.",
-      "Ajuster le theme, les couleurs et le comportement du mode sombre.",
-      "Mettre a jour l'adresse e-mail du DPO reprise dans les informations RGPD."
+      "Définir le nom de la collectivité pour les informations institutionnelles et le footer.",
+      "Choisir le logo par défaut, une URL distante ou un fichier téléversé.",
+      "Ajuster le thème, les couleurs et le comportement du mode sombre.",
+      "Mettre à jour l'adresse e-mail du DPO reprise dans les informations RGPD."
     ],
     sections: [
       {
-        title: "Preparer les changements",
-        text: "La page detecte les modifications avant enregistrement. Verifiez le logo, le theme et les textes avant de lancer la sauvegarde."
+        title: "Préparer les changements",
+        text: "La page détecte les modifications avant enregistrement. Vérifiez le logo, le thème et les textes avant de lancer la sauvegarde."
       },
       {
         title: "Comprendre la sauvegarde",
-        text: "La fenetre de chargement detaille les changements appliques pour vous eviter une impression de blocage pendant l'enregistrement."
+        text: "La fenêtre de chargement détaille les changements appliqués pour vous éviter une impression de blocage pendant l'enregistrement."
       }
     ]
   },
   "admin-logs": {
     title: "Aide du journal applicatif",
-    subtitle: "Analysez les traces systeme et utilisateur pour retrouver une action, un dossier ou un incident.",
-    hero: "Le journal applicatif sert a la tracabilite, au diagnostic et au suivi des evenements importants de l'application.",
+    subtitle: "Analysez les traces système et utilisateur pour retrouver une action, un dossier ou un incident.",
+    hero: "Le journal applicatif sert à la traçabilité, au diagnostic et au suivi des événements importants de l'application.",
     pill: "Admin journal",
     returnHref: "logs.html",
     returnLabel: "Retour au journal",
     quickLinkLabel: "Ouvrir le journal",
     summary: [
-      "Rechercher un acteur, un dossier, une ressource ou une action precise.",
-      "Lire rapidement le perimetre, l'action et la cible pour comprendre un evenement.",
-      "Utiliser le volume d'affichage pour adapter la quantite de traces chargees."
+      "Rechercher un acteur, un dossier, une ressource ou une action précise.",
+      "Lire rapidement le périmètre, l'action et la cible pour comprendre un événement.",
+      "Utiliser le volume d'affichage pour adapter la quantité de traces chargées."
     ],
     sections: [
       {
         title: "Filtrer efficacement",
-        text: "La recherche plein texte permet de retrouver rapidement une action utilisateur, un detail technique ou un identifiant metier."
+        text: "La recherche plein texte permet de retrouver rapidement une action utilisateur, un détail technique ou un identifiant métier."
       },
       {
         title: "Lire les colonnes",
-        text: "Date, acteur, perimetre, action, cible et detail donnent ensemble le contexte complet d'une trace."
+        text: "Date, acteur, périmètre, action, cible et détail donnent ensemble le contexte complet d'une trace."
       }
     ]
   },
   "admin-trash": {
     title: "Aide de la corbeille",
-    subtitle: "Retrouvez et restaurez les elements supprimes avant leur suppression definitive.",
-    hero: "La corbeille est l'espace de recuperation des dossiers, comptes et ressources supprimes par erreur.",
+    subtitle: "Retrouvez et restaurez les éléments supprimés avant leur suppression définitive.",
+    hero: "La corbeille est l'espace de récupération des dossiers, comptes et ressources supprimés par erreur.",
     pill: "Admin corbeille",
     returnHref: "trash.html",
-    returnLabel: "Retour a la corbeille",
+    returnLabel: "Retour à la corbeille",
     quickLinkLabel: "Ouvrir la corbeille",
     summary: [
-      "Rechercher un element supprime par son type, son nom ou son identifiant.",
-      "Controler l'auteur et la date de suppression avant de restaurer.",
-      "Restaurer une ligne individuellement ou vider entierement la corbeille si necessaire."
+      "Rechercher un élément supprimé par son type, son nom ou son identifiant.",
+      "Contrôler l'auteur et la date de suppression avant de restaurer.",
+      "Restaurer une ligne individuellement ou vider entièrement la corbeille si nécessaire."
     ],
     sections: [
       {
         title: "Restaurer avec prudence",
-        text: "Avant chaque restauration, verifiez bien le type d'element et le contexte de suppression pour eviter une remise en circulation non souhaitee."
+        text: "Avant chaque restauration, vérifiez bien le type d'élément et le contexte de suppression pour éviter une remise en circulation non souhaitée."
       },
       {
-        title: "Suppression definitive",
-        text: "Le vidage de corbeille supprime la copie de restauration en base. Apres cette action, l'element n'est plus recuperable depuis l'application."
+        title: "Suppression définitive",
+        text: "Le vidage de corbeille supprime la copie de restauration en base. Après cette action, l'élément n'est plus récupérable depuis l'application."
       }
     ]
   }
@@ -415,8 +415,8 @@ function initHelpPage() {
   primaryBackLink.href = safeReturnHref;
   primaryBackLink.textContent = content.returnLabel;
   returnTextNode.textContent = requestedReturn
-    ? "Revenez exactement a la page depuis laquelle vous avez ouvert cette aide."
-    : "Revenez a la page concernee pour poursuivre votre saisie ou votre consultation.";
+    ? "Revenez exactement à la page depuis laquelle vous avez ouvert cette aide."
+    : "Revenez à la page concernée pour poursuivre votre saisie ou votre consultation.";
 
   if (content.quickLinkLabel && safeReturnHref !== content.returnHref) {
     quickAccessLink.classList.remove("d-none");
@@ -428,8 +428,3 @@ function initHelpPage() {
 }
 
 document.addEventListener("DOMContentLoaded", initHelpPage);
-
-
-
-
-

@@ -2,7 +2,7 @@
 
 Application interne de gestion des dossiers d'attribution et de restitution.
 
-Version courante : `2.10.0`
+Version courante : `2.11.2`
 
 ## Ce que fait l'application
 

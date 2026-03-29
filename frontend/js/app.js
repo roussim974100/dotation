@@ -1,16 +1,16 @@
-﻿const form = document.getElementById("dotationForm");
+const form = document.getElementById("dotationForm");
 const draftStatus = document.getElementById("draftStatus");
 const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 const DOSSIER_TYPE_LABELS = {
-  arrivee: "Nouvelle arrivÃ©e",
+  arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
-  mise_a_jour: "Mise Ã  jour de ressources",
+  mise_a_jour: "Mise à jour de ressources",
   sortie: "Sortie / restitution"
 };
 const DEFAULT_SERVICE_OPTIONS = [
   "Affaires juridiques / Commande publique",
-  "BÃ¢timent",
+  "Bâtiment",
   "Cabinet du Maire",
   "CCAS",
   "Communication",
@@ -24,7 +24,7 @@ const DEFAULT_SERVICE_OPTIONS = [
   "PM",
   "Population",
   "SEJE",
-  "SecrÃ©tariat service technique",
+  "Secrétariat service technique",
   "Sports",
   "Subvention",
   "Urbanisme",
@@ -39,9 +39,11 @@ let currentRestitutionData = {
   items: {}
 };
 let currentSignatureLink = null;
+let formBootstrapWatchdogId = null;
+let formBootstrapStage = "";
 
-// Mapping central des Ã©quipements :
-// on s'en sert pour gÃ©nÃ©rer la restitution, les rÃ©sumÃ©s et certaines validations.
+// Mapping central des équipements :
+// on s'en sert pour générer la restitution, les résumés et certaines validations.
 const EQUIPMENT_CONFIG = [
   {
     key: "ordinateur",
@@ -52,14 +54,14 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "ecran",
-    label: "Ã‰cran",
+    label: "Écran",
     category: "materiel",
     checkboxId: "has_screen",
     detail: () => [getFieldValue("screen_marque"), getFieldValue("screen_modele"), getFieldValue("screen_sn")].filter(Boolean).join(" - ")
   },
   {
     key: "telephone",
-    label: "TÃ©lÃ©phone",
+    label: "Téléphone",
     category: "materiel",
     checkboxId: "has_phone",
     detail: () => [getFieldValue("tel_nom"), getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
@@ -73,21 +75,21 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "vehicule",
-    label: "VÃ©hicule",
+    label: "Véhicule",
     category: "materiel",
     checkboxId: "has_vehicule",
     detail: () => [getFieldValue("vehicule_marque"), getFieldValue("vehicule_modele"), getFieldValue("vehicule_plaque")].filter(Boolean).join(" - ")
   },
   {
     key: "badge",
-    label: "Badge d'accÃ¨s",
+    label: "Badge d'accès",
     category: "materiel",
     checkboxId: "has_badge",
     detail: () => getFieldValue("badge_numero")
   },
   {
     key: "cles",
-    label: "ClÃ©(s)",
+    label: "Clé(s)",
     category: "materiel",
     checkboxId: "has_cles",
     detail: () => getRepeatableValues("clesRows").join(" - ")
@@ -101,14 +103,14 @@ const EQUIPMENT_CONFIG = [
   },
   {
     key: "chaussuresSecurite",
-    label: "Chaussures de sÃ©curitÃ©",
+    label: "Chaussures de sécurité",
     category: "materiel",
     checkboxId: "chaussure",
     detail: () => ""
   },
   {
     key: "autre",
-    label: "Autre matÃ©riel",
+    label: "Autre matériel",
     category: "materiel",
     checkboxId: "has_autre",
     detail: () => getFieldValue("autre_materiel")
@@ -139,37 +141,37 @@ const EQUIPMENT_CONFIG = [
 const CORE_RESOURCE_RULES = {
   ordinateur: [
     { fieldId: "pc_nom", label: "Nom du poste", required: false, pattern: ".*", hint: "" },
-    { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
-    { fieldId: "pc_modele", label: "ModÃ¨le ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
-    { fieldId: "pc_sn", label: "NumÃ©ro de sÃ©rie ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 Ã  40 caractÃ¨res alphanumÃ©riques" }
+    { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
+    { fieldId: "pc_modele", label: "Modèle ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
+    { fieldId: "pc_sn", label: "Numéro de série ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
   ],
   ecran: [
-    { fieldId: "screen_marque", label: "Marque Ã©cran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
-    { fieldId: "screen_modele", label: "ModÃ¨le Ã©cran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
-    { fieldId: "screen_sn", label: "NumÃ©ro de sÃ©rie Ã©cran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 Ã  40 caractÃ¨res alphanumÃ©riques" }
+    { fieldId: "screen_marque", label: "Marque écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
+    { fieldId: "screen_modele", label: "Modèle écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
+    { fieldId: "screen_sn", label: "Numéro de série écran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
   ],
   telephone: [
-    { fieldId: "tel_nom", label: "Nom du tÃ©lÃ©phone", required: false, pattern: ".*", hint: "" },
-    { fieldId: "tel_marque", label: "Marque tÃ©lÃ©phone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
-    { fieldId: "tel_modele", label: "ModÃ¨le tÃ©lÃ©phone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
+    { fieldId: "tel_nom", label: "Nom du téléphone", required: false, pattern: ".*", hint: "" },
+    { fieldId: "tel_marque", label: "Marque téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
+    { fieldId: "tel_modele", label: "Modèle téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
     { fieldId: "tel_imei", label: "IMEI", required: true, pattern: "^\\d{15}$", hint: "15 chiffres" }
   ],
   tablette: [
     { fieldId: "tablette_nom", label: "Nom de la tablette", required: false, pattern: ".*", hint: "" },
     { fieldId: "tablette_marque", label: "Marque tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_modele", label: "ModÃ¨le tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_sn", label: "NumÃ©ro de sÃ©rie tablette", required: true, pattern: ".*", hint: "" }
+    { fieldId: "tablette_modele", label: "Modèle tablette", required: true, pattern: ".*", hint: "" },
+    { fieldId: "tablette_sn", label: "Numéro de série tablette", required: true, pattern: ".*", hint: "" }
   ],
   vehicule: [
-    { fieldId: "vehicule_marque", label: "Marque vÃ©hicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 Ã  50 caractÃ¨res" },
-    { fieldId: "vehicule_modele", label: "ModÃ¨le vÃ©hicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 Ã  60 caractÃ¨res" },
+    { fieldId: "vehicule_marque", label: "Marque véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
+    { fieldId: "vehicule_modele", label: "Modèle véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
     { fieldId: "vehicule_plaque", label: "Immatriculation", required: true, pattern: "^[A-Z]{2}-\\d{3}-[A-Z]{2}$", hint: "Format AA-123-AA" }
   ],
   badge: [
-    { fieldId: "badge_numero", label: "NumÃ©ro de badge", required: true, pattern: "^[A-Za-z0-9-]{3,30}$", hint: "3 Ã  30 caractÃ¨res" }
+    { fieldId: "badge_numero", label: "Numéro de badge", required: true, pattern: "^[A-Za-z0-9-]{3,30}$", hint: "3 à 30 caractères" }
   ],
   autre: [
-    { fieldId: "autre_materiel", label: "Description autre matÃ©riel", required: true, pattern: "^.{3,120}$", hint: "3 Ã  120 caractÃ¨res" }
+    { fieldId: "autre_materiel", label: "Description autre matériel", required: true, pattern: "^.{3,120}$", hint: "3 à 120 caractères" }
   ],
   email: [
     { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", hint: "Format de type nom@domaine.fr" }
@@ -178,22 +180,22 @@ const CORE_RESOURCE_RULES = {
 
 const restitutionStateLabels = {
   pending: "En attente",
-  returned: "RestituÃ©",
-  returned_damaged: "RestituÃ© abÃ®mÃ©",
-  missing: "Non restituÃ©",
-  transferred: "TransfÃ©rÃ©",
+  returned: "Restitué",
+  returned_damaged: "Restitué abîmé",
+  missing: "Non restitué",
+  transferred: "Transféré",
   conforme: "Conforme",
-  degrade: "DÃ©gradÃ©",
-  non_restitue: "Non restituÃ©",
+  degrade: "Dégradé",
+  non_restitue: "Non restitué",
   perdu: "Perdu",
   autre: "Autre"
 };
 
 const ASSIGNMENT_CONDITION_LABELS = {
   neuf: "Neuf",
-  bon_etat: "Bon Ã©tat",
-  etat_usage: "Ã‰tat d'usage",
-  degrade: "DÃ©gradÃ©"
+  bon_etat: "Bon état",
+  etat_usage: "État d'usage",
+  degrade: "Dégradé"
 };
 
 const ASSIGNMENT_CONDITION_CONFIG = [
@@ -288,7 +290,7 @@ function buildAssignmentConditionSummary(item) {
   const parts = [];
   const conditionLabel = formatAssignmentConditionLabel(item.conditionAttribution);
   if (conditionLabel) {
-    parts.push(`Ã‰tat Ã  la remise : ${conditionLabel}`);
+    parts.push(`État à la remise : ${conditionLabel}`);
   }
   if (item.assignedAt) {
     parts.push(`Date d'attribution : ${formatDisplayDate(item.assignedAt)}`);
@@ -309,11 +311,11 @@ function buildAssignmentConditionFieldsHtml(prefix, stacked = false, dateOnly = 
   return `
       <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
       <select class="form-select${marginClass}" id="${prefix}_condition">
-        <option value="">Ã‰tat Ã  la remise</option>
+        <option value="">État à la remise</option>
       <option value="neuf">Neuf</option>
-      <option value="bon_etat">Bon Ã©tat</option>
-      <option value="etat_usage">Ã‰tat d'usage</option>
-      <option value="degrade">DÃ©gradÃ©</option>
+      <option value="bon_etat">Bon état</option>
+      <option value="etat_usage">État d'usage</option>
+      <option value="degrade">Dégradé</option>
     </select>
     <input class="form-control${marginClass}" placeholder="Observation de remise" id="${prefix}_condition_notes">
   `;
@@ -402,7 +404,7 @@ function matchesPattern(value, pattern) {
     return new RegExp(pattern).test(String(value || ""));
   } catch (error) {
     // Une expression invalide ne doit pas bloquer la saisie;
-    // on considÃ¨re alors la rÃ¨gle comme non bloquante.
+    // on considère alors la règle comme non bloquante.
     return true;
   }
 }
@@ -696,7 +698,7 @@ function renderServiceOptions(options = []) {
   const currentDestinationValue = getServiceDestinationValue();
   serviceOptions = options.length ? [...options] : [...DEFAULT_SERVICE_OPTIONS];
   const optionsMarkup = `
-    <option value="">SÃ©lectionner un service</option>
+    <option value="">Sélectionner un service</option>
     ${serviceOptions.map((option) => `<option value="${escapeAttribute(option)}">${escapeHtml(option)}</option>`).join("")}
     <option value="__custom__">Autre...</option>
   `;
@@ -862,7 +864,7 @@ async function loadDynamicResourceReferences() {
         </div>
         <div class="resource-kind-block">
           <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources matÃ©rielles</h4>
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
           </div>
           <div class="equipment-grid equipment-grid--compact">
             ${group.materiel.map(buildResourceCard).join("")}
@@ -871,7 +873,7 @@ async function loadDynamicResourceReferences() {
         ${group.immateriel.length ? `
         <div class="resource-kind-block mt-4">
           <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources immatÃ©rielles</h4>
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
           </div>
           <div class="equipment-grid equipment-grid--compact">
             ${group.immateriel.map(buildResourceCard).join("")}
@@ -979,7 +981,7 @@ function hasCurrentDsiResources() {
 }
 
 function applyLockState(locked) {
-  // Une fiche signÃ©e complÃ¨te passe en lecture seule.
+  // Une fiche signée complète passe en lecture seule.
   // L'utilisateur peut encore consulter / imprimer, mais plus modifier.
   currentLockState = locked;
   form.classList.toggle("form-locked", locked);
@@ -997,7 +999,7 @@ function applyLockState(locked) {
   });
 
   if (resumeHint && locked) {
-    resumeHint.textContent = "Fiche signÃ©e : elle est maintenant verrouillÃ©e et disponible uniquement en consultation et impression.";
+    resumeHint.textContent = "Fiche signée : elle est maintenant verrouillée et disponible uniquement en consultation et impression.";
   }
 }
 
@@ -1015,7 +1017,40 @@ function showPageLoader(message) {
 }
 
 function hidePageLoader() {
+  clearFormBootstrapWatchdog();
   pageLoader.classList.add("is-hidden");
+}
+
+function setFormBootstrapStage(stage, loaderMessage = "") {
+  formBootstrapStage = stage || "";
+  if (loaderMessage) {
+    showPageLoader(loaderMessage);
+  }
+}
+
+function clearFormBootstrapWatchdog() {
+  if (formBootstrapWatchdogId) {
+    window.clearTimeout(formBootstrapWatchdogId);
+    formBootstrapWatchdogId = null;
+  }
+}
+
+function startFormBootstrapWatchdog() {
+  clearFormBootstrapWatchdog();
+  formBootstrapWatchdogId = window.setTimeout(() => {
+    const stageLabel = formBootstrapStage || "initialisation";
+    console.error("Chargement de la fiche bloqué", { stage: stageLabel });
+    hidePageLoader();
+    alert(`Le chargement de la fiche prend trop de temps à l'étape : ${stageLabel}.`);
+  }, 20000);
+}
+
+function failFormBootstrap(error, fallbackMessage) {
+  console.error(fallbackMessage, error);
+  clearFormBootstrapWatchdog();
+  hidePageLoader();
+  const message = error?.message || fallbackMessage || "Impossible de charger correctement la fiche.";
+  alert(message);
 }
 
 function renderPrintSummary(formData) {
@@ -1038,10 +1073,10 @@ function renderPrintSummary(formData) {
     pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ordinateur));
   }
   if (formData.materiel.ecran.selected) {
-    pushItem(dsiItems, "Ã‰cran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
+    pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
   }
   if (formData.materiel.telephone.selected) {
-    pushItem(dsiItems, "TÃ©lÃ©phone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
+    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
   }
   if (formData.materiel.tablette?.selected) {
     pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.tablette));
@@ -1054,26 +1089,26 @@ function renderPrintSummary(formData) {
   }
 
   if (formData.materiel.badge.selected) {
-    pushItem(batimentItems, "Badge d'accÃ¨s", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
+    pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
   }
   if (formData.materiel.cles?.selected) {
-    pushItem(batimentItems, "ClÃ©(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
+    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
   }
   if (formData.materiel.veste.selected) {
     pushItem(batimentItems, "Veste", "", buildAssignmentConditionSummary(formData.materiel.veste));
   }
   if (formData.materiel.chaussuresSecurite.selected) {
-    pushItem(batimentItems, "Chaussures de sÃ©curitÃ©", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
+    pushItem(batimentItems, "Chaussures de sécurité", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
   }
   if (formData.immateriel.zoneAlarme?.selected) {
     pushItem(batimentItems, "Zone alarme", (formData.immateriel.zoneAlarme.zones || []).join(" - "));
   }
 
   if (formData.materiel.vehicule.selected) {
-    pushItem(otherItems, "VÃ©hicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
+    pushItem(otherItems, "Véhicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
   }
   if (formData.materiel.autre.selected) {
-    pushItem(otherItems, "Autre matÃ©riel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
+    pushItem(otherItems, "Autre matériel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
   }
 
   const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
@@ -1091,11 +1126,11 @@ function renderPrintSummary(formData) {
       </div>
 
       <section class="print-block">
-        <h3>BÃ©nÃ©ficiaire</h3>
+        <h3>Bénéficiaire</h3>
         <div class="print-grid">
           <div class="print-line"><strong>Nom</strong><span>${escapeHtml(formData.beneficiaire.nom || "-")}</span></div>
-          <div class="print-line"><strong>PrÃ©nom</strong><span>${escapeHtml(formData.beneficiaire.prenom || "-")}</span></div>
-          <div class="print-line"><strong>QualitÃ©</strong><span>${escapeHtml(formData.beneficiaire.qualite || "-")}</span></div>
+          <div class="print-line"><strong>Prénom</strong><span>${escapeHtml(formData.beneficiaire.prenom || "-")}</span></div>
+          <div class="print-line"><strong>Qualité</strong><span>${escapeHtml(formData.beneficiaire.qualite || "-")}</span></div>
           <div class="print-line"><strong>Mandat / Service</strong><span>${escapeHtml(formData.beneficiaire.mandat || formData.beneficiaire.service || "-")}</span></div>
           <div class="print-line"><strong>Fonction</strong><span>${escapeHtml(formData.beneficiaire.fonction || "-")}</span></div>
           <div class="print-line"><strong>Date de remise</strong><span>${escapeHtml(formData.meta.assignedAt || "-")}</span></div>
@@ -1109,13 +1144,13 @@ function renderPrintSummary(formData) {
       </section>
 
       <section class="print-block">
-        <h3>Ressources service bÃ¢timent</h3>
-        ${batimentItems.length ? `<ul class="print-list">${batimentItems.join("")}</ul>` : "<p>Aucune ressource bÃ¢timent.</p>"}
+        <h3>Ressources service bâtiment</h3>
+        ${batimentItems.length ? `<ul class="print-list">${batimentItems.join("")}</ul>` : "<p>Aucune ressource bâtiment.</p>"}
       </section>
 
       <section class="print-block">
-        <h3>Autres ressources attribuÃ©es</h3>
-        ${otherItems.length ? `<ul class="print-list">${otherItems.join("")}</ul>` : "<p>Aucune autre ressource attribuÃ©e.</p>"}
+        <h3>Autres ressources attribuées</h3>
+        ${otherItems.length ? `<ul class="print-list">${otherItems.join("")}</ul>` : "<p>Aucune autre ressource attribuée.</p>"}
       </section>
 
       <section class="print-block">
@@ -1126,14 +1161,14 @@ function renderPrintSummary(formData) {
         </div>
         <div class="print-line" style="margin-top:0.8rem;"><strong>Observations</strong><span>${escapeHtml(formData.restitution.notes || "-")}</span></div>
         <div style="margin-top:0.8rem;">
-          ${restitutionItems.length ? `<ul class="print-list">${restitutionItems.join("")}</ul>` : "<p>Aucun dÃ©tail de restitution.</p>"}
+          ${restitutionItems.length ? `<ul class="print-list">${restitutionItems.join("")}</ul>` : "<p>Aucun détail de restitution.</p>"}
         </div>
       </section>
 
       <section class="print-block">
         <h3>Conformite et signature</h3>
         <div class="print-grid">
-          <div class="print-line"><strong>RGPD</strong><span>${formData.validation.rgpdAccepted ? "Validation effectuÃ©e" : "Non validÃ©e"}</span></div>
+          <div class="print-line"><strong>RGPD</strong><span>${formData.validation.rgpdAccepted ? "Validation effectuée" : "Non validée"}</span></div>
         </div>
         ${formData.validation.signatureDataUrl ? `<div class="print-signature" style="margin-top:0.9rem;"><img src="${formData.validation.signatureDataUrl}" alt="Signature"></div>` : "<p style='margin-top:0.9rem;'>Aucune signature.</p>"}
       </section>
@@ -1155,7 +1190,7 @@ function initConditionalBlocks() {
     const sync = () => {
       toggleField(checkbox.dataset.target, checkbox.checked);
       if (checkbox.checked && checkbox.id === "has_cles") {
-        ensureRepeatableRow("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©");
+        ensureRepeatableRow("clesRows", "Référence ou libellé de clé");
       }
       if (checkbox.checked && checkbox.id === "has_zone_alarme") {
         ensureRepeatableRow("zoneAlarmeRows", "Zone alarme");
@@ -1175,7 +1210,7 @@ function initRepeatableResourceLists() {
 
   if (clesButton && !clesButton.dataset.boundRepeatable) {
     clesButton.addEventListener("click", () => {
-      createRepeatableRow("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©");
+      createRepeatableRow("clesRows", "Référence ou libellé de clé");
     });
     clesButton.dataset.boundRepeatable = "true";
   }
@@ -1267,8 +1302,8 @@ function initQualite() {
 }
 
 function validateFixedResourceSelection() {
-  // Valide uniquement les ressources effectivement cochÃ©es
-  // pour Ã©viter les faux positifs sur les blocs masquÃ©s.
+  // Valide uniquement les ressources effectivement cochées
+  // pour éviter les faux positifs sur les blocs masqués.
   const issues = [];
   Object.values(CORE_RESOURCE_RULES).flat().forEach((rule) => {
     clearFieldError(document.getElementById(rule.fieldId));
@@ -1293,11 +1328,11 @@ function validateFixedResourceSelection() {
   });
 
   if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
-    issues.push("Au moins une clÃ© doit Ãªtre renseignÃ©e");
+    issues.push("Au moins une clé doit être renseignée");
   }
 
   if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
-    issues.push("Au moins une zone alarme doit Ãªtre renseignÃ©e");
+    issues.push("Au moins une zone alarme doit être renseignée");
   }
 
   return issues;
@@ -1363,13 +1398,13 @@ function updateStatusInfo(status = "draft") {
   }
 
   const hints = {
-    draft: "Le dossier reste modifiable tant qu'il n'est pas signÃ© et validÃ©.",
-    partial_assignment: "Le dossier reste modifiable car l'attribution est partielle ou parce qu'au moins une ressource cochÃ©e reste incomplÃ¨te.",
-    awaiting_signature: "Le dossier est prÃªt et n'attend plus que la signature finale.",
-    active: "Le dossier est verrouillÃ© et la restitution se gÃ¨re depuis la page dÃ©diÃ©e.",
-    returned: "Le dossier a Ã©tÃ© restituÃ©. Les dÃ©tails restent consultables depuis la restitution.",
-    partial_return: "Une partie des ressources a Ã©tÃ© restituÃ©e. Le dÃ©tail est visible dans la page de restitution.",
-    cancelled: "Le dossier a Ã©tÃ© annulÃ© et n'entre plus dans le flux normal d'attribution."
+    draft: "Le dossier reste modifiable tant qu'il n'est pas signé et validé.",
+    partial_assignment: "Le dossier reste modifiable car l'attribution est partielle ou parce qu'au moins une ressource cochée reste incomplète.",
+    awaiting_signature: "Le dossier est prêt et n'attend plus que la signature finale.",
+    active: "Le dossier est verrouillé et la restitution se gère depuis la page dédiée.",
+    returned: "Le dossier a été restitué. Les détails restent consultables depuis la restitution.",
+    partial_return: "Une partie des ressources a été restituée. Le détail est visible dans la page de restitution.",
+    cancelled: "Le dossier a été annulé et n'entre plus dans le flux normal d'attribution."
   };
   statusHint.textContent = hints[status] || hints.draft;
 }
@@ -1389,14 +1424,14 @@ function renderRestitutionSummary() {
   if (!hasGlobalInfo && !hasItems) {
     summary.classList.add("d-none");
     summary.innerHTML = "";
-    hint.textContent = "La restitution ne se renseigne plus dans ce formulaire. Elle se gÃ¨re depuis la page dÃ©diÃ©e accessible depuis l'accueil sur les attributions actives.";
+    hint.textContent = "La restitution ne se renseigne plus dans ce formulaire. Elle se gère depuis la page dédiée accessible depuis l'accueil sur les attributions actives.";
     return;
   }
 
   hint.textContent = "Les informations ci-dessous proviennent du formulaire de restitution et restent consultables ici en lecture seule.";
   const reasonLabels = {
     fin_de_fonction: "Fin de fonction",
-    demission: "DÃ©mission",
+    demission: "Démission",
     mutation: "Mutation",
     fin_de_mandat: "Fin de mandat",
     autre: "Autre"
@@ -1406,7 +1441,7 @@ function renderRestitutionSummary() {
     const config = EQUIPMENT_CONFIG.find((item) => item.key === key);
     const label = config.label || key;
     const parts = [
-      restitutionStateLabels[state.state] || state.state || "Ã‰tat non renseignÃ©",
+      restitutionStateLabels[state.state] || state.state || "État non renseigné",
       state.notes || ""
     ].filter(Boolean);
     return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`;
@@ -1419,7 +1454,7 @@ function renderRestitutionSummary() {
     </div>
     <div class="print-line mt-3"><strong>Observations</strong><span>${escapeHtml(restitution.notes || "-")}</span></div>
     <div class="mt-3">
-      ${hasItems ? `<ul class="print-list">${itemLines}</ul>` : "<p class='rgpd-text mb-0'>Aucun dÃ©tail par ressource n'a Ã©tÃ© saisi.</p>"}
+      ${hasItems ? `<ul class="print-list">${itemLines}</ul>` : "<p class='rgpd-text mb-0'>Aucun détail par ressource n'a été saisi.</p>"}
     </div>
   `;
   summary.classList.remove("d-none");
@@ -1575,7 +1610,7 @@ function collectRequestedResourcesFromFormData(formData) {
     if (resource?.selected) {
       resources.push({
         key: resource.id || resource.code || "resource",
-        label: resource.label || "Ressource complÃ©mentaire",
+        label: resource.label || "Ressource complémentaire",
         isCompleted: isDynamicResourceComplete(resource)
       });
     }
@@ -1594,7 +1629,7 @@ function summarizeRequestedResourceCompletion(formData) {
 }
 
 function getFormData(signaturePad) {
-  // Produit le payload mÃ©tier complet qui sera envoyÃ© Ã  l'API.
+  // Produit le payload métier complet qui sera envoyé à l'API.
   const now = new Date().toISOString();
   const currentDraftId = form.dataset.draftId || "";
   const signatureDataUrl = signaturePad.toDataUrl();
@@ -1743,7 +1778,7 @@ function populateForm(data, signaturePad) {
   document.getElementById("vpn_assigned_at").value = normalizeDateInputValue(data.immateriel.vpn.assignedAt || "");
   document.getElementById("email_assigned_at").value = normalizeDateInputValue(data.immateriel.email.assignedAt || "");
   document.getElementById("zoneAlarme_assigned_at").value = normalizeDateInputValue(data.immateriel.zoneAlarme?.assignedAt || "");
-  populateRepeatableRows("clesRows", "RÃ©fÃ©rence ou libellÃ© de clÃ©", data.materiel.cles?.values || []);
+  populateRepeatableRows("clesRows", "Référence ou libellé de clé", data.materiel.cles?.values || []);
   populateRepeatableRows("zoneAlarmeRows", "Zone alarme", data.immateriel.zoneAlarme?.zones || []);
 
   document.getElementById("veste").checked = Boolean(data.materiel.veste.selected);
@@ -1765,15 +1800,15 @@ function populateForm(data, signaturePad) {
 
 function formatStatusLabel(status) {
   const labels = {
-    draft: "Ã€ complÃ©ter",
+    draft: "À compléter",
     partial_assignment: "Attribution partielle",
     awaiting_signature: "En attente de signature",
     active: "Attribution active",
-    returned: "Restitution terminÃ©e",
+    returned: "Restitution terminée",
     partial_return: "Restitution partielle",
-    cancelled: "Dossier annulÃ©"
+    cancelled: "Dossier annulé"
   };
-  return labels[status] || "Ã€ complÃ©ter";
+  return labels[status] || "À compléter";
 }
 
 function updateDraftUi(savedAt, isLoaded = false, status = "draft") {
@@ -1794,10 +1829,10 @@ function updateDraftUi(savedAt, isLoaded = false, status = "draft") {
     timeStyle: "short"
   }).format(new Date(savedAt));
 
-  draftStatus.textContent = isLoaded ? `${label} chargÃ© le ${formatted}` : `${label} enregistrÃ© le ${formatted}`;
+  draftStatus.textContent = isLoaded ? `${label} chargé le ${formatted}` : `${label} enregistré le ${formatted}`;
   updateStatusInfo(status);
   if (!currentLockState) {
-    resumeHint.textContent = "Vous pouvez rouvrir ce dossier depuis l'accueil pour le mettre Ã  jour ou lancer une restitution dÃ©diÃ©e.";
+    resumeHint.textContent = "Vous pouvez rouvrir ce dossier depuis l'accueil pour le mettre à jour ou lancer une restitution dédiée.";
   }
 }
 
@@ -1817,11 +1852,11 @@ function renderReopenInfo(meta = {}) {
 
   const lastReopenedAt = meta.lastReopenedAt
     ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(meta.lastReopenedAt))
-    : "date non renseignÃ©e";
-  const lastReopenedBy = meta.lastReopenedBy || "utilisateur non renseignÃ©";
+    : "date non renseignée";
+  const lastReopenedBy = meta.lastReopenedBy || "utilisateur non renseigné";
   text.textContent = reopenCount === 1
-    ? `Ce dossier a dÃ©jÃ  Ã©tÃ© rouvert 1 fois. DerniÃ¨re rÃ©ouverture le ${lastReopenedAt} par ${lastReopenedBy}.`
-    : `Ce dossier a dÃ©jÃ  Ã©tÃ© rouvert ${reopenCount} fois. DerniÃ¨re rÃ©ouverture le ${lastReopenedAt} par ${lastReopenedBy}.`;
+    ? `Ce dossier a déjà été rouvert 1 fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`
+    : `Ce dossier a déjà été rouvert ${reopenCount} fois. Dernière réouverture le ${lastReopenedAt} par ${lastReopenedBy}.`;
   notice.classList.remove("d-none");
 }
 
@@ -1838,65 +1873,32 @@ function formatDateTime(value) {
 
 function updateSignatureLinkUi(link) {
   currentSignatureLink = link || null;
-  const card = document.getElementById("signatureLinkCard");
-  const emptyState = document.getElementById("signatureLinkEmptyState");
-  const details = document.getElementById("signatureLinkDetails");
-  const status = document.getElementById("signatureLinkStatus");
-  const urlField = document.getElementById("signatureLinkUrl");
-  const expiresAt = document.getElementById("signatureLinkExpiresAt");
-  const createdBy = document.getElementById("signatureLinkCreatedBy");
-  const lastOpenedAt = document.getElementById("signatureLinkLastOpenedAt");
-  const createBtn = document.getElementById("createSignatureLinkBtn");
-  const copyBtn = document.getElementById("copySignatureLinkBtn");
-  const revokeBtn = document.getElementById("revokeSignatureLinkBtn");
-  const refreshBtn = document.getElementById("refreshSignatureLinkBtn");
-  if (!card) {
+  const actionBtn = document.getElementById("saveAndCreateSignatureLinkBtn");
+  if (!actionBtn) {
     return;
   }
 
   const canEdit = Boolean(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.edit"));
   if (!canEdit) {
-    card.classList.add("d-none");
+    actionBtn.classList.add("d-none");
     return;
   }
-  card.classList.remove("d-none");
+  actionBtn.classList.remove("d-none");
 
   const hasCollectedSignature = Boolean(form.dataset.lockedAt || document.getElementById("signature")?.dataset.signed === "true");
-  if (!link) {
-    status.textContent = hasCollectedSignature ? "Dossier signÃ©" : "Aucun lien";
-    emptyState.classList.remove("d-none");
-    details.classList.add("d-none");
-    if (createBtn) {
-      createBtn.disabled = hasCollectedSignature || !form.dataset.draftId;
-    }
-    if (hasCollectedSignature) {
-      emptyState.innerHTML = "<p class=\"panel-text mb-0\">La signature a dÃ©jÃ  Ã©tÃ© recueillie pour ce dossier. Le lien Ã  distance n'est plus nÃ©cessaire.</p>";
-    }
+  if (hasCollectedSignature) {
+    actionBtn.disabled = true;
+    actionBtn.textContent = "Dossier déjà signé";
     return;
   }
 
-  const statusLabels = {
-    active: "Lien actif",
-    used: "Lien utilisÃ©",
-    revoked: "Lien rÃ©voquÃ©",
-    expired: "Lien expirÃ©"
-  };
-  status.textContent = statusLabels[link.status] || "Lien";
-  emptyState.classList.add("d-none");
-  details.classList.remove("d-none");
-  urlField.value = link.url ? new URL(link.url, window.location.origin).href : "";
-  expiresAt.textContent = formatDateTime(link.expiresAt);
-  createdBy.textContent = link.createdBy || "-";
-  lastOpenedAt.textContent = formatDateTime(link.lastOpenedAt);
-  if (copyBtn) {
-    copyBtn.disabled = !link.url;
+  actionBtn.disabled = false;
+  if (link?.status === "active") {
+    actionBtn.textContent = "Enregistrer et régénérer le lien";
+    return;
   }
-  if (revokeBtn) {
-    revokeBtn.disabled = link.status !== "active";
-  }
-  if (refreshBtn) {
-    refreshBtn.disabled = hasCollectedSignature;
-  }
+
+  actionBtn.textContent = "Enregistrer et générer le lien";
 }
 
 async function loadSignatureLinkState() {
@@ -1912,49 +1914,43 @@ async function loadSignatureLinkState() {
   }
 }
 
-async function createSignatureLink() {
+async function createSignatureLink(options = {}) {
   if (!form.dataset.draftId) {
-    window.alert("Enregistrez d'abord le dossier avant de gÃ©nÃ©rer un lien.");
-    return;
+    const message = "Enregistrez d'abord le dossier avant de générer un lien.";
+    if (!options.silentError) {
+      window.alert(message);
+    }
+    throw new Error(message);
   }
   try {
+    const payload = {};
+    if (Number.isFinite(options.validityDays)) {
+      payload.validityDays = options.validityDays;
+    }
     const result = await requestJson(`/api/forms/${encodeURIComponent(form.dataset.draftId)}/signature-link`, {
-      method: "POST"
+      method: "POST",
+      body: JSON.stringify(payload)
     });
     updateSignatureLinkUi(result.link);
-    window.alert("Le lien de signature a Ã©tÃ© gÃ©nÃ©rÃ©.");
+    const absoluteUrl = result.link?.url ? new URL(result.link.url, window.location.origin).href : "";
+    let copied = false;
+    if (options.copyAfterGenerate && absoluteUrl) {
+      try {
+        await navigator.clipboard.writeText(absoluteUrl);
+        copied = true;
+      } catch (error) {
+        copied = false;
+      }
+    }
+    if (!options.silentSuccess) {
+      window.alert("Le lien de signature a été généré.");
+    }
+    return { link: result.link, absoluteUrl, copied };
   } catch (error) {
-    window.alert(error.message || "Impossible de gÃ©nÃ©rer le lien de signature.");
-  }
-}
-
-async function revokeSignatureLink() {
-  if (!currentSignatureLink?.id) {
-    return;
-  }
-  if (!window.confirm("RÃ©voquer le lien de signature actif ?")) {
-    return;
-  }
-  try {
-    const result = await requestJson(`/api/signature-links/${encodeURIComponent(currentSignatureLink.id)}`, {
-      method: "DELETE"
-    });
-    updateSignatureLinkUi(result.link);
-  } catch (error) {
-    window.alert(error.message || "Impossible de rÃ©voquer ce lien.");
-  }
-}
-
-async function copySignatureLink() {
-  if (!currentSignatureLink?.url) {
-    return;
-  }
-  const absoluteUrl = new URL(currentSignatureLink.url, window.location.origin).href;
-  try {
-    await navigator.clipboard.writeText(absoluteUrl);
-    window.alert("Lien de signature copiÃ©.");
-  } catch (error) {
-    window.prompt("Copiez ce lien :", absoluteUrl);
+    if (!options.silentError) {
+      window.alert(error.message || "Impossible de générer le lien de signature.");
+    }
+    throw error;
   }
 }
 
@@ -1978,52 +1974,63 @@ async function loadDraftFromUrl(signaturePad) {
     return;
   }
 
-  showPageLoader("RÃ©cupÃ©ration des informations de la fiche en cours...");
-  const result = await getDraftById(id);
-  if (!result) {
-    alert("La fiche demandee est introuvable.");
-    hidePageLoader();
-    return;
-  }
-
-  const session = await getSessionInfo();
-  const canEdit = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.edit"));
-  const currentStatus = result.summary?.status || result.data?.workflow?.status || "draft";
-  if (canEdit && ["draft", "partial_assignment", "awaiting_signature"].includes(currentStatus)) {
-    try {
-      const reopenResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/reopen`, {
-        method: "POST"
-      });
-      if (reopenResult?.meta) {
-        result.data.meta = { ...(result.data.meta || {}), ...reopenResult.meta };
-      }
-    } catch (error) {
-      console.error("Impossible de tracer la rÃ©ouverture du dossier", error);
+  showPageLoader("Récupération des informations de la fiche en cours...");
+  try {
+    setFormBootstrapStage("lecture du dossier", "Récupération des informations de la fiche...");
+    const result = await getDraftById(id);
+    if (!result) {
+      alert("La fiche demandée est introuvable.");
+      hidePageLoader();
+      return;
     }
-  }
 
-  populateForm(result.data, signaturePad);
-  await loadSignatureLinkState();
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => hidePageLoader());
-  });
+    const session = await getSessionInfo();
+    const canEdit = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.edit"));
+    const currentStatus = result.summary?.status || result.data?.workflow?.status || "draft";
+    if (canEdit && ["draft", "partial_assignment", "awaiting_signature"].includes(currentStatus)) {
+      try {
+        setFormBootstrapStage("traçage de la réouverture", "Mise à jour des informations d'ouverture...");
+        const reopenResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/reopen`, {
+          method: "POST",
+          timeoutMs: 10000
+        });
+        if (reopenResult?.meta) {
+          result.data.meta = { ...(result.data.meta || {}), ...reopenResult.meta };
+        }
+      } catch (error) {
+        console.error("Impossible de tracer la réouverture du dossier", error);
+      }
+    }
+
+    setFormBootstrapStage("préparation des données métier", "Préparation de la fiche...");
+    populateForm(result.data, signaturePad);
+    setFormBootstrapStage("chargement du lien de signature", "Chargement du lien de signature...");
+    await loadSignatureLinkState();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => hidePageLoader());
+    });
+  } catch (error) {
+    console.error("Erreur lors du chargement de la fiche", error);
+    hidePageLoader();
+    alert(error?.message || "Impossible de charger correctement la fiche.");
+  }
 }
 
 async function exportPDF(signaturePad) {
-  alert("L'export PDF est disponible depuis la page d'accueil une fois la fiche enregistrÃ©e.");
+  alert("L'export PDF est disponible depuis la page d'accueil une fois la fiche enregistrée.");
 }
 
 function validateFormData(formData, options = {}) {
   if (!formData.beneficiaire.nom || !formData.beneficiaire.prenom) {
-    return "Le nom et le prÃ©nom sont obligatoires.";
+    return "Le nom et le prénom sont obligatoires.";
   }
 
   if (!formData.beneficiaire.qualite) {
-    return "Veuillez sÃ©lectionner la qualitÃ© du bÃ©nÃ©ficiaire.";
+    return "Veuillez sélectionner la qualité du bénéficiaire.";
   }
 
   if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat) {
-    return "Veuillez renseigner le mandat de l'Ã©lu.";
+    return "Veuillez renseigner le mandat de l'élu.";
   }
 
   if (options.requireRgpd && !formData.validation.rgpdAccepted) {
@@ -2095,6 +2102,29 @@ async function showSaveInfoDialog(title, text, items = []) {
   });
 }
 
+async function askSignatureLinkValidityDays() {
+  if (typeof window.askSignatureValidityDialog !== "function") {
+    const rawValue = window.prompt("Durée de validité du lien de signature à distance (1 à 30 jours) :", "7");
+    if (rawValue === null) {
+      return null;
+    }
+    const parsed = Number.parseInt(rawValue, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 30) {
+      await showSaveInfoDialog("Durée invalide", "Veuillez saisir une durée comprise entre 1 et 30 jours.");
+      return null;
+    }
+    return parsed;
+  }
+
+  return window.askSignatureValidityDialog({
+    title: "Validité du lien de signature",
+    text: "Choisissez pendant combien de jours le lien de signature à distance restera actif.",
+    defaultValue: 7,
+    maxDays: 30,
+    confirmLabel: "Enregistrer et continuer"
+  });
+}
+
 async function resolveSaveWorkflow(formData) {
   const hasSignature = Boolean(formData.validation.signatureDataUrl);
   const rgpdAccepted = Boolean(formData.validation.rgpdAccepted);
@@ -2117,7 +2147,7 @@ async function resolveSaveWorkflow(formData) {
     formData.meta.lockedAt = "";
     await showSaveInfoDialog(
       "Attribution partielle",
-      "Certaines ressources cochÃ©es ne sont pas complÃ¨tement renseignÃ©es. Le dossier reste modifiable.",
+      "Certaines ressources cochées ne sont pas complètement renseignées. Le dossier reste modifiable.",
       resourceIssues
     );
     return formData;
@@ -2129,7 +2159,7 @@ async function resolveSaveWorkflow(formData) {
     const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : ressource encore à compléter`);
     await showSaveInfoDialog(
       "Attribution partielle",
-      `L'attribution n'est pas encore complÃ¨te : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuÃ©es.`,
+      `L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuées.`,
       missingDetails
     );
     return formData;
@@ -2147,10 +2177,10 @@ async function resolveSaveWorkflow(formData) {
 
   const choice = await requestSaveDecision({
     title: "Finalisation du dossier",
-    text: "Toutes les informations sont prÃ©sentes. Souhaitez-vous verrouiller ce dossier comme attribution complÃ¨te ?",
+    text: "Toutes les informations sont présentes. Souhaitez-vous verrouiller ce dossier comme attribution complète ?",
     steps: [
-      { label: "BÃ©nÃ©ficiaire, ressources et validation sont complets", status: "done" },
-      { label: "Choisissez entre finalisation complÃ¨te ou poursuite en mode partiel", status: "active" }
+      { label: "Bénéficiaire, ressources et validation sont complets", status: "done" },
+      { label: "Choisissez entre finalisation complète ou poursuite en mode partiel", status: "active" }
     ],
     hideSpinner: true,
     showConfirm: true,
@@ -2169,18 +2199,27 @@ async function resolveSaveWorkflow(formData) {
   return formData;
 }
 
-async function saveDraft(signaturePad) {
-  const workflowLabels = [
-    "PrÃ©paration des informations du dossier",
-    "Analyse de complÃ©tude et du workflow",
-    "Enregistrement sÃ©curisÃ© du dossier",
-    "Finalisation de l'interface"
-  ];
+async function saveDraft(signaturePad, options = {}) {
+  const shouldGenerateRemoteLink = Boolean(options.generateSignatureLink);
+  const workflowLabels = shouldGenerateRemoteLink
+    ? [
+        "Préparation des informations du dossier",
+        "Analyse de complétude et du workflow",
+        "Enregistrement sécurisé du dossier",
+        "Génération du lien de signature",
+      "Finalisation de l'interface"
+      ]
+    : [
+        "Préparation des informations du dossier",
+        "Analyse de complétude et du workflow",
+        "Enregistrement sécurisé du dossier",
+        "Finalisation de l'interface"
+      ];
 
   try {
     updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "Le dossier est en cours de prÃ©paration avant sauvegarde.",
+      text: "Le dossier est en cours de préparation avant sauvegarde.",
       steps: createWorkflowSteps(workflowLabels, 0)
     });
 
@@ -2194,7 +2233,7 @@ async function saveDraft(signaturePad) {
 
     updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "Le dossier est en cours d'analyse pour dÃ©terminer son Ã©tat mÃ©tier.",
+      text: "Le dossier est en cours d'analyse pour déterminer son état métier.",
       steps: createWorkflowSteps(workflowLabels, 1)
     });
     await resolveSaveWorkflow(formData);
@@ -2214,9 +2253,47 @@ async function saveDraft(signaturePad) {
       applyLockState(true);
     }
 
+    if (result.offline && shouldGenerateRemoteLink) {
+      closeSaveProgress();
+      await showSaveInfoDialog(
+        "Lien à distance indisponible",
+        "Le dossier a été enregistré localement. Le lien de signature à distance pourra être généré après un enregistrement en base."
+      );
+      return;
+    }
+
+    let generatedSignatureLink = null;
+    if (shouldGenerateRemoteLink) {
+      updateSaveProgress({
+        title: "Enregistrement du dossier",
+        text: "Le lien de signature à distance est en cours de génération.",
+        steps: createWorkflowSteps(workflowLabels, 3)
+      });
+      generatedSignatureLink = await createSignatureLink({
+        validityDays: options.validityDays,
+        silentSuccess: true,
+        silentError: true,
+        copyAfterGenerate: true
+      });
+
+      if (generatedSignatureLink?.absoluteUrl) {
+        try {
+          sessionStorage.setItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY, JSON.stringify({
+            kind: "assignment",
+            formId: result.summary.id,
+            linkId: generatedSignatureLink.link?.id,
+            title: result.summary.title,
+            url: generatedSignatureLink.absoluteUrl
+          }));
+        } catch (error) {
+          // Rien de bloquant : le tableau de bord reste utilisable sans cette notice.
+        }
+      }
+    }
+
     updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "La fiche a Ã©tÃ© enregistrÃ©e. L'application finalise maintenant le retour vers le tableau de bord.",
+      text: "La fiche a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
       steps: workflowLabels.map((label) => ({ label, status: "done" }))
     });
 
@@ -2225,10 +2302,10 @@ async function saveDraft(signaturePad) {
     }
 
     if (result.offline) {
-      resumeHint.textContent = "Le dossier a Ã©tÃ© conservÃ© localement et pourra Ãªtre repris depuis cet appareil.";
+      resumeHint.textContent = "Le dossier a été conservé localement et pourra être repris depuis cet appareil.";
       await requestSaveDecision({
-        title: "Dossier enregistrÃ© localement",
-        text: `La fiche Â« ${result.summary.title} Â» a Ã©tÃ© conservÃ©e sur cet appareil.`,
+        title: "Dossier enregistré localement",
+        text: `La fiche « ${result.summary.title} » a été conservée sur cet appareil.`,
         steps: workflowLabels.map((label) => ({ label, status: "done" })),
         hideSpinner: true,
         showConfirm: true,
@@ -2239,8 +2316,10 @@ async function saveDraft(signaturePad) {
     }
 
     await requestSaveDecision({
-      title: "Dossier enregistrÃ©",
-      text: `La fiche Â« ${result.summary.title} Â» est maintenant Ã  jour.`,
+      title: shouldGenerateRemoteLink ? "Dossier enregistré et lien prêt" : "Dossier enregistré",
+      text: shouldGenerateRemoteLink
+        ? `La fiche « ${result.summary.title} » est enregistrée et le lien de signature à distance est prêt${generatedSignatureLink?.link?.expiresAt ? ` jusqu'au ${formatDateTime(generatedSignatureLink.link.expiresAt)}` : ""}.`
+        : `La fiche « ${result.summary.title} » est maintenant à jour.`,
       steps: workflowLabels.map((label) => ({ label, status: "done" })),
       hideSpinner: true,
       showConfirm: true,
@@ -2252,7 +2331,7 @@ async function saveDraft(signaturePad) {
     closeSaveProgress();
     await showSaveInfoDialog(
       "Erreur d'enregistrement",
-      error.message === "Cette fiche est signÃ©e et verrouillÃ©e. Elle ne peut plus Ãªtre modifiÃ©e."
+      error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
         ? error.message
         : "Impossible d'enregistrer la fiche."
     );
@@ -2299,81 +2378,105 @@ function formatIssuerServiceLabel(value) {
   return label || "Service";
 }
 
+window.addEventListener("error", (event) => {
+  if (!form || pageLoader?.classList.contains("is-hidden")) {
+    return;
+  }
+  failFormBootstrap(event.error || new Error(event.message || "Erreur JavaScript"), "Erreur JavaScript pendant le chargement de la fiche");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  if (!form || pageLoader?.classList.contains("is-hidden")) {
+    return;
+  }
+  failFormBootstrap(event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Promesse rejetée")), "Promesse rejetée pendant le chargement de la fiche");
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
-  // Ordre d'initialisation important:
-  // 1. widgets UI
-  // 2. chargement de la fiche
   if (!form) {
     return;
   }
 
-  showPageLoader("Chargement du formulaire...");
+  setFormBootstrapStage("préparation de l'interface", "Chargement du formulaire...");
+  startFormBootstrapWatchdog();
+
   try {
+    setFormBootstrapStage("chargement des services", "Chargement des services...");
     await loadServiceOptions();
+
+    setFormBootstrapStage("chargement des ressources", "Chargement des ressources...");
     await loadDynamicResourceReferences();
+
+    setFormBootstrapStage("chargement de la session", "Chargement de la session...");
     await getSessionInfo();
+
+    setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
-    document.getElementById("saveDraftBtn").addEventListener("click", () => {
+
+    document.getElementById("saveDraftBtn")?.addEventListener("click", () => {
       void saveDraft(signaturePad);
     });
+    document.getElementById("saveAndCreateSignatureLinkBtn")?.addEventListener("click", async () => {
+      const validityDays = await askSignatureLinkValidityDays();
+      if (validityDays === null) {
+        return;
+      }
+      await saveDraft(signaturePad, {
+        generateSignatureLink: true,
+        validityDays
+      });
+    });
+
+    setFormBootstrapStage("initialisation des blocs métier", "Préparation du formulaire...");
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();
     initConditionalBlocks();
     initQualite();
     syncDossierTypeUi();
+
+    setFormBootstrapStage("ouverture de la fiche", "Chargement de la fiche...");
     await loadDraftFromUrl(signaturePad);
+
+    [
+      "has_pc",
+      "has_screen",
+      "has_phone",
+      "has_mail",
+      "vpn",
+      "dossier_type",
+      "service",
+      "service_destination"
+    ].forEach((id) => {
+      const field = document.getElementById(id);
+      if (!field) {
+        return;
+      }
+      field.addEventListener("change", () => {
+        if (id === "dossier_type") {
+          syncDossierTypeUi();
+          return;
+        }
+        if (id === "service") {
+          syncServiceCustomField();
+          return;
+        }
+        if (id === "service_destination") {
+          syncServiceCustomField("service_destination", "service_destination_custom");
+        }
+      });
+    });
+
+    clearFormBootstrapWatchdog();
     if (!new URLSearchParams(window.location.search).get("id")) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => hidePageLoader());
       });
     }
-
-    document.getElementById("createSignatureLinkBtn")?.addEventListener("click", () => {
-      void createSignatureLink();
-    });
-    document.getElementById("refreshSignatureLinkBtn")?.addEventListener("click", () => {
-      void createSignatureLink();
-    });
-    document.getElementById("revokeSignatureLinkBtn")?.addEventListener("click", () => {
-      void revokeSignatureLink();
-    });
-    document.getElementById("copySignatureLinkBtn")?.addEventListener("click", () => {
-      void copySignatureLink();
-    });
-      [
-        "has_pc",
-        "has_screen",
-        "has_phone",
-        "has_mail",
-        "vpn",
-        "dossier_type",
-        "service",
-        "service_destination"
-      ].forEach((id) => {
-        const field = document.getElementById(id);
-        if (!field) {
-          return;
-        }
-        field.addEventListener("change", () => {
-          if (id === "dossier_type") {
-            syncDossierTypeUi();
-            return;
-          }
-          if (id === "service") {
-            syncServiceCustomField();
-            return;
-          }
-          if (id === "service_destination") {
-            syncServiceCustomField("service_destination", "service_destination_custom");
-          }
-        });
-      });
   } catch (error) {
-    console.error("Erreur de chargement du formulaire", error);
-    alert("Impossible de charger correctement le formulaire. La page a Ã©tÃ© dÃ©bloquÃ©e pour permettre un nouveau test.");
-    hidePageLoader();
+    failFormBootstrap(error, "Impossible de charger correctement le formulaire.");
   }
 });
+
 function normalizeDossierType(value) {
   const mapping = {
     nouvel_agent: "arrivee",
@@ -2392,6 +2495,4 @@ function normalizeDossierType(value) {
 
 
 // Module principal de la fiche d'attribution :
-// collecte mÃ©tier, validation locale et sÃ©rialisation du payload.
-
-
+// collecte métier, validation locale et sérialisation du payload.

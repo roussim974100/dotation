@@ -139,6 +139,7 @@ function initMojibakeRepair() {
 }
 
 let workflowDialogResolver = null;
+let signatureValidityDialogResolver = null;
 
 function ensureWorkflowDialog() {
   let overlay = document.getElementById("workflowDialog");
@@ -202,12 +203,12 @@ function getWorkflowStepStateLabel(status) {
     return "En cours";
   }
   if (status === "done") {
-    return "TerminÃ©";
+    return "Terminé";
   }
   if (status === "error") {
     return "Erreur";
   }
-  return "Ã€ traiter";
+  return "À traiter";
 }
 
 function renderWorkflowDialog(options = {}) {
@@ -267,6 +268,120 @@ function askWorkflowDialog(options = {}) {
   return new Promise((resolve) => {
     workflowDialogResolver = resolve;
     renderWorkflowDialog(options);
+  });
+}
+
+function ensureSignatureValidityDialog() {
+  let overlay = document.getElementById("signatureValidityDialog");
+  if (overlay) {
+    return overlay;
+  }
+
+  overlay = document.createElement("div");
+  overlay.id = "signatureValidityDialog";
+  overlay.className = "workflow-dialog is-hidden";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `
+    <div class="workflow-dialog__backdrop" data-signature-validity-close="backdrop"></div>
+    <div class="workflow-dialog__panel signature-validity-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="signatureValidityDialogTitle">
+      <div class="workflow-dialog__header">
+        <div class="workflow-dialog__spinner d-none" aria-hidden="true"></div>
+        <div>
+          <strong id="signatureValidityDialogTitle">Validité du lien</strong>
+          <p id="signatureValidityDialogText"></p>
+        </div>
+      </div>
+      <div class="signature-validity-dialog__body">
+        <label class="form-label" for="signatureValidityDaysInput">Durée de validité</label>
+        <div class="signature-validity-dialog__row">
+          <input class="form-control" id="signatureValidityDaysInput" type="number" min="1" max="30" step="1" value="7">
+          <span class="signature-validity-dialog__suffix">jours</span>
+        </div>
+        <p class="signature-validity-dialog__hint">Choisissez une durée comprise entre 1 et 30 jours.</p>
+        <p class="signature-validity-dialog__error d-none" id="signatureValidityDialogError"></p>
+      </div>
+      <div class="workflow-dialog__actions">
+        <button type="button" class="btn btn-outline-secondary" id="signatureValidityDialogCancelBtn">Annuler</button>
+        <button type="button" class="btn btn-primary" id="signatureValidityDialogConfirmBtn">Continuer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const resolveAndClose = (value) => {
+    const resolver = signatureValidityDialogResolver;
+    closeSignatureValidityDialog();
+    if (resolver) {
+      resolver(value);
+    }
+  };
+
+  overlay.querySelector("#signatureValidityDialogCancelBtn")?.addEventListener("click", () => {
+    resolveAndClose(null);
+  });
+
+  overlay.querySelector("#signatureValidityDialogConfirmBtn")?.addEventListener("click", () => {
+    const input = overlay.querySelector("#signatureValidityDaysInput");
+    const errorNode = overlay.querySelector("#signatureValidityDialogError");
+    const rawValue = Number.parseInt(input?.value || "7", 10);
+    const sanitized = Number.isFinite(rawValue) ? rawValue : NaN;
+    if (!Number.isFinite(sanitized) || sanitized < 1 || sanitized > 30) {
+      errorNode.textContent = "Veuillez saisir une durée valide entre 1 et 30 jours.";
+      errorNode.classList.remove("d-none");
+      input?.focus();
+      return;
+    }
+    errorNode.classList.add("d-none");
+    resolveAndClose(sanitized);
+  });
+
+  overlay.querySelector("[data-signature-validity-close='backdrop']")?.addEventListener("click", () => {
+    resolveAndClose(null);
+  });
+
+  overlay.querySelector("#signatureValidityDaysInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      overlay.querySelector("#signatureValidityDialogConfirmBtn")?.click();
+    }
+  });
+
+  return overlay;
+}
+
+function closeSignatureValidityDialog() {
+  const overlay = document.getElementById("signatureValidityDialog");
+  if (!overlay) {
+    return;
+  }
+  overlay.classList.add("is-hidden");
+  overlay.setAttribute("aria-hidden", "true");
+  signatureValidityDialogResolver = null;
+}
+
+function askSignatureValidityDialog(options = {}) {
+  return new Promise((resolve) => {
+    const overlay = ensureSignatureValidityDialog();
+    signatureValidityDialogResolver = resolve;
+
+    const titleNode = overlay.querySelector("#signatureValidityDialogTitle");
+    const textNode = overlay.querySelector("#signatureValidityDialogText");
+    const inputNode = overlay.querySelector("#signatureValidityDaysInput");
+    const errorNode = overlay.querySelector("#signatureValidityDialogError");
+    const confirmNode = overlay.querySelector("#signatureValidityDialogConfirmBtn");
+
+    titleNode.textContent = options.title || "Validité du lien";
+    textNode.textContent = options.text || "Définissez la durée de validité du lien de signature à distance.";
+    inputNode.value = String(options.defaultValue || 7);
+    inputNode.min = "1";
+    inputNode.max = String(options.maxDays || 30);
+    errorNode.textContent = "";
+    errorNode.classList.add("d-none");
+    confirmNode.textContent = options.confirmLabel || "Continuer";
+
+    overlay.classList.remove("is-hidden");
+    overlay.setAttribute("aria-hidden", "false");
+    window.setTimeout(() => inputNode.focus(), 0);
   });
 }
 

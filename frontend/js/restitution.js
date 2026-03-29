@@ -1,6 +1,5 @@
 const restitutionLoader = document.getElementById("restitutionLoader");
 const restitutionDetailList = document.getElementById("restitutionDetailList");
-const DASHBOARD_SIGNATURE_LINK_NOTICE_KEY = "dashboardSignatureLinkNotice";
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
@@ -392,7 +391,7 @@ function restoreRestitutionSignature(restitution, signaturePad) {
 function getRestitutionLinkValidityDays() {
   const field = document.getElementById("restitution_link_validity_days");
   const rawValue = Number.parseInt(field?.value || "7", 10);
-  const sanitized = Number.isFinite(rawValue) ? Math.min(60, Math.max(1, rawValue)) : 7;
+  const sanitized = Number.isFinite(rawValue) ? Math.min(30, Math.max(1, rawValue)) : 7;
   if (field) {
     field.value = String(sanitized);
   }
