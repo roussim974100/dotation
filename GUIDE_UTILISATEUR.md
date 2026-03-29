@@ -1,6 +1,6 @@
 ﻿# Guide Utilisateur
 
-Version de reference : `2.11.2`
+Version de reference : `2.11.3`
 
 ## Objet
 

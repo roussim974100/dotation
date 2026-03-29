@@ -4,7 +4,7 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.11.2` |
+| Version proposee | `2.11.3` |
 | Statut | `A valider` |
 | Date de mise a jour | `2026-03-29` |
 | Perimetre | `stabilisation du chargement des fiches + corrections d encodage et de typographie + ressources personnalisables et ordre par service + historiques dedies + harmonisation des e-mails prepares et PDF + archivage documentaire` |
