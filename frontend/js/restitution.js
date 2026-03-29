@@ -64,10 +64,66 @@ function escapeHtml(value) {
 }
 
 function selectedDetail(details) {
-  return Object.entries(details || {})
-    .filter(([key, value]) => key !== "selected" && value)
+  const payload = details || {};
+  const fields = payload.fields || {};
+  const fieldValues = Object.values(fields)
+    .map((value) => {
+      if (value === true || value === "true" || value === "Oui" || value === "on") {
+        return "Oui";
+      }
+      return Array.isArray(value) ? value.join(" - ") : String(value || "").trim();
+    })
+    .filter(Boolean);
+
+  if (fieldValues.length) {
+    return fieldValues.join(" - ");
+  }
+
+  if (payload.details) {
+    return String(payload.details).trim();
+  }
+
+  return Object.entries(payload)
+    .filter(([key, value]) => ![
+      "selected",
+      "id",
+      "code",
+      "label",
+      "category",
+      "issuerService",
+      "issuer_service",
+      "triggerKey",
+      "trigger_key",
+      "requiresReturn",
+      "requires_return",
+      "hasAssignmentDate",
+      "has_assignment_date",
+      "hasAssignmentCondition",
+      "has_assignment_condition",
+      "hasAssignmentNotes",
+      "has_assignment_notes",
+      "displayOrder",
+      "display_order",
+      "fieldSchema",
+      "field_schema",
+      "fields",
+      "assignedAt",
+      "conditionAttribution",
+      "conditionNotes"
+    ].includes(key) && value)
     .map(([, value]) => Array.isArray(value) ? value.join(" - ") : value)
     .join(" - ");
+}
+
+function isRestitutionEligibleItem(item) {
+  if (item.category !== "materiel") {
+    return false;
+  }
+  const details = item.details || {};
+  if ("requiresReturn" in details || "requires_return" in details) {
+    return Boolean(details.requiresReturn ?? details.requires_return);
+  }
+  return true;
 }
 
 function normalizeRestitutionState(value) {
@@ -401,7 +457,7 @@ async function initRestitutionPage() {
     document.getElementById("global_return_reason").value = result.data.restitution?.reason || "";
     document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
 
-    const materialItems = (result.items || []).filter((item) => item.category === "materiel");
+    const materialItems = (result.items || []).filter((item) => isRestitutionEligibleItem(item));
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
     let currentRestitution = result.data.restitution || {};
     restoreRestitutionSignature(currentRestitution, signaturePad);

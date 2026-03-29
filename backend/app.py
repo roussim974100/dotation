@@ -97,18 +97,18 @@ CORE_RESOURCE_CODES = {
 }
 
 DEFAULT_RESOURCE_REFERENCES = [
-    {"code": "ordinateur", "label": "Ordinateur", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "ecran", "label": "Écran", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "telephone", "label": "Téléphone", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "tablette", "label": "Tablette", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital"},
-    {"code": "vpn", "label": "VPN", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
-    {"code": "email", "label": "Email", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital"},
-    {"code": "badge", "label": "Badge d'accès", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "cles", "label": "Clé(s)", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "veste", "label": "Veste", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": ""},
-    {"code": "zoneAlarme", "label": "Zone alarme", "category": "immateriel", "issuer_service": "Bâtiment", "requires_return": 0, "trigger_key": ""},
-    {"code": "vehicule", "label": "Véhicule", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": ""},
+    {"code": "ordinateur", "label": "Ordinateur", "description": "Poste informatique remis par la DSI", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 10},
+    {"code": "ecran", "label": "Écran", "description": "Écran remis par la DSI", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 20},
+    {"code": "telephone", "label": "Téléphone", "description": "Téléphone professionnel remis par la DSI", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 30},
+    {"code": "tablette", "label": "Tablette", "description": "Tablette professionnelle remise par la DSI", "category": "materiel", "issuer_service": "DSI", "requires_return": 1, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 40},
+    {"code": "vpn", "label": "VPN", "description": "Accès distant sécurisé", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 0, "has_assignment_notes": 0, "display_order": 50},
+    {"code": "email", "label": "Email", "description": "Messagerie professionnelle", "category": "immateriel", "issuer_service": "DSI", "requires_return": 0, "trigger_key": "digital", "has_assignment_date": 1, "has_assignment_condition": 0, "has_assignment_notes": 0, "display_order": 60},
+    {"code": "badge", "label": "Badge d'accès", "description": "Badge d'accès bâtiment", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 0, "has_assignment_notes": 0, "display_order": 70},
+    {"code": "cles", "label": "Clé(s)", "description": "Clés remises par le service bâtiment", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 80},
+    {"code": "veste", "label": "Veste", "description": "Vêtement de travail remis par le service bâtiment", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 90},
+    {"code": "chaussuresSecurite", "label": "Chaussures de sécurité", "description": "Chaussures de sécurité remises par le service bâtiment", "category": "materiel", "issuer_service": "Bâtiment", "requires_return": 1, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 100},
+    {"code": "zoneAlarme", "label": "Zone alarme", "description": "Zone d'alarme attribuée", "category": "immateriel", "issuer_service": "Bâtiment", "requires_return": 0, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 0, "has_assignment_notes": 0, "display_order": 110},
+    {"code": "vehicule", "label": "Véhicule", "description": "Véhicule attribué par un service", "category": "materiel", "issuer_service": "Autres services", "requires_return": 1, "trigger_key": "", "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 120},
 ]
 
 DEFAULT_SERVICE_REFERENCES = [
@@ -391,17 +391,23 @@ def seed_reference_catalogs(connection):
         connection.execute(
             """
             INSERT INTO resource_catalog (
-                id, code, label, category, issuer_service, requires_return,
+                id, code, label, description, category, issuer_service, requires_return,
+                has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
                 trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
             """,
             (
                 generate_id("resource"),
                 resource["code"],
                 resource["label"],
+                resource.get("description", ""),
                 resource["category"],
                 resource["issuer_service"],
                 resource["requires_return"],
+                resource.get("has_assignment_date", 1),
+                resource.get("has_assignment_condition", 0),
+                resource.get("has_assignment_notes", 1),
+                resource.get("display_order", 100),
                 resource["trigger_key"],
                 "[]",
                 now,
@@ -445,6 +451,13 @@ def normalize_reference_row(row):
         data["field_schema"] = json.loads(data.get("field_schema_json") or "[]")
     except (TypeError, json.JSONDecodeError):
         data["field_schema"] = []
+    data["requires_return"] = bool(data.get("requires_return"))
+    data["has_assignment_date"] = bool(data.get("has_assignment_date", True))
+    data["has_assignment_condition"] = bool(data.get("has_assignment_condition", False))
+    data["has_assignment_notes"] = bool(data.get("has_assignment_notes", True))
+    data["is_active"] = bool(data.get("is_active", True))
+    data["is_builtin"] = bool(data.get("is_builtin", False))
+    data["display_order"] = int(data.get("display_order") or 100)
     return data
 
 
@@ -591,27 +604,83 @@ def build_public_settings_payload(settings=None):
 
 
 def slugify_field_key(value):
+    normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
     return "".join(
         character if character.isalnum() else "_"
-        for character in str(value or "").strip().lower()
+        for character in normalized
+        if unicodedata.category(character) != "Mn"
     ).strip("_")
 
 
 def normalize_resource_field_schema(raw_schema):
+    allowed_types = {"text", "textarea", "select", "date", "number", "checkbox"}
     normalized = []
     for index, field in enumerate(raw_schema or []):
         label = str(field.get("label") or "").strip()
         key = slugify_field_key(field.get("key") or label or f"champ_{index + 1}")
         if not label or not key:
             continue
+        field_type = str(field.get("type") or "text").strip().lower() or "text"
+        if field_type not in allowed_types:
+            field_type = "text"
+        options = field.get("options") or []
+        if not isinstance(options, list):
+            options = []
         normalized.append({
             "key": key,
             "label": label,
-            "type": str(field.get("type") or "text").strip() or "text",
+            "type": field_type,
             "placeholder": str(field.get("placeholder") or "").strip(),
             "required": bool(field.get("required", False)),
+            "options": [str(option).strip() for option in options if str(option or "").strip()],
         })
     return normalized
+
+
+def normalize_resource_catalog_payload(payload, existing_row=None):
+    existing = dict(existing_row) if existing_row else {}
+    code = str(payload.get("code") if payload.get("code") is not None else existing.get("code") or "").strip()
+    label = str(payload.get("label") if payload.get("label") is not None else existing.get("label") or "").strip()
+    description = str(payload.get("description") if payload.get("description") is not None else existing.get("description") or "").strip()
+    category = str(payload.get("category") if payload.get("category") is not None else existing.get("category") or "materiel").strip() or "materiel"
+    if category not in {"materiel", "immateriel"}:
+        category = "materiel"
+    issuer_service = str(payload.get("issuer_service") if payload.get("issuer_service") is not None else existing.get("issuer_service") or "").strip()
+    trigger_key = str(payload.get("trigger_key") if payload.get("trigger_key") is not None else existing.get("trigger_key") or "").strip()
+    raw_field_schema = payload.get("field_schema") if "field_schema" in payload else payload.get("fieldSchema")
+    if raw_field_schema is None:
+        try:
+            raw_field_schema = json.loads(existing.get("field_schema_json") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            raw_field_schema = []
+    field_schema = normalize_resource_field_schema(raw_field_schema)
+    display_order = payload.get("display_order") if payload.get("display_order") is not None else existing.get("display_order", 100)
+    try:
+        display_order = int(display_order)
+    except (TypeError, ValueError):
+        display_order = 100
+    requires_return = bool(payload.get("requires_return", bool(existing.get("requires_return", True))))
+    has_assignment_date = bool(payload.get("has_assignment_date", bool(existing.get("has_assignment_date", True))))
+    has_assignment_condition = bool(payload.get("has_assignment_condition", bool(existing.get("has_assignment_condition", category == "materiel"))))
+    has_assignment_notes = bool(payload.get("has_assignment_notes", bool(existing.get("has_assignment_notes", category == "materiel"))))
+    if category == "immateriel":
+        has_assignment_condition = False
+    is_active = bool(payload.get("is_active", bool(existing.get("is_active", True))))
+    return {
+        "code": code,
+        "label": label,
+        "description": description,
+        "category": category,
+        "issuer_service": issuer_service,
+        "requires_return": requires_return,
+        "has_assignment_date": has_assignment_date,
+        "has_assignment_condition": has_assignment_condition,
+        "has_assignment_notes": has_assignment_notes,
+        "display_order": display_order,
+        "trigger_key": trigger_key,
+        "field_schema": field_schema,
+        "is_active": is_active,
+    }
 
 
 def init_db():
@@ -722,9 +791,14 @@ def init_db():
                 id TEXT PRIMARY KEY,
                 code TEXT NOT NULL UNIQUE,
                 label TEXT NOT NULL,
+                description TEXT,
                 category TEXT NOT NULL,
                 issuer_service TEXT,
                 requires_return INTEGER NOT NULL DEFAULT 1,
+                has_assignment_date INTEGER NOT NULL DEFAULT 1,
+                has_assignment_condition INTEGER NOT NULL DEFAULT 0,
+                has_assignment_notes INTEGER NOT NULL DEFAULT 1,
+                display_order INTEGER NOT NULL DEFAULT 100,
                 trigger_key TEXT,
                 field_schema_json TEXT,
                 is_active INTEGER NOT NULL DEFAULT 1,
@@ -771,7 +845,25 @@ def init_db():
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
         ensure_column(connection, "dotation_forms", "dossier_type", "dossier_type TEXT")
         ensure_column(connection, "onboarding_dossiers", "dossier_type", "dossier_type TEXT NOT NULL DEFAULT 'arrivee'")
+        ensure_column(connection, "resource_catalog", "description", "description TEXT")
         ensure_column(connection, "resource_catalog", "field_schema_json", "field_schema_json TEXT")
+        ensure_column(connection, "resource_catalog", "has_assignment_date", "has_assignment_date INTEGER NOT NULL DEFAULT 1")
+        ensure_column(connection, "resource_catalog", "has_assignment_condition", "has_assignment_condition INTEGER NOT NULL DEFAULT 0")
+        ensure_column(connection, "resource_catalog", "has_assignment_notes", "has_assignment_notes INTEGER NOT NULL DEFAULT 1")
+        ensure_column(connection, "resource_catalog", "display_order", "display_order INTEGER NOT NULL DEFAULT 100")
+        connection.execute(
+            """
+            UPDATE resource_catalog
+            SET has_assignment_date = COALESCE(has_assignment_date, 1),
+                has_assignment_condition = CASE
+                    WHEN category = 'immatériel' THEN 0
+                    WHEN category = 'immateriel' THEN COALESCE(has_assignment_condition, 0)
+                    ELSE COALESCE(has_assignment_condition, 1)
+                END,
+                has_assignment_notes = COALESCE(has_assignment_notes, 1),
+                display_order = COALESCE(display_order, 100)
+            """
+        )
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
@@ -1859,6 +1951,76 @@ def summarize_dynamic_resource(resource):
     return str(resource.get("details") or "").strip()
 
 
+def uses_dynamic_resource_assignment_date(resource):
+    if not isinstance(resource, dict):
+        return True
+    if "hasAssignmentDate" in resource or "has_assignment_date" in resource:
+        return bool(resource.get("hasAssignmentDate", resource.get("has_assignment_date")))
+    return True
+
+
+def uses_dynamic_resource_assignment_condition(resource):
+    if not isinstance(resource, dict):
+        return False
+    if "hasAssignmentCondition" in resource or "has_assignment_condition" in resource:
+        return bool(resource.get("hasAssignmentCondition", resource.get("has_assignment_condition")))
+    return False
+
+
+def uses_dynamic_resource_assignment_notes(resource):
+    if not isinstance(resource, dict):
+        return False
+    if "hasAssignmentNotes" in resource or "has_assignment_notes" in resource:
+        return bool(resource.get("hasAssignmentNotes", resource.get("has_assignment_notes")))
+    return False
+
+
+def is_dynamic_resource_complete(resource):
+    if not isinstance(resource, dict) or not resource.get("selected"):
+        return False
+    field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
+    field_values = resource.get("fields") or {}
+    if field_schema:
+        for field in field_schema:
+            value = str(field_values.get(field["key"]) or "").strip()
+            if field.get("required") and not value:
+                return False
+    elif not summarize_dynamic_resource(resource):
+        return False
+    if uses_dynamic_resource_assignment_date(resource) and not str(resource.get("assignedAt") or "").strip():
+        return False
+    return True
+
+
+def is_dynamic_resource_payload(resource):
+    if not isinstance(resource, dict):
+        return False
+    marker_keys = {
+        "fieldSchema",
+        "field_schema",
+        "fields",
+        "issuerService",
+        "issuer_service",
+        "triggerKey",
+        "trigger_key",
+        "displayOrder",
+        "display_order",
+        "requiresReturn",
+        "requires_return",
+    }
+    return any(key in resource for key in marker_keys)
+
+
+def is_restitution_eligible_material_details(details):
+    if not isinstance(details, dict):
+        return True
+    if (details.get("category") or "") != "materiel":
+        return False
+    if "requiresReturn" in details or "requires_return" in details:
+        return bool(details.get("requiresReturn", details.get("requires_return")))
+    return True
+
+
 def collect_resource_entries(payload):
     materiel = payload.get("materiel", {})
     immateriel = payload.get("immateriel", {})
@@ -2319,11 +2481,18 @@ def build_restitution_pdf_bytes(title, payload):
     decision_label = format_restitution_decision_label(signature_status, restitution.get("signataireDecision"))
     signature_export_allowed = can_export_signature_assets()
     signature_present = bool(restitution.get("signatureDataUrl"))
+    additional_resource_index = {
+        resource.get("code") or resource.get("id"): resource
+        for resource in payload.get("resources", {}).get("additional", [])
+        if isinstance(resource, dict)
+    }
     material_entries = {}
     for item in extract_items(payload):
         if item.get("category") != "materiel":
             continue
         details = json.loads(item.get("details_json") or "{}") if item.get("details_json") else {}
+        if not is_restitution_eligible_material_details(details):
+            continue
         detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
             str(value).strip()
             for key, value in details.items()
@@ -2338,6 +2507,9 @@ def build_restitution_pdf_bytes(title, payload):
 
     for entry in collect_resource_entries(payload):
         if entry.get("category") != "materiel":
+            continue
+        resource_details = additional_resource_index.get(entry["itemKey"]) or {}
+        if resource_details and not is_restitution_eligible_material_details(resource_details):
             continue
         existing = material_entries.get(entry["itemKey"], {})
         material_entries[entry["itemKey"]] = {
@@ -2708,12 +2880,21 @@ def describe_assignment_condition(item):
         return []
     parts = []
     is_immaterial = item.get("category") == "immateriel"
-    if item.get("assignedAt"):
+    show_assignment_date = True
+    if is_dynamic_resource_payload(item):
+        show_assignment_date = uses_dynamic_resource_assignment_date(item)
+    if show_assignment_date and item.get("assignedAt"):
         parts.append(f"Date d'attribution : {format_export_datetime(item.get('assignedAt'))}")
-    if not is_immaterial and item.get("conditionAttribution"):
+    show_assignment_condition = not is_immaterial
+    if is_dynamic_resource_payload(item):
+        show_assignment_condition = uses_dynamic_resource_assignment_condition(item)
+    if show_assignment_condition and item.get("conditionAttribution"):
         parts.append(f"État à la remise : {format_assignment_condition_label(item.get('conditionAttribution'))}")
     notes = str(item.get("conditionNotes") or "").strip()
-    if notes and not is_immaterial:
+    show_assignment_notes = not is_immaterial
+    if is_dynamic_resource_payload(item):
+        show_assignment_notes = uses_dynamic_resource_assignment_notes(item)
+    if notes and show_assignment_notes:
         parts.append(f"Observation de remise : {notes}")
     return parts
 
@@ -2727,7 +2908,11 @@ def summarize_assignment_progress(payload):
             details = json.loads(item.get("details_json") or "{}")
         except (TypeError, json.JSONDecodeError):
             details = {}
-        if isinstance(details, dict) and details.get("assignedAt"):
+        if isinstance(details, dict) and (
+            is_dynamic_resource_complete(details)
+            if is_dynamic_resource_payload(details)
+            else bool(details.get("assignedAt"))
+        ):
             completed += 1
     start_at = (
         payload.get("meta", {}).get("startAt")
@@ -2921,6 +3106,8 @@ def collect_resource_validation_errors(payload):
                     continue
         elif not summarize_dynamic_resource(resource):
             errors.append(f"{resource.get('label') or 'Ressource complémentaire'} incomplète")
+        if uses_dynamic_resource_assignment_date(resource) and not str(resource.get("assignedAt") or "").strip():
+            errors.append(f"{resource.get('label') or 'Ressource'} : date d'attribution manquante")
 
     return errors
 
@@ -3290,7 +3477,7 @@ def build_restitution_signature_public_payload(form_data, link_row):
     material_index = {
         item["itemKey"]: item
         for item in (form_data.get("items") or [])
-        if item.get("category") == "materiel"
+        if item.get("category") == "materiel" and is_restitution_eligible_material_details(item.get("details") or {})
     }
     restitution_items = []
     for item_key, state in (restitution.get("items") or {}).items():
@@ -3463,6 +3650,18 @@ def index_page():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
+@app.route("/historique-dossiers.html")
+@login_required
+def assignments_history_page():
+    return send_from_directory(FRONTEND_DIR, "historique-dossiers.html")
+
+
+@app.route("/historique-restitutions.html")
+@login_required
+def restitutions_history_page():
+    return send_from_directory(FRONTEND_DIR, "historique-restitutions.html")
+
+
 @app.route("/form.html")
 @login_required
 def form_page():
@@ -3535,6 +3734,14 @@ def admin_resources_page():
     if not has_permission("users.manage"):
         return redirect("/")
     return send_from_directory(FRONTEND_DIR, "admin-ressources.html")
+
+
+@app.route("/admin-ressources-ordre.html")
+@login_required
+def admin_resources_order_page():
+    if not has_permission("users.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-ressources-ordre.html")
 
 
 @app.route("/admin-personnalisation.html")
@@ -4573,7 +4780,7 @@ def reference_resources():
             """
             SELECT * FROM resource_catalog
             WHERE is_active = 1
-            ORDER BY category ASC, label COLLATE NOCASE ASC
+            ORDER BY category ASC, display_order ASC, label COLLATE NOCASE ASC
             """
         ).fetchall()
     return jsonify([normalize_reference_row(row) for row in rows])
@@ -4935,7 +5142,7 @@ def delete_admin_service(service_id):
 def admin_resources():
     with get_db() as connection:
         rows = connection.execute(
-            "SELECT * FROM resource_catalog ORDER BY is_active DESC, category ASC, label COLLATE NOCASE ASC"
+            "SELECT * FROM resource_catalog ORDER BY is_active DESC, category ASC, display_order ASC, label COLLATE NOCASE ASC"
         ).fetchall()
     return jsonify([normalize_reference_row(row) for row in rows])
 
@@ -4945,45 +5152,45 @@ def admin_resources():
 @permission_required("users.manage")
 def create_admin_resource():
     payload = request.get_json(silent=True) or {}
-    code = (payload.get("code") or "").strip()
-    label = (payload.get("label") or "").strip()
-    category = (payload.get("category") or "").strip() or "materiel"
-    issuer_service = (payload.get("issuer_service") or "").strip()
-    trigger_key = (payload.get("trigger_key") or "").strip()
-    field_schema = normalize_resource_field_schema(payload.get("field_schema") or payload.get("fieldSchema") or [])
-    is_active = bool(payload.get("is_active", True))
-    requires_return = bool(payload.get("requires_return", True))
+    resource_data = normalize_resource_catalog_payload(payload)
 
-    if not code or not label:
+    if not resource_data["code"] or not resource_data["label"]:
         return jsonify({"error": "code_and_label_required"}), 400
 
     now = utc_now()
     with get_db() as connection:
-        existing = connection.execute("SELECT id FROM resource_catalog WHERE code = ?", (code,)).fetchone()
+        existing = connection.execute("SELECT id FROM resource_catalog WHERE code = ?", (resource_data["code"],)).fetchone()
         if existing:
             return jsonify({"error": "resource_exists"}), 409
         resource_id = generate_id("resource")
         connection.execute(
             """
             INSERT INTO resource_catalog (
-                id, code, label, category, issuer_service, requires_return, trigger_key,
-                field_schema_json, is_active, is_builtin, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                id, code, label, description, category, issuer_service, requires_return,
+                has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
+                trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             """,
             (
                 resource_id,
-                code,
-                label,
-                category,
-                issuer_service,
-                bool_to_int(requires_return),
-                trigger_key,
-                json.dumps(field_schema, ensure_ascii=False),
-                bool_to_int(is_active),
+                resource_data["code"],
+                resource_data["label"],
+                resource_data["description"],
+                resource_data["category"],
+                resource_data["issuer_service"],
+                bool_to_int(resource_data["requires_return"]),
+                bool_to_int(resource_data["has_assignment_date"]),
+                bool_to_int(resource_data["has_assignment_condition"]),
+                bool_to_int(resource_data["has_assignment_notes"]),
+                resource_data["display_order"],
+                resource_data["trigger_key"],
+                json.dumps(resource_data["field_schema"], ensure_ascii=False),
+                bool_to_int(resource_data["is_active"]),
                 now,
                 now,
             ),
         )
+        created_row = connection.execute("SELECT * FROM resource_catalog WHERE id = ?", (resource_id,)).fetchone()
         insert_app_log(
             connection,
             "admin",
@@ -4991,9 +5198,15 @@ def create_admin_resource():
             "Ressource creee",
             "resource",
             resource_id,
-            {"code": code, "label": label, "category": category, "issuer_service": issuer_service, "field_count": len(field_schema)},
+            {
+                "code": resource_data["code"],
+                "label": resource_data["label"],
+                "category": resource_data["category"],
+                "issuer_service": resource_data["issuer_service"],
+                "field_count": len(resource_data["field_schema"]),
+            },
         )
-    return jsonify({"created": True}), 201
+    return jsonify({"created": True, "resource": normalize_reference_row(created_row)}), 201
 
 
 @app.route("/api/admin/resources/<resource_id>", methods=["PUT"])
@@ -5006,7 +5219,8 @@ def update_admin_resource(resource_id):
         row = connection.execute("SELECT * FROM resource_catalog WHERE id = ?", (resource_id,)).fetchone()
         if not row:
             return jsonify({"error": "not_found"}), 404
-        next_code = (payload.get("code") or row["code"]).strip()
+        resource_data = normalize_resource_catalog_payload(payload, row)
+        next_code = resource_data["code"]
         if not next_code:
             return jsonify({"error": "code_required"}), 400
         duplicate = connection.execute(
@@ -5015,30 +5229,33 @@ def update_admin_resource(resource_id):
         ).fetchone()
         if duplicate:
             return jsonify({"error": "resource_code_exists"}), 409
-        raw_field_schema = payload.get("field_schema") if "field_schema" in payload else payload.get("fieldSchema")
-        field_schema = normalize_resource_field_schema(
-            raw_field_schema if raw_field_schema is not None else json.loads(row["field_schema_json"] or "[]")
-        )
         connection.execute(
             """
             UPDATE resource_catalog
-            SET code = ?, label = ?, category = ?, issuer_service = ?, requires_return = ?,
+            SET code = ?, label = ?, description = ?, category = ?, issuer_service = ?, requires_return = ?,
+                has_assignment_date = ?, has_assignment_condition = ?, has_assignment_notes = ?, display_order = ?,
                 trigger_key = ?, field_schema_json = ?, is_active = ?, updated_at = ?
             WHERE id = ?
             """,
             (
-                next_code,
-                (payload.get("label") or row["label"]).strip(),
-                (payload.get("category") or row["category"]).strip(),
-                (payload.get("issuer_service") if payload.get("issuer_service") is not None else row["issuer_service"]),
-                bool_to_int(payload.get("requires_return", bool(row["requires_return"]))),
-                (payload.get("trigger_key") if payload.get("trigger_key") is not None else row["trigger_key"]),
-                json.dumps(field_schema, ensure_ascii=False),
-                bool_to_int(payload.get("is_active", bool(row["is_active"]))),
+                resource_data["code"],
+                resource_data["label"],
+                resource_data["description"],
+                resource_data["category"],
+                resource_data["issuer_service"],
+                bool_to_int(resource_data["requires_return"]),
+                bool_to_int(resource_data["has_assignment_date"]),
+                bool_to_int(resource_data["has_assignment_condition"]),
+                bool_to_int(resource_data["has_assignment_notes"]),
+                resource_data["display_order"],
+                resource_data["trigger_key"],
+                json.dumps(resource_data["field_schema"], ensure_ascii=False),
+                bool_to_int(resource_data["is_active"]),
                 now,
                 resource_id,
             ),
         )
+        updated_row = connection.execute("SELECT * FROM resource_catalog WHERE id = ?", (resource_id,)).fetchone()
         insert_app_log(
             connection,
             "admin",
@@ -5048,12 +5265,12 @@ def update_admin_resource(resource_id):
             resource_id,
             {
                 "code": next_code,
-                "label": payload.get("label") or row["label"],
-                "category": payload.get("category") or row["category"],
-                "field_count": len(field_schema),
+                "label": resource_data["label"],
+                "category": resource_data["category"],
+                "field_count": len(resource_data["field_schema"]),
             },
         )
-    return jsonify({"updated": True})
+    return jsonify({"updated": True, "resource": normalize_reference_row(updated_row)})
 
 
 @app.route("/api/admin/resources/<resource_id>", methods=["DELETE"])

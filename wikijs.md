@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version proposee | `2.9.0` |
+| Version proposee | `2.10.0` |
 | Statut | `A valider` |
-| Date de mise a jour | `2026-03-27` |
-| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + liens de signature remise et restitution + admin en sous-pages + services administrables + archivage documentaire` |
+| Date de mise a jour | `2026-03-29` |
+| Perimetre | `Application complete + restitution avancee + tracabilite de reouverture + protection des signatures PDF + liens de signature remise et restitution + admin en sous-pages + services administrables + ressources personnalisables avec schema de champs + reorganisation visuelle de l'ordre des ressources + archivage documentaire` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.

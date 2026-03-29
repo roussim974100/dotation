@@ -2,6 +2,8 @@
 
 Application interne de gestion des dossiers d'attribution et de restitution.
 
+Version courante : `2.10.0`
+
 ## Ce que fait l'application
 
 - creer un dossier pour un agent ou un(e) elu(e)
@@ -12,6 +14,8 @@ Application interne de gestion des dossiers d'attribution et de restitution.
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
 - administrer les comptes, les groupes, les services et les ressources attribuables
+- définir des ressources personnalisées avec leurs champs métier, leur suivi à l'attribution et leur restitution éventuelle
+- réorganiser l'ordre d'affichage des ressources par service avec une page dédiée
 - consulter un journal des actions
 - restaurer des suppressions via une corbeille reservee aux admins
 - exporter les dossiers et les restitutions en PDF

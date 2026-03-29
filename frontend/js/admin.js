@@ -1,4 +1,4 @@
-// Module principal des écrans d'administration :
+﻿// Module principal des écrans d'administration :
 // comptes, groupes, services et ressources.
 async function adminRequest(url, options = {}) {
   const response = await fetch(url, {
@@ -30,6 +30,13 @@ let currentResources = [];
 let editingUsername = null;
 let editingServiceId = null;
 let editingResourceId = null;
+const RESOURCE_DISPLAY_ORDER_OPTIONS = [
+  { value: 10, label: "Tout en haut" },
+  { value: 30, label: "Début de liste" },
+  { value: 60, label: "Position standard" },
+  { value: 90, label: "Plus bas" },
+  { value: 120, label: "Fin de liste" }
+];
 
 function byId(id) {
   return document.getElementById(id);
@@ -47,9 +54,90 @@ function escapeHtml(value) {
 function slugifyFieldKey(value) {
   return String(value || "")
     .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function syncResourceCodeFromLabel(force = false) {
+  const labelInput = byId("resource_label");
+  const codeInput = byId("resource_code");
+  if (!labelInput || !codeInput) {
+    return;
+  }
+  if (!force && codeInput.dataset.manual === "true") {
+    return;
+  }
+  codeInput.value = slugifyFieldKey(labelInput.value);
+}
+
+function renderResourceIssuerOptions(selectedValue = "") {
+  const select = byId("resource_issuer");
+  if (!select) {
+    return;
+  }
+  const activeServices = currentServices
+    .filter((service) => service.is_active)
+    .map((service) => service.label);
+  const options = [...new Set(activeServices)];
+  const normalizedSelectedValue = String(selectedValue || "").trim();
+  if (normalizedSelectedValue && !options.includes(normalizedSelectedValue)) {
+    options.push(normalizedSelectedValue);
+  }
+  options.sort((left, right) => left.localeCompare(right, "fr"));
+  select.innerHTML = `
+    <option value="">Sélectionner un service</option>
+    ${options.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join("")}
+  `;
+  select.value = normalizedSelectedValue;
+}
+
+function syncResourceTrackingOptions() {
+  const category = byId("resource_category")?.value || "materiel";
+  const conditionInput = byId("resource_has_assignment_condition");
+  const notesInput = byId("resource_has_assignment_notes");
+  if (!conditionInput || !notesInput) {
+    return;
+  }
+  if (category === "immateriel") {
+    conditionInput.checked = false;
+    conditionInput.disabled = true;
+  } else {
+    conditionInput.disabled = false;
+  }
+}
+
+function formatResourceTrackingSummary(resource) {
+  const labels = [];
+  if (resource.has_assignment_date) {
+    labels.push("date");
+  }
+  if (resource.has_assignment_condition) {
+    labels.push("état");
+  }
+  if (resource.has_assignment_notes) {
+    labels.push("observation");
+  }
+  return labels.length ? labels.join(", ") : "Aucun suivi";
+}
+
+function renderResourceDisplayOrderOptions(selectedValue = 60) {
+  const select = byId("resource_display_order");
+  if (!select) {
+    return;
+  }
+  const normalizedValue = Number.parseInt(String(selectedValue || 60), 10) || 60;
+  const options = [...RESOURCE_DISPLAY_ORDER_OPTIONS];
+  if (!options.some((option) => option.value === normalizedValue)) {
+    options.push({ value: normalizedValue, label: `Position actuelle (${normalizedValue})` });
+  }
+  options.sort((left, right) => left.value - right.value);
+  select.innerHTML = options.map((option) => `
+    <option value="${option.value}">${escapeHtml(option.label)}</option>
+  `).join("");
+  select.value = String(normalizedValue);
 }
 
 function setNotice(elementId, message = "", visible = false) {
@@ -283,37 +371,39 @@ function populateUserForm(username) {
 }
 
 function createResourceFieldRow(field = {}) {
+  const optionsValue = Array.isArray(field.options) ? field.options.join("\n") : "";
+  const showOptions = field.type === "select";
   return `
     <div class="resource-field-row">
       <div class="row g-3 align-items-end">
-        <div class="col-md-4">
+        <div class="col-md-5">
           <label class="form-label">Libellé</label>
           <input class="form-control resource-field-label" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série">
         </div>
-        <div class="col-md-3">
-          <label class="form-label">Clé</label>
-          <input class="form-control resource-field-key" value="${escapeHtml(field.key || "")}" placeholder="numero_serie">
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label class="form-label">Type</label>
           <select class="form-select resource-field-type">
             <option value="text" ${field.type === "text" ? "selected" : ""}>Texte</option>
-            <option value="email" ${field.type === "email" ? "selected" : ""}>Email</option>
-            <option value="tel" ${field.type === "tel" ? "selected" : ""}>Téléphone</option>
+            <option value="textarea" ${field.type === "textarea" ? "selected" : ""}>Texte long</option>
+            <option value="select" ${field.type === "select" ? "selected" : ""}>Liste déroulante</option>
+            <option value="date" ${field.type === "date" ? "selected" : ""}>Date</option>
+            <option value="number" ${field.type === "number" ? "selected" : ""}>Nombre</option>
+            <option value="checkbox" ${field.type === "checkbox" ? "selected" : ""}>Case à cocher</option>
           </select>
         </div>
-        <div class="col-md-2 d-flex justify-content-md-end">
-          <button class="btn btn-outline-danger resource-field-remove" type="button">Suppr.</button>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Placeholder</label>
-          <input class="form-control resource-field-placeholder" value="${escapeHtml(field.placeholder || "")}" placeholder="SN123456">
-        </div>
-        <div class="col-md-6">
+        <div class="col-md-3">
           <label class="form-check">
             <input class="form-check-input resource-field-required" type="checkbox" ${field.required ? "checked" : ""}>
             <span class="form-check-label">Champ obligatoire</span>
           </label>
+        </div>
+        <div class="col-12 resource-field-options ${showOptions ? "" : "d-none"}">
+          <label class="form-label">Choix de la liste</label>
+          <textarea class="form-control resource-field-options-input" rows="3" placeholder="Une option par ligne">${escapeHtml(optionsValue)}</textarea>
+          <div class="form-text">Ajoutez une valeur par ligne pour la liste déroulante.</div>
+        </div>
+        <div class="col-12 d-flex justify-content-md-end">
+          <button class="btn btn-outline-danger resource-field-remove" type="button">Suppr.</button>
         </div>
       </div>
     </div>
@@ -326,15 +416,13 @@ function bindResourceFieldRows() {
       return;
     }
     const labelInput = row.querySelector(".resource-field-label");
-    const keyInput = row.querySelector(".resource-field-key");
+    const typeInput = row.querySelector(".resource-field-type");
+    const optionsWrap = row.querySelector(".resource-field-options");
     labelInput?.addEventListener("input", () => {
-      if (!keyInput.dataset.manual || !keyInput.value.trim()) {
-        keyInput.value = slugifyFieldKey(labelInput.value);
-      }
+      labelInput.dataset.key = slugifyFieldKey(labelInput.value);
     });
-    keyInput?.addEventListener("input", () => {
-      keyInput.dataset.manual = keyInput.value.trim() ? "true" : "";
-      keyInput.value = slugifyFieldKey(keyInput.value);
+    typeInput?.addEventListener("change", () => {
+      optionsWrap?.classList.toggle("d-none", typeInput.value !== "select");
     });
     row.querySelector(".resource-field-remove")?.addEventListener("click", () => {
       row.remove();
@@ -355,17 +443,21 @@ function appendResourceFieldRow(field = {}) {
 function collectResourceFieldSchema() {
   return Array.from(document.querySelectorAll(".resource-field-row")).map((row, index) => {
     const label = row.querySelector(".resource-field-label")?.value.trim() || "";
-    const keyInput = row.querySelector(".resource-field-key");
-    const key = slugifyFieldKey(keyInput?.value || label || `champ_${index + 1}`);
-    if (keyInput) {
-      keyInput.value = key;
-    }
+    const key = slugifyFieldKey(label || `champ_${index + 1}`);
+    const type = row.querySelector(".resource-field-type")?.value || "text";
+    const options = type === "select"
+      ? String(row.querySelector(".resource-field-options-input")?.value || "")
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter(Boolean)
+      : [];
     return {
       label,
       key,
-      type: row.querySelector(".resource-field-type")?.value || "text",
-      placeholder: row.querySelector(".resource-field-placeholder")?.value.trim() || "",
-      required: Boolean(row.querySelector(".resource-field-required")?.checked)
+      type,
+      placeholder: "",
+      required: Boolean(row.querySelector(".resource-field-required")?.checked),
+      options
     };
   }).filter((field) => field.label && field.key);
 }
@@ -376,10 +468,6 @@ function renderResourceFieldSchema(fields = []) {
     return;
   }
   container.innerHTML = "";
-  if (!fields.length) {
-    appendResourceFieldRow();
-    return;
-  }
   fields.forEach((field) => appendResourceFieldRow(field));
 }
 
@@ -420,11 +508,18 @@ function resetResourceForm() {
   byId("cancelResourceEditBtn").classList.add("d-none");
   setNotice("resourceEditNotice");
   byId("resource_code").value = "";
+  byId("resource_code").dataset.manual = "";
   byId("resource_label").value = "";
   byId("resource_category").value = "materiel";
-  byId("resource_issuer").value = "";
+  renderResourceIssuerOptions("");
+  byId("resource_description").value = "";
+  renderResourceDisplayOrderOptions(60);
   byId("resource_requires_return").checked = true;
   byId("resource_active").checked = true;
+  byId("resource_has_assignment_date").checked = true;
+  byId("resource_has_assignment_condition").checked = true;
+  byId("resource_has_assignment_notes").checked = true;
+  syncResourceTrackingOptions();
   renderResourceFieldSchema([]);
 }
 
@@ -439,11 +534,18 @@ function populateResourceForm(resourceId) {
   byId("cancelResourceEditBtn").classList.remove("d-none");
   setNotice("resourceEditNotice", "Définissez ici les champs qui devront être renseignés quand la ressource est attribuée.", true);
   byId("resource_code").value = resource.code || "";
+  byId("resource_code").dataset.manual = "true";
   byId("resource_label").value = resource.label || "";
   byId("resource_category").value = resource.category || "materiel";
-  byId("resource_issuer").value = resource.issuer_service || "";
+  renderResourceIssuerOptions(resource.issuer_service || "");
+  byId("resource_description").value = resource.description || "";
+  renderResourceDisplayOrderOptions(resource.display_order || 60);
   byId("resource_requires_return").checked = Boolean(resource.requires_return);
   byId("resource_active").checked = Boolean(resource.is_active);
+  byId("resource_has_assignment_date").checked = resource.has_assignment_date !== false;
+  byId("resource_has_assignment_condition").checked = Boolean(resource.has_assignment_condition);
+  byId("resource_has_assignment_notes").checked = resource.has_assignment_notes !== false;
+  syncResourceTrackingOptions();
   renderResourceFieldSchema(resource.field_schema || []);
 }
 
@@ -568,6 +670,7 @@ async function deleteUser(username) {
 
 async function loadServices() {
   currentServices = await adminRequest("/api/admin/services");
+  renderResourceIssuerOptions(byId("resource_issuer")?.value || "");
   const table = byId("serviceTableBody");
   if (!table) {
     updateAdminMetrics();
@@ -654,6 +757,7 @@ async function loadResources() {
       </td>
       <td data-label="Catégorie">${escapeHtml(resource.category)}</td>
       <td data-label="Service">${escapeHtml(resource.issuer_service || "-")}</td>
+      <td data-label="Suivi">${escapeHtml(formatResourceTrackingSummary(resource))}</td>
       <td data-label="Champs">${escapeHtml(String((resource.field_schema || []).length || 0))}</td>
       <td data-label="État"><span class="status-chip status-chip--${resource.is_active ? "active" : "cancelled"}">${resource.is_active ? "Active" : "Inactive"}</span></td>
       <td data-label="Actions" class="text-end">
@@ -669,15 +773,29 @@ async function loadResources() {
 }
 
 async function saveResource() {
+  syncResourceCodeFromLabel();
   const payload = {
     code: byId("resource_code")?.value.trim() || "",
     label: byId("resource_label")?.value.trim() || "",
+    description: byId("resource_description")?.value.trim() || "",
     category: byId("resource_category")?.value || "materiel",
-    issuer_service: byId("resource_issuer")?.value.trim() || "",
+    issuer_service: byId("resource_issuer")?.value || "",
     requires_return: Boolean(byId("resource_requires_return")?.checked),
+    has_assignment_date: Boolean(byId("resource_has_assignment_date")?.checked),
+    has_assignment_condition: Boolean(byId("resource_has_assignment_condition")?.checked),
+    has_assignment_notes: Boolean(byId("resource_has_assignment_notes")?.checked),
+    display_order: Number.parseInt(byId("resource_display_order")?.value || "100", 10) || 100,
     is_active: Boolean(byId("resource_active")?.checked),
     field_schema: collectResourceFieldSchema()
   };
+  if (!payload.label) {
+    window.alert("Le libellé de la ressource est obligatoire.");
+    return;
+  }
+  if (!payload.code) {
+    window.alert("Le code de la ressource n'a pas pu être généré automatiquement.");
+    return;
+  }
   if (!editingResourceId) {
     await adminRequest("/api/admin/resources", {
       method: "POST",
@@ -734,6 +852,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await Promise.all([loadUsers(), loadServices(), loadResources()]);
 
+    byId("resource_label")?.addEventListener("input", () => {
+      syncResourceCodeFromLabel();
+    });
+    byId("resource_category")?.addEventListener("change", () => {
+      syncResourceTrackingOptions();
+    });
+
     byId("addResourceFieldBtn")?.addEventListener("click", () => {
       appendResourceFieldRow();
     });
@@ -786,3 +911,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     alert(`Impossible de charger l'administration : ${error.message}`);
   }
 });
+
+
+
+

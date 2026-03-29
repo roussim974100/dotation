@@ -1,5 +1,7 @@
 ﻿# Recette Fonctionnelle
 
+Version de reference : `2.10.0`
+
 ## Preparation
 
 1. Lancer l'application :
@@ -34,6 +36,8 @@ python backend\app.py
 - l'administration des utilisateurs est accessible
 - l'administration des services est accessible
 - l'administration des ressources est accessible
+- une ressource personnalisee peut etre creee avec ses champs obligatoires
+- la page d'ordre des ressources est accessible et l'enregistrement du glisser-deposer fonctionne
 - la page `Journal` est accessible
 - la page `Corbeille` est accessible pour un admin
 - le dossier `version/versions/` est present

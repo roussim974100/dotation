@@ -1,4 +1,4 @@
-const HELP_CONTENT = {
+﻿const HELP_CONTENT = {
   dashboard: {
     title: "Aide du tableau de bord",
     subtitle: "Retrouvez vos dossiers, suivez leur avancement et lancez les actions utiles sans quitter la liste.",
@@ -177,23 +177,96 @@ const HELP_CONTENT = {
     returnLabel: "Retour aux ressources",
     quickLinkLabel: "Ouvrir les ressources",
     summary: [
-      "Creer une ressource avec son code, son libelle, sa categorie et son service emetteur.",
-      "Definir la structure des champs qui seront demandes dans les dossiers.",
+      "Creer une ressource avec son libelle, sa categorie et son service emetteur choisi dans la liste des services existants.",
+      "Le code technique est genere automatiquement a partir du libelle et ne demande pas de saisie manuelle.",
+      "Ajouter uniquement les champs utiles dans la ressource, au moment voulu, avec le bouton Ajouter un champ.",
+      "Choisir les informations de suivi a afficher dans le dossier : date d'attribution, etat a la remise et observation de remise.",
       "Choisir si la ressource est restituable ou non selon son cycle de vie.",
       "Desactiver une ressource sans casser l'historique des fiches existantes."
     ],
     sections: [
       {
         title: "Decrire la ressource",
-        text: "Le formulaire principal definit l'identite metier de la ressource et ses caracteristiques globales."
+        text: "Le formulaire principal definit le libelle visible, la categorie, le service emetteur, une description et un placement simple dans la liste. Le code interne est fabrique automatiquement pour garantir une denomination propre et homogène."
       },
       {
         title: "Structurer les champs",
-        text: "Le bloc Structure de la ressource sert a declarer les champs a saisir dans les dossiers, ainsi que leur caractere obligatoire."
+        text: "Le bloc Structure de la ressource sert a declarer les champs a saisir dans les dossiers. Aucune ligne n'apparait tant que vous n'avez pas clique sur Ajouter un champ."
+      },
+      {
+        title: "Definir le suivi a l'attribution",
+        text: "Le bloc Suivi a l'attribution permet d'afficher ou non la date d'attribution, l'etat a la remise et l'observation de remise. Pour une ressource immaterielle, l'etat a la remise est automatiquement desactive."
       },
       {
         title: "Maitriser l'impact metier",
         text: "Toute modification du referentiel influence les nouvelles fiches. Faites evoluer les ressources avec prudence quand elles sont deja utilisees."
+      }
+    ]
+  },
+  "admin-resources-order": {
+    title: "Aide de l'ordre des ressources",
+    subtitle: "Réorganisez les ressources avec un glisser-déposer simple et visuel.",
+    hero: "Cette page sert à régler l'ordre réel d'apparition des ressources dans les dossiers, sans manipuler de nombres techniques.",
+    pill: "Admin ordre",
+    returnHref: "admin-ressources-ordre.html",
+    returnLabel: "Retour à l'ordre des ressources",
+    quickLinkLabel: "Ouvrir l'ordre des ressources",
+    summary: [
+      "Glisser une ressource vers le haut ou vers le bas pour modifier son ordre d'apparition.",
+      "Utiliser cette page quand vous voulez un réglage fin, plus précis que le choix simple du formulaire.",
+      "Enregistrer l'ordre une fois la réorganisation terminée pour l'appliquer à tous les dossiers.",
+      "Conserver aussi les ressources inactives dans la liste pour garder une organisation complète du référentiel."
+    ],
+    sections: [
+      {
+        title: "Comprendre la liste",
+        text: "La ressource affichée en premier sera proposée plus haut dans les dossiers. La liste suit donc directement l'ordre de lecture de haut en bas."
+      },
+      {
+        title: "Réorganiser facilement",
+        text: "Utilisez la poignée de déplacement et faites glisser la ressource à l'endroit voulu. Un message vous rappelle ensuite d'enregistrer l'ordre."
+      },
+      {
+        title: "Quand utiliser cette page",
+        text: "Le formulaire de ressource suffit pour un placement simple. Cette page dédiée est préférable dès que vous voulez un ordre précis ou réorganiser plusieurs ressources d'un coup."
+      }
+    ]
+  },
+  "admin-resources-create": {
+    title: "Aide à l'ajout d'une ressource",
+    subtitle: "Créez une ressource de manière simple, claire et directement exploitable dans les dossiers.",
+    hero: "Cette aide vous accompagne pas à pas pour ajouter une ressource, choisir son service, ses champs et son suivi à l'attribution.",
+    pill: "Ajout ressource",
+    returnHref: "admin-ressources.html",
+    returnLabel: "Retour à l'ajout de ressource",
+    quickLinkLabel: "Ouvrir l'ajout de ressource",
+    summary: [
+      "Commencer par le libellé visible de la ressource, puis choisir sa catégorie et son service émetteur.",
+      "Ajouter uniquement les champs vraiment utiles avec le bouton Ajouter un champ.",
+      "Choisir si la ressource est restituable selon son cycle de vie réel.",
+      "Activer seulement les informations de suivi nécessaires : date, état et observation de remise.",
+      "Utiliser la page Ordre des ressources si vous voulez ensuite régler finement sa position dans les dossiers."
+    ],
+    sections: [
+      {
+        title: "Bien nommer la ressource",
+        text: "Le libellé est le nom vu par les utilisateurs dans les dossiers. Il doit être court, compréhensible et proche du vocabulaire métier utilisé au quotidien."
+      },
+      {
+        title: "Choisir la bonne catégorie",
+        text: "Une ressource matérielle peut être restituée physiquement. Une ressource immatérielle correspond plutôt à un accès, un droit ou un service."
+      },
+      {
+        title: "Ajouter les bons champs",
+        text: "Ajoutez un champ seulement si l'information doit vraiment être saisie dans le dossier. Gardez la structure légère pour éviter une fiche trop lourde."
+      },
+      {
+        title: "Régler le suivi à l'attribution",
+        text: "La date d'attribution sert à matérialiser l'action réalisée. L'état à la remise et l'observation sont surtout utiles pour le matériel."
+      },
+      {
+        title: "Penser à la restitution",
+        text: "Activez le caractère restituable uniquement si la ressource doit revenir à la collectivité ou à l'organisation à la fin du parcours."
       }
     ]
   },
@@ -355,4 +428,8 @@ function initHelpPage() {
 }
 
 document.addEventListener("DOMContentLoaded", initHelpPage);
+
+
+
+
 
