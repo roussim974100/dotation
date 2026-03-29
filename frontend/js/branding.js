@@ -1,8 +1,8 @@
-// Branding public partagé par toutes les pages frontend.
-// Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
-// ce qui évite le flash du fallback local avant le vrai logo configuré.
+﻿// Branding public partagÃ© par toutes les pages frontend.
+// Le logo reste masquÃ© jusqu'Ã  ce que le bon visuel soit prÃªt,
+// ce qui Ã©vite le flash du fallback local avant le vrai logo configurÃ©.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-  const APP_BUILD_VERSION = "2.11.3";
+  const APP_BUILD_VERSION = "2.11.4";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -212,7 +212,7 @@ function ensureAppFooter() {
   identityWrap.append(appName, version);
   const identityText = document.createElement("p");
   identityText.className = "app-footer__text";
-  identityText.textContent = "Application métier dédiée au suivi des attributions de ressources et des restitutions au sein de la commune.";
+  identityText.textContent = "Application mÃ©tier dÃ©diÃ©e au suivi des attributions de ressources et des restitutions au sein de la commune.";
   identityColumn.append(identityWrap, identityText);
 
   const navigationColumn = document.createElement("div");
@@ -225,7 +225,7 @@ function ensureAppFooter() {
   navigation.setAttribute("aria-label", "Navigation de pied de page");
   const aboutLink = document.createElement("a");
   aboutLink.href = "/about.html";
-  aboutLink.textContent = "À propos";
+  aboutLink.textContent = "Ã€ propos";
   const contactLink = document.createElement("a");
   contactLink.href = "/contact.html";
   contactLink.textContent = "Contact";
@@ -247,7 +247,7 @@ function ensureAppFooter() {
   supportContact.append(supportLabel, supportMail);
   const supportText = document.createElement("p");
   supportText.className = "app-footer__text";
-  supportText.textContent = "Développement et maintenance assurés par Samir Bassim, DSI de la commune de Publier.";
+  supportText.textContent = "DÃ©veloppement et maintenance assurÃ©s par Samir Bassim, DSI de la commune de Publier.";
   const supportLogo = document.createElement("img");
   supportLogo.className = "app-footer__org-logo";
   supportLogo.setAttribute("data-brand-org-logo", "");
@@ -268,7 +268,7 @@ function ensureAppFooter() {
   const org = document.createElement("span");
   org.setAttribute("data-brand-org", "");
   org.textContent = APP_FIXED_NAME;
-  copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits réservés."));
+  copyright.append(year, document.createTextNode(" "), org, document.createTextNode(". Tous droits rÃ©servÃ©s."));
   const cookiesButton = document.createElement("button");
   cookiesButton.className = "app-footer__cookies";
   cookiesButton.type = "button";
@@ -314,12 +314,12 @@ function ensureCookieConsentStylesheet() {
 }
 
 function revealBrandLogos() {
-  // Le logo courant est déjà chargé directement par le HTML.
+  // Le logo courant est dÃ©jÃ  chargÃ© directement par le HTML.
 }
 
 function hideBrandLogos() {
-  // Le masquage n'est plus nécessaire maintenant que le src HTML
-  // pointe déjà vers le logo courant de l'application.
+  // Le masquage n'est plus nÃ©cessaire maintenant que le src HTML
+  // pointe dÃ©jÃ  vers le logo courant de l'application.
 }
 
 function readBrandingCache() {
@@ -704,7 +704,7 @@ function applyBrandingContent(settings) {
     node.textContent = appName;
   });
   document.querySelectorAll("[data-rgpd-org-text]").forEach((node) => {
-    node.textContent = `Les données à caractère personnel renseignées dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas échéant, des restitutions.`;
+    node.textContent = `Les donnÃ©es Ã  caractÃ¨re personnel renseignÃ©es dans ce dossier font l'objet d'un traitement par ${orgName} afin d'assurer la gestion des attributions de ressources professionnelles, le suivi des remises et, le cas Ã©chÃ©ant, des restitutions.`;
   });
   document.querySelectorAll("[data-brand-dpo-email-link]").forEach((node) => {
     node.setAttribute("href", `mailto:${dpoEmail}`);
@@ -790,5 +790,6 @@ if (document.readyState === "loading") {
 } else {
   void bootBranding();
 }
+
 
 

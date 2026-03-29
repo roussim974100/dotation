@@ -1,4 +1,4 @@
-# Archives documentaires
+﻿# Archives documentaires
 
 Ce dossier centralise les archives documentaires versionnees du projet.
 
@@ -23,4 +23,5 @@ Ce dossier centralise les archives documentaires versionnees du projet.
 - `2.9.2` : archive reconstituee
 - `2.10.0` : snapshot courant
 - `2.11.2` : snapshot courant
-- `2.11.3` : snapshot courant
+- `2.11.4` : snapshot courant
+

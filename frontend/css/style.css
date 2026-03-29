@@ -2184,7 +2184,7 @@ body.login-shell {
 .completion-celebration {
   position: fixed;
   inset: 0;
-  z-index: 1085;
+  z-index: 1200;
   pointer-events: none;
   overflow: hidden;
 }
