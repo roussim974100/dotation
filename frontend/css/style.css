@@ -1853,6 +1853,7 @@ body.login-shell {
 .status-hover-card {
   position: fixed;
   z-index: 40;
+  pointer-events: none;
   width: min(360px, calc(100vw - 2rem));
   padding: 1rem 1.1rem;
   border: 1px solid rgba(15, 91, 141, 0.18);

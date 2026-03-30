@@ -2666,16 +2666,24 @@ def build_restitution_pdf_bytes(title, payload):
         ),
     ]
 
+    returned_resource_lines = []
     restitution_lines = []
     for item in material_items:
         item_key = item["itemKey"]
         state = (restitution.get("items") or {}).get(item_key, {})
         state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
         note = state.get("notes") or "-"
+        if (state.get("state") or state.get("condition")) in {"conforme", "degrade", "returned", "returned_damaged"}:
+            returned_resource_lines.append(
+                f"{item['label']} ({item.get('details') or '-'})"
+                f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
+            )
         restitution_lines.append(
             f"{item['label']} ({item.get('details') or '-'}) : {state_label} / {note}"
             f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
         )
+    if returned_resource_lines:
+        sections.append(("Ressources restituées", returned_resource_lines))
     if not restitution_lines:
         restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
     sections.append(("État des matériels restitués", restitution_lines))
@@ -3499,6 +3507,7 @@ def row_to_summary(row):
         "startAt": progress["startAt"],
         "returnedAt": row["returned_at"],
         "updatedAt": row["updated_at"],
+        "pendingFinalization": bool(payload.get("restitution", {}).get("pendingFinalization")),
         "completedResources": progress["completed"],
         "totalResources": progress["total"],
         "resourceProgressRatio": progress["ratio"],
@@ -4752,11 +4761,12 @@ def update_restitution(form_id):
     payload["restitution"]["signedAt"] = patch.get("signedAt", payload["restitution"].get("signedAt"))
     payload["restitution"]["signataireDecision"] = patch.get("signataireDecision", payload["restitution"].get("signataireDecision"))
     payload["restitution"]["signataireComment"] = patch.get("signataireComment", payload["restitution"].get("signataireComment"))
-    payload["workflow"]["status"] = derive_restitution_workflow_status(
+    computed_status = derive_restitution_workflow_status(
         payload["restitution"].get("items", {}),
         payload["restitution"].get("signatureStatus") or "",
         payload["restitution"].get("signatureDataUrl") or "",
     )
+    payload["workflow"]["status"] = "partial_return" if patch.get("keepPending") else computed_status
 
     form_data = persist_form(payload, allow_locked_update=True)
     with get_db() as connection:
