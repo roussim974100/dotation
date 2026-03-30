@@ -1,7 +1,6 @@
 ﻿from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
 import base64
 import bcrypt
-import hashlib
 import io
 import json
 import os
@@ -27,7 +26,6 @@ FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
 CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
 A_QUAI_PDF_LOGO_PATH = os.path.join(FRONTEND_ASSETS_DIR, "a-quai-email-mark.png")
-PDF_CACHE_DIR = os.path.join(BASE_DIR, "pdf_cache")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
 APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
 CITY_LOGO_URL = os.environ.get(
@@ -75,6 +73,12 @@ def disable_frontend_cache(response):
     if "text/html" in content_type:
         if "charset=" not in content_type:
             response.headers["Content-Type"] = "text/html; charset=utf-8"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    elif "application/json" in content_type:
+        if "charset=" not in content_type:
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -1882,85 +1886,6 @@ def load_a_quai_pdf_logo_image():
         return None
 
 
-def get_file_signature(path):
-    if not path or not os.path.exists(path):
-        return {"exists": False}
-
-    try:
-        stats = os.stat(path)
-        with open(path, "rb") as file:
-            digest = hashlib.sha256(file.read()).hexdigest()
-    except OSError:
-        return {"exists": False}
-
-    return {
-        "exists": True,
-        "size": stats.st_size,
-        "mtime_ns": stats.st_mtime_ns,
-        "sha256": digest,
-    }
-
-
-def build_pdf_cache_key(pdf_kind, title, payload):
-    settings = get_app_settings()
-    local_candidates, remote_url = get_brand_logo_candidates(settings)
-    source = {
-        "kind": pdf_kind,
-        "title": title,
-        "payload": payload,
-        "settings": settings,
-        "app_file": get_file_signature(__file__),
-        "brand_logo_candidates": [get_file_signature(candidate) for candidate in local_candidates],
-        "brand_logo_remote_url": remote_url,
-        "a_quai_logo": get_file_signature(A_QUAI_PDF_LOGO_PATH),
-    }
-    serialized = json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-
-def cleanup_cached_pdf_versions(cache_dir, keep_name):
-    if not os.path.isdir(cache_dir):
-        return
-
-    try:
-        for entry in os.listdir(cache_dir):
-            if not entry.lower().endswith(".pdf") or entry == keep_name:
-                continue
-            try:
-                os.remove(os.path.join(cache_dir, entry))
-            except OSError:
-                continue
-    except OSError:
-        return
-
-
-def get_or_build_cached_pdf(form_id, pdf_kind, title, payload, generator):
-    cache_key = build_pdf_cache_key(pdf_kind, title, payload)
-    cache_dir = os.path.join(PDF_CACHE_DIR, pdf_kind, slugify_field_key(form_id) or "form")
-    cache_name = f"{cache_key}.pdf"
-    cache_path = os.path.join(cache_dir, cache_name)
-
-    if os.path.exists(cache_path):
-        try:
-            with open(cache_path, "rb") as file:
-                return file.read()
-        except OSError:
-            pass
-
-    pdf_bytes = generator(title, payload)
-    try:
-        os.makedirs(cache_dir, exist_ok=True)
-        temp_path = os.path.join(cache_dir, f"{cache_key}.tmp")
-        with open(temp_path, "wb") as file:
-            file.write(pdf_bytes)
-        os.replace(temp_path, cache_path)
-        cleanup_cached_pdf_versions(cache_dir, cache_name)
-    except OSError:
-        return pdf_bytes
-
-    return pdf_bytes
-
-
 def format_export_datetime(value):
     if not value:
         return "-"
@@ -2675,7 +2600,7 @@ def build_restitution_pdf_bytes(title, payload):
         note = state.get("notes") or "-"
         if (state.get("state") or state.get("condition")) in {"conforme", "degrade", "returned", "returned_damaged"}:
             returned_resource_lines.append(
-                f"{item['label']} ({item.get('details') or '-'})"
+                f"{item['label']} ({item.get('details') or '-'}) : {state_label}"
                 f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
             )
         restitution_lines.append(
@@ -2683,7 +2608,7 @@ def build_restitution_pdf_bytes(title, payload):
             f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
         )
     if returned_resource_lines:
-        sections.append(("Ressources restituées", returned_resource_lines))
+        sections.append(("Ressources restituées et état", returned_resource_lines))
     if not restitution_lines:
         restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
     sections.append(("État des matériels restitués", restitution_lines))
@@ -4053,7 +3978,7 @@ def export_form_pdf(form_id):
         return jsonify({"error": "not_found"}), 404
 
     title = form_data["summary"]["title"]
-    pdf_bytes = get_or_build_cached_pdf(form_id, "attribution", title, form_data["data"], build_pdf_bytes)
+    pdf_bytes = build_pdf_bytes(title, form_data["data"])
     filename = f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf"
     return download_response(pdf_bytes, filename, "application/pdf")
 
@@ -4079,7 +4004,7 @@ def export_restitution_pdf(form_id):
         return jsonify({"error": "restitution_not_ready"}), 400
 
     title = f"Restitution - {form_data['summary']['title']}"
-    pdf_bytes = get_or_build_cached_pdf(form_id, "restitution", title, form_data["data"], build_restitution_pdf_bytes)
+    pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
     filename = f"{slugify_filename(title, 'restitution')}.pdf"
     return download_response(pdf_bytes, filename, "application/pdf")
 
@@ -4103,7 +4028,7 @@ def export_forms_pdf_batch():
             if not form_data:
                 continue
             title = form_data["summary"]["title"]
-            pdf_bytes = get_or_build_cached_pdf(str(form_id), "attribution", title, form_data["data"], build_pdf_bytes)
+            pdf_bytes = build_pdf_bytes(title, form_data["data"])
             zip_file.writestr(f"attribution_{slugify_filename(title, 'dossier_attribution')}.pdf", pdf_bytes)
             exported_count += 1
 
@@ -4143,7 +4068,7 @@ def export_restitution_forms_pdf_batch():
             ):
                 continue
             title = f"Restitution - {form_data['summary']['title']}"
-            pdf_bytes = get_or_build_cached_pdf(str(form_id), "restitution", title, form_data["data"], build_restitution_pdf_bytes)
+            pdf_bytes = build_restitution_pdf_bytes(title, form_data["data"])
             zip_file.writestr(f"{slugify_filename(title, 'restitution')}.pdf", pdf_bytes)
             exported_count += 1
 
