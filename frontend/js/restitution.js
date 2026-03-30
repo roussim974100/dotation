@@ -3,6 +3,7 @@ const restitutionDetailList = document.getElementById("restitutionDetailList");
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
