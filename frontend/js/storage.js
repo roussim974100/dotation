@@ -697,6 +697,44 @@ function buildDotationPreview(data) {
   return items;
 }
 
+function buildMissingProgressPreview(data) {
+  if (!data) {
+    return [];
+  }
+
+  const missing = [];
+  const workflowStatus = data.workflow?.status || "draft";
+  const beneficiaire = data.beneficiaire || {};
+  const validation = data.validation || {};
+  const resourceErrors = Array.isArray(data.meta?.resourceValidationErrors)
+    ? data.meta.resourceValidationErrors.filter(Boolean)
+    : [];
+
+  if (!beneficiaire.nom) {
+    missing.push("Nom");
+  }
+  if (!beneficiaire.prenom) {
+    missing.push("Prénom");
+  }
+  if ((beneficiaire.qualite || "agent") === "elu") {
+    if (!beneficiaire.mandat) {
+      missing.push("Mandat");
+    }
+  } else if (!beneficiaire.service) {
+    missing.push("Service");
+  }
+
+  if (!validation.rgpdAccepted) {
+    missing.push("Validation RGPD");
+  }
+
+  if (!validation.signatureDataUrl && ["draft", "partial_assignment", "awaiting_signature"].includes(workflowStatus)) {
+    missing.push("Signature du dossier");
+  }
+
+  return [...new Set([...resourceErrors, ...missing])];
+}
+
 function formatDossierTypeLabel(dossierType) {
   const labels = {
     arrivee: "Nouvelle arrivée",
@@ -2028,8 +2066,16 @@ async function showStatusPreview(target, id) {
     return;
   }
   const previewItems = buildDotationPreview(result.data);
-  card.innerHTML = previewItems.length
-    ? `<h4>Ressources attribuées</h4><ul>${previewItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+  const missingItems = buildMissingProgressPreview(result.data);
+  const sections = [];
+  if (previewItems.length) {
+    sections.push(`<h4>Ressources attribuées</h4><ul>${previewItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
+  }
+  if (missingItems.length) {
+    sections.push(`<h4>À compléter pour finaliser</h4><ul class="status-hover-card__missing-list">${missingItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
+  }
+  card.innerHTML = sections.length
+    ? sections.join("")
     : '<p class="status-hover-card__hint">Aucune ressource renseignée.</p>';
   positionHoverCard(card, target);
 }

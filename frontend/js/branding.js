@@ -2,7 +2,7 @@
 // Le logo reste masquÃ© jusqu'Ã  ce que le bon visuel soit prÃªt,
 // ce qui Ã©vite le flash du fallback local avant le vrai logo configurÃ©.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-  const APP_BUILD_VERSION = "2.11.4";
+  const APP_BUILD_VERSION = "2.11.5";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -790,6 +790,7 @@ if (document.readyState === "loading") {
 } else {
   void bootBranding();
 }
+
 
 
 

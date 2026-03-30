@@ -435,6 +435,156 @@ function setFieldError(field, message) {
   field.parentElement.appendChild(help);
 }
 
+function clearProgressIndicators() {
+  document.querySelectorAll(".progress-required-field").forEach((field) => field.classList.remove("progress-required-field"));
+  document.querySelectorAll(".progress-required-surface").forEach((field) => field.classList.remove("progress-required-surface"));
+  document.querySelectorAll(".progress-required-label").forEach((label) => label.classList.remove("progress-required-label"));
+  document.querySelectorAll("[data-progress-required-badge]").forEach((badge) => badge.remove());
+}
+
+function resolveProgressIndicatorLabel(fieldId) {
+  if (fieldId === "rgpdCheck") {
+    return document.getElementById("rgpdCheck")?.closest("label.form-check")?.querySelector(".form-check-label") || null;
+  }
+  if (fieldId === "addCleBtn" || fieldId === "addZoneAlarmeBtn") {
+    return document.getElementById(fieldId);
+  }
+  return document.querySelector(`label[for="${fieldId}"]`);
+}
+
+function addProgressIndicator(fieldId) {
+  if (!fieldId) {
+    return;
+  }
+  const field = document.getElementById(fieldId);
+  if (field) {
+    if (fieldId === "signature") {
+      field.closest(".signature-wrap")?.classList.add("progress-required-surface");
+    } else if (field.type === "checkbox") {
+      field.closest("label.form-check")?.classList.add("progress-required-surface");
+    } else if (field.tagName === "BUTTON") {
+      field.classList.add("progress-required-surface");
+    } else {
+      field.classList.add("progress-required-field");
+    }
+  }
+
+  const label = resolveProgressIndicatorLabel(fieldId);
+  if (!label || label.querySelector("[data-progress-required-badge]")) {
+    return;
+  }
+  label.classList.add("progress-required-label");
+  const badge = document.createElement("span");
+  badge.className = "progress-required-badge";
+  badge.dataset.progressRequiredBadge = "true";
+  badge.textContent = "À renseigner";
+  label.appendChild(badge);
+}
+
+function collectProgressRequirementsFromForm() {
+  const requirements = [];
+  const pushRequirement = (fieldId, label) => requirements.push({ fieldId, label });
+
+  if (!getFieldValue("nom")) {
+    pushRequirement("nom", "Nom");
+  }
+  if (!getFieldValue("prenom")) {
+    pushRequirement("prenom", "Prénom");
+  }
+
+  const qualite = document.querySelector('input[name="qualite"]:checked')?.value || "agent";
+  if (qualite === "elu") {
+    if (!getFieldValue("mandat")) {
+      pushRequirement("mandat", "Mandat");
+    }
+  } else if (!getServiceValue()) {
+    pushRequirement("service", "Service");
+  }
+
+  Object.entries(CORE_RESOURCE_RULES).forEach(([resourceKey, rules]) => {
+    const equipment = buildEquipmentSelectionMap();
+    const immaterial = buildIntangibleSelectionMap();
+    const selected = Boolean(equipment[resourceKey]?.selected || immaterial[resourceKey]?.selected);
+    if (!selected) {
+      return;
+    }
+    rules.forEach((rule) => {
+      if (rule.required && !getFieldValue(rule.fieldId)) {
+        pushRequirement(rule.fieldId, rule.label);
+      }
+    });
+  });
+
+  if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
+    pushRequirement("addCleBtn", "Au moins une clé");
+  }
+
+  if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
+    pushRequirement("addZoneAlarmeBtn", "Au moins une zone alarme");
+  }
+
+  dynamicResourceReferences.forEach((resource) => {
+    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+    if (!checkbox || !checkbox.checked) {
+      return;
+    }
+    const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+    if (!fieldSchema.length) {
+      if (!getFieldValue(`dynamic_resource_details_${resource.id}`)) {
+        pushRequirement(`dynamic_resource_details_${resource.id}`, `${resource.label} : précision`);
+      }
+    } else {
+      fieldSchema.forEach((fieldDef) => {
+        const value = getDynamicResourceFieldValue(resource.id, fieldDef.key);
+        if (fieldDef.required && !value) {
+          pushRequirement(`dynamic_resource_${resource.id}_${fieldDef.key}`, `${resource.label} : ${fieldDef.label}`);
+        }
+      });
+    }
+    if (usesDynamicResourceAssignmentDate(resource) && !getFieldValue(`dynamic_resource_assigned_at_${resource.id}`)) {
+      pushRequirement(`dynamic_resource_assigned_at_${resource.id}`, `${resource.label} : date d'attribution`);
+    }
+  });
+
+  if (!document.getElementById("rgpdCheck")?.checked) {
+    pushRequirement("rgpdCheck", "Validation RGPD");
+  }
+
+  const signatureCanvas = document.getElementById("signature");
+  if (signatureCanvas instanceof HTMLCanvasElement) {
+    const blankCanvas = document.createElement("canvas");
+    blankCanvas.width = signatureCanvas.width;
+    blankCanvas.height = signatureCanvas.height;
+    if (signatureCanvas.toDataURL() === blankCanvas.toDataURL()) {
+      pushRequirement("signature", "Signature");
+    }
+  }
+
+  return requirements;
+}
+
+function refreshProgressIndicators() {
+  clearProgressIndicators();
+  const requirements = collectProgressRequirementsFromForm();
+  requirements.forEach((requirement) => addProgressIndicator(requirement.fieldId));
+  const hint = document.getElementById("resumeHint");
+  if (hint) {
+    hint.textContent = requirements.length
+      ? `${requirements.length} point(s) restent à renseigner pour finaliser la progression du dossier.`
+      : "Tous les éléments utiles à la progression du dossier sont renseignés.";
+  }
+}
+
+function bindProgressIndicatorRefresh() {
+  if (!form || form.dataset.boundProgressIndicators) {
+    return;
+  }
+  const refresh = () => refreshProgressIndicators();
+  form.addEventListener("input", refresh);
+  form.addEventListener("change", refresh);
+  form.dataset.boundProgressIndicators = "true";
+}
+
 function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
   const placeholder = field.placeholder || field.label;
@@ -991,6 +1141,7 @@ function populateAdditionalResources(data = {}) {
     });
   });
   bindDynamicResourceToggles();
+  refreshProgressIndicators();
 }
 
 function syncDossierTypeUi() {
@@ -2463,6 +2614,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initRepeatableResourceLists();
     initConditionalBlocks();
     initQualite();
+    bindProgressIndicatorRefresh();
     syncDossierTypeUi();
 
     setFormBootstrapStage("ouverture de la fiche", "Chargement de la fiche...");
@@ -2496,6 +2648,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       });
     });
+
+    refreshProgressIndicators();
 
     clearFormBootstrapWatchdog();
     if (!new URLSearchParams(window.location.search).get("id")) {
