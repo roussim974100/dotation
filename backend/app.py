@@ -2033,7 +2033,8 @@ def is_dynamic_resource_payload(resource):
 def is_restitution_eligible_material_details(details):
     if not isinstance(details, dict):
         return True
-    if (details.get("category") or "") != "materiel":
+    category = details.get("category")
+    if category and category != "materiel":
         return False
     if "requiresReturn" in details or "requires_return" in details:
         return bool(details.get("requiresReturn", details.get("requires_return")))
@@ -2743,8 +2744,7 @@ def build_restitution_pdf_bytes(title, payload):
         for line in wrapped_lines:
             draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
             line_y -= 15
-
-
+        current_y = box_bottom - 16
 
     for section_title, section_lines in sections:
         add_section(section_title, section_lines)
