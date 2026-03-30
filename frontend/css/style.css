@@ -1128,6 +1128,35 @@ body.login-shell {
   font-size: 0.84rem;
 }
 
+.progress-required-field {
+  border-color: #d6a53a !important;
+  box-shadow: 0 0 0 0.18rem rgba(214, 165, 58, 0.14);
+  background: linear-gradient(180deg, #fffdf7, #ffffff);
+}
+
+.progress-required-surface {
+  border-color: #d6a53a !important;
+  box-shadow: 0 0 0 0.18rem rgba(214, 165, 58, 0.12);
+}
+
+.progress-required-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.progress-required-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(214, 165, 58, 0.14);
+  color: #8a5a00;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .equipment-toggle input {
   accent-color: var(--brand);
 }
@@ -1847,6 +1876,10 @@ body.login-shell {
 
 .status-hover-card li + li {
   margin-top: 0.35rem;
+}
+
+.status-hover-card__missing-list li {
+  color: #8a5a00;
 }
 
 .status-hover-card__hint {
