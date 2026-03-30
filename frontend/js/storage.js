@@ -165,6 +165,7 @@ function buildLocalSummary(payload) {
     startAt: payload.meta.startAt || "",
     returnedAt: payload.restitution.returnedAt || "",
     updatedAt: now,
+    pendingFinalization: Boolean(payload.restitution?.pendingFinalization),
     completedResources: progress.completed,
     totalResources: progress.total,
     resourceProgressRatio: progress.ratio,
@@ -337,7 +338,7 @@ function buildDashboardRow(draft, permissions) {
         <div class="draft-meta">${startAtLabel}</div>
       </td>
       <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
+      <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
       <td data-label="Pilotage">
         <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}">${escapeHtml(progress.timingLabel)}</span>
         ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
@@ -382,6 +383,13 @@ function formatStatusLabel(status) {
     cancelled: "Dossier annulé"
   };
   return labels[status] || "À compléter";
+}
+
+function formatDraftStatusLabel(draft) {
+  if (draft?.pendingFinalization && (draft.status || "draft") === "partial_return") {
+    return "En attente de finalisation";
+  }
+  return formatStatusLabel(draft?.status || "draft");
 }
 function hasRestitutionData(draft) {
   const restitution = draft.data?.restitution || {};
@@ -600,7 +608,7 @@ function getDraftSearchText(draft) {
     draft.service || draft.data?.beneficiaire?.service || "",
     draft.fonction || draft.data?.beneficiaire?.fonction || "",
     draft.mandat || draft.data?.beneficiaire?.mandat || "",
-    formatStatusLabel(status),
+    formatDraftStatusLabel(draft),
     status,
     timingLabel,
     draft.timingStatus || ""

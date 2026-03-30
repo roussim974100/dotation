@@ -261,10 +261,14 @@ function toggleSignatureMode() {
   document.getElementById("restitutionSignatureReasonWrap")?.classList.toggle("d-none", mode !== "impossible");
   document.getElementById("restitutionLinkValidityWrap")?.classList.toggle("d-none", mode !== "deferred");
   const saveButton = document.getElementById("saveRestitutionBtn");
+  const pendingButton = document.getElementById("saveRestitutionPendingBtn");
   if (saveButton) {
     saveButton.textContent = mode === "deferred"
       ? "Enregistrer et générer le lien"
-      : "Enregistrer la restitution";
+      : "Finaliser la restitution";
+  }
+  if (pendingButton) {
+    pendingButton.classList.toggle("d-none", mode === "deferred");
   }
 }
 
@@ -503,10 +507,13 @@ async function initRestitutionPage() {
       };
     }
 
-    async function saveRestitution(payload) {
+    async function saveRestitution(payload, options = {}) {
       const response = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution`, {
         method: "PATCH",
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          keepPending: Boolean(options.keepPending)
+        })
       });
       currentRestitution = response?.data?.restitution || {
         ...currentRestitution,
@@ -538,7 +545,7 @@ async function initRestitutionPage() {
 
     async function shareRestitutionSignatureLink() {
       try {
-        await saveRestitution(buildRestitutionPayload(true));
+        await saveRestitution(buildRestitutionPayload(true), { keepPending: false });
 
         const linkResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`, {
           method: "POST",
@@ -568,6 +575,50 @@ async function initRestitutionPage() {
         );
       }
     }
+
+    document.getElementById("saveRestitutionPendingBtn")?.addEventListener("click", async () => {
+      const workflowLabels = [
+        "Préparation des éléments de restitution",
+        "Vérification des états saisis",
+        "Enregistrement en attente de finalisation",
+        "Retour au tableau de bord"
+      ];
+      try {
+        const selectedSignatureMode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
+        if (selectedSignatureMode === "deferred") {
+          throw new Error("Utilisez le bouton de finalisation pour générer un lien de signature à distance.");
+        }
+
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "La restitution est enregistrée en attente de finalisation.",
+          steps: createRestitutionWorkflowSteps(workflowLabels, 1)
+        });
+
+        const payload = buildRestitutionPayload(false);
+        window.showWorkflowDialog({
+          title: "Enregistrement de la restitution",
+          text: "Les informations sont enregistrées sans finaliser la restitution.",
+          steps: createRestitutionWorkflowSteps(workflowLabels, 2)
+        });
+        await saveRestitution(payload, { keepPending: true });
+        await window.askWorkflowDialog({
+          title: "Restitution enregistrée en attente",
+          text: "La restitution reste modifiable et pourra être finalisée plus tard.",
+          steps: workflowLabels.map((label) => ({ label, status: "done" })),
+          hideSpinner: true,
+          showConfirm: true,
+          confirmLabel: "OK"
+        });
+        window.location.href = "index.html";
+      } catch (error) {
+        window.closeWorkflowDialog();
+        await showRestitutionInfoDialog(
+          "Erreur de restitution",
+          error.message || "Impossible d'enregistrer la restitution en attente."
+        );
+      }
+    });
 
     document.getElementById("saveRestitutionBtn")?.addEventListener("click", async () => {
       const workflowLabels = [
@@ -604,7 +655,7 @@ async function initRestitutionPage() {
           text: "Les informations sont en cours d'enregistrement.",
           steps: createRestitutionWorkflowSteps(workflowLabels, 2)
         });
-        const response = await saveRestitution(buildRestitutionPayload(false));
+        const response = await saveRestitution(buildRestitutionPayload(false), { keepPending: false });
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
