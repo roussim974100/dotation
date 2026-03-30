@@ -291,11 +291,36 @@ function formatShortDate(value) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(date);
 }
 
+function getTimingOffsetLabel(startAt) {
+  if (!startAt) {
+    return "";
+  }
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(startAt) ? `${startAt}T00:00:00` : startAt;
+  const startDate = new Date(normalized);
+  if (Number.isNaN(startDate.getTime())) {
+    return "";
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  startDate.setHours(0, 0, 0, 0);
+  const dayDelta = Math.round((startDate - today) / 86400000);
+  if (dayDelta === 0) {
+    return "Échéance aujourd'hui";
+  }
+  if (dayDelta > 0) {
+    return `${dayDelta} j d'avance`;
+  }
+  return `${Math.abs(dayDelta)} j de retard`;
+}
+
 function buildDashboardRow(draft, permissions) {
   const progress = getDraftProgressMetrics(draft);
   const progressPercent = Math.max(0, Math.min(100, Math.round((progress.ratio || 0) * 100)));
   const title = draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier");
   const dossierTypeLabel = formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || "");
+  const timingOffsetLabel = getDashboardViewMode() === "history_assignments"
+    ? getTimingOffsetLabel(draft.startAt)
+    : "";
   const startAtLabel = draft.startAt
     ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
     : "Prise de fonction non renseignée";
@@ -315,6 +340,7 @@ function buildDashboardRow(draft, permissions) {
       <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatStatusLabel(draft.status || "draft"))}</span></td>
       <td data-label="Pilotage">
         <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}">${escapeHtml(progress.timingLabel)}</span>
+        ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
       </td>
       <td data-label="Progression">
         <div class="resource-progress">
