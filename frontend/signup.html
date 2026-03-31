@@ -34,6 +34,7 @@
       <div id="signupError" class="alert alert-danger d-none" role="alert"></div>
 
       <form method="post" action="/signup" class="login-form" novalidate>
+        <input type="hidden" name="csrf_token" id="csrfToken">
         <div>
           <label class="form-label" for="signup_username">Identifiant</label>
           <input id="signup_username" class="form-control form-control-lg" name="username" autocomplete="username" placeholder="Identifiant" required>

@@ -35,6 +35,7 @@
       <div id="loginError" class="alert alert-danger d-none" role="alert"></div>
 
       <form method="post" class="login-form" novalidate>
+        <input type="hidden" name="csrf_token" id="csrfToken">
         <input type="hidden" name="client_device_label" id="clientDeviceLabel">
         <input type="hidden" name="client_browser" id="clientBrowser">
         <input type="hidden" name="client_platform" id="clientPlatform">
