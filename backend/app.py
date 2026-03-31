@@ -21,20 +21,11 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import re
 import threading
 
-
-# Paths principaux du projet: frontend servi par Flask, base SQLite et cache catalogue.
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
-FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
-CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
-A_QUAI_PDF_LOGO_PATH = os.path.join(FRONTEND_ASSETS_DIR, "a-quai-email-mark.png")
-DB_PATH = os.path.join(BASE_DIR, "dotation.db")
-APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
-CITY_LOGO_URL = os.environ.get(
-    "CITY_LOGO_URL",
-    "https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png",
+from config import (
+    BASE_DIR, FRONTEND_DIR, FRONTEND_ASSETS_DIR, CUSTOM_BRANDING_DIR,
+    A_QUAI_PDF_LOGO_PATH, DB_PATH, APP_SECRET_PATH,
+    CITY_LOGO_URL, CITY_LOGO_PATH, get_app_secret_key,
 )
-CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
 
 # Rate limiting login : max 10 tentatives par IP sur une fenêtre glissante de 10 minutes.
 _LOGIN_MAX_ATTEMPTS = 10
@@ -54,29 +45,6 @@ def _is_login_rate_limited(ip: str) -> bool:
         attempts.append(now)
         _login_attempts[ip] = attempts
         return False
-
-
-def get_app_secret_key():
-    env_secret = os.environ.get("APP_SECRET_KEY", "").strip()
-    if env_secret:
-        return env_secret
-
-    try:
-        if os.path.exists(APP_SECRET_PATH):
-            with open(APP_SECRET_PATH, "r", encoding="utf-8") as secret_file:
-                stored_secret = secret_file.read().strip()
-                if stored_secret:
-                    return stored_secret
-    except OSError:
-        pass
-
-    generated_secret = secrets.token_hex(32)
-    try:
-        with open(APP_SECRET_PATH, "w", encoding="utf-8") as secret_file:
-            secret_file.write(generated_secret)
-    except OSError:
-        pass
-    return generated_secret
 
 
 app = Flask(__name__, static_folder=None)
