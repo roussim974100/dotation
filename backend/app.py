@@ -1,4 +1,4 @@
-﻿from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
+from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
 import base64
 import bcrypt
 import io
@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from xml.sax.saxutils import escape as xml_escape
-import zlib
+from fpdf import FPDF
 from werkzeug.middleware.proxy_fix import ProxyFix
 import re
 
@@ -1691,8 +1691,10 @@ def normalize_pdf_text(value):
     return text.encode("cp1252", "replace").decode("latin-1")
 
 
-def pdf_escape(value):
-    return normalize_pdf_text(value).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+def _get_png_size(png_bytes):
+    if not png_bytes or len(png_bytes) < 24 or png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
+        return 0, 0
+    return struct.unpack(">II", png_bytes[16:24])
 
 
 def slugify_filename(value, fallback="dossier_attribution"):
@@ -1707,122 +1709,14 @@ def slugify_filename(value, fallback="dossier_attribution"):
     return slug or fallback
 
 
-def extract_png_image(png_bytes):
-    if png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
-        return None
-
-    position = 8
-    width = None
-    height = None
-    bit_depth = None
-    color_type = None
-    compressed_data = bytearray()
-
-    while position + 8 <= len(png_bytes):
-        length = struct.unpack(">I", png_bytes[position:position + 4])[0]
-        chunk_type = png_bytes[position + 4:position + 8]
-        chunk_data = png_bytes[position + 8:position + 8 + length]
-        position += 12 + length
-
-        if chunk_type == b"IHDR":
-            width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(">IIBBBBB", chunk_data)
-            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
-                return None
-            if color_type not in {2, 6}:
-                return None
-        elif chunk_type == b"IDAT":
-            compressed_data.extend(chunk_data)
-        elif chunk_type == b"IEND":
-            break
-
-    if not width or not height or not compressed_data:
-        return None
-
-    try:
-        raw = zlib.decompress(bytes(compressed_data))
-    except zlib.error:
-        return None
-
-    channels = 4 if color_type == 6 else 3
-    row_stride = width * channels
-    expected_size = height * (1 + row_stride)
-    if len(raw) != expected_size:
-        return None
-
-    def paeth_predictor(left, up, up_left):
-        prediction = left + up - up_left
-        pa = abs(prediction - left)
-        pb = abs(prediction - up)
-        pc = abs(prediction - up_left)
-        if pa <= pb and pa <= pc:
-            return left
-        if pb <= pc:
-            return up
-        return up_left
-
-    rows = []
-    previous = [0] * row_stride
-    offset = 0
-    for _ in range(height):
-        filter_type = raw[offset]
-        offset += 1
-        row = list(raw[offset:offset + row_stride])
-        offset += row_stride
-
-        if filter_type == 1:
-            for index in range(row_stride):
-                left = row[index - channels] if index >= channels else 0
-                row[index] = (row[index] + left) & 0xFF
-        elif filter_type == 2:
-            for index in range(row_stride):
-                row[index] = (row[index] + previous[index]) & 0xFF
-        elif filter_type == 3:
-            for index in range(row_stride):
-                left = row[index - channels] if index >= channels else 0
-                up = previous[index]
-                row[index] = (row[index] + ((left + up) // 2)) & 0xFF
-        elif filter_type == 4:
-            for index in range(row_stride):
-                left = row[index - channels] if index >= channels else 0
-                up = previous[index]
-                up_left = previous[index - channels] if index >= channels else 0
-                row[index] = (row[index] + paeth_predictor(left, up, up_left)) & 0xFF
-        elif filter_type != 0:
-            return None
-
-        rows.append(row)
-        previous = row
-
-    rgb = bytearray()
-    for row in rows:
-        for index in range(0, len(row), channels):
-            red = row[index]
-            green = row[index + 1]
-            blue = row[index + 2]
-            alpha = row[index + 3] if channels == 4 else 255
-            if alpha < 255:
-                red = (red * alpha + 255 * (255 - alpha)) // 255
-                green = (green * alpha + 255 * (255 - alpha)) // 255
-                blue = (blue * alpha + 255 * (255 - alpha)) // 255
-            rgb.extend((red, green, blue))
-
-    return {
-        "width": width,
-        "height": height,
-        "data": zlib.compress(bytes(rgb)),
-    }
-
-
 def extract_signature_image(signature_data_url):
     if not signature_data_url or not signature_data_url.startswith("data:image/png;base64,"):
         return None
 
     try:
-        png_bytes = base64.b64decode(signature_data_url.split(",", 1)[1])
+        return base64.b64decode(signature_data_url.split(",", 1)[1])
     except (ValueError, IndexError):
         return None
-
-    return extract_png_image(png_bytes)
 
 
 def load_brand_logo_image():
@@ -1836,18 +1730,20 @@ def load_brand_logo_image():
     if BRAND_LOGO_CACHE["loaded"] and BRAND_LOGO_CACHE.get("cache_key") == cache_key:
         return BRAND_LOGO_CACHE["image"]
 
-    image = None
+    image_bytes = None
     for candidate in local_candidates:
         if candidate and os.path.exists(candidate):
             try:
                 with open(candidate, "rb") as file:
-                    image = extract_png_image(file.read())
+                    data = file.read()
+                if data[:8] == b"\x89PNG\r\n\x1a\n":
+                    image_bytes = data
             except OSError:
-                image = None
-            if image:
+                pass
+            if image_bytes:
                 break
 
-    if not image and remote_url:
+    if not image_bytes and remote_url:
         try:
             request = urllib.request.Request(
                 remote_url,
@@ -1857,9 +1753,10 @@ def load_brand_logo_image():
                 },
             )
             with urllib.request.urlopen(request, timeout=10) as response:
-                image_bytes = response.read()
-                image = extract_png_image(image_bytes)
-                if image and CITY_LOGO_PATH:
+                data = response.read()
+            if data[:8] == b"\x89PNG\r\n\x1a\n":
+                image_bytes = data
+                if image_bytes and CITY_LOGO_PATH:
                     try:
                         os.makedirs(os.path.dirname(CITY_LOGO_PATH), exist_ok=True)
                         with open(CITY_LOGO_PATH, "wb") as file:
@@ -1867,12 +1764,12 @@ def load_brand_logo_image():
                     except OSError:
                         pass
         except Exception:
-            image = None
+            pass
 
     BRAND_LOGO_CACHE["loaded"] = True
     BRAND_LOGO_CACHE["cache_key"] = cache_key
-    BRAND_LOGO_CACHE["image"] = image
-    return image
+    BRAND_LOGO_CACHE["image"] = image_bytes
+    return image_bytes
 
 
 def load_a_quai_pdf_logo_image():
@@ -1881,7 +1778,8 @@ def load_a_quai_pdf_logo_image():
 
     try:
         with open(A_QUAI_PDF_LOGO_PATH, "rb") as file:
-            return extract_png_image(file.read())
+            data = file.read()
+        return data if data[:8] == b"\x89PNG\r\n\x1a\n" else None
     except OSError:
         return None
 
@@ -2171,15 +2069,205 @@ def build_form_export_lines(payload):
     return lines
 
 
+
+class _AQuaiDoc(FPDF):
+    _MARGIN = 42
+    _CONTENT_W = 511  # 595 - 2*42
+    _CONTENT_START = 182  # 842 - 660
+    _CONTENT_END = 790  # 842 - 52
+
+    def __init__(self, page_title, page_subtitle, org_name, brand_logo_bytes, aq_logo_bytes):
+        super().__init__(unit="pt", format=(595, 842))
+        self.alias_nb_pages()
+        self.set_auto_page_break(False)
+        self._page_title = page_title
+        self._page_subtitle = page_subtitle
+        self._org_name = org_name
+        self._brand_logo = brand_logo_bytes
+        self._aq_logo = aq_logo_bytes
+        self._generated_at = format_export_datetime(datetime.now().isoformat())
+
+    def _scale_logo(self, png_bytes, max_w, max_h):
+        w, h = _get_png_size(png_bytes)
+        if not w or not h:
+            return 0, 0
+        ratio = min(max_w / w, max_h / h)
+        return round(w * ratio, 2), round(h * ratio, 2)
+
+    def header(self):
+        # Blue banner
+        self.set_fill_color(13, 84, 133)
+        self.rect(0, 0, self.w, 92, "F")
+        # Gold stripe
+        self.set_fill_color(214, 163, 64)
+        self.rect(0, 92, self.w, 12, "F")
+
+        # Logo (a quai preferred, fall back to brand)
+        logo_bytes = self._aq_logo or self._brand_logo
+        if logo_bytes:
+            lw, lh = self._scale_logo(logo_bytes, 88, 52)
+            if lw and lh:
+                self.image(io.BytesIO(logo_bytes), x=self._MARGIN, y=76 - lh, w=lw, h=lh)
+
+        # Org name
+        self.set_font("Helvetica", "B", 18)
+        self.set_text_color(255, 255, 255)
+        self.text(self._MARGIN + 100, 48, normalize_pdf_text(self._org_name))
+
+        # "A quai"
+        self.set_font("Helvetica", "B", 13)
+        self.set_text_color(235, 245, 252)
+        self.text(self._MARGIN + 100, 68, "A quai")
+
+        # Right side header
+        self.set_font("Helvetica", "B", 10)
+        self.set_text_color(255, 255, 255)
+        self.text(self.w - 190, 48, "Document interne")
+
+        self.set_font("Helvetica", "", 9)
+        self.set_text_color(235, 245, 252)
+        self.text(self.w - 190, 66, normalize_pdf_text(self._generated_at))
+
+        # Document title (sub-header area below the banner)
+        self.set_font("Helvetica", "B", 15)
+        self.set_text_color(18, 46, 66)
+        self.text(self._MARGIN, 118, normalize_pdf_text(self._page_title))
+
+        self.set_font("Helvetica", "", 10)
+        self.set_text_color(89, 110, 128)
+        self.text(self._MARGIN, 136, normalize_pdf_text(self._page_subtitle))
+
+    def footer(self):
+        # Separator line
+        self.set_draw_color(204, 219, 230)
+        self.set_line_width(0.8)
+        self.line(self._MARGIN, self.h - 34, self._MARGIN + self._CONTENT_W, self.h - 34)
+
+        # Left text
+        self.set_font("Helvetica", "", 8)
+        self.set_text_color(97, 115, 133)
+        self.text(self._MARGIN, self.h - 20, "A quai - document exploitable RH / DGS")
+
+        # Brand logo in footer
+        if self._brand_logo:
+            fw, fh = self._scale_logo(self._brand_logo, 54, 18)
+            if fw and fh:
+                self.image(io.BytesIO(self._brand_logo), x=self.w - 160, y=self.h - 13 - fh, w=fw, h=fh)
+
+        # Page number
+        self.text(self.w - 90, self.h - 20, "Page " + str(self.page_no()) + "/{nb}")
+
+    def _draw_section(self, y_top, title, lines):
+        wrapped = []
+        for line in lines:
+            wrapped.extend(textwrap.wrap(normalize_pdf_text(line), width=86) or [""])
+        section_h = 28 + len(wrapped) * 15 + 18
+
+        if y_top + section_h > self._CONTENT_END:
+            self.add_page()
+            y_top = self._CONTENT_START
+
+        self.set_fill_color(250, 251, 252)
+        self.set_draw_color(204, 219, 230)
+        self.set_line_width(0.5)
+        self.rect(self._MARGIN, y_top, self._CONTENT_W, section_h, "FD")
+
+        self.set_font("Helvetica", "B", 12)
+        self.set_text_color(13, 66, 102)
+        self.text(self._MARGIN + 14, y_top + 18, normalize_pdf_text(title))
+
+        self.set_font("Helvetica", "", 10)
+        self.set_text_color(43, 51, 61)
+        line_y = y_top + 40
+        for line in wrapped:
+            self.text(self._MARGIN + 14, line_y, normalize_pdf_text(line))
+            line_y += 15
+
+        return y_top + section_h + 16
+
+    def _draw_signature_box(self, y_top, label, date_str, note_text,
+                            sig_bytes=None, reservation_lines=None):
+        reservation_lines = reservation_lines or []
+        sig_w = sig_h = 0
+        if sig_bytes:
+            raw_w, raw_h = _get_png_size(sig_bytes)
+            if raw_w and raw_h:
+                ratio = min(220 / raw_w, 90 / raw_h)
+                sig_w = round(raw_w * ratio, 2)
+                sig_h = round(raw_h * ratio, 2)
+        section_h = 90 + sig_h + len(reservation_lines) * 14
+
+        if y_top + section_h > self._CONTENT_END:
+            self.add_page()
+            y_top = self._CONTENT_START
+
+        self.set_fill_color(251, 252, 254)
+        self.set_draw_color(204, 219, 230)
+        self.set_line_width(0.5)
+        self.rect(self._MARGIN, y_top, self._CONTENT_W, section_h, "FD")
+
+        self.set_font("Helvetica", "B", 12)
+        self.set_text_color(13, 66, 102)
+        self.text(self._MARGIN + 14, y_top + 18, normalize_pdf_text(label))
+
+        self.set_font("Helvetica", "", 10)
+        self.set_text_color(71, 92, 112)
+        self.text(self._MARGIN + 14, y_top + 38,
+                  normalize_pdf_text("Date de signature : " + date_str))
+        self.text(self._MARGIN + 14, y_top + 54, normalize_pdf_text(note_text))
+
+        text_y = y_top + 70
+        if reservation_lines:
+            self.set_text_color(115, 43, 31)
+            for line in reservation_lines:
+                self.text(self._MARGIN + 14, text_y, normalize_pdf_text(line))
+                text_y += 14
+
+        if sig_bytes and sig_w and sig_h:
+            img_y = y_top + section_h - 18 - sig_h
+            self.image(io.BytesIO(sig_bytes), x=self._MARGIN + 14, y=img_y, w=sig_w, h=sig_h)
+
+        return y_top + section_h + 16
+
+    def _draw_masked_signature_box(self, y_top, label, date_str, reservation_lines=None):
+        reservation_lines = reservation_lines or []
+        section_h = 92 + len(reservation_lines) * 14
+
+        if y_top + section_h > self._CONTENT_END:
+            self.add_page()
+            y_top = self._CONTENT_START
+
+        self.set_fill_color(251, 252, 254)
+        self.set_draw_color(204, 219, 230)
+        self.set_line_width(0.5)
+        self.rect(self._MARGIN, y_top, self._CONTENT_W, section_h, "FD")
+
+        self.set_font("Helvetica", "B", 12)
+        self.set_text_color(13, 66, 102)
+        self.text(self._MARGIN + 14, y_top + 18, normalize_pdf_text(label))
+
+        self.set_font("Helvetica", "", 10)
+        self.set_text_color(71, 92, 112)
+        self.text(self._MARGIN + 14, y_top + 38,
+                  normalize_pdf_text("Signature masqu\xe9e dans cet export."))
+        self.text(self._MARGIN + 14, y_top + 54,
+                  normalize_pdf_text("La signature est r\xe9serv\xe9e aux personnes autoris\xe9es."))
+        self.text(self._MARGIN + 14, y_top + 70,
+                  normalize_pdf_text("Date de signature : " + date_str))
+
+        if reservation_lines:
+            self.set_text_color(115, 43, 31)
+            text_y = y_top + 86
+            for line in reservation_lines:
+                self.text(self._MARGIN + 14, text_y, normalize_pdf_text(line))
+                text_y += 14
+
+        return y_top + section_h + 16
+
+
 def build_pdf_bytes(title, payload):
     settings = get_app_settings()
     org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
-    page_width = 595
-    page_height = 842
-    margin = 42
-    content_width = page_width - (margin * 2)
-    top_content_start = 660
-    bottom_margin = 52
 
     beneficiaire = payload.get("beneficiaire", {})
     dossier = payload.get("dossier", {})
@@ -2241,282 +2329,78 @@ def build_pdf_bytes(title, payload):
         f"Observations : {restitution.get('notes') or '-'}",
     ]
     for item_key, state in sorted((restitution.get("items") or {}).items()):
-        item_label = next((entry["label"] for entry in resources if entry["itemKey"] == item_key), item_key)
+        item_label = next((e["label"] for e in resources if e["itemKey"] == item_key), item_key)
         state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
-        note = state.get("notes") or "-"
-        restitution_lines.append(
-            f"{item_label} : {state_label}"
-            f" / {note}"
-        )
+        restitution_lines.append(f"{item_label} : {state_label} / {state.get('notes') or '-'}")
     sections.append(("Restitution", restitution_lines))
-    sections.append(
-        (
-            "Validation et conformité",
-            [
-                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-                f"Signature du bénéficiaire : {'Oui' if validation.get('signatureDataUrl') else 'Non'}",
-                f"Date de signature : {signature_datetime}",
-            ],
-        )
-    )
 
-    if not signature_export_allowed:
-        sections[-1] = (
-            sections[-1][0],
-            [
-                f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
-                "Signature du bénéficiaire : Masquée",
-                "Mention : la signature est réservée aux personnes autorisées.",
-            ],
-        )
-
-
-    objects = []
-
-    def add_object(content):
-        objects.append(content)
-        return len(objects)
-
-    font_regular_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
-    font_bold_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
-
-    logo_image = load_brand_logo_image()
-    logo_image_id = None
-    if logo_image:
-        logo_stream = logo_image["data"]
-        logo_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {logo_image['width']} /Height {logo_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(logo_stream)} >>\n"
-            f"stream\n{logo_stream.decode('latin-1')}\nendstream"
-        )
-
-    a_quai_logo_image = load_a_quai_pdf_logo_image()
-    a_quai_logo_image_id = None
-    if a_quai_logo_image:
-        a_quai_logo_stream = a_quai_logo_image["data"]
-        a_quai_logo_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {a_quai_logo_image['width']} /Height {a_quai_logo_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(a_quai_logo_stream)} >>\n"
-            f"stream\n{a_quai_logo_stream.decode('latin-1')}\nendstream"
-        )
-
-    signature_image = extract_signature_image(validation.get("signatureDataUrl")) if signature_export_allowed else None
-    signature_image_id = None
-    if signature_image:
-        signature_stream = signature_image["data"]
-        signature_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {signature_image['width']} /Height {signature_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(signature_stream)} >>\n"
-            f"stream\n{signature_stream.decode('latin-1')}\nendstream"
-        )
-
-    pages = []
-    current_page = []
-    current_y = top_content_start
-
-    def color_fill(r, g, b):
-        return f"{r:.3f} {g:.3f} {b:.3f} rg"
-
-    def color_stroke(r, g, b):
-        return f"{r:.3f} {g:.3f} {b:.3f} RG"
-
-    def draw_text(commands, x_pos, y_pos, text, font="F1", size=11, color=(0.12, 0.16, 0.2)):
-        commands.append(
-            f"q {color_fill(*color)} BT /{font} {size} Tf 1 0 0 1 {x_pos} {y_pos} Tm ({pdf_escape(text)}) Tj ET Q"
-        )
-
-    def draw_rect(commands, x_pos, y_pos, width, height, fill=None, stroke=None, line_width=1):
-        rect_commands = ["q"]
-        if fill:
-            rect_commands.append(color_fill(*fill))
-        if stroke:
-            rect_commands.append(color_stroke(*stroke))
-            rect_commands.append(f"{line_width} w")
-        operator = "B" if fill and stroke else "f" if fill else "S"
-        rect_commands.append(f"{x_pos} {y_pos} {width} {height} re {operator}")
-        rect_commands.append("Q")
-        commands.append(" ".join(rect_commands))
-
-    def ensure_space(required_height):
-        nonlocal current_page, current_y
-        if current_y - required_height >= bottom_margin:
-            return
-        pages.append(current_page)
-        current_page = []
-        current_y = top_content_start
-
-    def wrap_line(text, width=86):
-        normalized = normalize_pdf_text(text)
-        return textwrap.wrap(normalized, width=width) or [""]
-
-    def add_section(title_text, raw_lines):
-        nonlocal current_page, current_y
-        wrapped_lines = []
-        for raw_line in raw_lines:
-            wrapped_lines.extend(wrap_line(raw_line))
-        section_height = 28 + (len(wrapped_lines) * 15) + 18
-        ensure_space(section_height)
-
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.98, 0.985, 0.99), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, normalize_pdf_text(title_text), font="F2", size=12, color=(0.05, 0.26, 0.40))
-
-        line_y = current_y - 40
-        for line in wrapped_lines:
-            draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
-            line_y -= 15
-
-        current_y = box_bottom - 16
-
-    for section_title, section_lines in sections:
-        add_section(section_title, section_lines)
-
-    if signature_image and signature_image_id:
-        max_width = 220
-        max_height = 90
-        ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
-        draw_width = round(signature_image["width"] * ratio, 2)
-        draw_height = round(signature_image["height"] * ratio, 2)
-        section_height = 90 + draw_height
-        ensure_space(section_height)
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "Signature recueillie lors de la validation du dossier.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        current_page.append(
-            f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
-        )
-        current_y = box_bottom - 16
-
-    if signature_present and not signature_export_allowed:
-        reservation_lines = wrap_line(f"Réserve : {restitution.get('signataireComment') or '-'}", width=72) if restitution.get("signataireDecision") == "with_reservation" else []
-        section_height = 92 + (len(reservation_lines) * 14)
-        ensure_space(section_height)
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature du bénéficiaire", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, "Signature masquée dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "La signature est réservée aux personnes autorisées.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        text_y = current_y - 86
-        for line in reservation_lines:
-            draw_text(current_page, margin + 14, text_y, normalize_pdf_text(line), font="F1", size=10, color=(0.45, 0.17, 0.12))
-            text_y -= 14
-        current_y = box_bottom - 16
-
-    if not current_page:
-        current_page = []
-    pages.append(current_page)
-
-    page_object_ids = []
-    total_pages = len(pages)
-    generated_at = format_export_datetime(datetime.now().isoformat())
-
-    for page_index, page_commands in enumerate(pages, start=1):
-        commands = []
-        draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
-        draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
-        if a_quai_logo_image_id:
-            a_quai_ratio = min(88 / a_quai_logo_image["width"], 52 / a_quai_logo_image["height"])
-            a_quai_width = round(a_quai_logo_image["width"] * a_quai_ratio, 2)
-            a_quai_height = round(a_quai_logo_image["height"] * a_quai_ratio, 2)
-            commands.append(
-                f"q {a_quai_width} 0 0 {a_quai_height} {margin} {page_height - 76} cm /AQLOGO Do Q"
+    if signature_export_allowed:
+        sections.append(
+            (
+                "Validation et conformité",
+                [
+                    f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                    f"Signature du bénéficiaire : {'Oui' if signature_present else 'Non'}",
+                    f"Date de signature : {signature_datetime}",
+                ],
             )
-        elif logo_image_id:
-            logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
-            logo_width = round(logo_image["width"] * logo_ratio, 2)
-            logo_height = round(logo_image["height"] * logo_ratio, 2)
-            commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
-        draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "A quai", font="F2", size=13, color=(0.92, 0.96, 0.99))
-        draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
-        draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
-
-        draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Document de remise et de suivi des ressources attribuées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
-
-        commands.extend(page_commands)
-
-        draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
-        if logo_image_id:
-            footer_logo_ratio = min(54 / logo_image["width"], 18 / logo_image["height"])
-            footer_logo_width = round(logo_image["width"] * footer_logo_ratio, 2)
-            footer_logo_height = round(logo_image["height"] * footer_logo_ratio, 2)
-            commands.append(
-                f"q {footer_logo_width} 0 0 {footer_logo_height} {page_width - 160} {13} cm /LOGO Do Q"
+        )
+    else:
+        sections.append(
+            (
+                "Validation et conformité",
+                [
+                    f"Information RGPD portée à connaissance : {'Oui' if validation.get('rgpdAccepted') else 'Non'}",
+                    "Signature du bénéficiaire : Masquée",
+                    "Mention : la signature est réservée aux personnes autorisées.",
+                ],
             )
-        draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
-
-        stream = "\n".join(commands).encode("latin-1", "replace")
-        content_object_id = add_object(
-            f"<< /Length {len(stream)} >>\nstream\n{stream.decode('latin-1')}\nendstream"
         )
 
-        resource_parts = [
-            f"/Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R >>"
-        ]
-        xobjects = []
-        if logo_image_id:
-            xobjects.append(f"/LOGO {logo_image_id} 0 R")
-        if a_quai_logo_image_id:
-            xobjects.append(f"/AQLOGO {a_quai_logo_image_id} 0 R")
-        if signature_image_id:
-            xobjects.append(f"/SIG1 {signature_image_id} 0 R")
-        if xobjects:
-            resource_parts.append(f"/XObject << {' '.join(xobjects)} >>")
+    brand_logo = load_brand_logo_image()
+    aq_logo = load_a_quai_pdf_logo_image()
+    sig_bytes = extract_signature_image(validation.get("signatureDataUrl")) if signature_export_allowed else None
 
-        page_object_id = add_object(
-            f"<< /Type /Page /Parent PAGES_REF /MediaBox [0 0 {page_width} {page_height}] "
-            f"/Resources << {' '.join(resource_parts)} >> /Contents {content_object_id} 0 R >>"
+    pdf = _AQuaiDoc(
+        normalize_pdf_text(title),
+        "Document de remise et de suivi des ressources attribuées",
+        org_name,
+        brand_logo,
+        aq_logo,
+    )
+    pdf.add_page()
+    y = _AQuaiDoc._CONTENT_START
+    for sec_title, sec_lines in sections:
+        y = pdf._draw_section(y, sec_title, sec_lines)
+
+    if sig_bytes:
+        pdf._draw_signature_box(
+            y,
+            "Signature du bénéficiaire",
+            signature_datetime,
+            "Signature recueillie lors de la validation du dossier.",
+            sig_bytes=sig_bytes,
         )
-        page_object_ids.append(page_object_id)
+    elif signature_present and not signature_export_allowed:
+        reservation_lines = []
+        if restitution.get("signataireDecision") == "with_reservation":
+            reservation_lines = textwrap.wrap(
+                normalize_pdf_text(f"Réserve : {restitution.get('signataireComment') or '-'}"),
+                width=72,
+            )
+        pdf._draw_masked_signature_box(
+            y,
+            "Signature du bénéficiaire",
+            signature_datetime,
+            reservation_lines=reservation_lines,
+        )
 
-    kids = " ".join(f"{page_id} 0 R" for page_id in page_object_ids)
-    pages_object_id = add_object(f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_ids)} >>")
-
-    for page_id in page_object_ids:
-        objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
-
-    info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (A quai) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
-    )
-    catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
-
-    buffer = io.BytesIO()
-    buffer.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = [0]
-    for index, content in enumerate(objects, start=1):
-        offsets.append(buffer.tell())
-        buffer.write(f"{index} 0 obj\n".encode("latin-1"))
-        buffer.write(content.encode("latin-1", "replace"))
-        buffer.write(b"\nendobj\n")
-
-    xref_position = buffer.tell()
-    buffer.write(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
-    buffer.write(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        buffer.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
-
-    trailer = (
-        f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_object_id} 0 R /Info {info_object_id} 0 R >>\n"
-        f"startxref\n{xref_position}\n%%EOF"
-    )
-    buffer.write(trailer.encode("latin-1"))
-    return buffer.getvalue()
+    return bytes(pdf.output())
 
 
 def build_restitution_pdf_bytes(title, payload):
     settings = get_app_settings()
     org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
-    page_width = 595
-    page_height = 842
-    margin = 42
-    content_width = page_width - (margin * 2)
-    top_content_start = 660
-    bottom_margin = 52
 
     beneficiaire = payload.get("beneficiaire", {})
     dossier = payload.get("dossier", {})
@@ -2567,16 +2451,25 @@ def build_restitution_pdf_bytes(title, payload):
 
     material_items = sorted(material_entries.values(), key=lambda item: item.get("label") or item.get("itemKey"))
 
+    restitution_reason_labels = {
+        "fin_de_fonction": "Fin de fonction",
+        "demission": "Démission",
+        "mutation": "Mutation",
+        "fin_de_mandat": "Fin de mandat",
+        "autre": "Autre",
+    }
+    restitution_reason = restitution.get("reason") or ""
+    restitution_reason_label = restitution_reason_labels.get(restitution_reason) or ("-" if not restitution_reason else restitution_reason)
+
     sections = [
         (
             "Identification de la restitution",
             [
                 f"État du dossier : {format_status_label(workflow.get('status') or 'draft')}",
-                f"Type de dossier : {dossier_type_label(dossier.get('type'))}",
                 f"Date de prise de fonction : {format_export_datetime(payload.get('meta', {}).get('startAt'))}",
                 f"Date et heure de remise : {format_export_datetime(payload.get('meta', {}).get('assignedAt'))}",
                 f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",
-                f"Motif : {restitution.get('reason') or '-'}",
+                f"Motif de restitution : {restitution_reason_label}",
             ],
         ),
         (
@@ -2592,40 +2485,49 @@ def build_restitution_pdf_bytes(title, payload):
         ),
     ]
 
-    returned_resource_lines = []
     restitution_lines = []
     for item in material_items:
         item_key = item["itemKey"]
         state = (restitution.get("items") or {}).get(item_key, {})
         state_label = format_restitution_state_label(state.get("state") or state.get("condition"))
         note = state.get("notes") or "-"
-        if (state.get("state") or state.get("condition")) in {"conforme", "degrade", "returned", "returned_damaged"}:
-            returned_resource_lines.append(
-                f"{item['label']} ({item.get('details') or '-'}) : {state_label}"
-                f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
-            )
         restitution_lines.append(
             f"{item['label']} ({item.get('details') or '-'}) : {state_label} / {note}"
             f"{' / ' + item.get('assignmentSummary') if item.get('assignmentSummary') else ''}"
         )
-    if returned_resource_lines:
-        sections.append(("Ressources restituées et état", returned_resource_lines))
     if not restitution_lines:
         restitution_lines.append("Aucun matériel n'a encore été renseigné dans la restitution.")
     sections.append(("État des matériels restitués", restitution_lines))
-    sections.append(
-        (
-            "Validation de la restitution",
-            [
-                f"Statut de signature : {format_restitution_signature_status(signature_status)}",
-                f"Date de signature : {signature_datetime}",
-                f"Motif si la signature n'a pas été recueillie : {restitution.get('signatureReason') or '-'}",
-                f"Décision du signataire : {decision_label}",
-                f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
-                f"Observations générales : {restitution.get('notes') or '-'}",
-            ],
+
+    if signature_export_allowed:
+        sections.append(
+            (
+                "Validation de la restitution",
+                [
+                    f"Statut de signature : {format_restitution_signature_status(signature_status)}",
+                    f"Date de signature : {signature_datetime}",
+                    f"Motif si la signature n'a pas été recueillie : {restitution.get('signatureReason') or '-'}",
+                    f"Décision du signataire : {decision_label}",
+                    f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
+                    f"Observations générales : {restitution.get('notes') or '-'}",
+                ],
+            )
         )
-    )
+    else:
+        sections.append(
+            (
+                "Validation de la restitution",
+                [
+                    "Statut de signature : Masquée",
+                    "Mention : la signature est réservée aux personnes autorisées.",
+                    "Motif si la signature n'a pas été recueillie : Information réservée.",
+                    f"Décision du signataire : {decision_label}",
+                    f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
+                    f"Observations générales : {restitution.get('notes') or '-'}",
+                ],
+            )
+        )
+
     if restitution.get("signataireDecision") == "with_reservation":
         sections.append(
             (
@@ -2637,261 +2539,47 @@ def build_restitution_pdf_bytes(title, payload):
             )
         )
 
-    if not signature_export_allowed:
-        sections[-1] = (
-            sections[-1][0],
-            [
-                "Statut de signature : Masquée",
-                "Mention : la signature est réservée aux personnes autorisées.",
-                "Motif si la signature n'a pas été recueillie : Information réservée.",
-                f"Décision du signataire : {decision_label}",
-                f"Réserve / réclamation du signataire : {restitution.get('signataireComment') or '-'}",
-                f"Observations générales : {restitution.get('notes') or '-'}",
-            ],
+    brand_logo = load_brand_logo_image()
+    aq_logo = load_a_quai_pdf_logo_image()
+    sig_bytes = extract_signature_image(restitution.get("signatureDataUrl")) if signature_export_allowed else None
+
+    pdf = _AQuaiDoc(
+        normalize_pdf_text(title),
+        "Bon de restitution et de suivi des ressources récupérées",
+        org_name,
+        brand_logo,
+        aq_logo,
+    )
+    pdf.add_page()
+    y = _AQuaiDoc._CONTENT_START
+    for sec_title, sec_lines in sections:
+        y = pdf._draw_section(y, sec_title, sec_lines)
+
+    if sig_bytes:
+        reservation_lines = (
+            textwrap.wrap(
+                normalize_pdf_text(f"Réserve : {restitution.get('signataireComment') or '-'}"),
+                width=72,
+            )
+            if restitution.get("signataireDecision") == "with_reservation"
+            else []
         )
-
-    objects = []
-
-    def add_object(content):
-        objects.append(content)
-        return len(objects)
-
-    font_regular_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
-    font_bold_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
-
-    logo_image = load_brand_logo_image()
-    logo_image_id = None
-    if logo_image:
-        logo_stream = logo_image["data"]
-        logo_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {logo_image['width']} /Height {logo_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(logo_stream)} >>\n"
-            f"stream\n{logo_stream.decode('latin-1')}\nendstream"
-        )
-
-    a_quai_logo_image = load_a_quai_pdf_logo_image()
-    a_quai_logo_image_id = None
-    if a_quai_logo_image:
-        a_quai_logo_stream = a_quai_logo_image["data"]
-        a_quai_logo_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {a_quai_logo_image['width']} /Height {a_quai_logo_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(a_quai_logo_stream)} >>\n"
-            f"stream\n{a_quai_logo_stream.decode('latin-1')}\nendstream"
-        )
-
-    signature_image = extract_signature_image(restitution.get("signatureDataUrl")) if signature_export_allowed else None
-    signature_image_id = None
-    if signature_image:
-        signature_stream = signature_image["data"]
-        signature_image_id = add_object(
-            f"<< /Type /XObject /Subtype /Image /Width {signature_image['width']} /Height {signature_image['height']} "
-            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(signature_stream)} >>\n"
-            f"stream\n{signature_stream.decode('latin-1')}\nendstream"
-        )
-
-    pages = []
-    current_page = []
-    current_y = top_content_start
-
-    def color_fill(r, g, b):
-        return f"{r:.3f} {g:.3f} {b:.3f} rg"
-
-    def color_stroke(r, g, b):
-        return f"{r:.3f} {g:.3f} {b:.3f} RG"
-
-    def draw_text(commands, x_pos, y_pos, text, font="F1", size=11, color=(0.12, 0.16, 0.2)):
-        commands.append(
-            f"q {color_fill(*color)} BT /{font} {size} Tf 1 0 0 1 {x_pos} {y_pos} Tm ({pdf_escape(text)}) Tj ET Q"
-        )
-
-    def draw_rect(commands, x_pos, y_pos, width, height, fill=None, stroke=None, line_width=1):
-        rect_commands = ["q"]
-        if fill:
-            rect_commands.append(color_fill(*fill))
-        if stroke:
-            rect_commands.append(color_stroke(*stroke))
-            rect_commands.append(f"{line_width} w")
-        operator = "B" if fill and stroke else "f" if fill else "S"
-        rect_commands.append(f"{x_pos} {y_pos} {width} {height} re {operator}")
-        rect_commands.append("Q")
-        commands.append(" ".join(rect_commands))
-
-    def ensure_space(required_height):
-        nonlocal current_page, current_y
-        if current_y - required_height >= bottom_margin:
-            return
-        pages.append(current_page)
-        current_page = []
-        current_y = top_content_start
-
-    def wrap_line(text, width=86):
-        normalized = normalize_pdf_text(text)
-        return textwrap.wrap(normalized, width=width) or [""]
-
-    def add_section(title_text, raw_lines):
-        nonlocal current_page, current_y
-        wrapped_lines = []
-        for raw_line in raw_lines:
-            wrapped_lines.extend(wrap_line(raw_line))
-        section_height = 28 + (len(wrapped_lines) * 15) + 18
-        ensure_space(section_height)
-
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.98, 0.985, 0.99), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, normalize_pdf_text(title_text), font="F2", size=12, color=(0.05, 0.26, 0.40))
-
-        line_y = current_y - 40
-        for line in wrapped_lines:
-            draw_text(current_page, margin + 14, line_y, normalize_pdf_text(line), font="F1", size=10.5, color=(0.17, 0.20, 0.24))
-            line_y -= 15
-        current_y = box_bottom - 16
-
-    for section_title, section_lines in sections:
-        add_section(section_title, section_lines)
-
-    if signature_image and signature_image_id:
-        max_width = 220
-        max_height = 90
-        ratio = min(max_width / signature_image["width"], max_height / signature_image["height"])
-        draw_width = round(signature_image["width"] * ratio, 2)
-        draw_height = round(signature_image["height"] * ratio, 2)
-        reservation_lines = wrap_line(f"Réserve : {restitution.get('signataireComment') or '-'}", width=72) if restitution.get("signataireDecision") == "with_reservation" else []
-        section_height = 90 + draw_height + (len(reservation_lines) * 14)
-        ensure_space(section_height)
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(
-            current_page,
-            margin + 14,
-            current_y - 54,
+        pdf._draw_signature_box(
+            y,
+            "Signature de restitution",
+            signature_datetime,
             "Signature recueillie avec réserve." if restitution.get("signataireDecision") == "with_reservation" else "Signature recueillie lors de la restitution.",
-            font="F1",
-            size=10,
-            color=(0.28, 0.36, 0.44),
+            sig_bytes=sig_bytes,
+            reservation_lines=reservation_lines,
         )
-        text_y = current_y - 70
-        for line in reservation_lines:
-            draw_text(current_page, margin + 14, text_y, normalize_pdf_text(line), font="F1", size=10, color=(0.45, 0.17, 0.12))
-            text_y -= 14
-        current_page.append(
-            f"q {draw_width} 0 0 {draw_height} {margin + 14} {box_bottom + 18} cm /SIG1 Do Q"
-        )
-        current_y = box_bottom - 16
-
-    if signature_present and not signature_export_allowed:
-        section_height = 92
-        ensure_space(section_height)
-        box_bottom = current_y - section_height
-        draw_rect(current_page, margin, box_bottom, content_width, section_height, fill=(0.985, 0.99, 0.995), stroke=(0.80, 0.86, 0.90))
-        draw_text(current_page, margin + 14, current_y - 18, "Signature de restitution", font="F2", size=12, color=(0.05, 0.26, 0.40))
-        draw_text(current_page, margin + 14, current_y - 38, "Signature masquée dans cet export.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 54, "La signature est réservée aux personnes autorisées.", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        draw_text(current_page, margin + 14, current_y - 70, f"Date de signature : {normalize_pdf_text(signature_datetime)}", font="F1", size=10, color=(0.28, 0.36, 0.44))
-        current_y = box_bottom - 16
-
-    if not current_page:
-        current_page = []
-    pages.append(current_page)
-
-    page_object_ids = []
-    total_pages = len(pages)
-    generated_at = format_export_datetime(datetime.now().isoformat())
-
-    for page_index, page_commands in enumerate(pages, start=1):
-        commands = []
-        draw_rect(commands, 0, page_height - 92, page_width, 92, fill=(0.05, 0.33, 0.52))
-        draw_rect(commands, 0, page_height - 104, page_width, 12, fill=(0.84, 0.64, 0.25))
-        if a_quai_logo_image_id:
-            a_quai_ratio = min(88 / a_quai_logo_image["width"], 52 / a_quai_logo_image["height"])
-            a_quai_width = round(a_quai_logo_image["width"] * a_quai_ratio, 2)
-            a_quai_height = round(a_quai_logo_image["height"] * a_quai_ratio, 2)
-            commands.append(
-                f"q {a_quai_width} 0 0 {a_quai_height} {margin} {page_height - 76} cm /AQLOGO Do Q"
-            )
-        elif logo_image_id:
-            logo_ratio = min(88 / logo_image["width"], 52 / logo_image["height"])
-            logo_width = round(logo_image["width"] * logo_ratio, 2)
-            logo_height = round(logo_image["height"] * logo_ratio, 2)
-            commands.append(f"q {logo_width} 0 0 {logo_height} {margin} {page_height - 76} cm /LOGO Do Q")
-        draw_text(commands, margin + 100, page_height - 48, org_name, font="F2", size=18, color=(1, 1, 1))
-        draw_text(commands, margin + 100, page_height - 68, "A quai", font="F2", size=13, color=(0.92, 0.96, 0.99))
-        draw_text(commands, page_width - 190, page_height - 48, "Document interne", font="F2", size=10.5, color=(1, 1, 1))
-        draw_text(commands, page_width - 190, page_height - 66, normalize_pdf_text(generated_at), font="F1", size=9.5, color=(0.92, 0.96, 0.99))
-
-        draw_text(commands, margin, page_height - 118, normalize_pdf_text(title), font="F2", size=15, color=(0.07, 0.18, 0.26))
-        draw_text(commands, margin, page_height - 136, "Bon de restitution et de suivi des ressources récupérées", font="F1", size=10.5, color=(0.35, 0.43, 0.50))
-
-        commands.extend(page_commands)
-
-        draw_rect(commands, margin, 34, content_width, 0.5, stroke=(0.80, 0.86, 0.90), line_width=0.8)
-        draw_text(commands, margin, 20, "A quai - document exploitable RH / DGS", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
-        if logo_image_id:
-            footer_logo_ratio = min(54 / logo_image["width"], 18 / logo_image["height"])
-            footer_logo_width = round(logo_image["width"] * footer_logo_ratio, 2)
-            footer_logo_height = round(logo_image["height"] * footer_logo_ratio, 2)
-            commands.append(
-                f"q {footer_logo_width} 0 0 {footer_logo_height} {page_width - 160} {13} cm /LOGO Do Q"
-            )
-        draw_text(commands, page_width - 90, 20, f"Page {page_index}/{total_pages}", font="F1", size=8.5, color=(0.38, 0.45, 0.52))
-
-        stream = "\n".join(commands).encode("latin-1", "replace")
-        content_object_id = add_object(
-            f"<< /Length {len(stream)} >>\nstream\n{stream.decode('latin-1')}\nendstream"
+    elif signature_present and not signature_export_allowed:
+        pdf._draw_masked_signature_box(
+            y,
+            "Signature de restitution",
+            signature_datetime,
         )
 
-        resource_parts = [
-            f"/Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R >>"
-        ]
-        xobjects = []
-        if logo_image_id:
-            xobjects.append(f"/LOGO {logo_image_id} 0 R")
-        if a_quai_logo_image_id:
-            xobjects.append(f"/AQLOGO {a_quai_logo_image_id} 0 R")
-        if signature_image_id:
-            xobjects.append(f"/SIG1 {signature_image_id} 0 R")
-        if xobjects:
-            resource_parts.append(f"/XObject << {' '.join(xobjects)} >>")
-
-        page_object_id = add_object(
-            f"<< /Type /Page /Parent PAGES_REF /MediaBox [0 0 {page_width} {page_height}] "
-            f"/Resources << {' '.join(resource_parts)} >> /Contents {content_object_id} 0 R >>"
-        )
-        page_object_ids.append(page_object_id)
-
-    kids = " ".join(f"{page_id} 0 R" for page_id in page_object_ids)
-    pages_object_id = add_object(f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_ids)} >>")
-
-    for page_id in page_object_ids:
-        objects[page_id - 1] = objects[page_id - 1].replace("PAGES_REF", f"{pages_object_id} 0 R")
-
-    info_object_id = add_object(
-        f"<< /Title ({pdf_escape(title)}) /Producer (A quai) /CreationDate (D:{datetime.now().strftime('%Y%m%d%H%M%S')}) >>"
-    )
-    catalog_object_id = add_object(f"<< /Type /Catalog /Pages {pages_object_id} 0 R >>")
-
-    buffer = io.BytesIO()
-    buffer.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = [0]
-    for index, content in enumerate(objects, start=1):
-        offsets.append(buffer.tell())
-        buffer.write(f"{index} 0 obj\n".encode("latin-1"))
-        buffer.write(content.encode("latin-1", "replace"))
-        buffer.write(b"\nendobj\n")
-
-    xref_position = buffer.tell()
-    buffer.write(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
-    buffer.write(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        buffer.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
-
-    trailer = (
-        f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_object_id} 0 R /Info {info_object_id} 0 R >>\n"
-        f"startxref\n{xref_position}\n%%EOF"
-    )
-    buffer.write(trailer.encode("latin-1"))
-    return buffer.getvalue()
+    return bytes(pdf.output())
 
 
 def format_status_label(status):
