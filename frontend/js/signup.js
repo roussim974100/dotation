@@ -119,9 +119,32 @@ function initPasswordGeneratorModal() {
   document.getElementById("generateSignupPasswordBtn")?.addEventListener("click", openModal);
 }
 
+async function injectSignupCsrfToken() {
+  try {
+    const resp = await fetch("/api/csrf-token");
+    const data = await resp.json();
+    const field = document.getElementById("csrfToken");
+    if (field) field.value = data.token || "";
+  } catch (_) {
+    // silencieux
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applySignupError();
   initPasswordGeneratorModal();
+
+  const signupForm = document.querySelector(".login-form");
+  let csrfReady = injectSignupCsrfToken();
+  signupForm?.addEventListener("submit", async (event) => {
+    if (csrfReady) {
+      event.preventDefault();
+      const pending = csrfReady;
+      csrfReady = null;
+      await pending.catch(() => undefined);
+      signupForm.submit();
+    }
+  });
   document.getElementById("copySignupPasswordBtn")?.addEventListener("click", async () => {
     const passwordInput = document.getElementById("signup_password");
     if (!passwordInput?.value) {

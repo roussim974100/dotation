@@ -9,6 +9,7 @@ import sqlite3
 import struct
 import textwrap
 import unicodedata
+import urllib.parse
 import urllib.request
 import uuid
 import zipfile
@@ -18,6 +19,7 @@ from xml.sax.saxutils import escape as xml_escape
 from fpdf import FPDF
 from werkzeug.middleware.proxy_fix import ProxyFix
 import re
+import threading
 
 
 # Paths principaux du projet: frontend servi par Flask, base SQLite et cache catalogue.
@@ -33,6 +35,25 @@ CITY_LOGO_URL = os.environ.get(
     "https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png",
 )
 CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
+
+# Rate limiting login : max 10 tentatives par IP sur une fenêtre glissante de 10 minutes.
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 600
+_login_attempts: dict[str, list[float]] = {}
+_login_attempts_lock = threading.Lock()
+
+
+def _is_login_rate_limited(ip: str) -> bool:
+    now = datetime.now().timestamp()
+    with _login_attempts_lock:
+        attempts = _login_attempts.get(ip, [])
+        attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS]
+        if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+            _login_attempts[ip] = attempts
+            return True
+        attempts.append(now)
+        _login_attempts[ip] = attempts
+        return False
 
 
 def get_app_secret_key():
@@ -69,6 +90,10 @@ app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0
 
 @app.after_request
 def disable_frontend_cache(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+
     content_type = (response.headers.get("Content-Type") or "").lower()
     if "text/html" in content_type:
         if "charset=" not in content_type:
@@ -377,12 +402,23 @@ def generate_id(prefix):
     return f"{prefix}_{uuid.uuid4().hex}"
 
 
+_KNOWN_TABLES = {
+    "dotation_forms", "dotation_items", "onboarding_dossiers",
+    "resource_catalog", "service_catalog", "signature_links",
+    "app_settings", "app_logs", "deleted_items",
+}
+
+
 def table_columns(connection, table_name):
+    if table_name not in _KNOWN_TABLES:
+        raise ValueError(f"Table inconnue : {table_name!r}")
     rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
     return {row["name"] for row in rows}
 
 
 def ensure_column(connection, table_name, column_name, column_sql):
+    if table_name not in _KNOWN_TABLES:
+        raise ValueError(f"Table inconnue : {table_name!r}")
     if column_name not in table_columns(connection, table_name):
         connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
 
@@ -1753,7 +1789,9 @@ def load_brand_logo_image():
                 },
             )
             with urllib.request.urlopen(request, timeout=10) as response:
-                data = response.read()
+                data = response.read(2 * 1024 * 1024)
+            if len(data) >= 2 * 1024 * 1024:
+                data = b""
             if data[:8] == b"\x89PNG\r\n\x1a\n":
                 image_bytes = data
                 if image_bytes and CITY_LOGO_PATH:
@@ -3299,7 +3337,8 @@ def build_restitution_signature_public_payload(form_data, link_row):
 def download_response(file_bytes, filename, content_type):
     response = make_response(file_bytes)
     response.headers["Content-Type"] = content_type
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    encoded_filename = urllib.parse.quote(filename, safe="")
+    response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
     return response
 
 
@@ -3309,6 +3348,11 @@ init_db()
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        if _is_login_rate_limited(get_request_client_ip()):
+            return redirect("/login?error=rate_limited")
+        submitted_token = request.form.get("csrf_token") or ""
+        if not submitted_token or not secrets.compare_digest(submitted_token, session.get("csrf_token", "")):
+            return redirect("/login?error=invalid")
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         auth_state = check_user(username, password)
@@ -3346,6 +3390,9 @@ def login():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
+        submitted_token = request.form.get("csrf_token") or ""
+        if not submitted_token or not secrets.compare_digest(submitted_token, session.get("csrf_token", "")):
+            return redirect("/signup?error=invalid_request")
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         password_confirm = request.form.get("password_confirm") or ""
@@ -3573,7 +3620,7 @@ def public_logo_route():
 
     if logo_mode == "url":
         remote_url = settings.get("brand_logo_url") or CITY_LOGO_URL
-        if remote_url:
+        if remote_url and re.match(r"^https?://", remote_url, re.IGNORECASE):
             return redirect(remote_url, code=302)
 
     response = send_from_directory(FRONTEND_ASSETS_DIR, "app-icon.svg")
@@ -3581,6 +3628,13 @@ def public_logo_route():
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+@app.route("/api/csrf-token", methods=["GET"])
+def csrf_token_route():
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return jsonify({"token": session["csrf_token"]})
 
 
 @app.route("/api/client-context", methods=["GET"])
@@ -4518,10 +4572,17 @@ def upload_admin_logo_route():
     if extension not in {".png"}:
         return jsonify({"error": "invalid_logo_type"}), 400
 
+    file_bytes = file.read(2 * 1024 * 1024 + 1)
+    if len(file_bytes) > 2 * 1024 * 1024:
+        return jsonify({"error": "logo_too_large"}), 400
+    if file_bytes[:8] != b"\x89PNG\r\n\x1a\n":
+        return jsonify({"error": "invalid_logo_type"}), 400
+
     os.makedirs(CUSTOM_BRANDING_DIR, exist_ok=True)
     file_name = f"brand_logo_{uuid.uuid4().hex}{extension}"
     absolute_path = os.path.join(CUSTOM_BRANDING_DIR, file_name)
-    file.save(absolute_path)
+    with open(absolute_path, "wb") as f:
+        f.write(file_bytes)
     relative_path = f"custom/{file_name}"
 
     with get_db() as connection:

@@ -35,7 +35,8 @@ function applyLoginMessages() {
     invalid: getAppText("login.errorInvalid", "Identifiants invalides."),
     session: getAppText("login.errorSession", "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous."),
     pending: getAppText("login.errorPending", "Votre compte est en attente de validation par un administrateur."),
-    disabled: getAppText("login.errorDisabled", "Votre compte est désactivé. Rapprochez-vous d'un administrateur.")
+    disabled: getAppText("login.errorDisabled", "Votre compte est désactivé. Rapprochez-vous d'un administrateur."),
+    rate_limited: getAppText("login.errorRateLimited", "Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.")
   };
 
   const noticeMessages = {
@@ -162,7 +163,18 @@ function setHiddenValue(id, value) {
   }
 }
 
+async function fetchCsrfToken() {
+  try {
+    const resp = await fetch("/api/csrf-token");
+    const data = await resp.json();
+    setHiddenValue("csrfToken", data.token || "");
+  } catch (_) {
+    // silencieux — le serveur rejettera le formulaire si absent
+  }
+}
+
 async function hydrateLoginClientContext() {
+  await fetchCsrfToken();
   setHiddenValue("clientDeviceLabel", buildClientDeviceLabel());
   setHiddenValue("clientBrowser", detectBrowserName());
   setHiddenValue("clientPlatform", detectPlatformName());
