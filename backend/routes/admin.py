@@ -54,6 +54,7 @@ def unc_stats():
                 "nom": row["nom"] or "",
                 "prenom": row["prenom"] or "",
                 "service": row["service"] or "",
+                "ref_ad": (payload.get("unc_ref_ad") or "").strip(),
                 "chemin": e.get("chemin") or "",
                 "acces": _ACCES.get(e.get("acces") or "", e.get("acces") or ""),
                 "statut": _STATUT.get(statut, statut),
