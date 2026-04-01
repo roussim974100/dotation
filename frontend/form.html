@@ -282,6 +282,13 @@
             <h4 class="resource-kind-block__title">Accès réseau (UNC)</h4>
             <p class="resource-kind-block__text">Chemins réseau partagés à provisionner sur le poste.</p>
           </div>
+          <div class="unc-copy-from mb-3">
+            <p class="form-label small text-muted mb-1">Copier les accès depuis un dossier existant</p>
+            <div class="position-relative">
+              <input type="text" id="uncCopySearch" class="form-control form-control-sm" placeholder="Rechercher un agent (nom, prénom…)" autocomplete="off">
+              <div id="uncCopyResults" class="list-group shadow-sm position-absolute w-100 d-none" style="z-index:200;top:100%"></div>
+            </div>
+          </div>
           <div id="uncAccessList" class="d-flex flex-column gap-2"></div>
           <button type="button" id="addUncBtn" class="btn btn-outline-secondary btn-sm mt-2">+ Ajouter un chemin UNC</button>
         </div>
