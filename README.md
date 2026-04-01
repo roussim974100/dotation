@@ -14,8 +14,8 @@ Version courante : `2.12.1`
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
 - administrer les comptes, les groupes, les services et les ressources attribuables
-- dÃ©finir des ressources personnalisÃ©es avec leurs champs mÃ©tier, leur suivi Ã  l'attribution et leur restitution Ã©ventuelle
-- rÃ©organiser l'ordre d'affichage des ressources par service avec une page dÃ©diÃ©e
+- définir des ressources personnalisées avec leurs champs métier, leur suivi à l'attribution et leur restitution éventuelle
+- réorganiser l'ordre d'affichage des ressources par service avec une page dédiée
 - consulter un journal des actions
 - restaurer des suppressions via une corbeille reservee aux admins
 - exporter les dossiers et les restitutions en PDF
@@ -41,6 +41,13 @@ Version courante : `2.12.1`
 
 - `frontend/` : interface HTML, CSS et JavaScript servie par Flask
 - `backend/` : API Flask, authentification et persistance SQLite
+  - `app.py` : point d'entree Flask, routes et initialisation
+  - `config.py` : constantes et chemins
+  - `utils.py` : fonctions utilitaires partagees
+  - `database.py` : acces SQLite et helpers de schema
+  - `auth.py` : decorateurs, gestion des comptes et rate limiting
+  - `models/` : logique metier (workflow, dossier, signature, audit, settings)
+  - `pdf/` : generation des PDF dossier et restitution via `fpdf2`
 
 ## Prerequis avant lancement
 
@@ -427,7 +434,14 @@ alors il faut envisager a terme une migration vers `PostgreSQL`.
 - `frontend/admin-ressources.html` : catalogue des ressources
 - `frontend/logs.html` : journal des actions
 - `frontend/trash.html` : corbeille administrateur
-- `backend/app.py` : coeur du backend Flask
+- `backend/app.py` : point d'entree Flask et routes
+- `backend/auth.py` : authentification, decorateurs et gestion des comptes
+- `backend/models/workflow.py` : calculs de statut, validation des ressources
+- `backend/models/settings.py` : parametres applicatifs, logo et theme
+- `backend/models/signature.py` : liens de signature a distance
+- `backend/models/audit.py` : journal et tracabilite
+- `backend/pdf/attribution.py` : generation du PDF dossier
+- `backend/pdf/restitution.py` : generation du PDF restitution
 
 ## Lancement
 
@@ -602,6 +616,11 @@ Controle minimal recommande apres modification :
 
 ```powershell
 python -m py_compile backend\app.py
+python -m py_compile backend\auth.py
+python -m py_compile backend\models\workflow.py
+python -m py_compile backend\models\settings.py
+python -m py_compile backend\pdf\attribution.py
+python -m py_compile backend\pdf\restitution.py
 ```
 
 
