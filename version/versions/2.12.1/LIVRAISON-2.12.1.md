@@ -1,4 +1,4 @@
-﻿# Projet Pret a Remise
+# Projet Pret a Remise
 
 Ce document sert de point d'entree pour la remise du projet.
 

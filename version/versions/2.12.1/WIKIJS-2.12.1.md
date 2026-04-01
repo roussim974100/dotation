@@ -1,4 +1,4 @@
-﻿# A quai
+# A quai
 
 ## Cartouche de version
 
@@ -97,7 +97,7 @@ Le flux permet de :
 - choisir rapidement l'etat de chaque materiel
 - saisir une date de restitution
 - signer ou documenter l'absence de signature
-- exporter un `PDF restitution`
+- exporter un `PDF restitution` listant toutes les ressources materielles
 
 ## Exports
 
@@ -116,7 +116,7 @@ Le `PDF restitution` contient :
 
 - les informations de la personne
 - la date de restitution
-- l'etat de chaque materiel restitue
+- toutes les ressources materielles avec leur etat
 - la signature de restitution ou le motif d'absence
 
 ### E-mails prepares
@@ -175,6 +175,7 @@ Elle permet de restaurer :
 ## Points d'attention
 
 - definir une vraie valeur `APP_SECRET_KEY` en environnement de deploiement
+- installer `fpdf2` dans le venv de production via `pip install -r backend/requirements.txt`
 - verifier les comportements critiques apres chaque evolution frontend
 - maintenir a jour `version/versions/` et les fichiers Markdown racine a chaque release
 

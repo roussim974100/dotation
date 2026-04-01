@@ -1,4 +1,4 @@
-﻿# A quai
+# A quai
 
 Application interne de gestion des dossiers d'attribution et de restitution.
 
@@ -14,11 +14,11 @@ Version courante : `2.12.1`
 - tracer les reouvertures de dossier encore modifiable
 - suivre la restitution des ressources materielles
 - administrer les comptes, les groupes, les services et les ressources attribuables
-- dÃ©finir des ressources personnalisÃ©es avec leurs champs mÃ©tier, leur suivi Ã  l'attribution et leur restitution Ã©ventuelle
+- dÃ©finir des ressources personnalisÃ©es avec leurs champs mÃ©tier, leur suivi Ã  l'attribution et leur restitution Ã©ventuelle
 - rÃ©organiser l'ordre d'affichage des ressources par service avec une page dÃ©diÃ©e
 - consulter un journal des actions
 - restaurer des suppressions via une corbeille reservee aux admins
-- exporter les dossiers et les restitutions en PDF
+- exporter les dossiers et les restitutions en PDF via `fpdf2`
 - proteger les signatures dans les exports PDF selon le profil connecte
 - exporter les donnees en Excel
 
@@ -583,7 +583,7 @@ Document distinct avec :
 
 - informations de la personne
 - date de restitution
-- etat de chaque materiel
+- toutes les ressources materielles avec leur etat
 - commentaires d'anomalie
 - signature de restitution ou motif d'absence
 

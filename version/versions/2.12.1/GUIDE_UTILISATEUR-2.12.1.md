@@ -1,4 +1,4 @@
-﻿# Guide Utilisateur
+# Guide Utilisateur
 
 Version de reference : `2.12.1`
 
@@ -106,7 +106,7 @@ La restitution comprend aussi :
 - une signature de restitution
 - ou un motif si la signature est impossible ou differee
 
-Un `PDF restitution` peut etre exporte separement.
+Un `PDF restitution` peut etre exporte separement. Il inclut toutes les ressources materielles avec leur etat.
 
 ## Administration
 
