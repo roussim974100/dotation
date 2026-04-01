@@ -1810,6 +1810,59 @@ function summarizeRequestedResourceCompletion(formData) {
   };
 }
 
+function bindUncCopyFrom() {
+  const searchInput = document.getElementById("uncCopySearch");
+  const resultsBox = document.getElementById("uncCopyResults");
+  if (!searchInput || !resultsBox) return;
+
+  let debounceTimer;
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { resultsBox.classList.add("d-none"); resultsBox.innerHTML = ""; return; }
+    debounceTimer = setTimeout(async () => {
+      const res = await fetch(`/api/forms?search=${encodeURIComponent(q)}`);
+      if (!res.ok) return;
+      const forms = await res.json();
+      const withUnc = forms.filter(f => f.id !== (document.getElementById("form")?.dataset?.draftId || ""));
+      resultsBox.innerHTML = "";
+      if (!withUnc.length) {
+        resultsBox.innerHTML = `<span class="list-group-item list-group-item-secondary small">Aucun dossier trouvé</span>`;
+      } else {
+        withUnc.slice(0, 8).forEach(f => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "list-group-item list-group-item-action small";
+          btn.textContent = `${f.prenom} ${f.nom}${f.service ? " — " + f.service : ""}`;
+          btn.addEventListener("click", async () => {
+            resultsBox.classList.add("d-none");
+            searchInput.value = "";
+            const detail = await fetch(`/api/forms/${f.id}`);
+            if (!detail.ok) return;
+            const data = await detail.json();
+            const entries = data.data?.unc_acces || [];
+            if (!entries.length) {
+              searchInput.placeholder = `${f.prenom} ${f.nom} — aucun accès UNC dans ce dossier`;
+              return;
+            }
+            entries.forEach(e => document.getElementById("uncAccessList").appendChild(createUncRow(e)));
+            searchInput.placeholder = `${entries.length} accès copiés depuis ${f.prenom} ${f.nom}`;
+          });
+          resultsBox.appendChild(btn);
+        });
+      }
+      resultsBox.classList.remove("d-none");
+    }, 280);
+  });
+
+  document.addEventListener("click", e => {
+    if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+      resultsBox.classList.add("d-none");
+    }
+  });
+}
+
 function createUncRow(entry = {}) {
   const row = document.createElement("div");
   row.className = "unc-row";
@@ -2633,6 +2686,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
 
+    bindUncCopyFrom();
     document.getElementById("addUncBtn")?.addEventListener("click", () => {
       document.getElementById("uncAccessList").appendChild(createUncRow());
     });
