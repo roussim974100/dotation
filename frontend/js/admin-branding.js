@@ -59,6 +59,7 @@ function normalizeBrandingSettings(raw = {}) {
   return {
     org_name: raw.org_name || "",
     dpo_email: raw.dpo_email || "",
+    email_domains: raw.email_domains || "",
     brand_logo_mode: raw.brand_logo_mode || "url",
     brand_logo_url: raw.brand_logo_url || "",
     theme_id: raw.theme_id || "institutionnel",
@@ -70,6 +71,7 @@ function collectBrandingPayload() {
   return normalizeBrandingSettings({
     org_name: brandingById("brandingOrgName")?.value.trim(),
     dpo_email: brandingById("brandingDpoEmail")?.value.trim(),
+    email_domains: brandingById("brandingEmailDomains")?.value.trim(),
     brand_logo_mode: brandingById("brandingLogoMode")?.value,
     brand_logo_url: brandingById("brandingLogoUrl")?.value.trim(),
     theme_id: brandingById("brandingTheme")?.value,
@@ -240,6 +242,7 @@ async function loadBrandingSettings() {
 
   brandingById("brandingOrgName").value = raw.org_name;
   brandingById("brandingDpoEmail").value = raw.dpo_email || payload.dpoEmail || "";
+  brandingById("brandingEmailDomains").value = raw.email_domains || "";
   brandingById("brandingLogoMode").value = raw.brand_logo_mode;
   brandingById("brandingLogoUrl").value = raw.brand_logo_url;
   brandingById("brandingTheme").innerHTML = (payload.themeOptions || []).map((theme) => `

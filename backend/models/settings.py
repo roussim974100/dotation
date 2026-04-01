@@ -17,6 +17,7 @@ DEFAULT_APP_SETTINGS = {
     "org_name": "Ville de Publier",
     "app_name": "A quai",
     "dpo_email": "dpo@ville-publier.fr",
+    "email_domains": "",
     "brand_logo_mode": "url",
     "brand_logo_url": CITY_LOGO_URL,
     "brand_logo_file": "",
@@ -302,6 +303,7 @@ def build_public_settings_payload(settings=None):
             key: {"label": value["label"]}
             for key, value in THEME_PRESETS.items()
         },
+        "emailDomains": [d.strip() for d in (settings.get("email_domains") or "").split(",") if d.strip()],
     }
 
 
