@@ -168,6 +168,25 @@ def build_excel_workbook(rows, item_rows):
 </Workbook>"""
 
 
+@bp.route("/api/forms/unc-paths", methods=["GET"])
+@login_required
+def list_unc_paths():
+    if not has_permission("forms.read_list"):
+        return jsonify({"error": "forbidden"}), 403
+    rows = get_db().execute("SELECT payload_json FROM dotation_forms WHERE payload_json IS NOT NULL").fetchall()
+    seen = set()
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        for e in payload.get("unc_acces") or []:
+            chemin = (e.get("chemin") or "").strip()
+            if chemin:
+                seen.add(chemin)
+    return jsonify(sorted(seen, key=str.lower))
+
+
 @bp.route("/api/forms", methods=["GET"])
 @login_required
 def list_forms():
