@@ -1867,7 +1867,7 @@ function createUncRow(entry = {}) {
   const row = document.createElement("div");
   row.className = "unc-row";
   row.innerHTML = `
-    <input class="form-control unc-chemin" placeholder="\\\\serveur\\partage" value="${(entry.chemin || "").replace(/"/g, "&quot;")}">
+    <input class="form-control unc-chemin" list="uncPathsList" placeholder="\\\\serveur\\partage" value="${(entry.chemin || "").replace(/"/g, "&quot;")}">
     <select class="form-select unc-acces">
       <option value="lecture"${entry.acces === "lecture" ? " selected" : ""}>Lecture</option>
       <option value="lecture_ecriture"${entry.acces === "lecture_ecriture" ? " selected" : ""}>Lecture / Écriture</option>
@@ -2686,6 +2686,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
 
+    fetch("/api/forms/unc-paths").then(r => r.ok ? r.json() : []).then(paths => {
+      const dl = document.getElementById("uncPathsList");
+      if (dl) paths.forEach(p => { const o = document.createElement("option"); o.value = p; dl.appendChild(o); });
+    });
     bindUncCopyFrom();
     document.getElementById("addUncBtn")?.addEventListener("click", () => {
       document.getElementById("uncAccessList").appendChild(createUncRow());
