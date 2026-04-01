@@ -1810,6 +1810,18 @@ function summarizeRequestedResourceCompletion(formData) {
   };
 }
 
+function setUncRefAd(label) {
+  const wrap = document.getElementById("uncRefAd");
+  const lbl = document.getElementById("uncRefAdLabel");
+  if (!wrap || !lbl) return;
+  if (label) { lbl.textContent = label; wrap.classList.remove("d-none"); }
+  else { wrap.classList.add("d-none"); lbl.textContent = ""; }
+}
+
+function getUncRefAd() {
+  return document.getElementById("uncRefAdLabel")?.textContent?.trim() || "";
+}
+
 function bindUncCopyFrom() {
   const searchInput = document.getElementById("uncCopySearch");
   const resultsBox = document.getElementById("uncCopyResults");
@@ -1842,12 +1854,9 @@ function bindUncCopyFrom() {
             if (!detail.ok) return;
             const data = await detail.json();
             const entries = data.data?.unc_acces || [];
-            if (!entries.length) {
-              searchInput.placeholder = `${f.prenom} ${f.nom} — aucun accès UNC dans ce dossier`;
-              return;
-            }
+            setUncRefAd(`${f.prenom} ${f.nom}${f.service ? " — " + f.service : ""}`);
+            if (!entries.length) return;
             entries.forEach(e => document.getElementById("uncAccessList").appendChild(createUncRow(e)));
-            searchInput.placeholder = `${entries.length} accès copiés depuis ${f.prenom} ${f.nom}`;
           });
           resultsBox.appendChild(btn);
         });
@@ -1940,6 +1949,7 @@ function getFormData(signaturePad) {
       additional: getAdditionalResourcesData()
     },
     unc_acces: getUncAccesData(),
+    unc_ref_ad: getUncRefAd(),
     restitution: currentRestitutionData,
     validation: {
       rgpdAccepted: document.getElementById("rgpdCheck").checked,
@@ -2004,6 +2014,7 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: data.immateriel.email.adresse });
   setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
   populateUncAcces(data.unc_acces || []);
+  setUncRefAd(data.unc_ref_ad || "");
 
   document.getElementById("pc_nom").value = data.materiel.ordinateur.nomPoste || "";
   document.getElementById("pc_marque").value = data.materiel.ordinateur.marque || "";
@@ -2691,6 +2702,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (dl) paths.forEach(p => { const o = document.createElement("option"); o.value = p; dl.appendChild(o); });
     });
     bindUncCopyFrom();
+    document.getElementById("uncRefAdClear")?.addEventListener("click", () => setUncRefAd(""));
     document.getElementById("addUncBtn")?.addEventListener("click", () => {
       document.getElementById("uncAccessList").appendChild(createUncRow());
     });

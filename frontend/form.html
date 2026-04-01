@@ -283,10 +283,14 @@
             <p class="resource-kind-block__text">Chemins réseau partagés à provisionner sur le poste.</p>
           </div>
           <div class="unc-copy-from mb-3">
-            <p class="form-label small text-muted mb-1">Copier les accès depuis un dossier existant</p>
+            <p class="form-label small text-muted mb-1">Référence AD — Copier les droits de</p>
             <div class="position-relative">
               <input type="text" id="uncCopySearch" class="form-control form-control-sm" placeholder="Rechercher un agent (nom, prénom…)" autocomplete="off">
               <div id="uncCopyResults" class="list-group shadow-sm position-absolute w-100 d-none" style="z-index:200;top:100%"></div>
+            </div>
+            <div id="uncRefAd" class="d-none mt-1 d-flex align-items-center gap-2">
+              <span class="badge bg-info text-dark" id="uncRefAdLabel"></span>
+              <button type="button" id="uncRefAdClear" class="btn btn-link btn-sm p-0 text-muted">Effacer</button>
             </div>
           </div>
           <datalist id="uncPathsList"></datalist>
