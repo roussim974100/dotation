@@ -250,6 +250,50 @@ def export_forms():
     return response
 
 
+@bp.route("/api/forms/export-unc", methods=["GET"])
+@login_required
+def export_unc_access():
+    if not has_permission("forms.export"):
+        return jsonify({"error": "forbidden"}), 403
+
+    _ACCES = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Ecriture", "refuse": "Acces refuse"}
+    _STATUT = {"demande": "Demande", "en_cours": "En cours", "provisionne": "Provisionne"}
+
+    rows = get_db().execute(
+        "SELECT nom, prenom, service, fonction, payload_json, updated_at FROM dotation_forms ORDER BY nom, prenom"
+    ).fetchall()
+
+    lines = ["Nom", "Prenom", "Service", "Fonction", "Chemin UNC", "Acces", "Statut", "Commentaire", "Mis a jour"]
+    csv_rows = [";".join(lines)]
+
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        for e in payload.get("unc_acces") or []:
+            chemin = (e.get("chemin") or "").strip()
+            if not chemin:
+                continue
+            csv_rows.append(";".join([
+                row["nom"] or "",
+                row["prenom"] or "",
+                row["service"] or "",
+                row["fonction"] or "",
+                chemin,
+                _ACCES.get(e.get("acces") or "", e.get("acces") or ""),
+                _STATUT.get(e.get("statut") or "", e.get("statut") or ""),
+                (e.get("commentaire") or "").replace(";", ","),
+                (row["updated_at"] or "")[:10],
+            ]))
+
+    content = "\n".join(csv_rows)
+    response = make_response(content.encode("utf-8-sig"))
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="acces_unc_export.csv"'
+    return response
+
+
 @bp.route("/api/forms/<form_id>/pdf", methods=["GET"])
 @login_required
 def export_form_pdf(form_id):
