@@ -266,6 +266,22 @@ def build_pdf_bytes(title, payload):
     else:
         sections.append(("Ressources attribuées", ["Aucune ressource renseignée."]))
 
+    unc_entries = payload.get("unc_acces") or []
+    if unc_entries:
+        _ACCES_LABEL = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Écriture", "refuse": "Accès refusé"}
+        _STATUT_LABEL = {"demande": "Demandé", "en_cours": "En cours", "provisionne": "Provisionné"}
+        unc_lines = []
+        for e in unc_entries:
+            chemin = e.get("chemin") or "-"
+            acces = _ACCES_LABEL.get(e.get("acces") or "", e.get("acces") or "-")
+            statut = _STATUT_LABEL.get(e.get("statut") or "", e.get("statut") or "-")
+            commentaire = e.get("commentaire") or ""
+            line = f"{chemin}  —  {acces}  —  {statut}"
+            if commentaire:
+                line += f"  ({commentaire})"
+            unc_lines.append(line)
+        sections.append(("Accès réseau (UNC)", unc_lines))
+
     restitution_lines = [
         f"Statut : {format_status_label(workflow.get('status') or 'draft')}",
         f"Date de restitution : {format_export_datetime(restitution.get('returnedAt'))}",

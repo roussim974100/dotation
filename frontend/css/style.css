@@ -210,6 +210,20 @@ body.login-shell {
   max-width: min(100%, 260px);
 }
 
+.unc-row {
+  display: grid;
+  grid-template-columns: 1fr 160px 140px 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .unc-row {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-rows: auto auto;
+  }
+}
+
 .login-lead {
   max-width: 42rem;
   margin: 0.6rem 0 0;
