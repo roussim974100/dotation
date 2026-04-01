@@ -1810,6 +1810,42 @@ function summarizeRequestedResourceCompletion(formData) {
   };
 }
 
+function createUncRow(entry = {}) {
+  const row = document.createElement("div");
+  row.className = "unc-row";
+  row.innerHTML = `
+    <input class="form-control unc-chemin" placeholder="\\\\serveur\\partage" value="${(entry.chemin || "").replace(/"/g, "&quot;")}">
+    <select class="form-select unc-acces">
+      <option value="lecture"${entry.acces === "lecture" ? " selected" : ""}>Lecture</option>
+      <option value="lecture_ecriture"${entry.acces === "lecture_ecriture" ? " selected" : ""}>Lecture / Écriture</option>
+      <option value="refuse"${entry.acces === "refuse" ? " selected" : ""}>Accès refusé</option>
+    </select>
+    <select class="form-select unc-statut">
+      <option value="demande"${!entry.statut || entry.statut === "demande" ? " selected" : ""}>Demandé</option>
+      <option value="en_cours"${entry.statut === "en_cours" ? " selected" : ""}>En cours</option>
+      <option value="provisionne"${entry.statut === "provisionne" ? " selected" : ""}>Provisionné</option>
+    </select>
+    <input class="form-control unc-commentaire" placeholder="Commentaire (optionnel)" value="${(entry.commentaire || "").replace(/"/g, "&quot;")}">
+    <button type="button" class="btn btn-outline-danger btn-sm unc-remove" aria-label="Supprimer">−</button>`;
+  return row;
+}
+
+function getUncAccesData() {
+  return Array.from(document.querySelectorAll("#uncAccessList .unc-row")).map(row => ({
+    chemin: row.querySelector(".unc-chemin").value.trim(),
+    acces: row.querySelector(".unc-acces").value,
+    statut: row.querySelector(".unc-statut").value,
+    commentaire: row.querySelector(".unc-commentaire").value.trim(),
+  })).filter(e => e.chemin);
+}
+
+function populateUncAcces(entries = []) {
+  const list = document.getElementById("uncAccessList");
+  if (!list) return;
+  list.innerHTML = "";
+  entries.forEach(e => list.appendChild(createUncRow(e)));
+}
+
 function getFormData(signaturePad) {
   // Produit le payload métier complet qui sera envoyé à l'API.
   const now = new Date().toISOString();
@@ -1850,6 +1886,7 @@ function getFormData(signaturePad) {
     resources: {
       additional: getAdditionalResourcesData()
     },
+    unc_acces: getUncAccesData(),
     restitution: currentRestitutionData,
     validation: {
       rgpdAccepted: document.getElementById("rgpdCheck").checked,
@@ -1913,6 +1950,7 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_autre", data.materiel.autre.selected, { autre_materiel: data.materiel.autre.description });
   setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: data.immateriel.email.adresse });
   setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
+  populateUncAcces(data.unc_acces || []);
 
   document.getElementById("pc_nom").value = data.materiel.ordinateur.nomPoste || "";
   document.getElementById("pc_marque").value = data.materiel.ordinateur.marque || "";
@@ -2594,6 +2632,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
+
+    document.getElementById("addUncBtn")?.addEventListener("click", () => {
+      document.getElementById("uncAccessList").appendChild(createUncRow());
+    });
+    document.getElementById("uncAccessList")?.addEventListener("click", e => {
+      if (e.target.closest(".unc-remove")) {
+        e.target.closest(".unc-row").remove();
+      }
+    });
 
     document.getElementById("saveDraftBtn")?.addEventListener("click", () => {
       void saveDraft(signaturePad);

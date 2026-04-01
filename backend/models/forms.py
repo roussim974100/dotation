@@ -59,6 +59,18 @@ def build_form_export_lines(payload):
     else:
         lines.append("- Aucune ressource renseignee")
 
+    unc_entries = payload.get("unc_acces") or []
+    if unc_entries:
+        _ACCES = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Ecriture", "refuse": "Acces refuse"}
+        _STATUT = {"demande": "Demande", "en_cours": "En cours", "provisionne": "Provisionne"}
+        lines.append("")
+        lines.append("Acces reseau (UNC)")
+        for e in unc_entries:
+            acces = _ACCES.get(e.get("acces") or "", e.get("acces") or "-")
+            statut = _STATUT.get(e.get("statut") or "", e.get("statut") or "-")
+            commentaire = f" ({e['commentaire']})" if e.get("commentaire") else ""
+            lines.append(f"- {e.get('chemin') or '-'} : {acces} / {statut}{commentaire}")
+
     lines.extend(
         [
             "",
