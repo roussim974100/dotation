@@ -174,7 +174,7 @@ const CORE_RESOURCE_RULES = {
     { fieldId: "autre_materiel", label: "Description autre matériel", required: true, pattern: "^.{3,120}$", hint: "3 à 120 caractères" }
   ],
   email: [
-    { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", hint: "Format de type nom@domaine.fr" }
+    { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+(@ville-publier\\.fr)?$", hint: "Saisir le préfixe uniquement (ex: prenom.nom)" }
   ]
 };
 
@@ -1763,7 +1763,7 @@ function buildEquipmentSelectionMap() {
 function buildIntangibleSelectionMap() {
   return {
     vpn: { selected: document.getElementById("vpn").checked, category: "immateriel", ...getAssignmentConditionData("vpn") },
-    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: getFieldValue("email"), ...getAssignmentConditionData("email") },
+    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: (() => { const v = getFieldValue("email").trim(); return v ? (v.includes("@") ? v : v + "@ville-publier.fr") : ""; })(), ...getAssignmentConditionData("email") },
     zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, category: "immateriel", zones: getRepeatableValues("zoneAlarmeRows"), ...getAssignmentConditionData("zoneAlarme") }
   };
 }
@@ -2011,7 +2011,7 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_badge", data.materiel.badge.selected, { badge_numero: data.materiel.badge.numero });
   setCheckboxAndFields("has_cles", data.materiel.cles?.selected, {});
   setCheckboxAndFields("has_autre", data.materiel.autre.selected, { autre_materiel: data.materiel.autre.description });
-  setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: data.immateriel.email.adresse });
+  setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: (data.immateriel.email.adresse || "").replace(/@ville-publier\.fr$/i, "") });
   setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
   populateUncAcces(data.unc_acces || []);
   setUncRefAd(data.unc_ref_ad || "");
