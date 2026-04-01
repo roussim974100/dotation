@@ -263,7 +263,7 @@ def export_unc_access():
         "SELECT nom, prenom, service, fonction, payload_json, updated_at FROM dotation_forms ORDER BY nom, prenom"
     ).fetchall()
 
-    lines = ["Nom", "Prenom", "Service", "Fonction", "Chemin UNC", "Acces", "Statut", "Commentaire", "Mis a jour"]
+    lines = ["Nom", "Prenom", "Service", "Fonction", "Reference AD", "Chemin UNC", "Acces", "Statut", "Commentaire", "Mis a jour"]
     csv_rows = [";".join(lines)]
 
     for row in rows:
@@ -271,6 +271,7 @@ def export_unc_access():
             payload = json.loads(row["payload_json"] or "{}")
         except (TypeError, ValueError):
             continue
+        ref_ad = (payload.get("unc_ref_ad") or "").replace(";", ",")
         for e in payload.get("unc_acces") or []:
             chemin = (e.get("chemin") or "").strip()
             if not chemin:
@@ -280,6 +281,7 @@ def export_unc_access():
                 row["prenom"] or "",
                 row["service"] or "",
                 row["fonction"] or "",
+                ref_ad,
                 chemin,
                 _ACCES.get(e.get("acces") or "", e.get("acces") or ""),
                 _STATUT.get(e.get("statut") or "", e.get("statut") or ""),

@@ -57,7 +57,7 @@ async function loadUncStats() {
     toggle.classList.remove("d-none");
     data.detail.forEach(e => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${e.prenom} ${e.nom}</td><td>${e.service}</td><td><code>${e.chemin}</code></td><td>${e.acces}</td><td class="${STATUT_CLASS[e.statut] || ""}">${e.statut}</td><td>${e.commentaire}</td>`;
+      tr.innerHTML = `<td>${e.prenom} ${e.nom}</td><td>${e.service}</td><td>${e.ref_ad ? `<span class="badge bg-info text-dark">${e.ref_ad}</span>` : ""}</td><td><code>${e.chemin}</code></td><td>${e.acces}</td><td class="${STATUT_CLASS[e.statut] || ""}">${e.statut}</td><td>${e.commentaire}</td>`;
       tbody.appendChild(tr);
     });
     toggle.addEventListener("click", () => {

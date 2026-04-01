@@ -2711,6 +2711,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         e.target.closest(".unc-row").remove();
       }
     });
+    document.getElementById("uncAccessList")?.addEventListener("blur", e => {
+      const input = e.target.closest(".unc-chemin");
+      if (!input) return;
+      const val = input.value.trim();
+      if (val && !val.startsWith("\\\\")) {
+        input.classList.add("is-invalid");
+        if (!input.nextElementSibling?.classList.contains("unc-invalid-feedback")) {
+          const msg = document.createElement("div");
+          msg.className = "invalid-feedback unc-invalid-feedback";
+          msg.textContent = "Le chemin doit commencer par \\\\serveur\\partage";
+          input.after(msg);
+        }
+      } else {
+        input.classList.remove("is-invalid");
+        input.nextElementSibling?.classList.contains("unc-invalid-feedback") && input.nextElementSibling.remove();
+      }
+    }, true);
 
     document.getElementById("saveDraftBtn")?.addEventListener("click", () => {
       void saveDraft(signaturePad);
