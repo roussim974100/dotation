@@ -1,4 +1,4 @@
-﻿# Recette Fonctionnelle
+# Recette Fonctionnelle
 
 Version de reference : `2.12.1`
 
@@ -28,7 +28,7 @@ python backend\app.py
 - un lien de signature de restitution peut etre genere depuis une restitution preparee
 - la restitution fonctionne depuis un dossier actif
 - le `PDF dossier` unitaire fonctionne
-- le `PDF restitution` unitaire fonctionne
+- le `PDF restitution` unitaire fonctionne et affiche toutes les ressources materielles
 - les signatures sont masquees dans les PDF exportes par un profil `lecture`
 - l'export multiple des `PDF dossier` fonctionne
 - l'export multiple des `PDF restitution` fonctionne
@@ -97,7 +97,7 @@ Attendu :
 Attendu :
 
 - la restitution est enregistree
-- le `PDF restitution` est disponible
+- le `PDF restitution` est disponible et liste toutes les ressources materielles
 - le resume apparait dans le dossier
 
 ### 4 bis. Signature a distance
