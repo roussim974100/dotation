@@ -174,7 +174,7 @@ const CORE_RESOURCE_RULES = {
     { fieldId: "autre_materiel", label: "Description autre matériel", required: true, pattern: "^.{3,120}$", hint: "3 à 120 caractères" }
   ],
   email: [
-    { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+(@ville-publier\\.fr)?$", hint: "Saisir le préfixe uniquement (ex: prenom.nom)" }
+    { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+(@[^\\s@]+\\.[^\\s@]+)?$", hint: "Saisir le préfixe ou l'adresse complète" }
   ]
 };
 
@@ -1763,7 +1763,7 @@ function buildEquipmentSelectionMap() {
 function buildIntangibleSelectionMap() {
   return {
     vpn: { selected: document.getElementById("vpn").checked, category: "immateriel", ...getAssignmentConditionData("vpn") },
-    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: (() => { const v = getFieldValue("email").trim(); return v ? (v.includes("@") ? v : v + "@ville-publier.fr") : ""; })(), ...getAssignmentConditionData("email") },
+    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: (() => { const v = getFieldValue("email").trim(); if (!v) return ""; if (v.includes("@")) return v; const sel = document.getElementById("emailDomainSelect"); const domain = sel?.value; return domain ? v + "@" + domain : v; })(), ...getAssignmentConditionData("email") },
     zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, category: "immateriel", zones: getRepeatableValues("zoneAlarmeRows"), ...getAssignmentConditionData("zoneAlarme") }
   };
 }
@@ -2011,7 +2011,7 @@ function populateForm(data, signaturePad) {
   setCheckboxAndFields("has_badge", data.materiel.badge.selected, { badge_numero: data.materiel.badge.numero });
   setCheckboxAndFields("has_cles", data.materiel.cles?.selected, {});
   setCheckboxAndFields("has_autre", data.materiel.autre.selected, { autre_materiel: data.materiel.autre.description });
-  setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: (data.immateriel.email.adresse || "").replace(/@ville-publier\.fr$/i, "") });
+  setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: (() => { const adresse = data.immateriel.email.adresse || ""; const sel = document.getElementById("emailDomainSelect"); if (sel?.options.length) { for (const o of sel.options) { if (adresse.endsWith("@" + o.value)) { sel.value = o.value; return adresse.slice(0, -(o.value.length + 1)); } } } return adresse; })() });
   setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
   populateUncAcces(data.unc_acces || []);
   setUncRefAd(data.unc_ref_ad || "");
@@ -2697,6 +2697,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
 
+    fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
+      const domains = s.emailDomains || [];
+      const sel = document.getElementById("emailDomainSelect");
+      if (!sel) return;
+      if (!domains.length) {
+        sel.replaceWith(Object.assign(document.createElement("span"), { className: "input-group-text text-muted", textContent: "(domaine libre)" }));
+        document.getElementById("email").type = "email";
+        document.getElementById("email").placeholder = "prenom.nom@domaine.fr";
+      } else {
+        domains.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = "@" + d; sel.appendChild(o); });
+      }
+    });
     fetch("/api/forms/unc-paths").then(r => r.ok ? r.json() : []).then(paths => {
       const dl = document.getElementById("uncPathsList");
       if (dl) paths.forEach(p => { const o = document.createElement("option"); o.value = p; dl.appendChild(o); });
