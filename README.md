@@ -41,12 +41,13 @@ Version courante : `2.12.1`
 
 - `frontend/` : interface HTML, CSS et JavaScript servie par Flask
 - `backend/` : API Flask, authentification et persistance SQLite
-  - `app.py` : point d'entree Flask, routes et initialisation
+  - `app.py` : point d'entree Flask, enregistrement des blueprints et init DB (256 lignes)
   - `config.py` : constantes et chemins
   - `utils.py` : fonctions utilitaires partagees
   - `database.py` : acces SQLite et helpers de schema
   - `auth.py` : decorateurs, gestion des comptes et rate limiting
-  - `models/` : logique metier (workflow, dossier, signature, audit, settings)
+  - `models/` : logique metier (workflow, dossier, signature, audit, settings, catalog, forms)
+  - `routes/` : blueprints Flask (admin, forms, pages, signature)
   - `pdf/` : generation des PDF dossier et restitution via `fpdf2`
 
 ## Prerequis avant lancement
