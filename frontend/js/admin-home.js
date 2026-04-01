@@ -43,6 +43,33 @@ function showAdminFlashNotice() {
   }
 }
 
+async function loadUncStats() {
+  const STATUT_CLASS = { "Demandé": "text-warning", "En cours": "text-primary", "Provisionné": "text-success" };
+  try {
+    const data = await fetchAdminJson("/api/admin/unc-stats");
+    setMetric("uncStatDemande", data.counts.demande ?? 0);
+    setMetric("uncStatEnCours", data.counts.en_cours ?? 0);
+    setMetric("uncStatProvisionne", data.counts.provisionne ?? 0);
+    setMetric("uncStatAgents", data.agents ?? 0);
+    const tbody = document.getElementById("uncDashboardBody");
+    const toggle = document.getElementById("uncDashboardToggle");
+    if (!tbody || !toggle || !data.detail.length) return;
+    toggle.classList.remove("d-none");
+    data.detail.forEach(e => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${e.prenom} ${e.nom}</td><td>${e.service}</td><td><code>${e.chemin}</code></td><td>${e.acces}</td><td class="${STATUT_CLASS[e.statut] || ""}">${e.statut}</td><td>${e.commentaire}</td>`;
+      tbody.appendChild(tr);
+    });
+    toggle.addEventListener("click", () => {
+      const list = document.getElementById("uncDashboardList");
+      const hidden = list.classList.toggle("d-none");
+      toggle.textContent = hidden ? "Afficher le détail" : "Masquer le détail";
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   showAdminFlashNotice();
   try {
@@ -58,4 +85,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     console.error(error);
   }
+  await loadUncStats();
 });
