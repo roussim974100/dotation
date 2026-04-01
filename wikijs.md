@@ -6,8 +6,8 @@
 | --- | --- |
 | Version proposee | `2.12.1` |
 | Statut | `A valider` |
-| Date de mise a jour | `2026-03-31` |
-| Perimetre | `migration fpdf2 + refonte PDF restitution + affichage complet des ressources materielles + amelioration workflow restitution + decalage de delai en jours dans le suivi` |
+| Date de mise a jour | `2026-04-01` |
+| Perimetre | `migration fpdf2 + refonte PDF restitution + affichage complet des ressources materielles + amelioration workflow restitution + decalage de delai en jours dans le suivi + refactoring backend en modules independants` |
 | Reference interne | `wikijs.md` |
 
 > Regle de maintenance : a chaque modification fonctionnelle ou documentaire notable, mettre a jour au minimum la version, la date et, si besoin, le perimetre.

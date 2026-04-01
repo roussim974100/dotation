@@ -44,6 +44,7 @@ python backend\app.py
 - les pages d'aide affichent un texte correctement accentue
 - le dossier `version/versions/` est present
 - la deconnexion fonctionne
+- les modules backend compilent sans erreur (`py_compile` sur `app.py`, `auth.py`, `models/`, `pdf/`)
 
 ## Scenarios de test
 

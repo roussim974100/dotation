@@ -22,6 +22,7 @@ Version de reference : `2.12.1`
 - export Excel lisible en deux feuilles
 - tracabilite de la reouverture des dossiers modifiables
 - affichage du decalage de delai en jours dans le suivi des dossiers
+- refactoring du backend en modules independants (`auth`, `models/`, `pdf/`)
 - archivage documentaire par version
 
 ## Documents a consulter
