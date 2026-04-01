@@ -115,9 +115,29 @@ def normalize_workflow_before_save(payload):
     return payload
 
 
+def _sanitize_unc_acces(payload):
+    entries = payload.get("unc_acces") or []
+    valid_acces = {"lecture", "lecture_ecriture", "refuse"}
+    valid_statut = {"demande", "en_cours", "provisionne"}
+    sanitized = []
+    for e in entries:
+        chemin = (e.get("chemin") or "").strip()
+        if not chemin:
+            continue
+        sanitized.append({
+            "chemin": chemin,
+            "acces": e.get("acces") if e.get("acces") in valid_acces else "lecture",
+            "statut": e.get("statut") if e.get("statut") in valid_statut else "demande",
+            "commentaire": (e.get("commentaire") or "").strip()[:500],
+        })
+    payload["unc_acces"] = sanitized
+    return payload
+
+
 def persist_form(payload, allow_locked_update=False):
     if not payload.get("beneficiaire", {}).get("nom") or not payload.get("beneficiaire", {}).get("prenom"):
         raise ValueError("Les champs nom et prenom sont obligatoires.")
+    payload = _sanitize_unc_acces(payload)
 
     payload = normalize_workflow_before_save(payload)
     form_id = payload.setdefault("meta", {}).get("id") or str(int(datetime.now().timestamp() * 1000))

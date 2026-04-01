@@ -196,11 +196,13 @@ def restitution_page():
 
 
 @bp.route("/about.html")
+@login_required
 def about_page():
     return send_from_directory(FRONTEND_DIR, "about.html")
 
 
 @bp.route("/contact.html")
+@login_required
 def contact_page():
     return send_from_directory(FRONTEND_DIR, "contact.html")
 
