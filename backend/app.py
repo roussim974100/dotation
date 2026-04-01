@@ -1,90 +1,12 @@
-from flask import Flask, jsonify, make_response, redirect, request, send_from_directory, session, has_request_context
-import base64
-import bcrypt
-import io
-import json
+from flask import Flask, request
 import os
-import secrets
-import urllib.parse
-import uuid
-import zipfile
-from datetime import datetime, timedelta, timezone
-from functools import wraps
-from xml.sax.saxutils import escape as xml_escape
 from werkzeug.middleware.proxy_fix import ProxyFix
-import re
 
-from config import (
-    BASE_DIR, FRONTEND_DIR, FRONTEND_ASSETS_DIR, CUSTOM_BRANDING_DIR,
-    DB_PATH, APP_SECRET_PATH,
-    CITY_LOGO_URL, CITY_LOGO_PATH, get_app_secret_key,
-)
-from utils import (
-    utc_now, generate_id, bool_to_int,
-    slugify_filename,
-    build_title, normalize_dossier_type, dossier_type_label,
-    format_export_datetime, get_signature_datetime, get_restitution_signature_datetime,
-    format_beneficiary_label, format_status_label, format_restitution_state_label,
-    format_restitution_decision_label,
-)
-from database import (
-    get_db, _KNOWN_TABLES, table_columns, ensure_column,
-)
-from auth import (
-    USERS_FILE, DEFAULT_GROUPS,
-    load_auth_config, save_auth_config,
-    _LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS, _login_attempts, _login_attempts_lock,
-    _is_login_rate_limited,
-    login_required, permission_required, admin_required,
-    get_user_record, password_complexity_error, is_valid_username,
-    build_user_context, current_user, can_export_signature_assets, has_permission,
-    check_user,
-    extract_first_forwarded_ip, get_request_client_ip,
-)
-from models.dossier import sync_person_and_dossier, migrate_forms_to_dossiers
-from models.audit import (
-    CLIENT_CONTEXT_COOKIE_NAME,
-    current_actor,
-    read_client_context_cookie, read_login_attempt_context,
-    build_request_client_log_details, merge_app_log_details,
-    insert_audit_event, insert_app_log,
-)
-from models.signature import (
-    signature_link_label, signature_link_scope,
-    signature_link_public_url, signature_link_public_actor,
-    signature_link_expiration, generate_signature_token,
-    materialize_signature_link, serialize_signature_link,
-    get_latest_signature_link, get_signature_link_by_id, get_signature_link_by_token,
-    revoke_signature_links_for_form, create_signature_link, revoke_signature_link,
-)
-from models.settings import (
-    DEFAULT_APP_SETTINGS,
-    seed_app_settings, get_app_settings,
-    build_public_settings_payload,
-)
-from models.workflow import (
-    summarize_dynamic_resource,
-    uses_dynamic_resource_assignment_date,
-    uses_dynamic_resource_assignment_condition,
-    uses_dynamic_resource_assignment_notes,
-    is_dynamic_resource_complete,
-    is_dynamic_resource_payload,
-    extract_items,
-    summarize_assignment_progress,
-    collect_resource_validation_errors,
-    derive_restitution_workflow_status,
-    compute_effective_workflow_status,
-    collect_resource_entries,
-)
-from pdf.attribution import build_pdf_bytes
-from pdf.restitution import build_restitution_pdf_bytes
+from config import get_app_secret_key
+from database import get_db, ensure_column
+from models.dossier import migrate_forms_to_dossiers
+from models.settings import seed_app_settings
 from models.catalog import seed_reference_catalogs, seed_service_catalog
-from models.forms import (
-    build_form_export_lines,
-    persist_form, row_to_summary, get_form,
-    build_signature_public_payload, build_restitution_signature_public_payload,
-)
-from models.audit import insert_deleted_item
 from routes.admin import bp as admin_bp
 from routes.pages import bp as pages_bp
 from routes.forms import bp as forms_bp
