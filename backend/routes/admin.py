@@ -27,6 +27,45 @@ from config import CUSTOM_BRANDING_DIR
 bp = Blueprint("admin", __name__)
 
 
+@bp.route("/api/admin/unc-stats", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def unc_stats():
+    _ACCES = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Écriture", "refuse": "Accès refusé"}
+    _STATUT = {"demande": "Demandé", "en_cours": "En cours", "provisionne": "Provisionné"}
+    rows = get_db().execute(
+        "SELECT nom, prenom, service, payload_json FROM dotation_forms WHERE payload_json IS NOT NULL ORDER BY nom, prenom"
+    ).fetchall()
+    counts = {"demande": 0, "en_cours": 0, "provisionne": 0}
+    agents_with_unc = set()
+    detail = []
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        entries = payload.get("unc_acces") or []
+        if entries:
+            agents_with_unc.add(f"{row['nom']}|{row['prenom']}")
+        for e in entries:
+            statut = e.get("statut") or "demande"
+            counts[statut] = counts.get(statut, 0) + 1
+            detail.append({
+                "nom": row["nom"] or "",
+                "prenom": row["prenom"] or "",
+                "service": row["service"] or "",
+                "chemin": e.get("chemin") or "",
+                "acces": _ACCES.get(e.get("acces") or "", e.get("acces") or ""),
+                "statut": _STATUT.get(statut, statut),
+                "commentaire": e.get("commentaire") or "",
+            })
+    return jsonify({
+        "counts": counts,
+        "agents": len(agents_with_unc),
+        "detail": detail,
+    })
+
+
 @bp.route("/api/admin/settings", methods=["GET"])
 @login_required
 @permission_required("users.manage")

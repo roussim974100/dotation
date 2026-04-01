@@ -100,6 +100,43 @@
       </a>
     </div>
   </section>
+
+  <section class="content-card mt-4">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">DSI</p>
+        <h2 class="section-title">Provisioning des accès réseau (UNC)</h2>
+        <p class="panel-text">Suivi des demandes d'accès réseau par statut. <a href="/api/forms/export-unc" class="text-decoration-none">↓ Exporter CSV</a></p>
+      </div>
+    </div>
+    <div class="stat-card-row mb-3">
+      <div class="stat-card">
+        <span class="stat-card__label">Demandés</span>
+        <span class="stat-card__value" id="uncStatDemande">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">En cours</span>
+        <span class="stat-card__value" id="uncStatEnCours">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Provisionnés</span>
+        <span class="stat-card__value" id="uncStatProvisionne">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Total agents</span>
+        <span class="stat-card__value" id="uncStatAgents">—</span>
+      </div>
+    </div>
+    <div id="uncDashboardList" class="d-none">
+      <table class="table table-sm table-hover">
+        <thead>
+          <tr><th>Agent</th><th>Service</th><th>Chemin UNC</th><th>Accès</th><th>Statut</th><th>Commentaire</th></tr>
+        </thead>
+        <tbody id="uncDashboardBody"></tbody>
+      </table>
+    </div>
+    <button type="button" id="uncDashboardToggle" class="btn btn-outline-secondary btn-sm mt-2 d-none">Afficher le détail</button>
+  </section>
 </main>
 
 <!-- Scripts du portail admin et du branding global. -->

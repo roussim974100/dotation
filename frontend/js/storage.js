@@ -2318,6 +2318,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
       document.getElementById("backupExportLink").classList.remove("d-none");
+      document.getElementById("uncExportLink")?.classList.remove("d-none");
     }
     if (user && (user.permissions.includes("forms.create") || user.permissions.includes("*"))) {
       document.getElementById("newFormBtn")?.classList.remove("d-none");
