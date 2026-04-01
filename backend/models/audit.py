@@ -5,6 +5,24 @@ from flask import has_request_context, request, session
 from utils import generate_id, utc_now
 from auth import get_request_client_ip, extract_first_forwarded_ip
 
+
+def insert_deleted_item(connection, item_type, item_key, item_label, payload):
+    connection.execute(
+        """
+        INSERT INTO deleted_items (id, item_type, item_key, item_label, payload_json, deleted_by, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            generate_id("trash"),
+            item_type,
+            item_key,
+            item_label,
+            json.dumps(payload, ensure_ascii=False),
+            session.get("user"),
+            utc_now(),
+        ),
+    )
+
 CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1"
 
 
