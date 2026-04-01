@@ -267,10 +267,13 @@ def build_pdf_bytes(title, payload):
         sections.append(("Ressources attribuées", ["Aucune ressource renseignée."]))
 
     unc_entries = payload.get("unc_acces") or []
-    if unc_entries:
+    unc_ref_ad = (payload.get("unc_ref_ad") or "").strip()
+    if unc_entries or unc_ref_ad:
         _ACCES_LABEL = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Écriture", "refuse": "Accès refusé"}
         _STATUT_LABEL = {"demande": "Demandé", "en_cours": "En cours", "provisionne": "Provisionné"}
         unc_lines = []
+        if unc_ref_ad:
+            unc_lines.append(f"Référence AD (copier les droits de) : {unc_ref_ad}")
         for e in unc_entries:
             chemin = e.get("chemin") or "-"
             acces = _ACCES_LABEL.get(e.get("acces") or "", e.get("acces") or "-")
