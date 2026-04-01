@@ -301,6 +301,7 @@ def row_to_summary(row):
         "startAt": progress["startAt"],
         "returnedAt": row["returned_at"],
         "updatedAt": row["updated_at"],
+        "uncAccesCount": len(payload.get("unc_acces") or []),
         "pendingFinalization": bool(payload.get("restitution", {}).get("pendingFinalization")),
         "completedResources": progress["completed"],
         "totalResources": progress["total"],
