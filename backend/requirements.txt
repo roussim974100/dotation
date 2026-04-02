@@ -1,3 +1,4 @@
 flask
 bcrypt
 fpdf2
+pytest
