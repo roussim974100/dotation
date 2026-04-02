@@ -137,8 +137,9 @@ function describeBrandingChanges(previous, next) {
   const dpoChange = describeValueChange("E-mail du DPO", previous.dpo_email, next.dpo_email);
   const themeChange = describeValueChange("Thème", getThemeLabel(previous.theme_id), getThemeLabel(next.theme_id));
   const darkModeChange = describeValueChange("Mode sombre", BRANDING_DARK_MODE_LABELS[previous.dark_mode_policy], BRANDING_DARK_MODE_LABELS[next.dark_mode_policy]);
+  const emailDomainsChange = describeValueChange("Domaines e-mail autorisés", previous.email_domains, next.email_domains);
 
-  [orgChange, dpoChange, themeChange, darkModeChange].filter(Boolean).forEach((item) => {
+  [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 

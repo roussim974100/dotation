@@ -76,6 +76,7 @@ def admin_settings_route():
     payload["raw"] = {
         "org_name": settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"],
         "dpo_email": get_dpo_email(settings),
+        "email_domains": settings.get("email_domains") or "",
         "brand_logo_mode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
         "brand_logo_url": settings.get("brand_logo_url") or DEFAULT_APP_SETTINGS["brand_logo_url"],
         "brand_logo_file": settings.get("brand_logo_file") or "",
