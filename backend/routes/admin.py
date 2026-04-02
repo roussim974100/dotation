@@ -98,6 +98,7 @@ def update_admin_settings_route():
         save_app_settings(connection, {
             "org_name": payload.get("org_name"),
             "dpo_email": payload.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"],
+            "email_domains": payload.get("email_domains"),
             "brand_logo_mode": payload.get("brand_logo_mode"),
             "brand_logo_url": payload.get("brand_logo_url"),
             "theme_id": payload.get("theme_id"),
