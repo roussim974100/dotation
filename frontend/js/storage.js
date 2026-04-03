@@ -340,7 +340,7 @@ function buildDashboardRow(draft, permissions) {
       <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
       <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
       <td data-label="Pilotage">
-        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}">${escapeHtml(progress.timingLabel)}</span>
+        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
         ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
       </td>
       <td data-label="Progression">
@@ -702,6 +702,13 @@ function buildDotationPreview(data) {
     }
   }
 
+  // Accès UNC
+  const uncAcces = data.unc_acces || [];
+  if (uncAcces.length) {
+    const uncDetails = uncAcces.map((unc) => unc.chemin || "").filter(Boolean);
+    pushItem(`Accès UNC (${uncAcces.length})`, uncDetails.join(", "));
+  }
+
   return items;
 }
 
@@ -1049,6 +1056,7 @@ async function renderDraftList() {
       setDashboardUpdateNotice();
     }
     bindStatusPreviews();
+    bindTimingPreviews();
     bindDraftActionMenus();
     bindSelectionActions(viewMode === "active" && canExport, viewMode === "active" && canDelete);
     restoreDashboardSelection();
@@ -2100,6 +2108,75 @@ function bindStatusPreviews() {
     });
     chip.addEventListener("mouseleave", hideStatusPreview);
     chip.dataset.previewBound = "true";
+  });
+}
+
+function buildTimingPreview(data) {
+  if (!data) {
+    return [];
+  }
+  const sections = [];
+  const startAt = data.meta?.startAt || "";
+  if (startAt) {
+    const offsetLabel = getTimingOffsetLabel(startAt);
+    sections.push(`Prise de fonction : ${formatShortDate(startAt)}${offsetLabel ? ` (${offsetLabel})` : ""}`);
+  } else {
+    sections.push("Prise de fonction non renseignée");
+  }
+  const requested = collectRequestedResourcesFromPayload(data);
+  const completed = requested.filter((r) => r.isCompleted);
+  const missing = requested.filter((r) => !r.isCompleted);
+  sections.push(`Progression : ${completed.length}/${requested.length} ressource(s) attribuée(s)`);
+  if (missing.length) {
+    const additional = data.resources?.additional || [];
+    const materiel = data.materiel || {};
+    const immateriel = data.immateriel || {};
+    const missingLabels = missing.map((r) => {
+      const fromAdditional = additional.find((a) => (a.id || a.code) === r.key);
+      if (fromAdditional) return fromAdditional.label || r.key;
+      const fromMat = materiel[r.key];
+      if (fromMat) return fromMat.label || r.key;
+      const fromImm = immateriel[r.key];
+      if (fromImm) return fromImm.label || r.key;
+      return r.key;
+    });
+    sections.push(`En attente : ${missingLabels.join(", ")}`);
+  }
+  return sections;
+}
+
+async function showTimingPreview(target, id) {
+  const card = getHoverCard();
+  if (!card) {
+    return;
+  }
+  card.innerHTML = '<p class="status-hover-card__hint">Chargement...</p>';
+  card.classList.remove("d-none");
+  positionHoverCard(card, target);
+
+  const result = await getDraftById(id);
+  if (!result || !result.data) {
+    card.innerHTML = '<p class="status-hover-card__hint">Impossible de charger le détail.</p>';
+    positionHoverCard(card, target);
+    return;
+  }
+  const items = buildTimingPreview(result.data);
+  card.innerHTML = items.length
+    ? `<h4>Pilotage</h4><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : '<p class="status-hover-card__hint">Aucune information de pilotage.</p>';
+  positionHoverCard(card, target);
+}
+
+function bindTimingPreviews() {
+  document.querySelectorAll("[data-timing-preview-id]").forEach((chip) => {
+    if (chip.dataset.timingPreviewBound) {
+      return;
+    }
+    chip.addEventListener("mouseenter", () => {
+      void showTimingPreview(chip, chip.dataset.timingPreviewId);
+    });
+    chip.addEventListener("mouseleave", hideStatusPreview);
+    chip.dataset.timingPreviewBound = "true";
   });
 }
 
