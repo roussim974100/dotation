@@ -351,7 +351,6 @@ function buildDashboardRow(draft, permissions) {
           </div>
         </div>
       </td>
-      <td data-label="UNC">${(draft.uncAccesCount || draft.data?.unc_acces?.length || 0) > 0 ? `<span class="badge bg-secondary" title="Accès réseau UNC configurés">${draft.uncAccesCount || draft.data.unc_acces.length}</span>` : ""}</td>
       <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
