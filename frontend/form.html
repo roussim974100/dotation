@@ -91,27 +91,6 @@
             <label class="form-label" for="service">Service</label>
             <select class="form-select" id="service" name="service">
               <option value="">Sélectionner un service</option>
-              <option value="Affaires juridiques / Commande publique">Affaires juridiques / Commande publique</option>
-              <option value="Bâtiment">Bâtiment</option>
-              <option value="Cabinet du Maire">Cabinet du Maire</option>
-              <option value="CCAS">CCAS</option>
-              <option value="Communication">Communication</option>
-              <option value="Culture et Patrimoine">Culture et Patrimoine</option>
-              <option value="CTM">CTM</option>
-              <option value="DGS">DGS</option>
-              <option value="DSI">DSI</option>
-              <option value="DST">DST</option>
-              <option value="Finances">Finances</option>
-              <option value="PM">PM</option>
-              <option value="DRH">DRH</option>
-              <option value="Population">Population</option>
-              <option value="SEJE">SEJE</option>
-              <option value="Secrétariat service technique">Secrétariat service technique</option>
-              <option value="Sports">Sports</option>
-              <option value="Subvention">Subvention</option>
-              <option value="Urbanisme">Urbanisme</option>
-              <option value="VRD">VRD</option>
-              <option value="__custom__">Autre...</option>
             </select>
             <input class="form-control mt-2 d-none" id="service_custom" name="service_custom" placeholder="Autre service">
           </div>
@@ -131,27 +110,6 @@
             <label class="form-label" for="service_destination">Nouveau service</label>
             <select class="form-select" id="service_destination" name="service_destination">
               <option value="">Sélectionner un service</option>
-              <option value="Affaires juridiques / Commande publique">Affaires juridiques / Commande publique</option>
-              <option value="Bâtiment">Bâtiment</option>
-              <option value="Cabinet du Maire">Cabinet du Maire</option>
-              <option value="CCAS">CCAS</option>
-              <option value="Communication">Communication</option>
-              <option value="Culture et Patrimoine">Culture et Patrimoine</option>
-              <option value="CTM">CTM</option>
-              <option value="DGS">DGS</option>
-              <option value="DSI">DSI</option>
-              <option value="DST">DST</option>
-              <option value="Finances">Finances</option>
-              <option value="PM">PM</option>
-              <option value="DRH">DRH</option>
-              <option value="Population">Population</option>
-              <option value="SEJE">SEJE</option>
-              <option value="Secrétariat service technique">Secrétariat service technique</option>
-              <option value="Sports">Sports</option>
-              <option value="Subvention">Subvention</option>
-              <option value="Urbanisme">Urbanisme</option>
-              <option value="VRD">VRD</option>
-              <option value="__custom__">Autre...</option>
             </select>
             <input class="form-control mt-2 d-none" id="service_destination_custom" name="service_destination_custom" placeholder="Service de destination">
           </div>
@@ -183,108 +141,16 @@
         </div>
       </section>
 
-      <section class="content-card" id="section-dsi">
+      <section class="content-card" id="section-unc">
         <div class="section-heading">
           <div>
-            <p class="panel-eyebrow">DSI</p>
-            <h3 class="section-title">Ressources numériques</h3>
+            <p class="panel-eyebrow">Responsable de service</p>
+            <h3 class="section-title">Accès réseau (UNC)</h3>
           </div>
         </div>
+        <p class="panel-text">Cette section est à remplir par le responsable de service. Indiquez les chemins réseau auxquels l'agent doit avoir accès.</p>
 
         <div class="resource-kind-block">
-          <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
-            <p class="resource-kind-block__text">Équipements physiques remis par la DSI.</p>
-          </div>
-          <div class="equipment-grid">
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_pc" data-target="pcFields">
-                <span>Ordinateur</span>
-              </label>
-              <div id="pcFields" class="subgrid d-none">
-                <input class="form-control" placeholder="Nom du poste" id="pc_nom">
-                <input class="form-control" placeholder="Marque" id="pc_marque">
-                <input class="form-control" placeholder="Modèle" id="pc_modele">
-                <input class="form-control" placeholder="Numéro de série" id="pc_sn">
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_screen" data-target="screenFields">
-                <span>Écran</span>
-              </label>
-              <div id="screenFields" class="subgrid d-none">
-                <input class="form-control" placeholder="Marque" id="screen_marque">
-                <input class="form-control" placeholder="Modèle" id="screen_modele">
-                <input class="form-control" placeholder="Numéro de série" id="screen_sn">
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_phone" data-target="phoneFields">
-                <span>Téléphone</span>
-              </label>
-              <div id="phoneFields" class="subgrid d-none">
-                <input class="form-control" placeholder="Nom du téléphone" id="tel_nom">
-                <input class="form-control" placeholder="Marque" id="tel_marque">
-                <input class="form-control" placeholder="Modèle" id="tel_modele">
-                <input class="form-control" placeholder="IMEI" id="tel_imei">
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_tablette" data-target="tabletteFields">
-                <span>Tablette</span>
-              </label>
-              <div id="tabletteFields" class="subgrid d-none">
-                <input class="form-control" placeholder="Nom de la tablette" id="tablette_nom">
-                <input class="form-control" placeholder="Marque" id="tablette_marque">
-                <input class="form-control" placeholder="Modèle" id="tablette_modele">
-                <input class="form-control" placeholder="Numéro de série" id="tablette_sn">
-              </div>
-            </div>
-          </div>
-          <div id="dynamicResourcesDsiMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
-        </div>
-
-        <div class="resource-kind-block mt-4">
-          <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
-            <p class="resource-kind-block__text">Accès et droits numériques remis par la DSI.</p>
-          </div>
-          <div class="equipment-grid equipment-grid--compact">
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="vpn">
-                <span>VPN</span>
-              </label>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_mail" data-target="mailFields">
-                <span>Email</span>
-              </label>
-              <div id="mailFields" class="single-field d-none">
-                <div class="input-group" id="emailInputGroup">
-                  <input class="form-control" placeholder="prenom.nom" id="email" type="text" autocomplete="email">
-                  <select class="input-group-text form-select" id="emailDomainSelect" style="max-width:220px;border-left:0"></select>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="dynamicResourcesDsiImmaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
-        </div>
-
-        <div class="resource-kind-block mt-4">
-          <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Accès réseau (UNC)</h4>
-            <p class="resource-kind-block__text">Chemins réseau partagés à provisionner sur le poste.</p>
-          </div>
           <div class="unc-copy-from mb-3">
             <p class="form-label small text-muted mb-1">Référence AD — Copier les droits de</p>
             <div class="position-relative">
@@ -302,6 +168,31 @@
         </div>
       </section>
 
+      <section class="content-card" id="section-dsi">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">DSI</p>
+            <h3 class="section-title">Ressources numériques</h3>
+          </div>
+        </div>
+
+        <div class="resource-kind-block">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
+            <p class="resource-kind-block__text">Équipements physiques remis par la DSI.</p>
+          </div>
+          <div id="dynamicResourcesDsiMaterialGrid" class="equipment-grid"></div>
+        </div>
+
+        <div class="resource-kind-block mt-4" id="dynamicResourcesDsiImmaterialWrap">
+          <div class="resource-kind-block__header">
+            <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
+            <p class="resource-kind-block__text">Accès et droits numériques remis par la DSI.</p>
+          </div>
+          <div id="dynamicResourcesDsiImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
+        </div>
+      </section>
+
       <section class="content-card" id="section-batiment">
         <div class="section-heading">
           <div>
@@ -315,109 +206,15 @@
             <h4 class="resource-kind-block__title">Ressources matérielles</h4>
             <p class="resource-kind-block__text">Éléments physiques remis par le service bâtiment.</p>
           </div>
-          <div class="equipment-grid equipment-grid--compact">
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_badge" data-target="badgeFields">
-                <span>Badge d'accès</span>
-              </label>
-              <div id="badgeFields" class="single-field d-none">
-                <input class="form-control" placeholder="Numéro de badge" id="badge_numero">
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_cles" data-target="clesFields">
-                <span>Clé(s)</span>
-              </label>
-              <div id="clesFields" class="single-field d-none">
-                <div id="clesRows" class="repeatable-list"></div>
-                <button class="btn btn-outline-secondary btn-sm mt-3" type="button" id="addCleBtn">+ Ajouter une clé</button>
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="veste">
-                <span>Veste</span>
-              </label>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="chaussure">
-                <span>Chaussures de sécurité</span>
-              </label>
-            </div>
-          </div>
-          <div id="dynamicResourcesBatimentMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
-          <div id="dynamicResourcesBatimentImmaterialWrap" class="resource-kind-block mt-4">
-            <div class="resource-kind-block__header">
-              <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
-              <p class="resource-kind-block__text">Accès ou droits gérés par le service bâtiment.</p>
-            </div>
-            <div class="equipment-grid equipment-grid--compact mb-3">
-              <div class="equipment-item">
-                <label class="equipment-toggle">
-                  <input type="checkbox" id="has_zone_alarme" data-target="zoneAlarmeFields">
-                  <span>Zone alarme</span>
-                </label>
-                <div id="zoneAlarmeFields" class="single-field d-none">
-                  <div id="zoneAlarmeRows" class="repeatable-list"></div>
-                  <button class="btn btn-outline-secondary btn-sm mt-3" type="button" id="addZoneAlarmeBtn">+ Ajouter une zone</button>
-                </div>
-              </div>
-            </div>
-            <div id="dynamicResourcesBatimentImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-card" id="section-autres">
-        <div class="section-heading">
-          <div>
-            <p class="panel-eyebrow">Autres services</p>
-            <h3 class="section-title">Autres ressources attribuées</h3>
-          </div>
+          <div id="dynamicResourcesBatimentMaterialGrid" class="equipment-grid equipment-grid--compact"></div>
         </div>
 
-        <div class="resource-kind-block">
-          <div class="resource-kind-block__header">
-            <h4 class="resource-kind-block__title">Ressources matérielles</h4>
-            <p class="resource-kind-block__text">Éléments physiques remis par les autres services.</p>
-          </div>
-          <div class="equipment-grid equipment-grid--compact">
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_vehicule" data-target="vehiculeFields">
-                <span>Véhicule</span>
-              </label>
-              <div id="vehiculeFields" class="subgrid d-none">
-                <input class="form-control" placeholder="Marque" id="vehicule_marque">
-                <input class="form-control" placeholder="Modèle" id="vehicule_modele">
-                <input class="form-control" placeholder="Immatriculation" id="vehicule_plaque">
-              </div>
-            </div>
-
-            <div class="equipment-item">
-              <label class="equipment-toggle">
-                <input type="checkbox" id="has_autre" data-target="autreFields">
-                <span>Autre matériel</span>
-              </label>
-              <div id="autreFields" class="single-field d-none">
-                <input class="form-control" placeholder="Description" id="autre_materiel">
-              </div>
-            </div>
-          </div>
-          <div id="dynamicResourcesOtherMaterialGrid" class="equipment-grid equipment-grid--compact mt-3"></div>
-        </div>
-        <div id="dynamicResourcesOtherImmaterialWrap" class="resource-kind-block mt-4 d-none">
+        <div id="dynamicResourcesBatimentImmaterialWrap" class="resource-kind-block mt-4 d-none">
           <div class="resource-kind-block__header">
             <h4 class="resource-kind-block__title">Ressources immatérielles</h4>
-            <p class="resource-kind-block__text">Accès ou droits attribués par les autres services.</p>
+            <p class="resource-kind-block__text">Accès ou droits gérés par le service bâtiment.</p>
           </div>
-          <div id="dynamicResourcesOtherImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
+          <div id="dynamicResourcesBatimentImmaterialGrid" class="equipment-grid equipment-grid--compact"></div>
         </div>
       </section>
 

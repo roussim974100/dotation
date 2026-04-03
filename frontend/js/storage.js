@@ -678,54 +678,27 @@ function buildDotationPreview(data) {
   }
 
   const items = [];
-  const materiel = data.materiel || {};
-  const immateriel = data.immateriel || {};
   const pushItem = (label, detail) => {
     items.push(detail ? `${label} : ${detail}` : label);
   };
 
-  if (materiel.ordinateur?.selected) {
-    pushItem("Ordinateur", [materiel.ordinateur.nomPoste, materiel.ordinateur.marque, materiel.ordinateur.modele].filter(Boolean).join(" - "));
-  }
-  if (materiel.ecran?.selected) {
-    pushItem("Écran", [materiel.ecran.marque, materiel.ecran.modele].filter(Boolean).join(" - "));
-  }
-  if (materiel.telephone?.selected) {
-    pushItem("Téléphone", [materiel.telephone.nomTelephone, materiel.telephone.marque, materiel.telephone.modele].filter(Boolean).join(" - "));
-  }
-  if (materiel.tablette?.selected) {
-    pushItem("Tablette", [materiel.tablette.nomTablette, materiel.tablette.marque, materiel.tablette.modele].filter(Boolean).join(" - "));
-  }
-  if (immateriel.email?.selected) {
-    pushItem("Email", immateriel.email.adresse || "");
-  }
-  if (immateriel.vpn?.selected) {
-    pushItem("VPN", "");
-  }
-  if (materiel.badge?.selected) {
-    pushItem("Badge", materiel.badge.numero || "");
-  }
-  if (materiel.cles?.selected) {
-    pushItem("Clé(s)", (materiel.cles.values || []).filter(Boolean).join(" - "));
-  }
-  if (materiel.veste?.selected) {
-    pushItem("Veste", "");
-  }
-  if (materiel.chaussuresSecurite?.selected) {
-    pushItem("Chaussures de sécurité", "");
-  }
-  if (immateriel.zoneAlarme?.selected) {
-    pushItem("Zone alarme", (immateriel.zoneAlarme.zones || []).filter(Boolean).join(" - "));
-  }
-  if (materiel.vehicule?.selected) {
-    pushItem("Véhicule", [materiel.vehicule.marque, materiel.vehicule.modele].filter(Boolean).join(" - "));
-  }
-  if (materiel.autre?.selected) {
-    pushItem("Autre matériel", materiel.autre.description || "");
-  }
+  // Ressources dynamiques (nouveau format)
   for (const resource of data.resources?.additional || []) {
-    if (resource.selected) {
-      pushItem(resource.label || "Ressource complémentaire", resource.details || "");
+    if (!resource.selected) continue;
+    const fields = resource.fields || {};
+    const fieldValues = Object.values(fields).map((v) => Array.isArray(v) ? v.join(", ") : String(v || "")).filter(Boolean);
+    pushItem(resource.label || "Ressource", resource.details || fieldValues.join(" - "));
+  }
+
+  // Fallback pour les anciens dossiers avec materiel/immateriel hardcodé
+  if (!items.length) {
+    const materiel = data.materiel || {};
+    const immateriel = data.immateriel || {};
+    for (const [, item] of Object.entries(materiel)) {
+      if (item?.selected) pushItem(item.label || "Matériel", item.details || "");
+    }
+    for (const [, item] of Object.entries(immateriel)) {
+      if (item?.selected) pushItem(item.label || "Immatériel", item.details || "");
     }
   }
 

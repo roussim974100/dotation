@@ -12,7 +12,7 @@ from utils import (
 # ---------------------------------------------------------------------------
 
 def normalize_resource_field_schema(raw_schema):
-    allowed_types = {"text", "textarea", "select", "date", "number", "checkbox"}
+    allowed_types = {"text", "textarea", "select", "date", "number", "checkbox", "list", "email_with_domain"}
     normalized = []
     for index, field in enumerate(raw_schema or []):
         label = str(field.get("label") or "").strip()

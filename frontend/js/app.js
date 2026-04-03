@@ -44,140 +44,6 @@ let formBootstrapStage = "";
 
 // Mapping central des équipements :
 // on s'en sert pour générer la restitution, les résumés et certaines validations.
-const EQUIPMENT_CONFIG = [
-  {
-    key: "ordinateur",
-    label: "Ordinateur",
-    category: "materiel",
-    checkboxId: "has_pc",
-    detail: () => [getFieldValue("pc_nom"), getFieldValue("pc_marque"), getFieldValue("pc_modele"), getFieldValue("pc_sn")].filter(Boolean).join(" - ")
-  },
-  {
-    key: "ecran",
-    label: "Écran",
-    category: "materiel",
-    checkboxId: "has_screen",
-    detail: () => [getFieldValue("screen_marque"), getFieldValue("screen_modele"), getFieldValue("screen_sn")].filter(Boolean).join(" - ")
-  },
-  {
-    key: "telephone",
-    label: "Téléphone",
-    category: "materiel",
-    checkboxId: "has_phone",
-    detail: () => [getFieldValue("tel_nom"), getFieldValue("tel_marque"), getFieldValue("tel_modele"), getFieldValue("tel_imei")].filter(Boolean).join(" - ")
-  },
-  {
-    key: "tablette",
-    label: "Tablette",
-    category: "materiel",
-    checkboxId: "has_tablette",
-    detail: () => [getFieldValue("tablette_nom"), getFieldValue("tablette_marque"), getFieldValue("tablette_modele"), getFieldValue("tablette_sn")].filter(Boolean).join(" - ")
-  },
-  {
-    key: "vehicule",
-    label: "Véhicule",
-    category: "materiel",
-    checkboxId: "has_vehicule",
-    detail: () => [getFieldValue("vehicule_marque"), getFieldValue("vehicule_modele"), getFieldValue("vehicule_plaque")].filter(Boolean).join(" - ")
-  },
-  {
-    key: "badge",
-    label: "Badge d'accès",
-    category: "materiel",
-    checkboxId: "has_badge",
-    detail: () => getFieldValue("badge_numero")
-  },
-  {
-    key: "cles",
-    label: "Clé(s)",
-    category: "materiel",
-    checkboxId: "has_cles",
-    detail: () => getRepeatableValues("clesRows").join(" - ")
-  },
-  {
-    key: "veste",
-    label: "Veste",
-    category: "materiel",
-    checkboxId: "veste",
-    detail: () => ""
-  },
-  {
-    key: "chaussuresSecurite",
-    label: "Chaussures de sécurité",
-    category: "materiel",
-    checkboxId: "chaussure",
-    detail: () => ""
-  },
-  {
-    key: "autre",
-    label: "Autre matériel",
-    category: "materiel",
-    checkboxId: "has_autre",
-    detail: () => getFieldValue("autre_materiel")
-  },
-  {
-    key: "vpn",
-    label: "VPN",
-    category: "immateriel",
-    checkboxId: "vpn",
-    detail: () => ""
-  },
-  {
-    key: "email",
-    label: "Email",
-    category: "immateriel",
-    checkboxId: "has_mail",
-    detail: () => getFieldValue("email")
-  },
-  {
-    key: "zoneAlarme",
-    label: "Zone alarme",
-    category: "immateriel",
-    checkboxId: "has_zone_alarme",
-    detail: () => getRepeatableValues("zoneAlarmeRows").join(" - ")
-  }
-];
-
-const CORE_RESOURCE_RULES = {
-  ordinateur: [
-    { fieldId: "pc_nom", label: "Nom du poste", required: false, pattern: ".*", hint: "" },
-    { fieldId: "pc_marque", label: "Marque ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "pc_modele", label: "Modèle ordinateur", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "pc_sn", label: "Numéro de série ordinateur", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
-  ],
-  ecran: [
-    { fieldId: "screen_marque", label: "Marque écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "screen_modele", label: "Modèle écran", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "screen_sn", label: "Numéro de série écran", required: true, pattern: "^[A-Za-z0-9-]{5,40}$", hint: "5 à 40 caractères alphanumériques" }
-  ],
-  telephone: [
-    { fieldId: "tel_nom", label: "Nom du téléphone", required: false, pattern: ".*", hint: "" },
-    { fieldId: "tel_marque", label: "Marque téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "tel_modele", label: "Modèle téléphone", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "tel_imei", label: "IMEI", required: true, pattern: "^\\d{15}$", hint: "15 chiffres" }
-  ],
-  tablette: [
-    { fieldId: "tablette_nom", label: "Nom de la tablette", required: false, pattern: ".*", hint: "" },
-    { fieldId: "tablette_marque", label: "Marque tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_modele", label: "Modèle tablette", required: true, pattern: ".*", hint: "" },
-    { fieldId: "tablette_sn", label: "Numéro de série tablette", required: true, pattern: ".*", hint: "" }
-  ],
-  vehicule: [
-    { fieldId: "vehicule_marque", label: "Marque véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._-]{1,49}$", hint: "2 à 50 caractères" },
-    { fieldId: "vehicule_modele", label: "Modèle véhicule", required: true, pattern: "^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,59}$", hint: "2 à 60 caractères" },
-    { fieldId: "vehicule_plaque", label: "Immatriculation", required: true, pattern: "^[A-Z]{2}-\\d{3}-[A-Z]{2}$", hint: "Format AA-123-AA" }
-  ],
-  badge: [
-    { fieldId: "badge_numero", label: "Numéro de badge", required: true, pattern: "^[A-Za-z0-9-]{3,30}$", hint: "3 à 30 caractères" }
-  ],
-  autre: [
-    { fieldId: "autre_materiel", label: "Description autre matériel", required: true, pattern: "^.{3,120}$", hint: "3 à 120 caractères" }
-  ],
-  email: [
-    { fieldId: "email", label: "Adresse email", required: true, pattern: "^[^\\s@]+(@[^\\s@]+\\.[^\\s@]+)?$", hint: "Saisir le préfixe ou l'adresse complète" }
-  ]
-};
-
 const restitutionStateLabels = {
   pending: "En attente",
   returned: "Restitué",
@@ -198,23 +64,11 @@ const ASSIGNMENT_CONDITION_LABELS = {
   degrade: "Dégradé"
 };
 
-const ASSIGNMENT_CONDITION_CONFIG = [
-  { checkboxId: "has_pc", targetId: "pcFields", prefix: "pc" },
-  { checkboxId: "has_screen", targetId: "screenFields", prefix: "screen" },
-  { checkboxId: "has_phone", targetId: "phoneFields", prefix: "tel" },
-  { checkboxId: "has_tablette", targetId: "tabletteFields", prefix: "tablette" },
-  { checkboxId: "vpn", targetId: "vpnFields", prefix: "vpn", createTarget: true, stacked: true, dateOnly: true },
-  { checkboxId: "has_mail", targetId: "mailFields", prefix: "email", stacked: true, dateOnly: true },
-  { checkboxId: "has_zone_alarme", targetId: "zoneAlarmeFields", prefix: "zoneAlarme", stacked: true, afterSelector: "#addZoneAlarmeBtn", dateOnly: true },
-  { checkboxId: "has_badge", targetId: "badgeFields", prefix: "badge", stacked: true, dateOnly: true },
-  { checkboxId: "has_cles", targetId: "clesFields", prefix: "cles", stacked: true, afterSelector: "#addCleBtn" },
-  { checkboxId: "veste", targetId: "vesteFields", prefix: "veste", createTarget: true, stacked: true },
-  { checkboxId: "chaussure", targetId: "chaussureFields", prefix: "chaussure", createTarget: true, stacked: true },
-  { checkboxId: "has_vehicule", targetId: "vehiculeFields", prefix: "vehicule" },
-  { checkboxId: "has_autre", targetId: "autreFields", prefix: "autre", stacked: true }
-];
-
 let currentLockState = false;
+
+function findResourceRefByCode(code) {
+  return dynamicResourceReferences.find((r) => r.code === code) || null;
+}
 
 // Helpers de lecture du formulaire.
 function getFieldValue(id) {
@@ -322,42 +176,8 @@ function buildAssignmentConditionFieldsHtml(prefix, stacked = false, dateOnly = 
 }
 
 function ensureAssignmentConditionFields() {
-  ASSIGNMENT_CONDITION_CONFIG.forEach((config) => {
-    const checkbox = document.getElementById(config.checkboxId);
-    if (!checkbox) {
-      return;
-    }
-
-    let target = document.getElementById(config.targetId);
-    if (!target && config.createTarget) {
-      const equipmentItem = checkbox.closest(".equipment-item");
-      if (!equipmentItem) {
-        return;
-      }
-      target = document.createElement("div");
-      target.id = config.targetId;
-      target.className = "single-field d-none";
-      equipmentItem.appendChild(target);
-      checkbox.dataset.target = config.targetId;
-    }
-
-    if (!target || target.querySelector(`#${config.prefix}_assigned_at`)) {
-      return;
-    }
-
-    const wrapper = document.createElement("div");
-    wrapper.className = config.stacked ? "assignment-condition-block" : "";
-    wrapper.innerHTML = buildAssignmentConditionFieldsHtml(config.prefix, Boolean(config.stacked), Boolean(config.dateOnly));
-
-    if (config.afterSelector) {
-      const anchor = target.querySelector(config.afterSelector);
-      if (anchor) {
-        anchor.insertAdjacentElement("afterend", wrapper);
-        return;
-      }
-    }
-    target.appendChild(wrapper);
-  });
+  // Les champs de condition d'attribution sont désormais générés
+  // dynamiquement via buildDynamicResourceTrackingFields dans le rendu catalogue.
 }
 
 function createRepeatableRow(containerId, placeholder, value = "") {
@@ -501,28 +321,6 @@ function collectProgressRequirementsFromForm() {
     pushRequirement("service", "Service");
   }
 
-  Object.entries(CORE_RESOURCE_RULES).forEach(([resourceKey, rules]) => {
-    const equipment = buildEquipmentSelectionMap();
-    const immaterial = buildIntangibleSelectionMap();
-    const selected = Boolean(equipment[resourceKey]?.selected || immaterial[resourceKey]?.selected);
-    if (!selected) {
-      return;
-    }
-    rules.forEach((rule) => {
-      if (rule.required && !getFieldValue(rule.fieldId)) {
-        pushRequirement(rule.fieldId, rule.label);
-      }
-    });
-  });
-
-  if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
-    pushRequirement("addCleBtn", "Au moins une clé");
-  }
-
-  if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
-    pushRequirement("addZoneAlarmeBtn", "Au moins une zone alarme");
-  }
-
   dynamicResourceReferences.forEach((resource) => {
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     if (!checkbox || !checkbox.checked) {
@@ -620,6 +418,27 @@ function buildDynamicFieldInput(resource, field) {
       </div>
     `;
   }
+  if (fieldType === "list") {
+    const listId = `dynamic_resource_list_${resource.id}_${field.key}`;
+    return `
+      <div>
+        <label class="form-label">${escapeHtml(field.label)}</label>
+        <div id="${escapeAttribute(listId)}" class="repeatable-list dynamic-resource-list" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-placeholder="${escapeAttribute(placeholder)}"></div>
+        <button class="btn btn-outline-secondary btn-sm mt-2 dynamic-resource-list-add" type="button" data-list-id="${escapeAttribute(listId)}" data-placeholder="${escapeAttribute(placeholder)}">+ Ajouter</button>
+      </div>
+    `;
+  }
+  if (fieldType === "email_with_domain") {
+    return `
+      <div>
+        <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
+        <div class="input-group">
+          <input class="form-control dynamic-resource-field" type="text" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="email_with_domain"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}" autocomplete="email">
+          <select class="input-group-text form-select dynamic-resource-email-domain" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" style="max-width:220px;border-left:0"></select>
+        </div>
+      </div>
+    `;
+  }
   const type = ["date", "number"].includes(fieldType) ? fieldType : "text";
   return `
     <div>
@@ -709,6 +528,59 @@ function bindDynamicResourceToggles() {
     }
     syncDynamicResourceCard(resource.id);
   });
+  initDynamicListFields();
+  initDynamicEmailDomainFields();
+}
+
+function initDynamicListFields() {
+  document.querySelectorAll(".dynamic-resource-list-add").forEach((button) => {
+    if (button.dataset.boundListAdd) return;
+    button.addEventListener("click", () => {
+      const listId = button.dataset.listId;
+      const placeholder = button.dataset.placeholder || "";
+      const container = document.getElementById(listId);
+      if (!container) return;
+      const row = document.createElement("div");
+      row.className = "repeatable-list__row";
+      row.innerHTML = `
+        <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}">
+        <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
+      `;
+      row.querySelector("button").addEventListener("click", () => row.remove());
+      container.appendChild(row);
+    });
+    button.dataset.boundListAdd = "true";
+  });
+}
+
+function initDynamicEmailDomainFields() {
+  const domainSelects = document.querySelectorAll(".dynamic-resource-email-domain");
+  if (!domainSelects.length) return;
+  const cachedDomains = window._emailDomainsCache;
+  const applyDomains = (domains) => {
+    domainSelects.forEach((select) => {
+      if (select.options.length > 0) return;
+      if (!domains.length) {
+        select.classList.add("d-none");
+        return;
+      }
+      domains.forEach((domain) => {
+        const option = document.createElement("option");
+        option.value = domain;
+        option.textContent = `@${domain}`;
+        select.appendChild(option);
+      });
+    });
+  };
+  if (cachedDomains) {
+    applyDomains(cachedDomains);
+  } else {
+    requestJson("/api/settings/public").then((settings) => {
+      const domains = settings.email_domains || [];
+      window._emailDomainsCache = domains;
+      applyDomains(domains);
+    }).catch(() => {});
+  }
 }
 
 function summarizeDynamicResource(resource) {
@@ -721,12 +593,29 @@ function summarizeDynamicResource(resource) {
 }
 
 function getDynamicResourceFieldValue(resourceId, fieldKey) {
+  // Type list : collecte les valeurs depuis le conteneur répétable
+  const listContainer = document.getElementById(`dynamic_resource_list_${resourceId}_${fieldKey}`);
+  if (listContainer) {
+    const values = Array.from(listContainer.querySelectorAll("input"))
+      .map((input) => input.value.trim())
+      .filter(Boolean);
+    return values.length ? values : "";
+  }
   const field = document.getElementById(`dynamic_resource_${resourceId}_${fieldKey}`);
   if (!field) {
     return "";
   }
   if (field.type === "checkbox") {
     return field.checked ? "Oui" : "";
+  }
+  // Type email_with_domain : ajouter le domaine sélectionné
+  if (field.dataset.fieldType === "email_with_domain") {
+    const value = field.value.trim();
+    if (!value) return "";
+    if (value.includes("@")) return value;
+    const domainSelect = field.closest(".input-group")?.querySelector(".dynamic-resource-email-domain");
+    const domain = domainSelect?.value;
+    return domain ? `${value}@${domain}` : value;
   }
   return typeof field.value === "string" ? field.value.trim() : "";
 }
@@ -908,16 +797,12 @@ async function loadDynamicResourceReferences() {
   const batimentMaterialContainer = document.getElementById("dynamicResourcesBatimentMaterialGrid");
   const batimentImmaterialContainer = document.getElementById("dynamicResourcesBatimentImmaterialGrid");
   const batimentImmaterialWrap = document.getElementById("dynamicResourcesBatimentImmaterialWrap");
-  const otherMaterialContainer = document.getElementById("dynamicResourcesOtherMaterialGrid");
-  const otherImmaterialContainer = document.getElementById("dynamicResourcesOtherImmaterialGrid");
-  const otherImmaterialWrap = document.getElementById("dynamicResourcesOtherImmaterialWrap");
   const dynamicSectionsContainer = document.getElementById("dynamicServiceSections");
   const emptyState = document.getElementById("dynamicResourcesEmpty");
   if (
     !genericMaterialContainer || !genericImmaterialContainer || !genericSection
     || !dsiMaterialContainer || !dsiImmaterialContainer
     || !batimentMaterialContainer || !batimentImmaterialContainer
-    || !otherMaterialContainer || !otherImmaterialContainer
     || !dynamicSectionsContainer || !emptyState
   ) {
     return;
@@ -925,7 +810,7 @@ async function loadDynamicResourceReferences() {
 
   try {
     const references = await requestJson("/api/reference/resources");
-    dynamicResourceReferences = references.filter((resource) => !EQUIPMENT_CONFIG.some((item) => item.key === resource.code));
+    dynamicResourceReferences = references;
   } catch (error) {
     dynamicResourceReferences = [];
   }
@@ -937,14 +822,11 @@ async function loadDynamicResourceReferences() {
     dsiImmaterialContainer.innerHTML = "";
     batimentMaterialContainer.innerHTML = "";
     batimentImmaterialContainer.innerHTML = "";
-    otherMaterialContainer.innerHTML = "";
-    otherImmaterialContainer.innerHTML = "";
     dynamicSectionsContainer.innerHTML = "";
     emptyState.classList.remove("d-none");
     genericSection.classList.add("d-none");
     genericMaterialWrap?.classList.add("d-none");
     genericImmaterialWrap?.classList.add("d-none");
-    otherImmaterialWrap?.classList.add("d-none");
     return;
   }
 
@@ -981,7 +863,6 @@ async function loadDynamicResourceReferences() {
   const grouped = {
     dsi: { materiel: [], immateriel: [] },
     batiment: { materiel: [], immateriel: [] },
-    other: { materiel: [], immateriel: [] },
     generic: { materiel: [], immateriel: [] },
     services: new Map()
   };
@@ -996,10 +877,6 @@ async function loadDynamicResourceReferences() {
     }
     if (issuer === "batiment") {
       grouped.batiment[category].push(resource);
-      return;
-    }
-    if (issuer === "autres_services") {
-      grouped.other[category].push(resource);
       return;
     }
     if (issuer) {
@@ -1020,14 +897,12 @@ async function loadDynamicResourceReferences() {
   dsiImmaterialContainer.innerHTML = grouped.dsi.immateriel.map(buildResourceCard).join("");
   batimentMaterialContainer.innerHTML = grouped.batiment.materiel.map(buildResourceCard).join("");
   batimentImmaterialContainer.innerHTML = grouped.batiment.immateriel.map(buildResourceCard).join("");
-  otherMaterialContainer.innerHTML = grouped.other.materiel.map(buildResourceCard).join("");
-  otherImmaterialContainer.innerHTML = grouped.other.immateriel.map(buildResourceCard).join("");
   genericMaterialContainer.innerHTML = grouped.generic.materiel.map(buildResourceCard).join("");
   genericImmaterialContainer.innerHTML = grouped.generic.immateriel.map(buildResourceCard).join("");
 
+  batimentImmaterialWrap?.classList.toggle("d-none", grouped.batiment.immateriel.length === 0);
   genericMaterialWrap?.classList.toggle("d-none", grouped.generic.materiel.length === 0);
   genericImmaterialWrap?.classList.toggle("d-none", grouped.generic.immateriel.length === 0);
-  otherImmaterialWrap?.classList.toggle("d-none", grouped.other.immateriel.length === 0);
 
   dynamicSectionsContainer.innerHTML = Array.from(grouped.services.values())
     .sort((left, right) => left.label.localeCompare(right.label, "fr"))
@@ -1130,10 +1005,41 @@ function populateAdditionalResources(data = {}) {
       notesField.value = resource.conditionNotes || "";
     }
     Object.entries(resource.fields || {}).forEach(([fieldKey, value]) => {
+      // Type list : peupler les lignes répétables
+      const listContainer = document.getElementById(`dynamic_resource_list_${resource.id}_${fieldKey}`);
+      if (listContainer && Array.isArray(value)) {
+        const placeholder = listContainer.dataset.placeholder || "";
+        value.forEach((v) => {
+          if (!String(v).trim()) return;
+          const row = document.createElement("div");
+          row.className = "repeatable-list__row";
+          row.innerHTML = `
+            <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}" value="${escapeAttribute(v)}">
+            <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
+          `;
+          row.querySelector("button").addEventListener("click", () => row.remove());
+          listContainer.appendChild(row);
+        });
+        return;
+      }
       const field = document.getElementById(`dynamic_resource_${resource.id}_${fieldKey}`);
       if (field) {
         if (field.type === "checkbox") {
           field.checked = value === true || value === "true" || value === "Oui" || value === "on";
+        } else if (field.dataset.fieldType === "email_with_domain" && typeof value === "string" && value.includes("@")) {
+          // Séparer le préfixe et le domaine pour l'affichage
+          const domainSelect = field.closest(".input-group")?.querySelector(".dynamic-resource-email-domain");
+          if (domainSelect?.options.length) {
+            const parts = value.split("@");
+            for (const option of domainSelect.options) {
+              if (option.value === parts[1]) {
+                domainSelect.value = parts[1];
+                field.value = parts[0];
+                return;
+              }
+            }
+          }
+          field.value = value;
         } else {
           field.value = value || "";
         }
@@ -1153,13 +1059,10 @@ function syncDossierTypeUi() {
 }
 
 function hasCurrentDsiResources() {
-  return Boolean(
-    document.getElementById("has_pc").checked
-    || document.getElementById("has_screen").checked
-    || document.getElementById("has_phone").checked
-    || document.getElementById("has_mail").checked
-    || document.getElementById("vpn").checked
-  );
+  // Vérifie si au moins une ressource DSI est cochée parmi les ressources dynamiques.
+  return dynamicResourceReferences
+    .filter((r) => normalizeServiceName(r.issuer_service) === "dsi")
+    .some((r) => document.getElementById(`dynamic_resource_${r.id}`)?.checked);
 }
 
 function applyLockState(locked) {
@@ -1242,60 +1145,28 @@ function renderPrintSummary(formData) {
     return;
   }
 
-  const dsiItems = [];
-  const batimentItems = [];
-  const otherItems = [];
-
-  const pushItem = (target, label, detail, conditionSummary = "") => {
+  // Collecte des ressources depuis resources.additional (format dynamique unifié)
+  const serviceGroups = new Map();
+  const pushItem = (service, label, detail, conditionSummary = "") => {
+    if (!serviceGroups.has(service)) {
+      serviceGroups.set(service, []);
+    }
     const parts = [detail, conditionSummary].filter(Boolean);
-    target.push(`<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`);
+    serviceGroups.get(service).push(`<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`);
   };
 
-  if (formData.materiel.ordinateur.selected) {
-    pushItem(dsiItems, "Ordinateur", [formData.materiel.ordinateur.nomPoste, formData.materiel.ordinateur.marque, formData.materiel.ordinateur.modele, formData.materiel.ordinateur.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ordinateur));
-  }
-  if (formData.materiel.ecran.selected) {
-    pushItem(dsiItems, "Écran", [formData.materiel.ecran.marque, formData.materiel.ecran.modele, formData.materiel.ecran.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.ecran));
-  }
-  if (formData.materiel.telephone.selected) {
-    pushItem(dsiItems, "Téléphone", [formData.materiel.telephone.nomTelephone, formData.materiel.telephone.marque, formData.materiel.telephone.modele, formData.materiel.telephone.imei].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.telephone));
-  }
-  if (formData.materiel.tablette?.selected) {
-    pushItem(dsiItems, "Tablette", [formData.materiel.tablette.nomTablette, formData.materiel.tablette.marque, formData.materiel.tablette.modele, formData.materiel.tablette.numeroSerie].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.tablette));
-  }
-  if (formData.immateriel.vpn.selected) {
-    pushItem(dsiItems, "VPN", "");
-  }
-  if (formData.immateriel.email.selected) {
-    pushItem(dsiItems, "Email", formData.immateriel.email.adresse);
-  }
-
-  if (formData.materiel.badge.selected) {
-    pushItem(batimentItems, "Badge d'accès", formData.materiel.badge.numero, buildAssignmentConditionSummary(formData.materiel.badge));
-  }
-  if (formData.materiel.cles?.selected) {
-    pushItem(batimentItems, "Clé(s)", (formData.materiel.cles.values || []).join(" - "), buildAssignmentConditionSummary(formData.materiel.cles));
-  }
-  if (formData.materiel.veste.selected) {
-    pushItem(batimentItems, "Veste", "", buildAssignmentConditionSummary(formData.materiel.veste));
-  }
-  if (formData.materiel.chaussuresSecurite.selected) {
-    pushItem(batimentItems, "Chaussures de sécurité", "", buildAssignmentConditionSummary(formData.materiel.chaussuresSecurite));
-  }
-  if (formData.immateriel.zoneAlarme?.selected) {
-    pushItem(batimentItems, "Zone alarme", (formData.immateriel.zoneAlarme.zones || []).join(" - "));
-  }
-
-  if (formData.materiel.vehicule.selected) {
-    pushItem(otherItems, "Véhicule", [formData.materiel.vehicule.marque, formData.materiel.vehicule.modele, formData.materiel.vehicule.immatriculation].filter(Boolean).join(" - "), buildAssignmentConditionSummary(formData.materiel.vehicule));
-  }
-  if (formData.materiel.autre.selected) {
-    pushItem(otherItems, "Autre matériel", formData.materiel.autre.description, buildAssignmentConditionSummary(formData.materiel.autre));
-  }
+  (formData.resources?.additional || []).forEach((resource) => {
+    if (!resource.selected) return;
+    const service = resource.issuerService || resource.issuer_service || "Autres";
+    const fields = resource.fields || {};
+    const fieldValues = Object.values(fields).map((v) => Array.isArray(v) ? v.join(", ") : String(v || "")).filter(Boolean);
+    const detail = resource.details || fieldValues.join(" - ");
+    pushItem(service, resource.label || "Ressource", detail, buildAssignmentConditionSummary(resource));
+  });
 
   const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
-    const config = EQUIPMENT_CONFIG.find((item) => item.key === key);
-    const label = config.label || key;
+    const ref = findResourceRefByCode(key);
+    const label = ref?.label || key;
     const parts = [restitutionStateLabels[state.state] || state.state, state.notes].filter(Boolean);
     return `<li><strong>${escapeHtml(label)}</strong> : ${escapeHtml(parts.join(" - "))}</li>`;
   });
@@ -1320,20 +1191,15 @@ function renderPrintSummary(formData) {
         </div>
       </section>
 
+      ${serviceGroups.size ? Array.from(serviceGroups.entries()).map(([service, items]) => `
       <section class="print-block">
-        <h3>Ressources DSI</h3>
-        ${dsiItems.length ? `<ul class="print-list">${dsiItems.join("")}</ul>` : "<p>Aucune ressource DSI.</p>"}
-      </section>
-
+        <h3>Ressources ${escapeHtml(service)}</h3>
+        <ul class="print-list">${items.join("")}</ul>
+      </section>`).join("") : `
       <section class="print-block">
-        <h3>Ressources service bâtiment</h3>
-        ${batimentItems.length ? `<ul class="print-list">${batimentItems.join("")}</ul>` : "<p>Aucune ressource bâtiment.</p>"}
-      </section>
-
-      <section class="print-block">
-        <h3>Autres ressources attribuées</h3>
-        ${otherItems.length ? `<ul class="print-list">${otherItems.join("")}</ul>` : "<p>Aucune autre ressource attribuée.</p>"}
-      </section>
+        <h3>Ressources attribuées</h3>
+        <p>Aucune ressource attribuée.</p>
+      </section>`}
 
       <section class="print-block">
         <h3>Restitution</h3>
@@ -1371,12 +1237,6 @@ function initConditionalBlocks() {
   document.querySelectorAll("[data-target]").forEach((checkbox) => {
     const sync = () => {
       toggleField(checkbox.dataset.target, checkbox.checked);
-      if (checkbox.checked && checkbox.id === "has_cles") {
-        ensureRepeatableRow("clesRows", "Référence ou libellé de clé");
-      }
-      if (checkbox.checked && checkbox.id === "has_zone_alarme") {
-        ensureRepeatableRow("zoneAlarmeRows", "Zone alarme");
-      }
     };
     if (!checkbox.dataset.boundToggle) {
       checkbox.addEventListener("change", sync);
@@ -1484,40 +1344,8 @@ function initQualite() {
 }
 
 function validateFixedResourceSelection() {
-  // Valide uniquement les ressources effectivement cochées
-  // pour éviter les faux positifs sur les blocs masqués.
-  const issues = [];
-  Object.values(CORE_RESOURCE_RULES).flat().forEach((rule) => {
-    clearFieldError(document.getElementById(rule.fieldId));
-  });
-
-  Object.entries(CORE_RESOURCE_RULES).forEach(([resourceKey, rules]) => {
-    const equipment = buildEquipmentSelectionMap();
-    const immaterial = buildIntangibleSelectionMap();
-    const selected = Boolean(equipment[resourceKey]?.selected || immaterial[resourceKey]?.selected);
-    if (!selected) {
-      return;
-    }
-    rules.forEach((rule) => {
-      const field = document.getElementById(rule.fieldId);
-      const value = getFieldValue(rule.fieldId);
-      if (rule.required && !value) {
-        setFieldError(field, `${rule.label} obligatoire.`);
-        issues.push(`${rule.label} manquant`);
-        return;
-      }
-    });
-  });
-
-  if (document.getElementById("has_cles")?.checked && getRepeatableValues("clesRows").length === 0) {
-    issues.push("Au moins une clé doit être renseignée");
-  }
-
-  if (document.getElementById("has_zone_alarme")?.checked && getRepeatableValues("zoneAlarmeRows").length === 0) {
-    issues.push("Au moins une zone alarme doit être renseignée");
-  }
-
-  return issues;
+  // Toutes les ressources sont désormais validées via validateDynamicResourceSelection.
+  return [];
 }
 
 function validateDynamicResourceSelection() {
@@ -1620,8 +1448,8 @@ function renderRestitutionSummary() {
   };
 
   const itemLines = itemEntries.map(([key, state]) => {
-    const config = EQUIPMENT_CONFIG.find((item) => item.key === key);
-    const label = config.label || key;
+    const ref = findResourceRefByCode(key);
+    const label = ref?.label || key;
     const parts = [
       restitutionStateLabels[state.state] || state.state || "État non renseigné",
       state.notes || ""
@@ -1745,27 +1573,82 @@ function initSignaturePad() {
   };
 }
 
-function buildEquipmentSelectionMap() {
-  return {
-    ordinateur: { selected: document.getElementById("has_pc").checked, nomPoste: getFieldValue("pc_nom"), marque: getFieldValue("pc_marque"), modele: getFieldValue("pc_modele"), numeroSerie: getFieldValue("pc_sn"), ...getAssignmentConditionData("pc") },
-    ecran: { selected: document.getElementById("has_screen").checked, marque: getFieldValue("screen_marque"), modele: getFieldValue("screen_modele"), numeroSerie: getFieldValue("screen_sn"), ...getAssignmentConditionData("screen") },
-    telephone: { selected: document.getElementById("has_phone").checked, nomTelephone: getFieldValue("tel_nom"), marque: getFieldValue("tel_marque"), modele: getFieldValue("tel_modele"), imei: getFieldValue("tel_imei"), ...getAssignmentConditionData("tel") },
-    tablette: { selected: document.getElementById("has_tablette").checked, nomTablette: getFieldValue("tablette_nom"), marque: getFieldValue("tablette_marque"), modele: getFieldValue("tablette_modele"), numeroSerie: getFieldValue("tablette_sn"), ...getAssignmentConditionData("tablette") },
-    vehicule: { selected: document.getElementById("has_vehicule").checked, marque: getFieldValue("vehicule_marque"), modele: getFieldValue("vehicule_modele"), immatriculation: getFieldValue("vehicule_plaque"), ...getAssignmentConditionData("vehicule") },
-    badge: { selected: document.getElementById("has_badge").checked, numero: getFieldValue("badge_numero"), ...getAssignmentConditionData("badge") },
-    cles: { selected: document.getElementById("has_cles").checked, values: getRepeatableValues("clesRows"), ...getAssignmentConditionData("cles") },
-    veste: { selected: document.getElementById("veste").checked, ...getAssignmentConditionData("veste") },
-    chaussuresSecurite: { selected: document.getElementById("chaussure").checked, ...getAssignmentConditionData("chaussure") },
-    autre: { selected: document.getElementById("has_autre").checked, description: getFieldValue("autre_materiel"), ...getAssignmentConditionData("autre") }
+function migrateLegacyResourcesToAdditional(data) {
+  // Pour les dossiers sauvegardés avec l'ancien format (materiel/immateriel hardcodé),
+  // on convertit les données en entrées resources.additional exploitables par populateAdditionalResources.
+  if (!data.resources) {
+    data.resources = {};
+  }
+  if (!data.resources.additional) {
+    data.resources.additional = [];
+  }
+  const existing = new Set(data.resources.additional.map((r) => r.code));
+
+  const migrateOne = (code, legacyData) => {
+    if (!legacyData || !legacyData.selected || existing.has(code)) {
+      return;
+    }
+    const ref = findResourceRefByCode(code);
+    if (!ref) {
+      return;
+    }
+    const fields = {};
+    const fieldSchema = Array.isArray(ref.field_schema) ? ref.field_schema : [];
+    fieldSchema.forEach((field) => {
+      const value = legacyData[field.key] || "";
+      if (value) {
+        fields[field.key] = value;
+      }
+    });
+    // Champs spéciaux pour types list
+    if (legacyData.values) {
+      const listField = fieldSchema.find((f) => f.type === "list");
+      if (listField) {
+        fields[listField.key] = legacyData.values;
+      }
+    }
+    if (legacyData.zones) {
+      const listField = fieldSchema.find((f) => f.type === "list");
+      if (listField) {
+        fields[listField.key] = legacyData.zones;
+      }
+    }
+    // Champ email spécial
+    if (legacyData.adresse) {
+      const emailField = fieldSchema.find((f) => f.type === "email_with_domain");
+      if (emailField) {
+        fields[emailField.key] = legacyData.adresse;
+      }
+    }
+    data.resources.additional.push({
+      id: ref.id,
+      code: ref.code,
+      label: ref.label,
+      category: ref.category,
+      issuerService: ref.issuer_service,
+      selected: true,
+      fieldSchema: fieldSchema,
+      fields: fields,
+      assignedAt: legacyData.assignedAt || "",
+      conditionAttribution: legacyData.conditionAttribution || "",
+      conditionNotes: legacyData.conditionNotes || ""
+    });
   };
+
+  const mat = data.materiel || {};
+  const imm = data.immateriel || {};
+  Object.entries(mat).forEach(([code, item]) => migrateOne(code, item));
+  Object.entries(imm).forEach(([code, item]) => migrateOne(code, item));
+}
+
+function buildEquipmentSelectionMap() {
+  // Les ressources matérielles sont désormais collectées via getAdditionalResourcesData().
+  return {};
 }
 
 function buildIntangibleSelectionMap() {
-  return {
-    vpn: { selected: document.getElementById("vpn").checked, category: "immateriel", ...getAssignmentConditionData("vpn") },
-    email: { selected: document.getElementById("has_mail").checked, category: "immateriel", adresse: (() => { const v = getFieldValue("email").trim(); if (!v) return ""; if (v.includes("@")) return v; const sel = document.getElementById("emailDomainSelect"); const domain = sel?.value; return domain ? v + "@" + domain : v; })(), ...getAssignmentConditionData("email") },
-    zoneAlarme: { selected: document.getElementById("has_zone_alarme").checked, category: "immateriel", zones: getRepeatableValues("zoneAlarmeRows"), ...getAssignmentConditionData("zoneAlarme") }
-  };
+  // Les ressources immatérielles sont désormais collectées via getAdditionalResourcesData().
+  return {};
 }
 
 function collectRequestedResourcesFromFormData(formData) {
@@ -1781,12 +1664,12 @@ function collectRequestedResourcesFromFormData(formData) {
   };
 
   Object.entries(formData.materiel || {}).forEach(([key, item]) => {
-    const config = EQUIPMENT_CONFIG.find((entry) => entry.key === key);
-    pushIfSelected(key, item, config?.label || key);
+    const ref = findResourceRefByCode(key);
+    pushIfSelected(key, item, ref?.label || key);
   });
   Object.entries(formData.immateriel || {}).forEach(([key, item]) => {
-    const config = EQUIPMENT_CONFIG.find((entry) => entry.key === key);
-    pushIfSelected(key, item, config?.label || key);
+    const ref = findResourceRefByCode(key);
+    pushIfSelected(key, item, ref?.label || key);
   });
   (formData.resources?.additional || []).forEach((resource) => {
     if (resource?.selected) {
@@ -2003,71 +1886,13 @@ function populateForm(data, signaturePad) {
     }
   }
 
-  setCheckboxAndFields("has_pc", data.materiel.ordinateur.selected, { pc_nom: data.materiel.ordinateur.nomPoste, pc_sn: data.materiel.ordinateur.numeroSerie });
-  setCheckboxAndFields("has_screen", data.materiel.ecran.selected, { screen_sn: data.materiel.ecran.numeroSerie });
-  setCheckboxAndFields("has_phone", data.materiel.telephone.selected, { tel_nom: data.materiel.telephone.nomTelephone, tel_imei: data.materiel.telephone.imei });
-  setCheckboxAndFields("has_tablette", data.materiel.tablette?.selected, { tablette_nom: data.materiel.tablette?.nomTablette, tablette_sn: data.materiel.tablette?.numeroSerie });
-  setCheckboxAndFields("has_vehicule", data.materiel.vehicule.selected, { vehicule_plaque: data.materiel.vehicule.immatriculation });
-  setCheckboxAndFields("has_badge", data.materiel.badge.selected, { badge_numero: data.materiel.badge.numero });
-  setCheckboxAndFields("has_cles", data.materiel.cles?.selected, {});
-  setCheckboxAndFields("has_autre", data.materiel.autre.selected, { autre_materiel: data.materiel.autre.description });
-  setCheckboxAndFields("has_mail", data.immateriel.email.selected, { email: (() => { const adresse = data.immateriel.email.adresse || ""; const sel = document.getElementById("emailDomainSelect"); if (sel?.options.length) { for (const o of sel.options) { if (adresse.endsWith("@" + o.value)) { sel.value = o.value; return adresse.slice(0, -(o.value.length + 1)); } } } return adresse; })() });
-  setCheckboxAndFields("has_zone_alarme", data.immateriel.zoneAlarme?.selected, {});
   populateUncAcces(data.unc_acces || []);
   setUncRefAd(data.unc_ref_ad || "");
 
-  document.getElementById("pc_nom").value = data.materiel.ordinateur.nomPoste || "";
-  document.getElementById("pc_marque").value = data.materiel.ordinateur.marque || "";
-  document.getElementById("pc_modele").value = data.materiel.ordinateur.modele || "";
-  document.getElementById("screen_marque").value = data.materiel.ecran.marque || "";
-  document.getElementById("screen_modele").value = data.materiel.ecran.modele || "";
-  document.getElementById("tel_nom").value = data.materiel.telephone.nomTelephone || "";
-  document.getElementById("tel_marque").value = data.materiel.telephone.marque || "";
-  document.getElementById("tel_modele").value = data.materiel.telephone.modele || "";
-  document.getElementById("tablette_nom").value = data.materiel.tablette?.nomTablette || "";
-  document.getElementById("tablette_marque").value = data.materiel.tablette?.marque || "";
-  document.getElementById("tablette_modele").value = data.materiel.tablette?.modele || "";
-  document.getElementById("vehicule_marque").value = data.materiel.vehicule.marque || "";
-  document.getElementById("vehicule_modele").value = data.materiel.vehicule.modele || "";
-  document.getElementById("pc_condition").value = data.materiel.ordinateur.conditionAttribution || "";
-  document.getElementById("pc_assigned_at").value = normalizeDateInputValue(data.materiel.ordinateur.assignedAt || "");
-  document.getElementById("pc_condition_notes").value = data.materiel.ordinateur.conditionNotes || "";
-  document.getElementById("screen_condition").value = data.materiel.ecran.conditionAttribution || "";
-  document.getElementById("screen_assigned_at").value = normalizeDateInputValue(data.materiel.ecran.assignedAt || "");
-  document.getElementById("screen_condition_notes").value = data.materiel.ecran.conditionNotes || "";
-  document.getElementById("tel_condition").value = data.materiel.telephone.conditionAttribution || "";
-  document.getElementById("tel_assigned_at").value = normalizeDateInputValue(data.materiel.telephone.assignedAt || "");
-  document.getElementById("tel_condition_notes").value = data.materiel.telephone.conditionNotes || "";
-  document.getElementById("tablette_condition").value = data.materiel.tablette?.conditionAttribution || "";
-  document.getElementById("tablette_assigned_at").value = normalizeDateInputValue(data.materiel.tablette?.assignedAt || "");
-  document.getElementById("tablette_condition_notes").value = data.materiel.tablette?.conditionNotes || "";
-  document.getElementById("vehicule_condition").value = data.materiel.vehicule.conditionAttribution || "";
-  document.getElementById("vehicule_assigned_at").value = normalizeDateInputValue(data.materiel.vehicule.assignedAt || "");
-  document.getElementById("vehicule_condition_notes").value = data.materiel.vehicule.conditionNotes || "";
-  setFieldValueIfExists("badge_condition", data.materiel.badge.conditionAttribution || "");
-  setFieldValueIfExists("badge_assigned_at", normalizeDateInputValue(data.materiel.badge.assignedAt || ""));
-  setFieldValueIfExists("badge_condition_notes", data.materiel.badge.conditionNotes || "");
-  document.getElementById("cles_condition").value = data.materiel.cles?.conditionAttribution || "";
-  document.getElementById("cles_assigned_at").value = normalizeDateInputValue(data.materiel.cles?.assignedAt || "");
-  document.getElementById("cles_condition_notes").value = data.materiel.cles?.conditionNotes || "";
-  document.getElementById("veste_condition").value = data.materiel.veste.conditionAttribution || "";
-  document.getElementById("veste_assigned_at").value = normalizeDateInputValue(data.materiel.veste.assignedAt || "");
-  document.getElementById("veste_condition_notes").value = data.materiel.veste.conditionNotes || "";
-  document.getElementById("chaussure_condition").value = data.materiel.chaussuresSecurite.conditionAttribution || "";
-  document.getElementById("chaussure_assigned_at").value = normalizeDateInputValue(data.materiel.chaussuresSecurite.assignedAt || "");
-  document.getElementById("chaussure_condition_notes").value = data.materiel.chaussuresSecurite.conditionNotes || "";
-  document.getElementById("autre_condition").value = data.materiel.autre.conditionAttribution || "";
-  document.getElementById("autre_assigned_at").value = normalizeDateInputValue(data.materiel.autre.assignedAt || "");
-  document.getElementById("autre_condition_notes").value = data.materiel.autre.conditionNotes || "";
-  document.getElementById("vpn_assigned_at").value = normalizeDateInputValue(data.immateriel.vpn.assignedAt || "");
-  document.getElementById("email_assigned_at").value = normalizeDateInputValue(data.immateriel.email.assignedAt || "");
-  document.getElementById("zoneAlarme_assigned_at").value = normalizeDateInputValue(data.immateriel.zoneAlarme?.assignedAt || "");
-  populateRepeatableRows("clesRows", "Référence ou libellé de clé", data.materiel.cles?.values || []);
-  populateRepeatableRows("zoneAlarmeRows", "Zone alarme", data.immateriel.zoneAlarme?.zones || []);
+  // Migration : convertir les anciennes données materiel/immateriel en resources.additional
+  // pour les dossiers sauvegardés avant le rendu dynamique.
+  migrateLegacyResourcesToAdditional(data);
 
-  document.getElementById("veste").checked = Boolean(data.materiel.veste.selected);
-  document.getElementById("chaussure").checked = Boolean(data.materiel.chaussuresSecurite.selected);
-  document.getElementById("vpn").checked = Boolean(data.immateriel.vpn.selected);
   document.getElementById("rgpdCheck").checked = Boolean(data.validation.rgpdAccepted);
   populateAdditionalResources(data);
 
@@ -2698,16 +2523,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const signaturePad = initSignaturePad();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
-      const domains = s.emailDomains || [];
-      const sel = document.getElementById("emailDomainSelect");
-      if (!sel) return;
-      if (!domains.length) {
-        sel.replaceWith(Object.assign(document.createElement("span"), { className: "input-group-text text-muted", textContent: "(domaine libre)" }));
-        document.getElementById("email").type = "email";
-        document.getElementById("email").placeholder = "prenom.nom@domaine.fr";
-      } else {
-        domains.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = "@" + d; sel.appendChild(o); });
-      }
+      window._emailDomainsCache = s.emailDomains || [];
     });
     fetch("/api/forms/unc-paths").then(r => r.ok ? r.json() : []).then(paths => {
       const dl = document.getElementById("uncPathsList");
@@ -2767,11 +2583,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadDraftFromUrl(signaturePad);
 
     [
-      "has_pc",
-      "has_screen",
-      "has_phone",
-      "has_mail",
-      "vpn",
       "dossier_type",
       "service",
       "service_destination"
