@@ -2114,6 +2114,57 @@ function buildTimingPreview(data) {
   if (!data) {
     return [];
   }
+
+  const restitution = data.restitution || {};
+  const restitutionItems = restitution.items || {};
+  const isRestitution = Boolean(
+    restitution.returnedAt
+    || Object.keys(restitutionItems).length
+    || (["returned", "partial_return", "awaiting_signature"].includes(data.workflow?.status) && (restitution.reason || restitution.returnedAt))
+  );
+
+  if (isRestitution) {
+    return buildRestitutionTimingPreview(data, restitution, restitutionItems);
+  }
+  return buildAttributionTimingPreview(data);
+}
+
+function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
+  const sections = [];
+  const returnDate = restitution.returnedAt || "";
+  if (returnDate) {
+    const offsetLabel = getTimingOffsetLabel(returnDate);
+    sections.push(`Date de fin de fonction : ${formatShortDate(returnDate)}${offsetLabel ? ` (${offsetLabel})` : ""}`);
+  } else {
+    sections.push("Date de fin de fonction non renseignée");
+  }
+
+  const additional = data.resources?.additional || [];
+  const returnableResources = additional.filter((r) => r.requiresReturn && r.selected);
+  const returnedStates = ["returned", "returned_damaged", "transferred", "conforme", "degrade"];
+  const returnedCount = returnableResources.filter((r) => {
+    const code = r.id || r.code;
+    const item = restitutionItems[code];
+    return item && returnedStates.includes(item.state);
+  }).length;
+
+  sections.push(`Progression restitution : ${returnedCount}/${returnableResources.length} ressource(s) restituée(s)`);
+
+  const pendingLabels = returnableResources
+    .filter((r) => {
+      const code = r.id || r.code;
+      const item = restitutionItems[code];
+      return !item || !returnedStates.includes(item.state);
+    })
+    .map((r) => r.label || r.id || r.code);
+
+  if (pendingLabels.length) {
+    sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
+  }
+  return sections;
+}
+
+function buildAttributionTimingPreview(data) {
   const sections = [];
   const startAt = data.meta?.startAt || "";
   if (startAt) {
