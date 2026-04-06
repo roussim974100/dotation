@@ -102,6 +102,40 @@
             </div>
           </div>
         </div>
+        <div class="dashboard-group mt-4 mb-4">
+          <div class="dashboard-group__header">
+            <div>
+              <p class="panel-eyebrow">Import / Export</p>
+              <h3 class="section-title">Gestion par fichier CSV</h3>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="csvFileInput">Importer un fichier CSV</label>
+              <input class="form-control" id="csvFileInput" type="file" accept=".csv">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="csvImportMode">Mode d'import</label>
+              <select class="form-select" id="csvImportMode">
+                <option value="append">Ajouter (conserver l'existant)</option>
+                <option value="replace">Remplacer (désactiver les absents)</option>
+              </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-primary" id="csvImportBtn" type="button">Importer</button>
+            </div>
+            <div class="col-12">
+              <div id="csvImportFeedback" class="d-none"></div>
+            </div>
+            <div class="col-12">
+              <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="/api/admin/services/csv-template">Télécharger le modèle CSV</a>
+                <a class="btn btn-outline-secondary" href="/api/admin/services/export-csv">Exporter les services (CSV)</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="table align-middle draft-table">
             <thead>

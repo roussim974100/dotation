@@ -742,6 +742,48 @@ async function deleteService(serviceId) {
   await loadServices();
 }
 
+async function handleServiceCsvImport() {
+  const fileInput = byId("csvFileInput");
+  const modeSelect = byId("csvImportMode");
+  const feedback = byId("csvImportFeedback");
+  if (!fileInput?.files?.length) {
+    showCsvFeedback(feedback, "Veuillez sélectionner un fichier CSV.", true);
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+  formData.append("mode", modeSelect?.value || "append");
+  try {
+    const response = await fetch("/api/admin/services/import-csv", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      const msgs = {
+        no_file: "Aucun fichier reçu.",
+        invalid_encoding: "Encodage du fichier invalide (UTF-8 attendu).",
+        missing_label_column: "Colonne « label » manquante dans le fichier.",
+      };
+      showCsvFeedback(feedback, msgs[data.error] || data.error, true);
+      return;
+    }
+    showCsvFeedback(feedback, `Import terminé : ${data.imported} ajouté(s), ${data.skipped} existant(s) ignoré(s).`, false);
+    fileInput.value = "";
+    await loadServices();
+  } catch (_) {
+    showCsvFeedback(feedback, "Erreur de connexion au serveur.", true);
+  }
+}
+
+function showCsvFeedback(el, msg, isError) {
+  if (!el) return;
+  el.textContent = msg;
+  el.className = "alert " + (isError ? "alert-danger" : "alert-success");
+  el.classList.remove("d-none");
+}
+
 async function loadResources() {
   currentResources = await adminRequest("/api/admin/resources");
   const table = byId("resourceTableBody");
@@ -889,6 +931,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     byId("cancelServiceEditBtn")?.addEventListener("click", () => {
       resetServiceForm();
+    });
+
+    byId("csvImportBtn")?.addEventListener("click", () => {
+      handleServiceCsvImport();
     });
 
     byId("saveResourceBtn")?.addEventListener("click", async () => {
