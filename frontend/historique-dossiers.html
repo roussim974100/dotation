@@ -113,7 +113,12 @@
       </div>
       <div class="dashboard-toolbar__actions">
         <button id="refreshDashboardBtn" class="btn btn-outline-secondary" type="button">Rafraîchir</button>
-        <a id="backupExportLink" class="btn btn-outline-light d-none" href="/api/forms/export">Exporter Excel</a>
+        <details id="exportMenu" class="export-menu d-none">
+          <summary class="btn btn-outline-secondary">Exports</summary>
+          <div class="export-menu__panel">
+            <a class="export-menu__item" href="/api/forms/export">Dossiers (Excel)</a>
+          </div>
+        </details>
       </div>
     </div>
 
