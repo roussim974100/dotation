@@ -8,10 +8,7 @@ CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
 A_QUAI_PDF_LOGO_PATH = os.path.join(FRONTEND_ASSETS_DIR, "a-quai-email-mark.png")
 DB_PATH = os.path.join(BASE_DIR, "dotation.db")
 APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
-CITY_LOGO_URL = os.environ.get(
-    "CITY_LOGO_URL",
-    "https://fr.wikipedia.org/wiki/Special:Redirect/file/Logo_ville_Publier_2022.png",
-)
+CITY_LOGO_URL = os.environ.get("CITY_LOGO_URL", "")
 CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
 
 
