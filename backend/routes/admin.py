@@ -1,9 +1,11 @@
 import bcrypt
+import csv
+import io
 import json
 import os
 import uuid
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, Response, jsonify, make_response, request, session
 
 from utils import utc_now, generate_id, bool_to_int
 from database import get_db, normalize_reference_row, normalize_service_row
@@ -542,6 +544,100 @@ def delete_admin_service(service_id):
                 {"label": row["label"] if row else ""},
             )
     return jsonify({"deleted": bool(deleted)})
+
+
+@bp.route("/api/admin/services/csv-template", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def service_csv_template():
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["label", "is_active"])
+    writer.writerow(["Direction generale", "1"])
+    writer.writerow(["Ressources humaines", "1"])
+    writer.writerow(["Informatique", "1"])
+    resp = make_response(output.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = "attachment; filename=modele_services.csv"
+    return resp
+
+
+@bp.route("/api/admin/services/export-csv", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def export_services_csv():
+    with get_db() as connection:
+        rows = connection.execute(
+            "SELECT label, is_active FROM service_catalog ORDER BY label COLLATE NOCASE ASC"
+        ).fetchall()
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["label", "is_active"])
+    for row in rows:
+        writer.writerow([row["label"], row["is_active"]])
+    resp = make_response(output.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = "attachment; filename=services.csv"
+    return resp
+
+
+@bp.route("/api/admin/services/import-csv", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+def import_services_csv():
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "no_file"}), 400
+    mode = request.form.get("mode", "append")
+    try:
+        raw = file.read().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return jsonify({"error": "invalid_encoding"}), 400
+    delimiter = ";" if ";" in raw.split("\n")[0] else ","
+    reader = csv.DictReader(io.StringIO(raw), delimiter=delimiter)
+    if not reader.fieldnames or "label" not in [f.strip().lower() for f in reader.fieldnames]:
+        return jsonify({"error": "missing_label_column"}), 400
+    field_map = {f.strip().lower(): f for f in reader.fieldnames}
+    imported = 0
+    skipped = 0
+    errors = []
+    now = utc_now()
+    with get_db() as connection:
+        existing_labels = {
+            r["label"].strip().lower()
+            for r in connection.execute("SELECT label FROM service_catalog").fetchall()
+        }
+        csv_labels = set()
+        for i, row in enumerate(reader, start=2):
+            label = (row.get(field_map.get("label", "label")) or "").strip()
+            if not label:
+                continue
+            is_active_raw = (row.get(field_map.get("is_active", "is_active")) or "1").strip()
+            is_active = is_active_raw not in ("0", "false", "non", "False")
+            csv_labels.add(label.lower())
+            if label.lower() in existing_labels:
+                skipped += 1
+                continue
+            existing_labels.add(label.lower())
+            connection.execute(
+                """
+                INSERT INTO service_catalog (id, label, is_active, is_builtin, created_at, updated_at)
+                VALUES (?, ?, ?, 0, ?, ?)
+                """,
+                (generate_id("service"), label, bool_to_int(is_active), now, now),
+            )
+            imported += 1
+        if mode == "replace":
+            connection.execute(
+                "UPDATE service_catalog SET is_active = 0, updated_at = ? WHERE lower(label) NOT IN ({})".format(
+                    ",".join("?" for _ in csv_labels)
+                ),
+                [now] + list(csv_labels),
+            )
+        insert_app_log(connection, "admin", "services_csv_imported", "Import CSV services", details={
+            "mode": mode, "imported": imported, "skipped": skipped,
+        })
+    return jsonify({"imported": imported, "skipped": skipped, "errors": errors})
 
 
 @bp.route("/api/admin/resources", methods=["GET"])
