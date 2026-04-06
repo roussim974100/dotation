@@ -1649,6 +1649,53 @@ body.login-shell {
   width: 100%;
 }
 
+/* Menu export regroupé (details/summary natif) */
+.export-menu {
+  position: relative;
+}
+
+.export-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.export-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu__panel {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  min-width: 200px;
+  margin-top: 0.45rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 16px 34px rgba(15, 55, 84, 0.14);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.export-menu__item {
+  display: block;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: background-color 0.15s ease;
+}
+
+.export-menu__item:hover,
+.export-menu__item:focus {
+  background: var(--surface-alt);
+  color: var(--brand);
+  text-decoration: none;
+}
+
 .dashboard-groups {
   display: grid;
   gap: 1.2rem;
@@ -2754,6 +2801,664 @@ body.login-shell {
     justify-self: start;
   }
 }
+
+/* ========================================================================
+   Mode sombre — surcharges des couleurs codees en dur
+   Les variables CSS (--brand, --surface, --text, etc.) sont deja remplacees
+   par branding.js. Ce bloc corrige les backgrounds, couleurs et bordures
+   ecrites en valeurs fixes dans le reste du fichier.
+   ======================================================================== */
+
+[data-color-mode="dark"] body.app-shell {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 18%, transparent), transparent 28%),
+    linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 40%, var(--surface) 100%);
+}
+
+[data-color-mode="dark"] body.login-shell {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 24%, transparent), transparent 24%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--brand) 18%, transparent), transparent 26%),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-alt) 45%, var(--surface) 100%);
+}
+
+/* Logos — fond adapte */
+[data-color-mode="dark"] .app-logo {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-color-mode="dark"] .app-footer__org-logo {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Contenants principaux */
+[data-color-mode="dark"] .hero-panel,
+[data-color-mode="dark"] .content-card {
+  background: color-mix(in srgb, var(--surface-alt) 90%, transparent);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .login-info-card,
+[data-color-mode="dark"] .login-card {
+  background: color-mix(in srgb, var(--surface-alt) 95%, transparent);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .product-hero-card {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+/* Cartes, panneaux et zones de contenu */
+[data-color-mode="dark"] .stat-card,
+[data-color-mode="dark"] .status-pill {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .document-choice-card,
+[data-color-mode="dark"] .document-step-card,
+[data-color-mode="dark"] .document-card,
+[data-color-mode="dark"] .document-viewer-frame-wrap {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .document-signing-intro,
+[data-color-mode="dark"] .document-final-signature,
+[data-color-mode="dark"] .document-initial-card {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .document-initial-card--locked {
+  background: var(--surface);
+}
+
+[data-color-mode="dark"] .document-viewer-frame {
+  background: var(--surface);
+}
+
+/* Filtres et toolbar */
+[data-color-mode="dark"] .filter-toolbar {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Formulaire — sous-sections */
+[data-color-mode="dark"] .form-section__header {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .equipment-panel,
+[data-color-mode="dark"] .equipment-toggle {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .choice-chip span {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .choice-chip input:checked + span {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+/* Panneau action-bar */
+[data-color-mode="dark"] .action-bar {
+  background: color-mix(in srgb, var(--surface-alt) 96%, transparent);
+  border-color: var(--border);
+}
+
+/* Dashboard */
+[data-color-mode="dark"] .dashboard-update-notice {
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .dashboard-pending-badge {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--accent);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link:hover,
+[data-color-mode="dark"] .dashboard-nav__link:focus-visible {
+  background: var(--surface-alt);
+  border-color: var(--brand);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  color: #fff;
+}
+
+[data-color-mode="dark"] .dashboard-group__label {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Menu dossier */
+[data-color-mode="dark"] .draft-actions__menu-panel {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Badges de statut */
+[data-color-mode="dark"] .status-badge--draft {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--accent);
+}
+
+[data-color-mode="dark"] .status-badge--active,
+[data-color-mode="dark"] .status-badge--returned {
+  background: color-mix(in srgb, #2d8a56 22%, var(--surface));
+  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .status-badge--partial_assignment,
+[data-color-mode="dark"] .status-badge--awaiting_signature,
+[data-color-mode="dark"] .status-badge--partial_return {
+  background: color-mix(in srgb, #c87830 18%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+  color: #e8a060;
+}
+
+[data-color-mode="dark"] .status-badge--cancelled {
+  background: color-mix(in srgb, #b84a4a 18%, var(--surface));
+  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
+  color: #e88080;
+}
+
+/* Badges pilotage */
+[data-color-mode="dark"] .timing-badge--ok {
+  background: color-mix(in srgb, #2d8a56 22%, var(--surface));
+  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .timing-badge--warning {
+  background: color-mix(in srgb, #c87830 18%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+  color: #e8a060;
+}
+
+[data-color-mode="dark"] .timing-badge--late {
+  background: color-mix(in srgb, #b84a4a 18%, var(--surface));
+  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
+  color: #e88080;
+}
+
+[data-color-mode="dark"] .timing-badge--neutral {
+  background: color-mix(in srgb, var(--brand) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
+  color: var(--brand);
+}
+
+/* Hover cards */
+[data-color-mode="dark"] .status-hover-card {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .status-hover-card__title {
+  color: var(--text);
+}
+
+/* Resource order */
+[data-color-mode="dark"] .resource-order-group {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .resource-order-item {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Equipement items */
+[data-color-mode="dark"] .equipment-item {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Resource progress */
+[data-color-mode="dark"] .resource-progress__track {
+  background: var(--border);
+}
+
+/* Login */
+[data-color-mode="dark"] .login-lead {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .login-footnote__title {
+  color: var(--text);
+}
+
+/* Password generator / help modal */
+[data-color-mode="dark"] .password-generator-modal__dialog,
+[data-color-mode="dark"] .page-help-modal__dialog {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .password-generator-modal__result {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .page-help-modal__links a {
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Workflow dialog */
+[data-color-mode="dark"] .workflow-dialog__backdrop,
+[data-color-mode="dark"] .password-generator-modal__backdrop,
+[data-color-mode="dark"] .page-help-modal__backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+[data-color-mode="dark"] .workflow-dialog__panel {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item {
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-active .workflow-dialog__state {
+  color: var(--brand);
+}
+
+/* Branding save loader */
+[data-color-mode="dark"] .branding-save-loader__item.is-active .branding-save-loader__state {
+  color: var(--brand);
+}
+
+/* Couleurs texte fixes */
+[data-color-mode="dark"] .panel-title,
+[data-color-mode="dark"] .section-title {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .resource-kind-block__title,
+[data-color-mode="dark"] .resource-progress__fraction {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .draft-title {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .app-footer__heading,
+[data-color-mode="dark"] .app-footer__app {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .app-footer__badge {
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Bouton retour en haut */
+[data-color-mode="dark"] .back-to-top {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Export progress */
+[data-color-mode="dark"] .export-progress__value {
+  color: var(--text);
+}
+
+/* Carte signature */
+[data-color-mode="dark"] .document-card--active {
+  border-color: var(--brand);
+}
+
+/* Admin layout */
+[data-color-mode="dark"] .admin-nav__link {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .admin-nav__link:hover,
+[data-color-mode="dark"] .admin-nav__link.is-active {
+  background: var(--surface-alt);
+  border-color: var(--brand);
+}
+
+/* Tables (mode mobile card) */
+[data-color-mode="dark"] .draft-row {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Form controls Bootstrap override */
+[data-color-mode="dark"] .form-control,
+[data-color-mode="dark"] .form-select {
+  background-color: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .form-control:focus,
+[data-color-mode="dark"] .form-select:focus {
+  background-color: var(--surface);
+  border-color: var(--brand);
+  color: var(--text);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+[data-color-mode="dark"] .form-check-input {
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .form-label {
+  color: var(--text);
+}
+
+/* Cookie consent */
+[data-color-mode="dark"] #cc-main {
+  --cc-bg: var(--surface);
+  --cc-primary-color: var(--text);
+  --cc-secondary-color: var(--muted);
+}
+
+/* Status chips (avancement) */
+[data-color-mode="dark"] .status-chip--draft {
+  color: #f0c94d;
+  background: color-mix(in srgb, #694b00 30%, var(--surface));
+  border-color: color-mix(in srgb, #c89e30 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--active {
+  color: #6bc990;
+  background: color-mix(in srgb, #0a4d28 30%, var(--surface));
+  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--partial_assignment,
+[data-color-mode="dark"] .status-chip--partial_return {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--awaiting_signature,
+[data-color-mode="dark"] .status-chip--returned {
+  color: #7ab8e8;
+  background: color-mix(in srgb, #18436d 28%, var(--surface));
+  border-color: color-mix(in srgb, #3a80b8 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--cancelled {
+  color: #e88080;
+  background: color-mix(in srgb, #7f1d1d 25%, var(--surface));
+  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
+}
+
+/* Timing chips (pilotage) */
+[data-color-mode="dark"] .timing-chip--ok {
+  color: #6bc990;
+  background: color-mix(in srgb, #0a4d28 30%, var(--surface));
+  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
+}
+
+[data-color-mode="dark"] .timing-chip--warning {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+}
+
+[data-color-mode="dark"] .timing-chip--late {
+  color: #e88080;
+  background: color-mix(in srgb, #7f1d1d 25%, var(--surface));
+  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
+}
+
+[data-color-mode="dark"] .timing-chip--neutral {
+  color: #7ab8e8;
+  background: color-mix(in srgb, #18436d 28%, var(--surface));
+  border-color: color-mix(in srgb, #3a80b8 40%, var(--border));
+}
+
+/* Progress bars */
+[data-color-mode="dark"] .resource-progress__bar {
+  background: linear-gradient(90deg, var(--brand), var(--accent));
+}
+
+[data-color-mode="dark"] .export-progress__track {
+  background: var(--border);
+}
+
+[data-color-mode="dark"] .export-progress__bar {
+  background: linear-gradient(90deg, var(--brand), var(--accent));
+}
+
+/* Dashboard group */
+[data-color-mode="dark"] .dashboard-group {
+  background: color-mix(in srgb, var(--surface-alt) 85%, transparent);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .dashboard-group__badge {
+  background: color-mix(in srgb, var(--brand) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
+  color: var(--brand);
+}
+
+/* Resource & restitution rows */
+[data-color-mode="dark"] .resource-field-row,
+[data-color-mode="dark"] .restitution-row {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Signature, RGPD, status cards */
+[data-color-mode="dark"] .signature-wrap {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .signature-box {
+  background: var(--surface);
+}
+
+[data-color-mode="dark"] .rgpd-card {
+  background: color-mix(in srgb, #694b00 12%, var(--surface));
+  border-color: color-mix(in srgb, #c89e30 25%, var(--border));
+}
+
+[data-color-mode="dark"] .rgpd-card__title {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .signature-link-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .signature-link-card__body {
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .status-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Footer */
+[data-color-mode="dark"] .app-footer {
+  background: color-mix(in srgb, var(--surface-alt) 92%, transparent);
+  border-color: var(--border);
+}
+
+/* Page loader */
+[data-color-mode="dark"] .page-loader {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+[data-color-mode="dark"] .page-loader__panel {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .page-loader__spinner {
+  border-color: var(--border);
+  border-top-color: var(--brand);
+}
+
+/* Status hover card */
+[data-color-mode="dark"] .status-hover-card h4 {
+  color: var(--brand);
+}
+
+[data-color-mode="dark"] .status-hover-card__missing-list li {
+  color: #e8a060;
+}
+
+/* Admin nav & inner card */
+[data-color-mode="dark"] .admin-nav__link span {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .admin-inner-card {
+  background: var(--surface);
+}
+
+/* Page anchor nav */
+[data-color-mode="dark"] .page-anchor-nav__link {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .page-anchor-nav__link:hover,
+[data-color-mode="dark"] .page-anchor-nav__link:focus {
+  color: var(--text);
+  border-color: var(--brand);
+}
+
+/* Form field help & validation */
+[data-color-mode="dark"] .field-help {
+  color: #e8a060;
+}
+
+[data-color-mode="dark"] .progress-required-field {
+  border-color: #c89e30 !important;
+  box-shadow: 0 0 0 0.18rem rgba(200, 158, 48, 0.18);
+  background: color-mix(in srgb, #694b00 10%, var(--surface));
+}
+
+[data-color-mode="dark"] .progress-required-surface {
+  border-color: #c89e30 !important;
+  box-shadow: 0 0 0 0.18rem rgba(200, 158, 48, 0.12);
+}
+
+[data-color-mode="dark"] .progress-required-badge {
+  background: rgba(200, 158, 48, 0.18);
+  color: #f0c94d;
+}
+
+/* Branding save loader */
+[data-color-mode="dark"] .branding-save-loader__bullet {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .branding-save-loader__list {
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .branding-save-loader__item {
+  border-color: var(--border);
+}
+
+/* Bootstrap form-check-input — checked state */
+[data-color-mode="dark"] .form-check-input:checked {
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* Export menu */
+[data-color-mode="dark"] .export-menu__panel {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .export-menu__item {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .export-menu__item:hover {
+  background: var(--surface-alt);
+  color: var(--brand);
+}
+
+/* Table overrides */
+[data-color-mode="dark"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .table thead th {
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .table td {
+  border-color: var(--border);
+}
+
+/* Misc text colors */
+[data-color-mode="dark"] .panel-text,
+[data-color-mode="dark"] .panel-eyebrow {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .draft-subtitle {
+  color: var(--muted);
+}
+
+/* btn-outline-secondary on dark surfaces */
+[data-color-mode="dark"] .btn-outline-secondary {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .btn-outline-secondary:hover {
+  background: var(--surface-alt);
+  border-color: var(--brand);
+  color: var(--text);
+}
+
+/* Confetti / animations — pas de changement */
 
 @media print {
   @page {
