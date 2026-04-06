@@ -368,6 +368,34 @@ def session_route():
     return jsonify(current_user())
 
 
+@bp.route("/api/me/password", methods=["POST"])
+@login_required
+def change_own_password():
+    user = current_user()
+    payload = request.get_json(silent=True) or {}
+    current_pw = payload.get("current_password") or ""
+    new_pw = payload.get("new_password") or ""
+    if not current_pw or not new_pw:
+        return jsonify({"error": "missing_fields"}), 400
+    record = get_user_record(user["username"])
+    if not record or not bcrypt.checkpw(current_pw.encode(), record["password_hash"].encode()):
+        return jsonify({"error": "invalid_current_password"}), 403
+    complexity_error = password_complexity_error(new_pw)
+    if complexity_error:
+        return jsonify({"error": complexity_error}), 400
+    config = load_auth_config()
+    for u in config["users"]:
+        if u.get("username") == user["username"]:
+            u["password_hash"] = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
+            break
+    save_auth_config(config)
+    insert_app_log(get_db(), "security", "password_self_change", {
+        "username": user["username"],
+        "ip": get_request_client_ip(),
+    })
+    return jsonify({"ok": True})
+
+
 @bp.route("/api/settings/public", methods=["GET"])
 def public_settings_route():
     response = jsonify(build_public_settings_payload())

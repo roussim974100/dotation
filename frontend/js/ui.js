@@ -447,9 +447,226 @@ window.askWorkflowDialog = askWorkflowDialog;
 window.closeWorkflowDialog = closeWorkflowDialog;
 window.playCompletionCelebration = playCompletionCelebration;
 
+// ───────────────────────────────────────────────────────
+// Menu utilisateur : dark mode toggle, changement mdp
+// ───────────────────────────────────────────────────────
+
+const DARK_MODE_KEY = "userDarkModePreference";
+
+function isDarkModeActive() {
+  return document.documentElement.dataset.colorMode === "dark";
+}
+
+function updateDarkModeLabel() {
+  const btn = document.getElementById("darkModeToggle");
+  if (btn) {
+    btn.textContent = isDarkModeActive() ? "\u2600 Mode clair" : "\u263E Mode sombre";
+  }
+}
+
+function toggleDarkMode() {
+  const next = isDarkModeActive() ? "light" : "dark";
+  localStorage.setItem(DARK_MODE_KEY, next);
+  if (typeof applyBrandingTheme === "function") {
+    applyBrandingTheme(window.APP_BRANDING || {});
+  }
+  updateDarkModeLabel();
+}
+
+function initUserMenu() {
+  const menu = document.getElementById("userMenu");
+  if (!menu) {
+    return;
+  }
+
+  // Fermer le menu au clic externe
+  document.addEventListener("click", (e) => {
+    if (menu.open && !menu.contains(e.target)) {
+      menu.open = false;
+    }
+  });
+
+  // Dark mode toggle
+  const darkBtn = document.getElementById("darkModeToggle");
+  if (darkBtn) {
+    darkBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleDarkMode();
+    });
+  }
+
+  // Changement de mot de passe
+  const pwdBtn = document.getElementById("changePasswordBtn");
+  if (pwdBtn) {
+    pwdBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      menu.open = false;
+      openPasswordChangeModal();
+    });
+  }
+
+  // Mettre à jour le label du toggle
+  updateDarkModeLabel();
+
+  // Observer data-color-mode pour garder le label synchronisé
+  const observer = new MutationObserver(() => updateDarkModeLabel());
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-color-mode"] });
+
+  // Injecter l'identité utilisateur
+  populateUserMenuIdentity();
+}
+
+async function populateUserMenuIdentity() {
+  try {
+    const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const user = await response.json();
+    const nameEl = document.getElementById("userMenuName");
+    const roleEl = document.getElementById("userMenuRole");
+    if (nameEl) {
+      nameEl.textContent = user.username || "";
+    }
+    if (roleEl) {
+      roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
+    }
+  } catch (_) {
+    // silently ignore
+  }
+}
+
+// ─── Modale changement de mot de passe ─────────────
+
+function openPasswordChangeModal() {
+  if (document.getElementById("passwordChangeModal")) {
+    return;
+  }
+  const backdrop = document.createElement("div");
+  backdrop.id = "passwordChangeModal";
+  backdrop.className = "password-change-modal__backdrop";
+  backdrop.innerHTML = `
+    <div class="password-change-modal__dialog">
+      <h3>Changer le mot de passe</h3>
+      <div style="display:grid;gap:0.85rem;">
+        <div>
+          <label class="form-label" for="pwdCurrent">Mot de passe actuel</label>
+          <input class="form-control" type="password" id="pwdCurrent" autocomplete="current-password">
+        </div>
+        <div>
+          <label class="form-label" for="pwdNew">Nouveau mot de passe</label>
+          <input class="form-control" type="password" id="pwdNew" autocomplete="new-password">
+        </div>
+        <div>
+          <label class="form-label" for="pwdConfirm">Confirmer le nouveau mot de passe</label>
+          <input class="form-control" type="password" id="pwdConfirm" autocomplete="new-password">
+        </div>
+        <p style="margin:0;font-size:0.82rem;color:var(--muted);">12 caractères minimum, majuscule, minuscule, chiffre et caractère spécial.</p>
+      </div>
+      <div id="pwdFeedback"></div>
+      <div class="password-change-modal__actions">
+        <button class="btn btn-outline-secondary" type="button" id="pwdCancelBtn">Annuler</button>
+        <button class="btn btn-primary" type="button" id="pwdSubmitBtn">Valider</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  // Fermer au clic sur backdrop
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) {
+      closePasswordChangeModal();
+    }
+  });
+
+  document.getElementById("pwdCancelBtn").addEventListener("click", closePasswordChangeModal);
+  document.getElementById("pwdSubmitBtn").addEventListener("click", submitPasswordChange);
+
+  // Fermer avec Escape
+  backdrop._escHandler = (e) => {
+    if (e.key === "Escape") {
+      closePasswordChangeModal();
+    }
+  };
+  document.addEventListener("keydown", backdrop._escHandler);
+
+  document.getElementById("pwdCurrent").focus();
+}
+
+function closePasswordChangeModal() {
+  const modal = document.getElementById("passwordChangeModal");
+  if (modal) {
+    if (modal._escHandler) {
+      document.removeEventListener("keydown", modal._escHandler);
+    }
+    modal.remove();
+  }
+}
+
+const PASSWORD_ERROR_MESSAGES = {
+  missing_fields: "Veuillez remplir tous les champs.",
+  invalid_current_password: "Le mot de passe actuel est incorrect.",
+  password_too_short: "Le nouveau mot de passe est trop court (12 caractères minimum).",
+  password_no_upper: "Le mot de passe doit contenir au moins une majuscule.",
+  password_no_lower: "Le mot de passe doit contenir au moins une minuscule.",
+  password_no_digit: "Le mot de passe doit contenir au moins un chiffre.",
+  password_no_special: "Le mot de passe doit contenir au moins un caractère spécial.",
+};
+
+async function submitPasswordChange() {
+  const current = document.getElementById("pwdCurrent")?.value || "";
+  const newPw = document.getElementById("pwdNew")?.value || "";
+  const confirm = document.getElementById("pwdConfirm")?.value || "";
+  const feedback = document.getElementById("pwdFeedback");
+  const submitBtn = document.getElementById("pwdSubmitBtn");
+
+  if (!current || !newPw || !confirm) {
+    showPwdFeedback(feedback, "Veuillez remplir tous les champs.", true);
+    return;
+  }
+  if (newPw !== confirm) {
+    showPwdFeedback(feedback, "Les mots de passe ne correspondent pas.", true);
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "En cours…";
+
+  try {
+    const response = await fetch("/api/me/password", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: current, new_password: newPw }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      showPwdFeedback(feedback, "Mot de passe modifié avec succès.", false);
+      setTimeout(closePasswordChangeModal, 1500);
+    } else {
+      const msg = PASSWORD_ERROR_MESSAGES[data.error] || data.error || "Erreur inconnue.";
+      showPwdFeedback(feedback, msg, true);
+    }
+  } catch (_) {
+    showPwdFeedback(feedback, "Erreur de connexion au serveur.", true);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Valider";
+  }
+}
+
+function showPwdFeedback(el, msg, isError) {
+  if (!el) {
+    return;
+  }
+  el.textContent = msg;
+  el.className = "password-change-modal__feedback " +
+    (isError ? "password-change-modal__feedback--error" : "password-change-modal__feedback--success");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initBackToTop();
   initContextualHelpLinks();
   initMojibakeRepair();
+  initUserMenu();
 });
 

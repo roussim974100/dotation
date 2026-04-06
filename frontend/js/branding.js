@@ -666,7 +666,13 @@ function applyBrandingTheme(settings) {
   const themeId = settings?.themeId || "institutionnel";
   const policy = settings?.darkModePolicy || "disabled";
   const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const mode = policy === "forced" ? "dark" : (policy === "allowed" && prefersDark ? "dark" : "light");
+  const userPref = localStorage.getItem("userDarkModePreference");
+  let mode;
+  if (userPref === "dark" || userPref === "light") {
+    mode = userPref;
+  } else {
+    mode = policy === "forced" ? "dark" : (policy === "allowed" && prefersDark ? "dark" : "light");
+  }
   const preset = BRAND_THEME_PRESETS[themeId] || BRAND_THEME_PRESETS.institutionnel;
   const palette = preset[mode] || preset.light;
   const root = document.documentElement;
