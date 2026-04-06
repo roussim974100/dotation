@@ -713,6 +713,10 @@ function applyBrandingContent(settings) {
     node.textContent = dpoEmail;
   });
 
+  document.querySelectorAll("[data-app-version]").forEach((node) => {
+    node.textContent = APP_BUILD_VERSION;
+  });
+
   if (window.APP_TEXT?.app) {
     window.APP_TEXT.app.kicker = APP_FIXED_NAME;
     window.APP_TEXT.app.name = appName;
