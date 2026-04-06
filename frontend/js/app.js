@@ -8,28 +8,7 @@ const DOSSIER_TYPE_LABELS = {
   mise_a_jour: "Mise à jour de ressources",
   sortie: "Sortie / restitution"
 };
-const DEFAULT_SERVICE_OPTIONS = [
-  "Affaires juridiques / Commande publique",
-  "Bâtiment",
-  "Cabinet du Maire",
-  "CCAS",
-  "Communication",
-  "Culture et Patrimoine",
-  "CTM",
-  "DGS",
-  "DRH",
-  "DSI",
-  "DST",
-  "Finances",
-  "PM",
-  "Population",
-  "SEJE",
-  "Secrétariat service technique",
-  "Sports",
-  "Subvention",
-  "Urbanisme",
-  "VRD"
-];
+const DEFAULT_SERVICE_OPTIONS = [];
 let serviceOptions = [...DEFAULT_SERVICE_OPTIONS];
 let dynamicResourceReferences = [];
 let currentRestitutionData = {

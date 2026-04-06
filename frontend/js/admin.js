@@ -258,9 +258,9 @@ function generateThemedPassword(theme = "licorne") {
       first: ["Amelie", "Belmondo", "Truffaut", "Renoir", "Tautou", "Noiret", "Depardieu", "Audiard"],
       second: ["cinema", "paris", "camera", "dialogue", "lumiere", "ecran", "replique", "studio"]
     },
-    publier: {
-      first: ["Publier", "Leman", "Mairie", "Alpes", "Geneve", "Rive", "Port", "Chablais"],
-      second: ["lac", "maison", "service", "rivage", "commune", "montagne", "horizon", "village"]
+    local: {
+      first: ["Bureau", "Equipe", "Projet", "Campus", "Atelier", "Agence", "Siege", "Centre"],
+      second: ["reseau", "bureau", "dossier", "service", "espace", "portail", "accueil", "support"]
     }
   };
   const symbols = ["!", "@", "#", "$", "%"];

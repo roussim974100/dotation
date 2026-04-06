@@ -242,12 +242,15 @@ function ensureAppFooter() {
   const supportLabel = document.createElement("span");
   supportLabel.textContent = "Assistance applicative :";
   const supportMail = document.createElement("a");
-  supportMail.href = "mailto:s.bassim@ville-publier.fr";
-  supportMail.textContent = "s.bassim@ville-publier.fr";
+  supportMail.setAttribute("data-brand-support-email-link", "");
+  supportMail.setAttribute("data-brand-support-email-text", "");
+  supportMail.href = "#";
+  supportMail.textContent = "";
   supportContact.append(supportLabel, supportMail);
   const supportText = document.createElement("p");
   supportText.className = "app-footer__text";
-  supportText.textContent = "Développement et maintenance assurés par Samir Bassim, DSI de la commune de Publier.";
+  supportText.setAttribute("data-brand-support-credit", "");
+  supportText.textContent = "";
   const supportLogo = document.createElement("img");
   supportLogo.className = "app-footer__org-logo";
   supportLogo.setAttribute("data-brand-org-logo", "");
@@ -691,9 +694,12 @@ function applyBrandingTheme(settings) {
 }
 
 function applyBrandingContent(settings) {
-  const orgName = settings?.orgName || "Ville de Publier";
+  const orgName = settings?.orgName || APP_FIXED_NAME;
   const appName = APP_FIXED_NAME;
-  const dpoEmail = settings?.dpoEmail || "dpo@ville-publier.fr";
+  const dpoEmail = settings?.dpoEmail || "";
+  const supportEmail = settings?.supportEmail || "";
+  const supportName = settings?.supportName || "";
+  const supportRole = settings?.supportRole || "";
   const logoUrl = settings?.logoUrl;
   const logos = getBrandLogos();
 
@@ -716,7 +722,36 @@ function applyBrandingContent(settings) {
     node.setAttribute("href", `mailto:${dpoEmail}`);
   });
   document.querySelectorAll("[data-brand-dpo-email-text]").forEach((node) => {
-    node.textContent = dpoEmail;
+    node.textContent = dpoEmail || "Non configuré";
+  });
+
+  // Support contact
+  document.querySelectorAll("[data-brand-support-email-link]").forEach((node) => {
+    if (supportEmail) {
+      node.setAttribute("href", `mailto:${supportEmail}`);
+      node.hidden = false;
+    } else {
+      node.hidden = true;
+    }
+  });
+  document.querySelectorAll("[data-brand-support-email-text]").forEach((node) => {
+    node.textContent = supportEmail || "";
+  });
+  document.querySelectorAll("[data-brand-support-name]").forEach((node) => {
+    node.textContent = supportName || "";
+  });
+  document.querySelectorAll("[data-brand-support-role]").forEach((node) => {
+    node.textContent = supportRole || "";
+  });
+  document.querySelectorAll("[data-brand-support-credit]").forEach((node) => {
+    if (supportName) {
+      const parts = [supportName];
+      if (supportRole) parts.push(supportRole);
+      if (orgName) parts.push(orgName);
+      node.textContent = `Développement et maintenance : ${parts.join(" — ")}.`;
+    } else {
+      node.textContent = "";
+    }
   });
 
   document.querySelectorAll("[data-app-version]").forEach((node) => {

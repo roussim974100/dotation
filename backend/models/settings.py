@@ -14,15 +14,18 @@ from config import (
 # ---------------------------------------------------------------------------
 
 DEFAULT_APP_SETTINGS = {
-    "org_name": "Ville de Publier",
+    "org_name": "",
     "app_name": "A quai",
-    "dpo_email": "dpo@ville-publier.fr",
+    "dpo_email": "",
     "email_domains": "",
     "brand_logo_mode": "url",
-    "brand_logo_url": CITY_LOGO_URL,
+    "brand_logo_url": "",
     "brand_logo_file": "",
     "theme_id": "institutionnel",
     "dark_mode_policy": "disabled",
+    "support_email": "",
+    "support_name": "",
+    "support_role": "",
 }
 
 THEME_PRESETS = {
@@ -304,6 +307,9 @@ def build_public_settings_payload(settings=None):
             for key, value in THEME_PRESETS.items()
         },
         "emailDomains": [d.strip() for d in (settings.get("email_domains") or "").split(",") if d.strip()],
+        "supportEmail": settings.get("support_email") or "",
+        "supportName": settings.get("support_name") or "",
+        "supportRole": settings.get("support_role") or "",
     }
 
 
