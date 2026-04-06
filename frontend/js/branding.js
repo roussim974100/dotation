@@ -250,7 +250,7 @@ function ensureAppFooter() {
   const supportText = document.createElement("p");
   supportText.className = "app-footer__text";
   supportText.setAttribute("data-brand-support-credit", "");
-  supportText.textContent = "";
+  supportText.innerHTML = 'Développé par <a href="mailto:computing.bs@gmail.com">Samir Bassim</a>.';
   const supportLogo = document.createElement("img");
   supportLogo.className = "app-footer__org-logo";
   supportLogo.setAttribute("data-brand-org-logo", "");
@@ -743,14 +743,16 @@ function applyBrandingContent(settings) {
   document.querySelectorAll("[data-brand-support-role]").forEach((node) => {
     node.textContent = supportRole || "";
   });
+  // data-brand-support-credit : ne pas écraser si déjà renseigné (crédit développeur statique)
   document.querySelectorAll("[data-brand-support-credit]").forEach((node) => {
+    if (node.textContent.trim() || node.innerHTML.trim()) {
+      return;
+    }
     if (supportName) {
       const parts = [supportName];
       if (supportRole) parts.push(supportRole);
       if (orgName) parts.push(orgName);
       node.textContent = `Développement et maintenance : ${parts.join(" — ")}.`;
-    } else {
-      node.textContent = "";
     }
   });
 
