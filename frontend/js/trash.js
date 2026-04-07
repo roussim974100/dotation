@@ -83,8 +83,8 @@ function renderTrash() {
       <td data-label="Supprimé par">${escapeHtml(item.deleted_by || "-")}</td>
       <td data-label="Actions" class="draft-actions-cell">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-outline-primary" type="button" onclick="restoreTrashItem('${escapeHtml(item.id)}')">Restaurer</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTrashItem('${escapeHtml(item.id)}')">Supprimer</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-trash-action="restore" data-id="${escapeHtml(item.id)}">Restaurer</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" data-trash-action="delete" data-id="${escapeHtml(item.id)}">Supprimer</button>
         </div>
       </td>
     </tr>
@@ -137,6 +137,14 @@ async function emptyTrash() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-trash-action]");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.trashAction === "restore") restoreTrashItem(id);
+    else if (btn.dataset.trashAction === "delete") deleteTrashItem(id);
+  });
+
   try {
     await loadTrash();
   } catch (error) {

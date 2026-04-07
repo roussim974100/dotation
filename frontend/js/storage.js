@@ -503,52 +503,53 @@ function renderDraftActionMenu(label, tone, actions) {
 }
 
 function buildDraftActionButtons(draft, options) {
+  const id = draft.id;
   const openActions = [
-    `<button class="btn btn-sm btn-primary" type="button" onclick="editDraft('${draft.id}')">Ouvrir dossier</button>`
+    `<button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir dossier</button>`
   ];
 
   if (canOpenRestitution(draft, options)) {
-    openActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="openRestitution('${draft.id}')">Ouvrir restitution</button>`);
+    openActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Ouvrir restitution</button>`);
   }
 
   const pdfActions = [];
   if (options.canExport) {
-    pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="exportDraftPdf('${draft.id}')">Télécharger le PDF dossier</button>`);
+    pdfActions.push(`<button class="btn btn-sm btn-outline-success" type="button" data-action="exportDraftPdf" data-id="${id}">Télécharger le PDF dossier</button>`);
   }
   if (options.canExport && hasRestitutionData(draft)) {
-    pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportRestitutionPdf('${draft.id}')">Télécharger le PDF restitution</button>`);
+    pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="exportRestitutionPdf" data-id="${id}">Télécharger le PDF restitution</button>`);
   }
 
   const signatureActions = [];
   if (canRequestAssignmentSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="shareSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
+    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="shareSignatureLink" data-id="${id}">Copier le lien de signature</button>`);
   }
 
   if (canRequestRestitutionSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyRestitutionSignatureLink('${draft.id}')">Copier le lien de signature</button>`);
+    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="copyRestitutionSignatureLink" data-id="${id}">Copier le lien de signature</button>`);
   }
 
   const emailActions = [];
-  emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="prepareAssignmentInfoEmail('${draft.id}')">Informer de la création du dossier</button>`);
+  emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" data-action="prepareAssignmentInfoEmail" data-id="${id}">Informer de la création du dossier</button>`);
   if (hasRestitutionData(draft) || ["active", "partial_return", "awaiting_signature", "returned"].includes(draft.status || "draft")) {
-    emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" onclick="prepareRestitutionInfoEmail('${draft.id}')">Informer de la restitution</button>`);
+    emailActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" data-action="prepareRestitutionInfoEmail" data-id="${id}">Informer de la restitution</button>`);
   }
   if (options.canExport) {
-    emailActions.push(`<button class="btn btn-sm btn-outline-success" type="button" onclick="prepareDraftPdfEmail('${draft.id}')">Envoyer le PDF dossier</button>`);
+    emailActions.push(`<button class="btn btn-sm btn-outline-success" type="button" data-action="prepareDraftPdfEmail" data-id="${id}">Envoyer le PDF dossier</button>`);
   }
   if (options.canExport && hasRestitutionData(draft)) {
-    emailActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" onclick="prepareRestitutionPdfEmail('${draft.id}')">Envoyer le PDF restitution</button>`);
+    emailActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="prepareRestitutionPdfEmail" data-id="${id}">Envoyer le PDF restitution</button>`);
   }
   if (canRequestAssignmentSignature(draft, options)) {
-    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareAssignmentSignatureEmail('${draft.id}')">Envoyer le lien de signature du dossier</button>`);
+    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" data-action="prepareAssignmentSignatureEmail" data-id="${id}">Envoyer le lien de signature du dossier</button>`);
   }
   if (canRequestRestitutionSignature(draft, options)) {
-    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" onclick="prepareRestitutionSignatureEmail('${draft.id}')">Envoyer le lien de signature de restitution</button>`);
+    emailActions.push(`<button class="btn btn-sm btn-outline-info" type="button" data-action="prepareRestitutionSignatureEmail" data-id="${id}">Envoyer le lien de signature de restitution</button>`);
   }
 
   const managementActions = [];
   if (options.canDelete) {
-    managementActions.push(`<button class="btn btn-sm btn-outline-danger" type="button" onclick="removeDraft('${draft.id}')">Supprimer le dossier</button>`);
+    managementActions.push(`<button class="btn btn-sm btn-outline-danger" type="button" data-action="removeDraft" data-id="${id}">Supprimer le dossier</button>`);
   }
 
   return `
@@ -2479,6 +2480,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("newFormBtn")?.addEventListener("click", newForm);
   document.getElementById("emptyStateNewFormBtn")?.addEventListener("click", newForm);
+
+  const DRAFT_ACTION_MAP = {
+    editDraft, openRestitution, exportDraftPdf, exportRestitutionPdf,
+    shareSignatureLink, copyRestitutionSignatureLink,
+    prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
+    prepareDraftPdfEmail, prepareRestitutionPdfEmail,
+    prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail,
+    removeDraft
+  };
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const fn = DRAFT_ACTION_MAP[btn.dataset.action];
+    if (fn) fn(btn.dataset.id);
+  });
+
   bindDashboardFilters();
   void renderDraftList();
   startDashboardAutoRefresh();

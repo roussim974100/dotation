@@ -572,8 +572,8 @@ async function loadUsers() {
   byId("userTableBody").innerHTML = currentUsers.map((user) => {
     const statusMeta = getUserStatusMeta(user);
     const statusAction = user.status === "pending"
-      ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="approveUser(${jsStr(user.username)})">Valider</button>`
-      : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleUserState(${jsStr(user.username)}, ${user.is_active ? "false" : "true"})">${user.is_active ? "Desactiver" : "Activer"}</button>`;
+      ? `<button class="btn btn-sm btn-outline-success" type="button" data-admin-action="approveUser" data-username="${escapeHtml(user.username)}">Valider</button>`
+      : `<button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleUserState" data-username="${escapeHtml(user.username)}" data-active="${user.is_active ? "false" : "true"}">${user.is_active ? "Desactiver" : "Activer"}</button>`;
     return `
       <tr>
         <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
@@ -581,9 +581,9 @@ async function loadUsers() {
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
-            <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateUserForm(${jsStr(user.username)})">Modifier</button>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateUserForm" data-username="${escapeHtml(user.username)}">Modifier</button>
             ${statusAction}
-            <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteUser(${jsStr(user.username)})">Supprimer</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteUser" data-username="${escapeHtml(user.username)}">Supprimer</button>
           </div>
         </td>
       </tr>
@@ -697,9 +697,9 @@ async function loadServices() {
       <td data-label="État"><span class="status-chip status-chip--${service.is_active ? "active" : "cancelled"}">${service.is_active ? "Actif" : "Inactif"}</span></td>
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateServiceForm(${jsStr(service.id)})">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleServiceState(${jsStr(service.id)}, ${service.is_active ? "false" : "true"})">${service.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteService(${jsStr(service.id)})">Supprimer</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateServiceForm" data-id="${escapeHtml(String(service.id))}">Modifier</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleServiceState" data-id="${escapeHtml(String(service.id))}" data-active="${service.is_active ? "false" : "true"}">${service.is_active ? "Désactiver" : "Activer"}</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteService" data-id="${escapeHtml(String(service.id))}">Supprimer</button>
         </div>
       </td>
     </tr>
@@ -817,9 +817,9 @@ async function loadResources() {
       <td data-label="État"><span class="status-chip status-chip--${resource.is_active ? "active" : "cancelled"}">${resource.is_active ? "Active" : "Inactive"}</span></td>
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateResourceForm(${jsStr(resource.id)})">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleResourceState(${jsStr(resource.id)}, ${resource.is_active ? "false" : "true"})">${resource.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteResource(${jsStr(resource.id)})">Supprimer</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateResourceForm" data-id="${escapeHtml(String(resource.id))}">Modifier</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleResourceState" data-id="${escapeHtml(String(resource.id))}" data-active="${resource.is_active ? "false" : "true"}">${resource.is_active ? "Désactiver" : "Activer"}</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteResource" data-id="${escapeHtml(String(resource.id))}">Supprimer</button>
         </div>
       </td>
     </tr>
@@ -891,6 +891,25 @@ async function deleteResource(resourceId) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-admin-action]");
+    if (!btn) return;
+    const action = btn.dataset.adminAction;
+    const id = btn.dataset.id;
+    const username = btn.dataset.username;
+    const active = btn.dataset.active;
+    if (action === "approveUser") approveUser(username);
+    else if (action === "toggleUserState") toggleUserState(username, active === "true");
+    else if (action === "populateUserForm") populateUserForm(username);
+    else if (action === "deleteUser") deleteUser(username);
+    else if (action === "populateServiceForm") populateServiceForm(id);
+    else if (action === "toggleServiceState") toggleServiceState(id, active === "true");
+    else if (action === "deleteService") deleteService(id);
+    else if (action === "populateResourceForm") populateResourceForm(id);
+    else if (action === "toggleResourceState") toggleResourceState(id, active === "true");
+    else if (action === "deleteResource") deleteResource(id);
+  });
+
   try {
     groups = await adminRequest("/api/admin/groups");
     renderGroups();
