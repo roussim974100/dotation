@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<title>Configuration initiale — À Quai</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="setup-shell">
+
+<header class="setup-header">
+  <div class="container setup-header__inner">
+    <img class="setup-header__logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo A quai">
+    <div>
+      <h1 class="setup-header__title">Configuration initiale</h1>
+      <p class="setup-header__sub">Paramétrez l'application pour votre organisation en quelques étapes.</p>
+    </div>
+  </div>
+</header>
+
+<main class="setup-main">
+  <div class="container">
+    <div class="setup-card">
+
+      <!-- Stepper -->
+      <div class="setup-stepper" id="setupStepper" aria-label="Étapes de configuration">
+        <div class="setup-step is-active" data-step-indicator="1">
+          <div class="setup-step__dot">1</div>
+          <span class="setup-step__label">Organisation</span>
+        </div>
+        <div class="setup-step" data-step-indicator="2">
+          <div class="setup-step__dot">2</div>
+          <span class="setup-step__label">Identité</span>
+        </div>
+        <div class="setup-step" data-step-indicator="3">
+          <div class="setup-step__dot">3</div>
+          <span class="setup-step__label">Support</span>
+        </div>
+        <div class="setup-step" data-step-indicator="4">
+          <div class="setup-step__dot">4</div>
+          <span class="setup-step__label">Bénéficiaires</span>
+        </div>
+        <div class="setup-step" data-step-indicator="5">
+          <div class="setup-step__dot">5</div>
+          <span class="setup-step__label">Récapitulatif</span>
+        </div>
+      </div>
+
+      <div id="setupAlert" class="alert d-none mb-3" role="alert"></div>
+
+      <!-- Étape 1 : Type d'organisation -->
+      <div class="setup-panel" id="setupStep1">
+        <p class="setup-panel__eyebrow">Étape 1 / 5</p>
+        <h2 class="setup-panel__title">Type d'organisation</h2>
+        <p class="setup-panel__desc">Choisissez le type d'organisation qui décrit le mieux votre structure. Ce choix adapte le vocabulaire du formulaire.</p>
+
+        <div class="mb-3">
+          <label class="form-label" for="setupOrgContext">Type d'organisation</label>
+          <select class="form-select" id="setupOrgContext">
+            <option value="public_collectivite">Collectivité territoriale (mairie, intercommunalité…)</option>
+            <option value="public_administration">Administration publique (ministère, préfecture…)</option>
+            <option value="private_company">Entreprise privée</option>
+            <option value="association">Association</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label d-block mb-1">Labels des bénéficiaires</label>
+          <p class="form-text mt-0 mb-2">Pré-rempli selon le type d'organisation. Vous pouvez les modifier.</p>
+          <div class="preset-chips" id="beneficiaryPresets"></div>
+        </div>
+
+        <div class="mb-1">
+          <label class="form-label" for="setupBeneficiaryTypes">Format personnalisé</label>
+          <input class="form-control" id="setupBeneficiaryTypes" type="text" placeholder="agent:Agent,elu:Élu(e)">
+          <div class="form-text">Format : <code>valeur:Libellé</code>, séparés par des virgules.</div>
+        </div>
+      </div>
+
+      <!-- Étape 2 : Identité de l'organisation -->
+      <div class="setup-panel d-none" id="setupStep2">
+        <p class="setup-panel__eyebrow">Étape 2 / 5</p>
+        <h2 class="setup-panel__title">Identité de l'organisation</h2>
+        <p class="setup-panel__desc">Ces informations apparaissent dans les dossiers et les documents générés.</p>
+
+        <div class="mb-3">
+          <label class="form-label" for="setupOrgName">Nom de l'organisation</label>
+          <input class="form-control" id="setupOrgName" type="text" placeholder="Mairie de Lyon, Ministère X, Acme Corp…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="setupDpoEmail">Email du DPO <span class="text-muted fw-normal">(optionnel)</span></label>
+          <input class="form-control" id="setupDpoEmail" type="email" placeholder="dpo@organisation.fr">
+          <div class="form-text">Délégué à la Protection des Données. Apparaît dans les mentions RGPD du formulaire.</div>
+        </div>
+      </div>
+
+      <!-- Étape 3 : Contact support -->
+      <div class="setup-panel d-none" id="setupStep3">
+        <p class="setup-panel__eyebrow">Étape 3 / 5</p>
+        <h2 class="setup-panel__title">Contact support</h2>
+        <p class="setup-panel__desc">La personne ou le service à contacter en cas de difficulté avec l'application. Ces informations apparaissent dans le pied de page et la page contact.</p>
+
+        <div class="mb-3">
+          <label class="form-label" for="setupSupportName">Nom du contact <span class="text-muted fw-normal">(optionnel)</span></label>
+          <input class="form-control" id="setupSupportName" type="text" placeholder="Prénom Nom">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="setupSupportRole">Rôle / Fonction <span class="text-muted fw-normal">(optionnel)</span></label>
+          <input class="form-control" id="setupSupportRole" type="text" placeholder="Responsable informatique">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="setupSupportEmail">Email support <span class="text-muted fw-normal">(optionnel)</span></label>
+          <input class="form-control" id="setupSupportEmail" type="email" placeholder="support@organisation.fr">
+        </div>
+      </div>
+
+      <!-- Étape 4 : Confirmation des bénéficiaires -->
+      <div class="setup-panel d-none" id="setupStep4">
+        <p class="setup-panel__eyebrow">Étape 4 / 5</p>
+        <h2 class="setup-panel__title">Types de bénéficiaires</h2>
+        <p class="setup-panel__desc">Confirmez les types de bénéficiaires qui seront proposés dans le formulaire de dossier.</p>
+
+        <div id="setupBeneficiaryPreview" class="mb-3"></div>
+
+        <div class="alert alert-info" role="alert">
+          <strong>Note :</strong> Le premier type sera sélectionné par défaut dans le formulaire. Si votre organisation est une collectivité, le second type affichera un champ "Mandat" supplémentaire.
+        </div>
+
+        <p class="form-text">Pour modifier ces types, revenez à l'étape 1 ou modifiez-les ultérieurement dans <strong>Administration → Personnalisation</strong>.</p>
+      </div>
+
+      <!-- Étape 5 : Récapitulatif -->
+      <div class="setup-panel d-none" id="setupStep5">
+        <p class="setup-panel__eyebrow">Étape 5 / 5</p>
+        <h2 class="setup-panel__title">Récapitulatif</h2>
+        <p class="setup-panel__desc">Vérifiez les informations avant de valider la configuration.</p>
+
+        <div id="setupRecap" class="mb-3"></div>
+
+        <div class="alert alert-success" role="alert">
+          Toutes ces informations pourront être modifiées ultérieurement dans <strong>Administration → Personnalisation</strong>.
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="setup-nav">
+        <button class="btn btn-outline-secondary" id="setupPrevBtn" type="button" style="visibility:hidden">Précédent</button>
+        <div class="setup-nav__right">
+          <a class="btn btn-outline-secondary" href="admin.html" id="setupSkipBtn">Passer cette étape</a>
+          <button class="btn btn-primary" id="setupNextBtn" type="button">Suivant</button>
+          <button class="btn btn-success d-none" id="setupSubmitBtn" type="button">
+            Terminer la configuration
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script src="js/branding.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const TOTAL_STEPS = 5;
+  const BENEFICIARY_PRESETS = {
+    public_collectivite:  "agent:Agent,elu:Élu(e)",
+    public_administration: "agent:Agent,contractuel:Contractuel(le)",
+    private_company:       "salarie:Salarié(e),prestataire:Prestataire",
+    association:           "salarie:Salarié(e),benevole:Bénévole",
+  };
+
+  let currentStep = 1;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function $(id) { return document.getElementById(id); }
+
+  function showAlert(msg, tone) {
+    const el = $("setupAlert");
+    el.textContent = msg;
+    el.className = `alert alert-${tone || "danger"} mb-3`;
+  }
+
+  function hideAlert() {
+    $("setupAlert").className = "alert d-none mb-3";
+  }
+
+  function parseBeneficiaryTypes(raw) {
+    const result = [];
+    (raw || "").split(",").forEach((part) => {
+      const p = part.trim();
+      const colon = p.indexOf(":");
+      if (colon > 0) {
+        result.push({ value: p.slice(0, colon).trim(), label: p.slice(colon + 1).trim() });
+      }
+    });
+    return result;
+  }
+
+  function getCsrfToken() {
+    return fetch("/api/csrf-token", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d) => d.token || "")
+      .catch(() => "");
+  }
+
+  // ── Stepper UI ────────────────────────────────────────────────────────────
+
+  function updateStepper(step) {
+    document.querySelectorAll("[data-step-indicator]").forEach((el) => {
+      const n = parseInt(el.dataset.stepIndicator, 10);
+      el.classList.remove("is-active", "is-done");
+      if (n < step) el.classList.add("is-done");
+      else if (n === step) el.classList.add("is-active");
+    });
+  }
+
+  function showStep(n) {
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+      $(`setupStep${i}`)?.classList.toggle("d-none", i !== n);
+    }
+    updateStepper(n);
+
+    const prevBtn = $("setupPrevBtn");
+    const nextBtn = $("setupNextBtn");
+    const submitBtn = $("setupSubmitBtn");
+
+    prevBtn.style.visibility = n === 1 ? "hidden" : "visible";
+    nextBtn.classList.toggle("d-none", n === TOTAL_STEPS);
+    submitBtn.classList.toggle("d-none", n !== TOTAL_STEPS);
+
+    if (n === 4) renderBeneficiaryPreview();
+    if (n === 5) renderRecap();
+
+    currentStep = n;
+    hideAlert();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ── Preset chips ──────────────────────────────────────────────────────────
+
+  function renderPresetChips(orgContext) {
+    const container = $("beneficiaryPresets");
+    if (!container) return;
+    container.innerHTML = "";
+    Object.entries(BENEFICIARY_PRESETS).forEach(([ctx, value]) => {
+      const labels = parseBeneficiaryTypes(value).map((t) => t.label).join(" + ");
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "preset-chip" + (ctx === orgContext ? " border-brand" : "");
+      chip.style.borderColor = ctx === orgContext ? "var(--brand)" : "";
+      chip.style.background = ctx === orgContext ? "var(--brand-soft)" : "";
+      chip.textContent = labels;
+      chip.addEventListener("click", () => {
+        $("setupBeneficiaryTypes").value = value;
+        renderPresetChips(ctx);
+        $("setupOrgContext").value = ctx;
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  // ── Preview & recap ───────────────────────────────────────────────────────
+
+  function renderBeneficiaryPreview() {
+    const raw = $("setupBeneficiaryTypes").value.trim()
+      || BENEFICIARY_PRESETS[$("setupOrgContext").value]
+      || BENEFICIARY_PRESETS.public_collectivite;
+    const types = parseBeneficiaryTypes(raw);
+    const container = $("setupBeneficiaryPreview");
+    if (!container) return;
+    if (!types.length) {
+      container.innerHTML = '<p class="text-muted">Aucun type configuré.</p>';
+      return;
+    }
+    container.innerHTML = '<div class="d-flex flex-wrap gap-2">' +
+      types.map((t) =>
+        `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2" style="font-size:.9rem">${escHtml(t.label)}</span>`
+      ).join("") +
+      "</div>";
+  }
+
+  function renderRecap() {
+    const orgContextLabels = {
+      public_collectivite:  "Collectivité territoriale",
+      public_administration: "Administration publique",
+      private_company:       "Entreprise privée",
+      association:           "Association",
+    };
+    const rows = [
+      ["Type d'organisation", orgContextLabels[$("setupOrgContext").value] || "-"],
+      ["Nom de l'organisation", $("setupOrgName").value.trim() || "(non renseigné)"],
+      ["Email DPO", $("setupDpoEmail").value.trim() || "(non renseigné)"],
+      ["Contact support", $("setupSupportName").value.trim() || "(non renseigné)"],
+      ["Rôle support", $("setupSupportRole").value.trim() || "(non renseigné)"],
+      ["Email support", $("setupSupportEmail").value.trim() || "(non renseigné)"],
+      ["Types de bénéficiaires", $("setupBeneficiaryTypes").value.trim() || BENEFICIARY_PRESETS[$("setupOrgContext").value]],
+    ];
+    $("setupRecap").innerHTML = rows.map(([label, value]) => `
+      <div class="setup-recap__row">
+        <span class="setup-recap__label">${escHtml(label)}</span>
+        <span class="setup-recap__value">${escHtml(value)}</span>
+      </div>
+    `).join("");
+  }
+
+  function escHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ── Validation par étape ──────────────────────────────────────────────────
+
+  function validateStep(n) {
+    if (n === 2 && !$("setupOrgName").value.trim()) {
+      showAlert("Le nom de l'organisation est obligatoire.");
+      $("setupOrgName").focus();
+      return false;
+    }
+    return true;
+  }
+
+  // ── Soumission ────────────────────────────────────────────────────────────
+
+  async function submitSetup() {
+    const btn = $("setupSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Enregistrement…";
+    hideAlert();
+
+    try {
+      const csrf = await getCsrfToken();
+      const body = {
+        org_context:       $("setupOrgContext").value,
+        beneficiary_types: $("setupBeneficiaryTypes").value.trim()
+          || BENEFICIARY_PRESETS[$("setupOrgContext").value],
+        org_name:          $("setupOrgName").value.trim(),
+        dpo_email:         $("setupDpoEmail").value.trim(),
+        support_name:      $("setupSupportName").value.trim(),
+        support_role:      $("setupSupportRole").value.trim(),
+        support_email:     $("setupSupportEmail").value.trim(),
+      };
+
+      const res = await fetch("/api/setup/complete", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur ${res.status}`);
+      }
+
+      // Succès → portail admin
+      try {
+        sessionStorage.setItem("adminFlashNotice", "Configuration initiale enregistrée avec succès.");
+      } catch (_) {}
+      window.location.href = "admin.html";
+    } catch (err) {
+      showAlert(`Impossible d'enregistrer la configuration : ${err.message}`);
+      btn.disabled = false;
+      btn.textContent = "Terminer la configuration";
+    }
+  }
+
+  // ── Initialisation ────────────────────────────────────────────────────────
+
+  async function init() {
+    // Vérifier si setup déjà fait
+    try {
+      const res = await fetch("/api/setup/status", { credentials: "same-origin" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.setupCompleted) {
+          window.location.href = "admin.html";
+          return;
+        }
+        // Pré-remplir avec settings existants
+        if (data.orgContext) $("setupOrgContext").value = data.orgContext;
+        if (data.beneficiaryTypes) $("setupBeneficiaryTypes").value = data.beneficiaryTypes;
+        if (data.orgName) $("setupOrgName").value = data.orgName;
+        if (data.dpoEmail) $("setupDpoEmail").value = data.dpoEmail;
+        if (data.supportName) $("setupSupportName").value = data.supportName;
+        if (data.supportRole) $("setupSupportRole").value = data.supportRole;
+        if (data.supportEmail) $("setupSupportEmail").value = data.supportEmail;
+      }
+    } catch (_) {}
+
+    const ctx = $("setupOrgContext").value || "public_collectivite";
+    if (!$("setupBeneficiaryTypes").value) {
+      $("setupBeneficiaryTypes").value = BENEFICIARY_PRESETS[ctx] || BENEFICIARY_PRESETS.public_collectivite;
+    }
+    renderPresetChips(ctx);
+
+    $("setupOrgContext").addEventListener("change", () => {
+      const newCtx = $("setupOrgContext").value;
+      $("setupBeneficiaryTypes").value = BENEFICIARY_PRESETS[newCtx] || "";
+      renderPresetChips(newCtx);
+    });
+
+    $("setupNextBtn").addEventListener("click", () => {
+      if (!validateStep(currentStep)) return;
+      if (currentStep < TOTAL_STEPS) showStep(currentStep + 1);
+    });
+
+    $("setupPrevBtn").addEventListener("click", () => {
+      if (currentStep > 1) showStep(currentStep - 1);
+    });
+
+    $("setupSubmitBtn").addEventListener("click", submitSetup);
+
+    showStep(1);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

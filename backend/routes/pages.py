@@ -289,6 +289,12 @@ def trash_page():
     return send_from_directory(FRONTEND_DIR, "trash.html")
 
 
+@bp.route("/setup.html")
+@login_required
+def setup_page():
+    return send_from_directory(FRONTEND_DIR, "setup.html")
+
+
 # ---------------------------------------------------------------------------
 # Fichiers statiques
 # ---------------------------------------------------------------------------
