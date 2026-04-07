@@ -6,7 +6,7 @@
   const TOTAL_STEPS = 5;
   const BENEFICIARY_PRESETS = {
     public_collectivite:  "agent:Agent,elu:Élu(e)",
-    public_administration: "agent:Agent,contractuel:Contractuel(le)",
+    public_administration: "fonctionnaire:Fonctionnaire,contractuel:Contractuel(le),prestataire:Prestataire",
     private_company:       "salarie:Salarié(e),prestataire:Prestataire",
     association:           "salarie:Salarié(e),benevole:Bénévole",
   };
