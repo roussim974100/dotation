@@ -2,7 +2,7 @@
 // Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-  const APP_BUILD_VERSION = "2.18.1";
+  const APP_BUILD_VERSION = "2.19.0";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -758,6 +758,58 @@ function applyBrandingContent(settings) {
 
   document.querySelectorAll("[data-app-version]").forEach((node) => {
     node.textContent = APP_BUILD_VERSION;
+  });
+
+  // Radios qualité dynamiques
+  const beneficiaryTypes = settings?.beneficiaryTypes || [
+    { value: "agent", label: "Agent" },
+    { value: "elu", label: "Élu(e)" }
+  ];
+  const orgContext = settings?.orgContext || "public_collectivite";
+
+  document.querySelectorAll("[data-dynamic-qualite]").forEach((container) => {
+    const currentChecked = container.querySelector('input[name="qualite"]:checked')?.value || null;
+    container.innerHTML = "";
+    beneficiaryTypes.forEach((type) => {
+      const label = document.createElement("label");
+      label.className = "choice-chip";
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "qualite";
+      input.value = type.value;
+      if (currentChecked === type.value) input.checked = true;
+      const span = document.createElement("span");
+      span.textContent = type.label;
+      label.append(input, span);
+      container.appendChild(label);
+    });
+    window.dispatchEvent(new CustomEvent("qualite:ready"));
+  });
+
+  // Visibilité du bloc mandat élu selon le contexte organisationnel
+  const eluBlock = document.getElementById("eluBlock");
+  if (eluBlock) {
+    if (orgContext !== "public_collectivite") {
+      eluBlock.dataset.eluBlockDisabled = "true";
+      eluBlock.classList.add("d-none");
+    } else {
+      delete eluBlock.dataset.eluBlockDisabled;
+    }
+  }
+
+  // Options qualité dans les filtres du tableau de bord
+  document.querySelectorAll("[data-dynamic-qualite-filter]").forEach((select) => {
+    const currentVal = select.value;
+    const placeholder = select.querySelector('option[value=""]')?.cloneNode(true);
+    select.innerHTML = "";
+    if (placeholder) select.appendChild(placeholder);
+    beneficiaryTypes.forEach((type) => {
+      const option = document.createElement("option");
+      option.value = type.value;
+      option.textContent = type.label;
+      select.appendChild(option);
+    });
+    if (currentVal) select.value = currentVal;
   });
 
   if (window.APP_TEXT?.app) {

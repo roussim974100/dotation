@@ -185,7 +185,10 @@ function populatePublicForm(payload) {
   document.getElementById("publicSignatureExpiresAt").textContent = formatPublicDateTime(payload.link.expiresAt);
   document.getElementById("publicNom").textContent = formData.beneficiaire.nom || "-";
   document.getElementById("publicPrenom").textContent = formData.beneficiaire.prenom || "-";
-  document.getElementById("publicQualite").textContent = formData.beneficiaire.qualite === "elu" ? "Élu(e)" : "Agent";
+  const qualiteVal = formData.beneficiaire.qualite;
+  const qualiteTypes = window.APP_BRANDING?.beneficiaryTypes;
+  const qualiteFound = qualiteTypes?.find((t) => t.value === qualiteVal);
+  document.getElementById("publicQualite").textContent = qualiteFound ? qualiteFound.label : (qualiteVal === "elu" ? "Élu(e)" : "Agent");
   document.getElementById("publicService").textContent = formData.beneficiaire.service || formData.beneficiaire.fonction || "-";
   document.getElementById("publicMandat").textContent = formData.beneficiaire.mandat || "-";
   renderResourceList("publicMaterialResources", formData.resources.materiel || []);

@@ -26,7 +26,24 @@ DEFAULT_APP_SETTINGS = {
     "support_email": "",
     "support_name": "",
     "support_role": "",
+    "org_context": "public_collectivite",
+    "beneficiary_types": "agent:Agent,elu:Élu(e)",
 }
+
+VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
+
+
+def _parse_beneficiary_types(raw):
+    result = []
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if ":" in part:
+            value, label = part.split(":", 1)
+            value = value.strip()
+            label = label.strip()
+            if value and label:
+                result.append({"value": value, "label": label})
+    return result or [{"value": "agent", "label": "Agent"}, {"value": "elu", "label": "Élu(e)"}]
 
 THEME_PRESETS = {
     "institutionnel": {
@@ -216,6 +233,8 @@ def save_app_settings(connection, updates):
         sanitized["theme_id"] = DEFAULT_APP_SETTINGS["theme_id"]
     if "dark_mode_policy" in sanitized and sanitized["dark_mode_policy"] not in {"disabled", "allowed", "forced"}:
         sanitized["dark_mode_policy"] = DEFAULT_APP_SETTINGS["dark_mode_policy"]
+    if "org_context" in sanitized and sanitized["org_context"] not in VALID_ORG_CONTEXTS:
+        sanitized["org_context"] = DEFAULT_APP_SETTINGS["org_context"]
 
     for key, value in sanitized.items():
         connection.execute(
@@ -310,6 +329,8 @@ def build_public_settings_payload(settings=None):
         "supportEmail": settings.get("support_email") or "",
         "supportName": settings.get("support_name") or "",
         "supportRole": settings.get("support_role") or "",
+        "orgContext": settings.get("org_context") or DEFAULT_APP_SETTINGS["org_context"],
+        "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
     }
 
 
