@@ -136,6 +136,53 @@ def update_admin_settings_route():
     return jsonify(build_public_settings_payload())
 
 
+@bp.route("/api/setup/status", methods=["GET"])
+@login_required
+def setup_status_route():
+    settings = get_app_settings()
+    completed = settings.get("setup_completed", "0") == "1"
+    return jsonify({
+        "setupCompleted": completed,
+        "orgName": settings.get("org_name") or "",
+        "dpoEmail": settings.get("dpo_email") or "",
+        "orgContext": settings.get("org_context") or DEFAULT_APP_SETTINGS["org_context"],
+        "beneficiaryTypes": settings.get("beneficiary_types") or DEFAULT_APP_SETTINGS["beneficiary_types"],
+        "supportName": settings.get("support_name") or "",
+        "supportEmail": settings.get("support_email") or "",
+        "supportRole": settings.get("support_role") or "",
+    })
+
+
+@bp.route("/api/setup/complete", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+def setup_complete_route():
+    payload = request.get_json(silent=True) or {}
+    updates = {
+        "org_name": payload.get("org_name"),
+        "dpo_email": payload.get("dpo_email"),
+        "org_context": payload.get("org_context"),
+        "beneficiary_types": payload.get("beneficiary_types"),
+        "support_name": payload.get("support_name"),
+        "support_email": payload.get("support_email"),
+        "support_role": payload.get("support_role"),
+        "setup_completed": "1",
+    }
+    with get_db() as connection:
+        save_app_settings(connection, updates)
+        insert_app_log(
+            connection,
+            "admin",
+            "setup_completed",
+            "Configuration initiale complétée via le wizard",
+            "settings",
+            "setup",
+            {"org_name": payload.get("org_name"), "org_context": payload.get("org_context")},
+            actor=current_actor(),
+        )
+    return jsonify(build_public_settings_payload())
+
+
 @bp.route("/api/admin/settings/logo-upload", methods=["POST"])
 @login_required
 @permission_required("users.manage")
