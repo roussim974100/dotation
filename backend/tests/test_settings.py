@@ -18,10 +18,10 @@ class TestPublicSettings:
     def test_email_domains_parse_apres_sauvegarde(self, admin_client):
         admin_client.put(
             "/api/admin/settings",
-            json={"email_domains": "ville-publier.fr, agglo.fr"},
+            json={"email_domains": "example.fr, agglo.fr"},
         )
         data = admin_client.get("/api/settings/public").get_json()
-        assert data["emailDomains"] == ["ville-publier.fr", "agglo.fr"]
+        assert data["emailDomains"] == ["example.fr", "agglo.fr"]
 
     def test_email_domains_un_seul(self, admin_client):
         admin_client.put("/api/admin/settings", json={"email_domains": "mairie.fr"})
