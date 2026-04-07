@@ -938,7 +938,7 @@ async function deleteDraft(id) {
 
 function newForm() {
   if (!(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create"))) {
-    window.alert("Votre profil est en consultation seule. La création de dossier n'est pas autorisée.");
+    showToast("Votre profil est en consultation seule. La création de dossier n'est pas autorisée.", "warning");
     return;
   }
   window.location.href = "form.html";
@@ -1362,10 +1362,11 @@ async function preparePdfEmail(id, kind) {
     const emailFileName = `${sanitizeDownloadFileName(`${kind}_pdf_email_${title}`, `${kind}_pdf_email`)}.eml`;
     saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), emailFileName);
   } catch (error) {
-    window.alert(
+    showToast(
       error.message || (kind === "restitution"
         ? "Impossible de préparer l'e-mail du PDF restitution."
-        : "Impossible de préparer l'e-mail du PDF dossier.")
+        : "Impossible de préparer l'e-mail du PDF dossier."),
+      "error"
     );
   }
 }
@@ -1383,7 +1384,7 @@ async function exportDraftPdf(id) {
     const { blob, fileName } = await fetchPdfDocument(id, "dossier");
     saveBlob(blob, fileName);
   } catch (error) {
-    alert("Impossible de générer le PDF dossier.");
+    showToast("Impossible de générer le PDF dossier.", "error");
   }
 }
 
@@ -1392,7 +1393,7 @@ async function exportRestitutionPdf(id) {
     const { blob, fileName } = await fetchPdfDocument(id, "restitution");
     saveBlob(blob, fileName);
   } catch (error) {
-    alert("Impossible de générer le PDF restitution.");
+    showToast("Impossible de générer le PDF restitution.", "error");
   }
 }
 function findDraftSummary(id) {
@@ -1557,9 +1558,9 @@ async function shareSignatureLink(id) {
   try {
     const { absoluteUrl } = await ensureAssignmentSignatureLink(id);
     const copied = await copyTextWithFallback(absoluteUrl, "Copiez ce lien de signature :");
-    window.alert(copied ? "Lien de signature copié dans le presse-papiers." : "Lien de signature prêt à être copié.");
+    showToast(copied ? "Lien de signature copié dans le presse-papiers." : "Lien de signature prêt à être copié.", copied ? "success" : "info");
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer le lien de signature.");
+    showToast(error.message || "Impossible de préparer le lien de signature.", "error");
   }
 }
 
@@ -1573,7 +1574,7 @@ async function prepareAssignmentSignatureEmail(id) {
     const emailDraft = buildAssignmentSignatureEmailContent(draft, absoluteUrl);
     await saveSimpleEmailDraft(emailDraft, `signature_dossier_${draft?.title || id}`);
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer l'e-mail de signature.");
+    showToast(error.message || "Impossible de préparer l'e-mail de signature.", "error");
   }
 }
 
@@ -1589,7 +1590,7 @@ async function prepareAssignmentInfoEmail(id) {
     const emailDraft = buildAssignmentInfoEmailContent(draft);
     await saveSimpleEmailDraft(emailDraft, `information_dossier_${draft?.title || id}`);
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer l'e-mail d'information du dossier.");
+    showToast(error.message || "Impossible de préparer l'e-mail d'information du dossier.", "error");
   }
 }
 
@@ -1597,9 +1598,9 @@ async function copyRestitutionSignatureLink(id) {
   try {
     const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
     const copied = await copyTextWithFallback(absoluteUrl, "Copiez ce lien de signature de restitution :");
-    window.alert(copied ? "Lien de signature de restitution copié dans le presse-papiers." : "Lien de signature de restitution prêt à être copié.");
+    showToast(copied ? "Lien de signature de restitution copié dans le presse-papiers." : "Lien de signature de restitution prêt à être copié.", copied ? "success" : "info");
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer le lien de restitution.");
+    showToast(error.message || "Impossible de préparer le lien de restitution.", "error");
   }
 }
 
@@ -1613,7 +1614,7 @@ async function prepareRestitutionSignatureEmail(id) {
     const emailDraft = buildRestitutionEmailContent(draft, absoluteUrl);
     await saveSimpleEmailDraft(emailDraft, `signature_restitution_${draft?.title || id}`);
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer l'e-mail de restitution.");
+    showToast(error.message || "Impossible de préparer l'e-mail de restitution.", "error");
   }
 }
 
@@ -1629,7 +1630,7 @@ async function prepareRestitutionInfoEmail(id) {
     const emailDraft = buildRestitutionInfoEmailContent(draft);
     await saveSimpleEmailDraft(emailDraft, `information_restitution_${draft?.title || id}`);
   } catch (error) {
-    window.alert(error.message || "Impossible de préparer l'e-mail d'information de restitution.");
+    showToast(error.message || "Impossible de préparer l'e-mail d'information de restitution.", "error");
   }
 }
 function bindSignatureLinkNotice() {
@@ -1646,7 +1647,7 @@ function bindSignatureLinkNotice() {
       }
       try {
         await navigator.clipboard.writeText(link);
-        window.alert("Lien copié.");
+        showToast("Lien copié.", "success");
       } catch (error) {
         window.prompt("Copiez ce lien :", link);
       }
@@ -1668,7 +1669,7 @@ function bindSignatureLinkNotice() {
       if (!linkId) {
         return;
       }
-      if (!window.confirm("Révoquer ce lien de signature ?")) {
+      if (!await askConfirm("Révoquer ce lien de signature ?", { confirmLabel: "Révoquer", confirmClass: "btn-danger" })) {
         return;
       }
       try {
@@ -1677,9 +1678,9 @@ function bindSignatureLinkNotice() {
         });
         persistDashboardSignatureLinkNotice(null);
         renderDashboardSignatureLinkNotice();
-        window.alert("Lien révoqué.");
+        showToast("Lien révoqué.", "success");
       } catch (error) {
-        window.alert(error.message || "Impossible de révoquer ce lien.");
+        showToast(error.message || "Impossible de révoquer ce lien.", "error");
       }
     });
     revokeButton.dataset.boundRevokeLink = "true";
@@ -1945,14 +1946,15 @@ async function exportSelectedRestitutionPdfs() {
 async function deleteSelectedDrafts() {
   const ids = getSelectedDraftIds();
   if (ids.length === 0) {
-    alert("Sélectionnez au moins un dossier à supprimer.");
+    showToast("Sélectionnez au moins un dossier à supprimer.", "warning");
     return;
   }
 
-  const confirmed = window.confirm(
+  const confirmed = await askConfirm(
     ids.length > 1
       ? `Supprimer définitivement les ${ids.length} dossiers sélectionnés ?`
-      : "Supprimer définitivement le dossier sélectionné ?"
+      : "Supprimer définitivement le dossier sélectionné ?",
+    { confirmLabel: "Supprimer", confirmClass: "btn-danger" }
   );
   if (!confirmed) {
     return;
@@ -2041,7 +2043,7 @@ async function removeDraft(id) {
     return;
   }
 
-  const confirmed = window.confirm(`Supprimer le dossier "${item.summary.title}" `);
+  const confirmed = await askConfirm(`Supprimer le dossier "${item.summary.title}" ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }

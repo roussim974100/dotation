@@ -2013,7 +2013,7 @@ async function createSignatureLink(options = {}) {
   if (!form.dataset.draftId) {
     const message = "Enregistrez d'abord le dossier avant de générer un lien.";
     if (!options.silentError) {
-      window.alert(message);
+      showToast(message, "error");
     }
     throw new Error(message);
   }
@@ -2038,12 +2038,12 @@ async function createSignatureLink(options = {}) {
       }
     }
     if (!options.silentSuccess) {
-      window.alert("Le lien de signature a été généré.");
+      showToast("Le lien de signature a été généré.", "success");
     }
     return { link: result.link, absoluteUrl, copied };
   } catch (error) {
     if (!options.silentError) {
-      window.alert(error.message || "Impossible de générer le lien de signature.");
+      showToast(error.message || "Impossible de générer le lien de signature.", "error");
     }
     throw error;
   }
@@ -2166,11 +2166,12 @@ async function requestSaveDecision(options = {}) {
   const message = lines.join("\n\n");
 
   if (options.secondaryLabel) {
-    return window.confirm(message) ? "confirm" : "secondary";
+    const ok = await askConfirm(message, { title: title, confirmLabel: options.confirmLabel, cancelLabel: options.secondaryLabel });
+    return ok ? "confirm" : "secondary";
   }
 
   if (options.showConfirm) {
-    window.alert(message);
+    showToast(message, "info");
     return "confirm";
   }
 

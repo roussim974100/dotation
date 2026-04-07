@@ -262,6 +262,7 @@ function renderWorkflowDialog(options = {}) {
   const showSecondary = Boolean(options.secondaryLabel);
   actionsNode.classList.toggle("d-none", !showConfirm && !showSecondary);
   confirmNode.classList.toggle("d-none", !showConfirm);
+  confirmNode.className = `btn ${options.confirmClass || "btn-primary"}`;
   confirmNode.textContent = options.confirmLabel || "OK";
   secondaryNode.classList.toggle("d-none", !showSecondary);
   secondaryNode.textContent = options.secondaryLabel || "";
@@ -461,12 +462,91 @@ function playCompletionCelebration(kind) {
   return playConfettiCelebration();
 }
 
+// ── Toasts ────────────────────────────────────────────────────────────────
+// Remplace window.alert() pour les retours utilisateur non bloquants.
+// Usage : showToast("Message", "success" | "error" | "warning" | "info", durationMs)
+
+function _getToastStack() {
+  let stack = document.getElementById("toastStack");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.id = "toastStack";
+    stack.className = "toast-stack";
+    stack.setAttribute("aria-live", "polite");
+    stack.setAttribute("aria-atomic", "false");
+    document.body.appendChild(stack);
+  }
+  return stack;
+}
+
+function showToast(message, type, duration) {
+  const _type = type || "info";
+  const _duration = typeof duration === "number" ? duration : 4000;
+  const icons = { success: "✓", error: "✕", warning: "⚠", info: "ℹ" };
+
+  const stack = _getToastStack();
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${_type}`;
+  toast.setAttribute("role", "status");
+
+  const icon = document.createElement("i");
+  icon.className = "toast__icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = icons[_type] || icons.info;
+
+  const msg = document.createElement("span");
+  msg.className = "toast__msg";
+  msg.textContent = String(message || "");
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast__close";
+  closeBtn.type = "button";
+  closeBtn.setAttribute("aria-label", "Fermer");
+  closeBtn.textContent = "×";
+
+  toast.append(icon, msg, closeBtn);
+
+  const dismiss = () => {
+    if (toast.classList.contains("is-dismissing")) return;
+    toast.classList.add("is-dismissing");
+    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  };
+
+  closeBtn.addEventListener("click", dismiss);
+  stack.appendChild(toast);
+
+  if (_duration > 0) {
+    setTimeout(dismiss, _duration);
+  }
+}
+
+// ── Confirm dialog ────────────────────────────────────────────────────────
+// Remplace window.confirm() — retourne une Promise<boolean>.
+// Usage : const ok = await askConfirm("Supprimer ?", { confirmLabel: "Supprimer", confirmClass: "btn-danger" })
+
+function askConfirm(message, options) {
+  const opts = options || {};
+  return askWorkflowDialog({
+    title: opts.title || "Confirmation",
+    text: message,
+    hideSpinner: true,
+    showConfirm: true,
+    confirmLabel: opts.confirmLabel || "Confirmer",
+    confirmClass: opts.confirmClass || "btn-primary",
+    secondaryLabel: opts.cancelLabel || "Annuler",
+  }).then(function(result) { return result === "confirm"; });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.repairMojibakeText = repairMojibakeText;
 window.repairMojibakeInNode = repairMojibakeInNode;
 window.showWorkflowDialog = showWorkflowDialog;
 window.askWorkflowDialog = askWorkflowDialog;
 window.closeWorkflowDialog = closeWorkflowDialog;
 window.playCompletionCelebration = playCompletionCelebration;
+window.showToast = showToast;
+window.askConfirm = askConfirm;
 
 // ───────────────────────────────────────────────────────
 // Menu utilisateur : dark mode toggle, changement mdp

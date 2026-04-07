@@ -2436,6 +2436,92 @@ body.login-shell {
   font-weight: 600;
 }
 
+/* ── Toasts ──────────────────────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: min(24rem, calc(100vw - 2.5rem));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text);
+  animation: toast-in 0.22s ease;
+}
+
+.toast.is-dismissing {
+  animation: toast-out 0.25s ease forwards;
+}
+
+.toast--success { border-left-color: #1f8f59; }
+.toast--error   { border-left-color: #c0392b; }
+.toast--warning { border-left-color: var(--accent); }
+.toast--info    { border-left-color: var(--brand); }
+
+.toast__icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  font-style: normal;
+}
+
+.toast--success .toast__icon { color: #1f8f59; }
+.toast--error   .toast__icon { color: #c0392b; }
+.toast--warning .toast__icon { color: var(--accent); }
+.toast--info    .toast__icon { color: var(--brand); }
+
+.toast__msg { flex: 1; }
+
+.toast__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.toast__close:hover { opacity: 1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(0.75rem); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); max-height: 6rem; margin-bottom: 0; }
+  to   { opacity: 0; transform: translateX(0.75rem); max-height: 0; margin-bottom: -0.5rem; }
+}
+
+[data-color-mode="dark"] .toast {
+  background: #1e2d3d;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e8f0f7;
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+
 .completion-celebration {
   position: fixed;
   inset: 0;

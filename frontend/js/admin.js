@@ -600,11 +600,11 @@ async function saveUser() {
   const passwordError = validatePasswordComplexity(password);
 
   if (!editingUsername && !password) {
-    window.alert("Le mot de passe est obligatoire.");
+    showToast("Le mot de passe est obligatoire.", "error");
     return;
   }
   if (passwordError) {
-    window.alert(passwordError);
+    showToast(passwordError, "error");
     return;
   }
 
@@ -668,7 +668,7 @@ async function approveUser(username) {
 }
 
 async function deleteUser(username) {
-  const confirmed = window.confirm(`Supprimer définitivement le compte "${username}" ?`);
+  const confirmed = await askConfirm(`Supprimer définitivement le compte "${username}" ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }
@@ -713,7 +713,7 @@ async function saveService() {
     is_active: Boolean(byId("service_active")?.checked)
   };
   if (!payload.label) {
-    window.alert("Le libellé du service est obligatoire.");
+    showToast("Le libellé du service est obligatoire.", "error");
     return;
   }
   if (!editingServiceId) {
@@ -742,7 +742,7 @@ async function toggleServiceState(serviceId, nextState) {
 async function deleteService(serviceId) {
   const service = currentServices.find((item) => item.id === serviceId);
   const label = service?.label || "ce service";
-  const confirmed = window.confirm(`Supprimer définitivement le service "${label}" ?`);
+  const confirmed = await askConfirm(`Supprimer définitivement le service "${label}" ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }
@@ -844,11 +844,11 @@ async function saveResource() {
     field_schema: collectResourceFieldSchema()
   };
   if (!payload.label) {
-    window.alert("Le libellé de la ressource est obligatoire.");
+    showToast("Le libellé de la ressource est obligatoire.", "error");
     return;
   }
   if (!payload.code) {
-    window.alert("Le code de la ressource n'a pas pu être généré automatiquement.");
+    showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
     return;
   }
   if (!editingResourceId) {
@@ -877,7 +877,7 @@ async function toggleResourceState(resourceId, nextState) {
 async function deleteResource(resourceId) {
   const resource = currentResources.find((item) => item.id === resourceId);
   const label = resource?.label || "cette ressource";
-  const confirmed = window.confirm(`Supprimer définitivement la ressource "${label}" ?`);
+  const confirmed = await askConfirm(`Supprimer définitivement la ressource "${label}" ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }
