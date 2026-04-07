@@ -2,7 +2,7 @@
 // Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-  const APP_BUILD_VERSION = "2.20.0";
+  const APP_BUILD_VERSION = "2.20.1";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -835,7 +835,69 @@ function applyBrandingContent(settings) {
     logo.alt = "";
   });
 
+  // Bannière setup si configuration initiale non effectuée
+  ensureSetupBanner(settings?.setupCompleted !== false);
+
   revealBrandLogos();
+}
+
+function ensureSetupBanner(setupCompleted) {
+  const DISMISSED_KEY = "setupBannerDismissed";
+  const isSetupPage = window.location.pathname.endsWith("setup.html");
+  const isLoginPage = window.location.pathname.endsWith("login.html") ||
+                      window.location.pathname === "/login" ||
+                      window.location.pathname.endsWith("signup.html");
+
+  // Supprimer la bannière si setup est fait
+  if (setupCompleted || isSetupPage || isLoginPage) {
+    document.getElementById("setupBanner")?.remove();
+    return;
+  }
+
+  // Ne pas afficher si déjà rejetée dans cette session
+  try {
+    if (sessionStorage.getItem(DISMISSED_KEY) === "1") return;
+  } catch (_) {}
+
+  if (document.getElementById("setupBanner")) return;
+
+  const banner = document.createElement("div");
+  banner.id = "setupBanner";
+  banner.className = "setup-banner no-print";
+  banner.setAttribute("role", "alert");
+
+  const inner = document.createElement("div");
+  inner.className = "container setup-banner__inner";
+
+  const text = document.createElement("span");
+  text.className = "setup-banner__text";
+  text.innerHTML = '<strong>Configuration initiale non effectuée.</strong> Paramétrez l\'organisation, les contacts et les types de bénéficiaires avant utilisation.';
+
+  const link = document.createElement("a");
+  link.href = "/setup.html";
+  link.className = "setup-banner__link btn btn-sm btn-light";
+  link.textContent = "Configurer maintenant";
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "setup-banner__dismiss";
+  dismiss.setAttribute("aria-label", "Fermer");
+  dismiss.textContent = "×";
+  dismiss.addEventListener("click", () => {
+    try { sessionStorage.setItem(DISMISSED_KEY, "1"); } catch (_) {}
+    banner.remove();
+  });
+
+  inner.append(text, link, dismiss);
+  banner.appendChild(inner);
+
+  // Insérer après le header ou au début du body
+  const header = document.querySelector(".app-header, .setup-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(banner, header.nextSibling);
+  } else {
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
 }
 
 async function loadBranding(options = {}) {
