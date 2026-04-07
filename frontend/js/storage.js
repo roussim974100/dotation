@@ -693,13 +693,28 @@ function buildDotationPreview(data) {
 
   // Fallback pour les anciens dossiers avec materiel/immateriel hardcodé
   if (!items.length) {
+    const OLD_META = new Set(["selected", "assignedAt", "label", "details"]);
     const materiel = data.materiel || {};
     const immateriel = data.immateriel || {};
-    for (const [, item] of Object.entries(materiel)) {
-      if (item?.selected) pushItem(item.label || "Matériel", item.details || "");
+    for (const [key, item] of Object.entries(materiel)) {
+      if (item?.selected) {
+        const label = item.label || key;
+        const parts = Object.entries(item)
+          .filter(([k]) => !OLD_META.has(k))
+          .map(([, v]) => String(v || "").trim())
+          .filter(Boolean);
+        pushItem(label, item.details || parts.join(" · ") || "");
+      }
     }
-    for (const [, item] of Object.entries(immateriel)) {
-      if (item?.selected) pushItem(item.label || "Immatériel", item.details || "");
+    for (const [key, item] of Object.entries(immateriel)) {
+      if (item?.selected) {
+        const label = item.label || key;
+        const parts = Object.entries(item)
+          .filter(([k]) => !OLD_META.has(k))
+          .map(([, v]) => String(v || "").trim())
+          .filter(Boolean);
+        pushItem(label, item.details || parts.join(" · ") || "");
+      }
     }
   }
 
@@ -2150,27 +2165,51 @@ function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
   }
 
   const additional = data.resources?.additional || [];
-  const returnableResources = additional.filter((r) => r.requiresReturn && r.selected);
   const returnedStates = ["returned", "returned_damaged", "transferred", "conforme", "degrade"];
-  const returnedCount = returnableResources.filter((r) => {
-    const code = r.id || r.code;
-    const item = restitutionItems[code];
-    return item && returnedStates.includes(item.state);
-  }).length;
 
-  sections.push(`Progression restitution : ${returnedCount}/${returnableResources.length} ressource(s) restituée(s)`);
-
-  const pendingLabels = returnableResources
-    .filter((r) => {
+  if (additional.length) {
+    // Nouveau format dynamique
+    const returnableResources = additional.filter((r) => r.requiresReturn && r.selected);
+    const returnedCount = returnableResources.filter((r) => {
       const code = r.id || r.code;
       const item = restitutionItems[code];
-      return !item || !returnedStates.includes(item.state);
-    })
-    .map((r) => r.label || r.id || r.code);
-
-  if (pendingLabels.length) {
-    sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
+      return item && returnedStates.includes(item.state);
+    }).length;
+    sections.push(`Progression restitution : ${returnedCount}/${returnableResources.length} ressource(s) restituée(s)`);
+    const pendingLabels = returnableResources
+      .filter((r) => {
+        const code = r.id || r.code;
+        const item = restitutionItems[code];
+        return !item || !returnedStates.includes(item.state);
+      })
+      .map((r) => r.label || r.id || r.code);
+    if (pendingLabels.length) {
+      sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
+    }
+  } else {
+    // Ancien format (materiel/immateriel hardcodé)
+    const materiel = data.materiel || {};
+    const immateriel = data.immateriel || {};
+    const allOld = [
+      ...Object.entries(materiel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k })),
+      ...Object.entries(immateriel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k })),
+    ];
+    const returnedCount = allOld.filter(({ key }) => {
+      const item = restitutionItems[key];
+      return item && returnedStates.includes(item.state);
+    }).length;
+    sections.push(`Progression restitution : ${returnedCount}/${allOld.length} ressource(s) restituée(s)`);
+    const pendingLabels = allOld
+      .filter(({ key }) => {
+        const item = restitutionItems[key];
+        return !item || !returnedStates.includes(item.state);
+      })
+      .map(({ label }) => label);
+    if (pendingLabels.length) {
+      sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
+    }
   }
+
   return sections;
 }
 
