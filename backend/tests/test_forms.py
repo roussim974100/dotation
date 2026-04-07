@@ -5,7 +5,7 @@ _MINIMAL = {"beneficiaire": {"nom": "Dupont", "prenom": "Jean"}}
 _FULL = {
     "beneficiaire": {"nom": "Martin", "prenom": "Alice", "service": "DSI"},
     "immateriel": {
-        "email": {"selected": True, "adresse": "alice.martin@ville-publier.fr"},
+        "email": {"selected": True, "adresse": "alice.martin@example.fr"},
     },
 }
 
