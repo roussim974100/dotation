@@ -3,7 +3,17 @@
 # deploy-debian.sh — Installation complete de l'application "A Quai"
 # sur un conteneur LXC Debian 12+ vierge.
 #
-# Usage : chmod +x deploy-debian.sh && sudo ./deploy-debian.sh
+# Usage :
+#   chmod +x deploy-debian.sh
+#   sudo ./deploy-debian.sh                          # installation standard (HTTP)
+#   sudo ./deploy-debian.sh --behind-proxy           # derriere un reverse proxy TLS
+#   sudo ./deploy-debian.sh --upgrade                # met aussi a jour les paquets systeme
+#   sudo ./deploy-debian.sh --upgrade --behind-proxy # les deux
+#
+# --behind-proxy : nginx relaie les headers X-Forwarded-* du proxy externe
+#                  au lieu de les reecrire avec les valeurs locales.
+#                  A utiliser quand un HAProxy, nginx frontal ou Traefik
+#                  termine le TLS en amont.
 # ============================================================================
 
 set -euo pipefail
@@ -36,6 +46,20 @@ warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
 fail() { echo -e "${RED}[ERREUR]${NC} $1"; exit 1; }
 
 # ---------------------------------------------------------------------------
+# Parsing des arguments
+# ---------------------------------------------------------------------------
+OPT_UPGRADE=0
+OPT_BEHIND_PROXY=0
+
+for arg in "$@"; do
+    case "${arg}" in
+        --upgrade)       OPT_UPGRADE=1 ;;
+        --behind-proxy)  OPT_BEHIND_PROXY=1 ;;
+        *) fail "Argument inconnu : ${arg}. Options : --upgrade, --behind-proxy" ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
 # Verification root
 # ---------------------------------------------------------------------------
 if [ "$(id -u)" -ne 0 ]; then
@@ -45,6 +69,9 @@ fi
 echo ""
 echo "=========================================="
 echo "  Installation A Quai — Debian LXC"
+if [ "${OPT_BEHIND_PROXY}" -eq 1 ]; then
+echo "  Mode : derriere un reverse proxy TLS"
+fi
 echo "=========================================="
 echo ""
 
@@ -54,7 +81,7 @@ echo ""
 log "Mise a jour des sources..."
 apt-get update -qq
 
-if [ "${1:-}" = "--upgrade" ]; then
+if [ "${OPT_UPGRADE}" -eq 1 ]; then
     log "Mise a jour des paquets systeme (--upgrade)..."
     apt-get upgrade -y -qq
 else
@@ -153,7 +180,12 @@ log "Service ${APP_NAME} demarre."
 # 7. Configuration nginx
 # ---------------------------------------------------------------------------
 log "Configuration de nginx..."
-cat > /etc/nginx/sites-available/${APP_NAME} << EOFNGINX
+
+if [ "${OPT_BEHIND_PROXY}" -eq 1 ]; then
+    # Mode reverse proxy : nginx relaie les headers X-Forwarded-* recus
+    # du proxy frontal (HAProxy, nginx externe, Traefik…) sans les reecrire.
+    # X-Forwarded-Proto vaut "https" cote client meme si nginx est en HTTP ici.
+    cat > /etc/nginx/sites-available/${APP_NAME} << EOFNGINX
 server {
     listen ${LISTEN_PORT};
     server_name ${SERVER_NAME};
@@ -161,15 +193,36 @@ server {
     client_max_body_size 5M;
 
     location / {
-        proxy_pass http://127.0.0.1:${GUNICORN_PORT};
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
+        proxy_pass         http://127.0.0.1:${GUNICORN_PORT};
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$remote_addr;
+        proxy_set_header   X-Forwarded-Proto \$http_x_forwarded_proto;
+        proxy_set_header   X-Forwarded-Host  \$http_x_forwarded_host;
     }
 }
 EOFNGINX
+    warn "Mode reverse proxy : verifier que le proxy frontal envoie bien X-Forwarded-Proto: https."
+else
+    # Mode standard : nginx termine lui-meme la connexion, les headers sont ecrits localement.
+    cat > /etc/nginx/sites-available/${APP_NAME} << EOFNGINX
+server {
+    listen ${LISTEN_PORT};
+    server_name ${SERVER_NAME};
+
+    client_max_body_size 5M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:${GUNICORN_PORT};
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$remote_addr;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_set_header   X-Forwarded-Host  \$host;
+    }
+}
+EOFNGINX
+fi
 
 # Activer le site, desactiver le default
 ln -sf /etc/nginx/sites-available/${APP_NAME} /etc/nginx/sites-enabled/${APP_NAME}
@@ -200,7 +253,19 @@ echo "=========================================="
 echo "  Installation terminee"
 echo "=========================================="
 echo ""
-echo "  Application : http://<IP_DU_LXC>:${LISTEN_PORT}"
+if [ "${OPT_BEHIND_PROXY}" -eq 1 ]; then
+echo "  Mode          : derriere un reverse proxy TLS"
+echo "  Application   : accessible via le proxy frontal (HTTPS)"
+echo "  URL locale    : http://<IP_DU_LXC>:${LISTEN_PORT}  (HTTP uniquement)"
+echo ""
+echo "  >> Verifier que votre proxy frontal envoie :"
+echo "       X-Forwarded-Proto: https"
+echo "       X-Forwarded-Host:  <nom de domaine>"
+echo "     Sinon : boucle de login (cookie Secure non pose)."
+else
+echo "  Application   : http://<IP_DU_LXC>:${LISTEN_PORT}"
+fi
+echo ""
 echo "  Service     : systemctl status ${APP_NAME}"
 echo "  Logs app    : journalctl -u ${APP_NAME} -f"
 echo "  Logs nginx  : journalctl -u nginx -f"
