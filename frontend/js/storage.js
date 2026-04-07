@@ -2477,6 +2477,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     renderDashboardSignatureLinkNotice();
   });
+  document.getElementById("newFormBtn")?.addEventListener("click", newForm);
+  document.getElementById("emptyStateNewFormBtn")?.addEventListener("click", newForm);
   bindDashboardFilters();
   void renderDraftList();
   startDashboardAutoRefresh();

@@ -2490,6 +2490,10 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  document.querySelectorAll("[data-back-to-index]").forEach((btn) => {
+    btn.addEventListener("click", () => { window.location.href = "index.html"; });
+  });
+
   if (!form) {
     return;
   }

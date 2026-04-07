@@ -766,6 +766,9 @@ function showPwdFeedback(el, msg, isError) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-back-btn]").forEach((btn) => {
+    btn.addEventListener("click", () => window.history.back());
+  });
   initBackToTop();
   initContextualHelpLinks();
   initMojibakeRepair();
