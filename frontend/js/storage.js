@@ -363,13 +363,15 @@ function buildDashboardRow(draft, permissions) {
 
 function formatQualiteLabel(item) {
   const qualite = item.beneficiaryType || item.data?.beneficiaire?.qualite;
-  if (qualite === "elu") {
-    return "Élu(e)";
+  if (!qualite) return "Non renseigné";
+  const types = window.APP_BRANDING?.beneficiaryTypes;
+  if (types) {
+    const found = types.find((t) => t.value === qualite);
+    if (found) return found.label;
   }
-  if (qualite === "agent") {
-    return "Agent";
-  }
-  return "Non renseigné";
+  if (qualite === "elu") return "Élu(e)";
+  if (qualite === "agent") return "Agent";
+  return qualite;
 }
 
 function formatStatusLabel(status) {

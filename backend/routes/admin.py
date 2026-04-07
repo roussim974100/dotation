@@ -84,6 +84,11 @@ def admin_settings_route():
         "brand_logo_file": settings.get("brand_logo_file") or "",
         "theme_id": resolve_theme_id(settings),
         "dark_mode_policy": resolve_dark_mode(settings),
+        "org_context": settings.get("org_context") or DEFAULT_APP_SETTINGS["org_context"],
+        "beneficiary_types": settings.get("beneficiary_types") or DEFAULT_APP_SETTINGS["beneficiary_types"],
+        "support_name": settings.get("support_name") or "",
+        "support_email": settings.get("support_email") or "",
+        "support_role": settings.get("support_role") or "",
     }
     payload["themeOptions"] = [
         {"id": key, "label": value["label"]}
@@ -106,6 +111,11 @@ def update_admin_settings_route():
             "brand_logo_url": payload.get("brand_logo_url"),
             "theme_id": payload.get("theme_id"),
             "dark_mode_policy": payload.get("dark_mode_policy"),
+            "org_context": payload.get("org_context"),
+            "beneficiary_types": payload.get("beneficiary_types"),
+            "support_name": payload.get("support_name"),
+            "support_email": payload.get("support_email"),
+            "support_role": payload.get("support_role"),
         })
         insert_app_log(
             connection,

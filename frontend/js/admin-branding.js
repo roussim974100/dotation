@@ -63,7 +63,12 @@ function normalizeBrandingSettings(raw = {}) {
     brand_logo_mode: raw.brand_logo_mode || "url",
     brand_logo_url: raw.brand_logo_url || "",
     theme_id: raw.theme_id || "institutionnel",
-    dark_mode_policy: raw.dark_mode_policy || "disabled"
+    dark_mode_policy: raw.dark_mode_policy || "disabled",
+    org_context: raw.org_context || "public_collectivite",
+    beneficiary_types: raw.beneficiary_types || "agent:Agent,elu:Élu(e)",
+    support_name: raw.support_name || "",
+    support_role: raw.support_role || "",
+    support_email: raw.support_email || ""
   };
 }
 
@@ -75,7 +80,12 @@ function collectBrandingPayload() {
     brand_logo_mode: brandingById("brandingLogoMode")?.value,
     brand_logo_url: brandingById("brandingLogoUrl")?.value.trim(),
     theme_id: brandingById("brandingTheme")?.value,
-    dark_mode_policy: brandingById("brandingDarkMode")?.value
+    dark_mode_policy: brandingById("brandingDarkMode")?.value,
+    org_context: brandingById("brandingOrgContext")?.value,
+    beneficiary_types: brandingById("brandingBeneficiaryTypes")?.value.trim(),
+    support_name: brandingById("brandingSupportName")?.value.trim(),
+    support_role: brandingById("brandingSupportRole")?.value.trim(),
+    support_email: brandingById("brandingSupportEmail")?.value.trim()
   });
 }
 
@@ -251,6 +261,15 @@ async function loadBrandingSettings() {
   `).join("");
   brandingById("brandingTheme").value = raw.theme_id;
   brandingById("brandingDarkMode").value = raw.dark_mode_policy;
+  if (brandingById("brandingOrgContext")) {
+    brandingById("brandingOrgContext").value = raw.org_context || "public_collectivite";
+  }
+  if (brandingById("brandingBeneficiaryTypes")) {
+    brandingById("brandingBeneficiaryTypes").value = raw.beneficiary_types || "agent:Agent,elu:Élu(e)";
+  }
+  if (brandingById("brandingSupportName")) brandingById("brandingSupportName").value = raw.support_name || "";
+  if (brandingById("brandingSupportRole")) brandingById("brandingSupportRole").value = raw.support_role || "";
+  if (brandingById("brandingSupportEmail")) brandingById("brandingSupportEmail").value = raw.support_email || "";
 
   toggleLogoFields(raw.brand_logo_mode);
   updateBrandingPreview(payload.logoUrl, raw.org_name || payload.orgName);

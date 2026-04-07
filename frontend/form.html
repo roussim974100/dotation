@@ -56,7 +56,7 @@
       <div>
         <p class="panel-eyebrow">Saisie</p>
         <h2 class="panel-title">Contexte du dossier</h2>
-        <p class="panel-text">Choisissez le contexte du dossier, puis indiquez s'il concerne un agent ou un(e) élu(e).</p>
+        <p class="panel-text">Choisissez le contexte du dossier, puis indiquez la qualité du bénéficiaire.</p>
       </div>
       <div class="hero-panel__meta">
         <div class="status-pill" id="draftStatus">Nouveau dossier</div>
@@ -130,16 +130,7 @@
 
         <div class="mt-4">
           <span class="form-label d-block mb-2">Qualité</span>
-          <div class="choice-group">
-            <label class="choice-chip">
-              <input type="radio" name="qualite" value="agent">
-              <span>Agent</span>
-            </label>
-            <label class="choice-chip">
-              <input type="radio" name="qualite" value="elu">
-              <span>Élu(e)</span>
-            </label>
-          </div>
+          <div class="choice-group" data-dynamic-qualite></div>
         </div>
 
         <div id="eluBlock" class="mt-3 d-none">

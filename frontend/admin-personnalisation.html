@@ -128,6 +128,58 @@
               <option value="forced">Forcé</option>
             </select>
           </div>
+        </div>
+      </section>
+
+      <section class="content-card mt-4" id="org-context-settings">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Organisation</p>
+            <h2 class="section-title">Contexte organisationnel</h2>
+            <p class="panel-text">Adaptez le vocabulaire et les champs du formulaire selon le type d'organisation.</p>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="brandingOrgContext">Type d'organisation</label>
+            <select class="form-select" id="brandingOrgContext">
+              <option value="public_collectivite">Collectivité territoriale (mairie, intercommunalité…)</option>
+              <option value="public_administration">Administration publique (ministère, préfecture…)</option>
+              <option value="private_company">Entreprise privée</option>
+              <option value="association">Association</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="brandingBeneficiaryTypes">Types de bénéficiaires</label>
+            <input class="form-control" id="brandingBeneficiaryTypes" type="text" placeholder="agent:Agent,elu:Élu(e)">
+            <div class="form-text">Format : <code>valeur:Libellé</code>, séparés par des virgules. Ex : <code>salarie:Salarié,prestataire:Prestataire</code></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card mt-4" id="support-settings">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Contact</p>
+            <h2 class="section-title">Contact support</h2>
+            <p class="panel-text">Ces informations apparaissent dans le pied de page et sur la page contact.</p>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="brandingSupportName">Nom du contact support</label>
+            <input class="form-control" id="brandingSupportName" type="text" placeholder="Prénom Nom">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="brandingSupportRole">Rôle / Fonction</label>
+            <input class="form-control" id="brandingSupportRole" type="text" placeholder="Responsable informatique">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="brandingSupportEmail">Email support</label>
+            <input class="form-control" id="brandingSupportEmail" type="email" placeholder="support@organisation.fr">
+          </div>
           <div class="col-12">
             <div class="header-actions">
               <button class="btn btn-primary" id="saveBrandingBtn" type="button">Enregistrer la personnalisation</button>

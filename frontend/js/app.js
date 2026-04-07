@@ -292,7 +292,8 @@ function collectProgressRequirementsFromForm() {
   }
 
   const qualite = document.querySelector('input[name="qualite"]:checked')?.value || "agent";
-  if (qualite === "elu") {
+  const eluBlockDisabledForReq = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
+  if (qualite === "elu" && !eluBlockDisabledForReq) {
     if (!getFieldValue("mandat")) {
       pushRequirement("mandat", "Mandat");
     }
@@ -1246,6 +1247,10 @@ function initRepeatableResourceLists() {
 
 function initQualite() {
   const radios = document.querySelectorAll('input[name="qualite"]');
+  if (!radios.length) {
+    window.addEventListener("qualite:ready", () => initQualite(), { once: true });
+    return;
+  }
   const service = document.getElementById("service");
   const serviceCustom = document.getElementById("service_custom");
   const serviceDestination = document.getElementById("service_destination");
@@ -1257,8 +1262,10 @@ function initQualite() {
 
   const sync = () => {
     const selectedInput = document.querySelector('input[name="qualite"]:checked');
-    const selected = selectedInput ? selectedInput.value : "agent";
-    const isElu = selected === "elu";
+    const selected = selectedInput ? selectedInput.value : (radios[0]?.value || "agent");
+    const eluBlockEl = document.getElementById("eluBlock");
+    const eluBlockDisabled = Boolean(eluBlockEl?.dataset.eluBlockDisabled);
+    const isElu = selected === "elu" && !eluBlockDisabled;
 
     toggleField("eluBlock", isElu);
     toggleField("serviceFieldBlock", !isElu);
@@ -2117,7 +2124,8 @@ function validateFormData(formData, options = {}) {
     return "Veuillez sélectionner la qualité du bénéficiaire.";
   }
 
-  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat) {
+  const eluBlockDisabledForValidation = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
+  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat && !eluBlockDisabledForValidation) {
     return "Veuillez renseigner le mandat de l'élu.";
   }
 
