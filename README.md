@@ -13,6 +13,7 @@ Application interne de gestion des dotations matérielles — attribution et res
 - [Déploiement rapide — Debian / LXC](#déploiement-rapide--debian--lxc)
 - [Déploiement manuel — Debian / Ubuntu](#déploiement-manuel--debian--ubuntu)
 - [Déploiement Windows — IIS + Waitress](#déploiement-windows--iis--waitress)
+- [Déploiement derrière un reverse proxy existant](#déploiement-derrière-un-reverse-proxy-existant)
 - [Configuration initiale (setup wizard)](#configuration-initiale-setup-wizard)
 - [Fichier users.json](#fichier-usersjson)
 - [Mise à jour en production](#mise-à-jour-en-production)
@@ -352,6 +353,132 @@ C:\inetpub\dotation\backend\.app_secret_key
 ### 7. Vérification
 
 Ouvrir un navigateur et accéder à l'URL configurée dans IIS. Le setup wizard doit s'afficher au premier lancement.
+
+---
+
+## Déploiement derrière un reverse proxy existant
+
+Ce scénario s'applique quand une infrastructure centralisée (HAProxy, nginx frontal, Traefik, Proxmox…) gère déjà les certificats TLS. L'application tourne alors en **HTTP simple** sur son serveur, sans certificat local.
+
+**Architecture :**
+```
+Internet ──HTTPS──▶ Reverse proxy (certificat TLS) ──HTTP──▶ Serveur app (gunicorn/waitress, port 5000)
+```
+
+### Comment l'application gère ce cas
+
+Flask est déjà configuré avec `ProxyFix` (`x_for=1, x_proto=1, x_host=1`). Il lit le header `X-Forwarded-Proto` transmis par le proxy pour savoir si la connexion cliente est en HTTPS.
+
+> **Point critique — boucle de login :** si `SESSION_COOKIE_SECURE=1` est activé mais que le header `X-Forwarded-Proto: https` n'est pas transmis, Flask pense que la connexion est en HTTP et refuse de poser le cookie sécurisé → boucle de login infinie. Toujours vérifier ce header en premier lors d'un problème de session.
+
+### Configuration de l'application (côté serveur app)
+
+Le service systemd ou NSSM doit avoir :
+
+```
+SESSION_COOKIE_SECURE=1
+```
+
+L'application n'a pas besoin de certificat. Le gunicorn ou Waitress écoute en HTTP sur `127.0.0.1:5000`.
+
+Aucun changement dans la configuration nginx locale (si présent sur le serveur app) — il reste en HTTP.
+
+### Exemples de configuration côté reverse proxy
+
+#### HAProxy
+
+```haproxy
+frontend https_in
+    bind *:443 ssl crt /etc/ssl/certs/dotation.pem
+    default_backend dotation_back
+
+backend dotation_back
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+    http-request set-header X-Real-IP         %[src]
+    server app1 192.168.1.10:80 check
+```
+
+> Remplacer `192.168.1.10` par l'IP du serveur applicatif (ou du LXC). Le port `80` suppose que nginx tourne localement sur le serveur app ; utiliser `5000` si Waitress ou gunicorn est exposé directement.
+
+#### Nginx frontal (sur une machine séparée)
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name dotation.exemple.local;
+
+    ssl_certificate     /etc/ssl/certs/dotation.crt;
+    ssl_certificate_key /etc/ssl/private/dotation.key;
+
+    location / {
+        proxy_pass         http://192.168.1.10:80;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_set_header   X-Forwarded-Host  $host;
+    }
+}
+
+server {
+    listen 80;
+    server_name dotation.exemple.local;
+    return 301 https://$host$request_uri;
+}
+```
+
+#### Traefik (docker-compose)
+
+```yaml
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.dotation.rule=Host(`dotation.exemple.local`)"
+  - "traefik.http.routers.dotation.entrypoints=websecure"
+  - "traefik.http.routers.dotation.tls=true"
+  - "traefik.http.services.dotation.loadbalancer.server.port=5000"
+```
+
+Traefik transmet automatiquement `X-Forwarded-Proto: https` quand TLS est activé sur le routeur.
+
+### Nginx local (sur le serveur app) — HTTP uniquement
+
+Si nginx est présent sur le serveur applicatif, sa configuration reste simple — pas de TLS, pas de redirection :
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 5M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header   X-Forwarded-Host  $http_x_forwarded_host;
+    }
+}
+```
+
+> Le nginx local **relaie** les headers `X-Forwarded-*` reçus du proxy frontal plutôt que de les réécrire. C'est ce `proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto` qui préserve la valeur `https` positionnée par le reverse proxy externe.
+
+### Diagnostic rapide
+
+Si l'application semble accessible mais que la connexion boucle ou que les cookies ne sont pas posés :
+
+```bash
+# Vérifier ce que Flask reçoit réellement
+curl -I http://127.0.0.1:5000/login
+# Doit retourner 200
+
+# Tester avec le header attendu
+curl -I -H "X-Forwarded-Proto: https" http://127.0.0.1:5000/login
+```
+
+Depuis les logs gunicorn/waitress, vérifier qu'aucune erreur 400 ou 500 n'apparaît lors de la connexion.
 
 ---
 
