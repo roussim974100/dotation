@@ -1,345 +1,180 @@
-﻿# A quai
+# À Quai
 
-Application interne de gestion des dossiers d'attribution et de restitution.
+Application interne de gestion des dotations matérielles — attribution et restitution de ressources pour les agents, collaborateurs ou élus d'une organisation.
 
-Version courante : `2.12.1`
+**Version :** `3.0.4` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne
 
-## Ce que fait l'application
+---
 
-- creer un dossier pour un agent ou un(e) elu(e)
-- enregistrer un dossier en brouillon ou en attribution partielle
-- verrouiller un dossier complet une fois signe et valide RGPD
-- generer un lien unique de signature a distance pour la remise
-- generer un lien unique de signature a distance pour la restitution
-- tracer les reouvertures de dossier encore modifiable
-- suivre la restitution des ressources materielles
-- administrer les comptes, les groupes, les services et les ressources attribuables
-- définir des ressources personnalisées avec leurs champs métier, leur suivi à l'attribution et leur restitution éventuelle
-- réorganiser l'ordre d'affichage des ressources par service avec une page dédiée
-- consulter un journal des actions
-- restaurer des suppressions via une corbeille reservee aux admins
-- exporter les dossiers et les restitutions en PDF
-- proteger les signatures dans les exports PDF selon le profil connecte
-- exporter les donnees en Excel
+## Sommaire
 
-## Types de dossier
+- [Fonctionnalités](#fonctionnalités)
+- [Prérequis](#prérequis)
+- [Déploiement rapide — Debian / LXC](#déploiement-rapide--debian--lxc)
+- [Déploiement manuel — Debian / Ubuntu](#déploiement-manuel--debian--ubuntu)
+- [Déploiement Windows — IIS + Waitress](#déploiement-windows--iis--waitress)
+- [Configuration initiale (setup wizard)](#configuration-initiale-setup-wizard)
+- [Fichier users.json](#fichier-usersjson)
+- [Mise à jour en production](#mise-à-jour-en-production)
+- [Variables d'environnement](#variables-denvironnement)
+- [Architecture](#architecture)
+- [Sécurité](#sécurité)
+- [Limites SQLite](#limites-sqlite)
+- [Développement local](#développement-local)
 
-- `arrivee` : nouvelle arrivee
-- `changement_service` : mobilite interne
-- `mise_a_jour` : mise a jour de ressources
-- `sortie` : sortie ou restitution
+---
 
-## Documents du projet
+## Fonctionnalités
 
-- `LIVRAISON.md` : vue de remise du projet
-- `GUIDE_UTILISATEUR.md` : guide d'usage rapide
-- `RECETTE_FONCTIONNELLE.md` : checklist et scenarios de test
-- `wikijs.md` : documentation prete a integrer dans Wiki.js
-- `version/versions/` : archives documentaires par version
+**Dossiers**
+- Créer, modifier et verrouiller des dossiers d'attribution pour agents, élus, salariés…
+- 4 types de dossier : nouvelle arrivée, changement de service, mise à jour, sortie
+- Ressources configurables par l'admin (avec champs métier, suivi à l'attribution, restitution)
+- Import / export CSV du catalogue de services
 
-## Architecture
+**Signature**
+- Signature directe sur l'écran ou via lien sécurisé à usage unique envoyé au bénéficiaire
+- Signature de restitution distincte
+- Protection de la signature dans les PDF selon les droits du profil
 
-- `frontend/` : interface HTML, CSS et JavaScript servie par Flask
-- `backend/` : API Flask, authentification et persistance SQLite
-  - `app.py` : point d'entree Flask, enregistrement des blueprints et init DB (256 lignes)
-  - `config.py` : constantes et chemins
-  - `utils.py` : fonctions utilitaires partagees
-  - `database.py` : acces SQLite et helpers de schema
-  - `auth.py` : decorateurs, gestion des comptes et rate limiting
-  - `models/` : logique metier (workflow, dossier, signature, audit, settings, catalog, forms)
-  - `routes/` : blueprints Flask (admin, forms, pages, signature)
-  - `pdf/` : generation des PDF dossier et restitution via `fpdf2`
+**Restitution**
+- Écran dédié : état par ressource (conforme, dégradé, manquant…), commentaires, date
+- PDF de restitution distinct du PDF d'attribution
 
-## Prerequis avant lancement
+**Exports**
+- PDF dossier et PDF restitution
+- Export Excel (dossiers + ressources)
+- Export groupé multi-sélection
 
-Pour un nouveau deploiement dans une collectivite ou une entreprise, prevoir :
+**Administration**
+- Gestion des comptes, groupes et permissions
+- Catalogue des services et des ressources (ordre, activation, champs)
+- Personnalisation : logo, couleur, nom d'organisation, email DPO, contact support
+- Contexte organisationnel : collectivité, administration, entreprise, association
+- Journal d'audit, corbeille avec restauration
+- Mode sombre intégré
 
-- `Python 3.11` ou plus recent
-- `pip`
-- un systeme capable d'executer Flask en service
-- un reverse proxy pour la production
-  - par exemple `nginx` + `gunicorn`
-- un stockage local rapide pour la base SQLite
-  - eviter de placer la base sur un partage reseau SMB
-- un certificat TLS si l'application est exposee en HTTPS
+**White-label**
+- Setup wizard guidé au premier lancement
+- Types de bénéficiaires configurables selon le contexte (agent, élu, fonctionnaire, militaire, salarié…)
+- Aucune référence au déploiement initial dans une installation neuve
 
-Dependances Python du projet :
+---
 
-- `flask`
-- `bcrypt`
-- `fpdf2`
+## Prérequis
 
-Installation recommandee sous Windows :
+| Composant | Version minimale |
+|---|---|
+| Python | 3.11 |
+| pip | récent |
+| Système | Debian 12+, Ubuntu 22.04+, Windows Server 2019+ |
+| Reverse proxy | nginx (Linux) ou IIS avec ARR (Windows) |
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
+Dépendances Python (installées automatiquement) :
+
+```
+flask==3.1.3
+bcrypt==5.0.0
+fpdf2==2.8.7
+werkzeug==3.1.7
 ```
 
-Installation recommandee sous Linux `VM` ou `LXC` :
+> **Important :** la base SQLite doit être sur le disque local du serveur. Ne jamais placer `dotation.db` sur un partage réseau SMB — risque de corruption par verrouillage.
+
+---
+
+## Déploiement rapide — Debian / LXC
+
+Un script automatisé est disponible pour un conteneur LXC ou une VM Debian 12+ vierge :
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
+# Depuis la racine du projet (ou après git clone)
+chmod +x scripts/deploy-debian.sh
+sudo ./scripts/deploy-debian.sh
 ```
 
-## Premier deploiement
+Le script effectue automatiquement :
+1. Installation des paquets système (Python, nginx, git)
+2. Clonage du dépôt dans `/opt/dotation`
+3. Création du venv Python et installation des dépendances
+4. Génération de la clé secrète applicative
+5. Configuration du service systemd `dotation`
+6. Configuration nginx en proxy sur le port 80
+7. Vérification de l'accessibilité HTTP
 
-### 1. Copier le projet
-
-Placer le projet dans un dossier applicatif, par exemple :
-
-Sous Windows :
-
-```text
-C:\www\dotation
-```
-
-Sous Linux :
-
-```text
-/opt/dotation
-```
-
-### 2. Preparer les variables d'environnement
-
-Variables recommandees avant le lancement :
-
-- `APP_SECRET_KEY`
-- `SESSION_COOKIE_SECURE=1` en production HTTPS
-
-Exemple Windows PowerShell :
-
-```powershell
-$env:APP_SECRET_KEY="une-cle-longue-et-aleatoire"
-$env:SESSION_COOKIE_SECURE="1"
-python backend\app.py
-```
-
-Exemple Linux bash :
+Pour mettre à jour les paquets système en même temps :
 
 ```bash
-export APP_SECRET_KEY="une-cle-longue-et-aleatoire"
-export SESSION_COOKIE_SECURE="1"
-python3 backend/app.py
+sudo ./scripts/deploy-debian.sh --upgrade
 ```
 
-### 3. Creer le fichier des utilisateurs
+Après l'installation, accéder à :
 
-L'authentification repose sur :
-
-- `backend/users.json`
-
-Ce fichier contient :
-
-- les groupes
-- les permissions
-- les comptes applicatifs
-- les mots de passe sous forme de hash `bcrypt`
-
-Le projet charge ce fichier via `backend/app.py` avec :
-
-- `USERS_FILE = os.path.join(BASE_DIR, "users.json")`
-
-### 4. Generer un hash bcrypt pour le premier administrateur
-
-Avant de creer le fichier, generer un hash pour le mot de passe admin :
-
-Sous Windows :
-
-```powershell
-python -c "import bcrypt; print(bcrypt.hashpw('ChangezMoi123!'.encode(), bcrypt.gensalt()).decode())"
+```
+http://<IP_DU_SERVEUR>/
 ```
 
-Sous Linux :
+> Le setup wizard s'affiche automatiquement au premier lancement pour configurer l'organisation.
 
-```bash
-python3 -c "import bcrypt; print(bcrypt.hashpw('ChangezMoi123!'.encode(), bcrypt.gensalt()).decode())"
-```
+---
 
-Remplacer ensuite `ChangezMoi123!` par un mot de passe fort propre au client.
+## Déploiement manuel — Debian / Ubuntu
 
-### 5. Exemple minimal de `backend/users.json`
-
-Pour un nouveau deploiement, vous pouvez partir de ce modele minimal :
-
-```json
-{
-  "_comment": "Configuration locale des groupes et comptes applicatifs. Les mots de passe sont stockes haches avec bcrypt.",
-  "groups": {
-    "lecture": {
-      "label": "Lecture",
-      "description": "Consultation seule, sans possibilite de saisie.",
-      "permissions": [
-        "forms.read_list",
-        "forms.read_detail",
-        "forms.export"
-      ],
-      "data_scope": "full"
-    },
-    "redaction": {
-      "label": "Redaction",
-      "description": "Creation et modification des fiches en cours.",
-      "permissions": [
-        "forms.read_list",
-        "forms.read_detail",
-        "forms.create",
-        "forms.edit",
-        "forms.export"
-      ],
-      "data_scope": "full"
-    },
-    "gestion": {
-      "label": "Gestion",
-      "description": "Gestion avancee avec restitution et export.",
-      "permissions": [
-        "forms.read_list",
-        "forms.read_detail",
-        "forms.create",
-        "forms.edit",
-        "forms.restitution",
-        "forms.export"
-      ],
-      "data_scope": "full"
-    },
-    "admin": {
-      "label": "Administration",
-      "description": "Controle total et gestion des utilisateurs.",
-      "permissions": [
-        "forms.read_list",
-        "forms.read_detail",
-        "forms.create",
-        "forms.edit",
-        "forms.restitution",
-        "forms.export",
-        "forms.delete",
-        "users.manage",
-        "*"
-      ],
-      "data_scope": "full"
-    }
-  },
-  "users": [
-    {
-      "username": "admin",
-      "password_hash": "COLLER_ICI_LE_HASH_BCRYPT",
-      "groups": [
-        "admin"
-      ],
-      "is_active": true,
-      "status": "active"
-    }
-  ]
-}
-```
-
-### 6. Premier lancement
-
-Depuis la racine du projet :
-
-Sous Windows :
-
-```powershell
-python backend\app.py
-```
-
-Sous Linux :
-
-```bash
-python3 backend/app.py
-```
-
-Puis ouvrir :
-
-```text
-http://127.0.0.1:5000/
-```
-
-Au premier lancement, l'application initialise automatiquement la base SQLite et les tables necessaires.
-
-### 7. Verification minimale avant mise en service
-
-- connexion avec le compte `admin`
-- acces au tableau de bord
-- acces au menu `Administration`
-- creation d'un dossier test
-- export PDF test
-- verification de l'ecriture dans la base SQLite
-- verification des droits sur `backend/users.json`
-
-## Deploiement Linux VM ou LXC
-
-Pour une `VM Linux` ou un conteneur `LXC`, la base recommandee est :
-
-- `Debian 12` ou `Ubuntu 22.04/24.04`
-- un utilisateur applicatif dedie
-- `nginx` en frontal
-- `gunicorn` pour servir Flask
-- un repertoire applicatif local
-  - par exemple `/opt/dotation`
-
-### Paquets systeme recommandes
+### 1. Paquets système
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip nginx
+sudo apt install -y python3 python3-venv python3-pip nginx git
 ```
 
-### Preparation du projet
+### 2. Récupérer le projet
 
 ```bash
 sudo mkdir -p /opt/dotation
-sudo chown -R $USER:$USER /opt/dotation
+sudo chown $USER:$USER /opt/dotation
+git clone https://github.com/roussim974100/dotation.git /opt/dotation
 cd /opt/dotation
 ```
 
-Puis copier les fichiers du projet dans ce repertoire, creer le venv et installer les dependances :
+### 3. Environnement Python
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
+pip install gunicorn
 ```
 
-### Lancement de verification
+### 4. Clé secrète
 
 ```bash
-source /opt/dotation/.venv/bin/activate
-export APP_SECRET_KEY="une-cle-longue-et-aleatoire"
-python3 /opt/dotation/backend/app.py
+python3 -c "import secrets; print(secrets.token_hex(32))" > backend/.app_secret_key
+chmod 600 backend/.app_secret_key
 ```
 
-### Service `gunicorn` conseille
+La clé est lue automatiquement par l'application au démarrage.
 
-Exemple de service systemd :
+### 5. Service systemd
+
+Créer `/etc/systemd/system/dotation.service` :
 
 ```ini
 [Unit]
-Description=Dotation Flask via Gunicorn
+Description=A Quai — Dotation Flask via Gunicorn
 After=network.target
 
 [Service]
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/dotation
-Environment="APP_SECRET_KEY=une-cle-longue-et-aleatoire"
 Environment="SESSION_COOKIE_SECURE=1"
 ExecStart=/opt/dotation/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 backend.app:app
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
-
-Exemple de fichier :
-
-```text
-/etc/systemd/system/dotation.service
-```
-
-Activation :
 
 ```bash
 sudo systemctl daemon-reload
@@ -347,9 +182,35 @@ sudo systemctl enable --now dotation
 sudo systemctl status dotation
 ```
 
-### Proxy `nginx` conseille
+### 6. Nginx — proxy HTTP
 
-Exemple de virtual host :
+Créer `/etc/nginx/sites-available/dotation` :
+
+```nginx
+server {
+    listen 80;
+    server_name dotation.exemple.local;
+
+    client_max_body_size 5M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Host  $host;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/dotation /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 7. Nginx — proxy HTTPS (certificat existant)
 
 ```nginx
 server {
@@ -362,268 +223,386 @@ server {
     listen 443 ssl;
     server_name dotation.exemple.local;
 
-    ssl_certificate /etc/ssl/certs/dotation.crt;
+    ssl_certificate     /etc/ssl/certs/dotation.crt;
     ssl_certificate_key /etc/ssl/private/dotation.key;
 
+    client_max_body_size 5M;
+
     location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $host;
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Host  $host;
     }
 }
 ```
 
-Puis :
+> **Note LXC :** si un reverse proxy externe (Proxmox, HAProxy) termine déjà le TLS avant le conteneur, conserver `SESSION_COOKIE_SECURE=1` et s'assurer que les headers `X-Forwarded-*` sont bien transmis jusqu'au backend Flask.
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
+---
+
+## Déploiement Windows — IIS + Waitress
+
+Cette configuration convient à un serveur Windows Server avec IIS existant.
+
+**Architecture :**
+```
+Internet → IIS (ARR reverse proxy, port 443/80) → Waitress (port 5000) → Flask
 ```
 
-### Points d'attention LXC
+### Prérequis IIS
 
-Dans un conteneur `LXC` :
+Depuis le **Gestionnaire de serveur** ou PowerShell, installer :
+- IIS (rôle Serveur Web)
+- Module **URL Rewrite** — [téléchargement Microsoft](https://www.iis.net/downloads/microsoft/url-rewrite)
+- Module **Application Request Routing (ARR)** — [téléchargement Microsoft](https://www.iis.net/downloads/microsoft/application-request-routing)
 
-- conserver la base SQLite sur le disque local du conteneur
-- eviter les montages reseau pour la base
-- verifier les droits d'ecriture sur :
-  - `backend/users.json`
-  - le fichier SQLite cree par l'application
-  - les assets de branding personnalises si le televersement de logo est utilise
-- si un reverse proxy externe termine deja le HTTPS, conserver tout de meme les bons headers `X-Forwarded-*`
+Activer le proxy dans ARR :
 
-## Capacite SQLite
+```
+IIS Manager → Application Request Routing Cache → Server Proxy Settings
+→ cocher "Enable proxy" → Apply
+```
 
-L'application utilise `SQLite`, ce qui convient bien a un usage interne modere.
+### 1. Installer Python
 
-En pratique :
+Télécharger Python 3.11+ depuis [python.org](https://www.python.org/downloads/) et cocher **"Add Python to PATH"** lors de l'installation.
 
-- quelques dizaines d'utilisateurs sont generalement supportes sans difficulte
-- autour de `10 a 30 utilisateurs simultanes`, le fonctionnement reste en general confortable
-- entre `30 et 80 utilisateurs simultanes`, cela peut encore tenir selon le serveur et le volume d'ecritures
-- au-dela, le point de vigilance principal devient la concurrence en ecriture
-
-Important :
-
-- `SQLite` gere bien les lectures concurrentes
-- `SQLite` serialise les ecritures
-- si beaucoup d'utilisateurs enregistrent en meme temps, des attentes ou verrous peuvent apparaitre
-
-Pour une petite ou moyenne collectivite, cette architecture peut suffire.
-
-Si l'application doit supporter :
-
-- beaucoup d'utilisateurs simultanes
-- de fortes ecritures concurrentes
-- plusieurs services actifs en permanence
-- une volumetrie croissante sur plusieurs annees
-
-alors il faut envisager a terme une migration vers `PostgreSQL`.
-
-## Fichiers principaux
-
-- `frontend/index.html` : tableau de bord des dossiers
-- `frontend/form.html` : creation et mise a jour d'un dossier
-- `frontend/restitution.html` : restitution des ressources materielles
-- `frontend/signature.html` : page publique de signature via lien securise
-- `frontend/admin.html` : portail administration
-- `frontend/admin-comptes.html` : gestion des comptes
-- `frontend/admin-services.html` : catalogue des services
-- `frontend/admin-ressources.html` : catalogue des ressources
-- `frontend/logs.html` : journal des actions
-- `frontend/trash.html` : corbeille administrateur
-- `backend/app.py` : point d'entree Flask et routes
-- `backend/auth.py` : authentification, decorateurs et gestion des comptes
-- `backend/models/workflow.py` : calculs de statut, validation des ressources
-- `backend/models/settings.py` : parametres applicatifs, logo et theme
-- `backend/models/signature.py` : liens de signature a distance
-- `backend/models/audit.py` : journal et tracabilite
-- `backend/pdf/attribution.py` : generation du PDF dossier
-- `backend/pdf/restitution.py` : generation du PDF restitution
-
-## Lancement
-
-Depuis la racine du projet :
+### 2. Préparer le projet
 
 ```powershell
+# Placer le projet dans un répertoire applicatif
+# Exemple : C:\inetpub\dotation
+
+python -m venv C:\inetpub\dotation\.venv
+C:\inetpub\dotation\.venv\Scripts\pip install -r C:\inetpub\dotation\backend\requirements.txt
+C:\inetpub\dotation\.venv\Scripts\pip install waitress
+```
+
+### 3. Clé secrète
+
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))" | Out-File -Encoding ASCII C:\inetpub\dotation\backend\.app_secret_key
+```
+
+### 4. Lancer Waitress comme service Windows (via NSSM)
+
+Télécharger **NSSM** (Non-Sucking Service Manager) sur [nssm.cc](https://nssm.cc/download).
+
+```powershell
+# Depuis le répertoire de nssm
+nssm install dotation "C:\inetpub\dotation\.venv\Scripts\waitress-serve.exe"
+nssm set dotation AppParameters "--port=5000 --threads=4 backend.app:app"
+nssm set dotation AppDirectory "C:\inetpub\dotation"
+nssm set dotation AppEnvironmentExtra "SESSION_COOKIE_SECURE=1"
+nssm start dotation
+```
+
+Vérifier que Waitress répond :
+
+```powershell
+Invoke-WebRequest http://localhost:5000/login
+```
+
+### 5. Configurer IIS comme proxy
+
+Dans le **Gestionnaire IIS**, créer un nouveau site ou utiliser le site par défaut.
+
+Créer le fichier `web.config` à la racine du site IIS (`C:\inetpub\dotation\` ou le répertoire du site) :
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="Proxy vers Waitress" stopProcessing="true">
+          <match url="(.*)" />
+          <action type="Rewrite" url="http://localhost:5000/{R:1}" />
+          <serverVariables>
+            <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+          </serverVariables>
+        </rule>
+      </rules>
+    </rewrite>
+    <security>
+      <requestFiltering>
+        <requestLimits maxAllowedContentLength="5242880" />
+      </requestFiltering>
+    </security>
+  </system.webServer>
+</configuration>
+```
+
+> Adapter `value="https"` en `value="http"` si le site IIS n'est pas en HTTPS.
+
+### 6. Droits sur les fichiers
+
+Le compte d'application IIS (`IIS AppPool\NomDuPool` ou `NETWORK SERVICE`) doit avoir les droits **lecture/écriture** sur :
+
+```
+C:\inetpub\dotation\backend\dotation.db
+C:\inetpub\dotation\backend\users.json
+C:\inetpub\dotation\backend\.app_secret_key
+```
+
+### 7. Vérification
+
+Ouvrir un navigateur et accéder à l'URL configurée dans IIS. Le setup wizard doit s'afficher au premier lancement.
+
+---
+
+## Configuration initiale (setup wizard)
+
+Au premier accès en tant qu'administrateur, l'application affiche un assistant de configuration en 5 étapes :
+
+1. **Type d'organisation** — collectivité territoriale, administration, entreprise privée, association
+2. **Identité** — nom de l'organisation, email DPO
+3. **Contact support** — nom, rôle et email de l'administrateur applicatif
+4. **Types de bénéficiaires** — pré-remplis selon le contexte (modifiables)
+5. **Récapitulatif** — validation avant enregistrement
+
+Les types de bénéficiaires par défaut selon le contexte :
+
+| Contexte | Types par défaut |
+|---|---|
+| Collectivité territoriale | Agent, Élu(e) |
+| Administration publique | Fonctionnaire, Contractuel(le), Prestataire |
+| Entreprise privée | Salarié(e), Prestataire |
+| Association | Salarié(e), Bénévole |
+
+Ces valeurs sont personnalisables. Pour un ministère avec personnel militaire, ajouter `militaire:Militaire` dans les types.
+
+---
+
+## Fichier users.json
+
+L'authentification repose sur `backend/users.json`. Ce fichier contient les groupes, permissions et comptes utilisateurs.
+
+### Générer un hash bcrypt pour le premier admin
+
+```bash
+python3 -c "import bcrypt; print(bcrypt.hashpw(b'MotDePasseForT!', bcrypt.gensalt()).decode())"
+```
+
+```powershell
+python -c "import bcrypt; print(bcrypt.hashpw(b'MotDePasseForT!', bcrypt.gensalt()).decode())"
+```
+
+### Modèle minimal
+
+```json
+{
+  "groups": {
+    "lecture": {
+      "label": "Lecture",
+      "permissions": ["forms.read_list", "forms.read_detail", "forms.export"],
+      "data_scope": "full"
+    },
+    "redaction": {
+      "label": "Rédaction",
+      "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.export"],
+      "data_scope": "full"
+    },
+    "gestion": {
+      "label": "Gestion",
+      "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"],
+      "data_scope": "full"
+    },
+    "admin": {
+      "label": "Administration",
+      "permissions": ["*"],
+      "data_scope": "full"
+    }
+  },
+  "users": [
+    {
+      "username": "admin",
+      "password_hash": "COLLER_ICI_LE_HASH_BCRYPT",
+      "groups": ["admin"],
+      "is_active": true,
+      "status": "active"
+    }
+  ]
+}
+```
+
+### Tableau des permissions
+
+| Permission | Description |
+|---|---|
+| `forms.read_list` | Voir la liste des dossiers |
+| `forms.read_detail` | Ouvrir le détail d'un dossier |
+| `forms.create` | Créer un dossier |
+| `forms.edit` | Modifier un dossier |
+| `forms.restitution` | Gérer les restitutions |
+| `forms.export` | Exporter PDF et Excel |
+| `forms.delete` | Supprimer des dossiers |
+| `users.manage` | Gérer les comptes utilisateurs |
+| `*` | Toutes les permissions (admin) |
+
+> `data_scope: "masked"` : les noms des bénéficiaires sont masqués pour conformité RGPD.
+
+---
+
+## Mise à jour en production
+
+### Debian / LXC
+
+```bash
+cd /opt/dotation
+git pull origin main
+/opt/dotation/.venv/bin/pip install -r backend/requirements.txt
+sudo systemctl restart dotation
+```
+
+### Windows / IIS
+
+```powershell
+cd C:\inetpub\dotation
+git pull origin main
+C:\inetpub\dotation\.venv\Scripts\pip install -r backend\requirements.txt
+nssm restart dotation
+```
+
+L'application applique automatiquement les évolutions de schéma de base de données au redémarrage (`ensure_column` — non destructif).
+
+---
+
+## Variables d'environnement
+
+| Variable | Rôle | Valeur dev | Valeur prod |
+|---|---|---|---|
+| `APP_SECRET_KEY` | Clé de chiffrement des sessions | auto-générée | lire depuis `.app_secret_key` |
+| `SESSION_COOKIE_SECURE` | Cookie HTTPS uniquement | `0` | `1` |
+
+> Si `APP_SECRET_KEY` n'est pas définie, l'application cherche automatiquement `backend/.app_secret_key` et génère une clé si le fichier n'existe pas.
+
+---
+
+## Architecture
+
+```
+dotation/
+├── backend/
+│   ├── app.py              # Point d'entrée Flask, blueprints, init DB
+│   ├── auth.py             # Login, bcrypt, décorateurs, rate limiting
+│   ├── config.py           # Constantes et variables d'environnement
+│   ├── database.py         # Connexion SQLite, ensure_column()
+│   ├── models/
+│   │   ├── forms.py        # CRUD dossiers
+│   │   ├── workflow.py     # Calcul des statuts
+│   │   ├── settings.py     # Branding et configuration
+│   │   ├── catalog.py      # Catalogue ressources et services
+│   │   ├── signature.py    # Liens de signature à usage unique
+│   │   └── audit.py        # Journal d'audit
+│   ├── routes/
+│   │   ├── admin.py        # Endpoints admin (comptes, settings, catalogs)
+│   │   ├── forms.py        # Endpoints dossiers (CRUD, export)
+│   │   ├── pages.py        # Authentification et service HTML
+│   │   └── signature.py    # Endpoints signature publique
+│   └── pdf/
+│       ├── attribution.py  # Génération PDF dossier
+│       └── restitution.py  # Génération PDF restitution
+├── frontend/               # HTML + JS statique servi par Flask
+│   ├── index.html          # Tableau de bord
+│   ├── form.html           # Dossier
+│   ├── restitution.html    # Restitution
+│   ├── signature.html      # Signature publique (sans compte)
+│   ├── setup.html          # Assistant de configuration initiale
+│   └── admin*.html         # Pages administration
+├── scripts/
+│   └── deploy-debian.sh    # Script de déploiement automatisé
+└── backend/requirements.txt
+```
+
+**Base de données SQLite — tables principales :**
+
+| Table | Contenu |
+|---|---|
+| `dotation_forms` | Dossiers avec `payload_json` |
+| `dotation_items` | Lignes de suivi restitution |
+| `app_settings` | Paramètres branding et configuration |
+| `resource_catalog` | Catalogue des ressources |
+| `service_catalog` | Catalogue des services |
+| `app_logs` | Journal d'audit global |
+| `audit_events` | Historique par dossier |
+| `signature_links` | Tokens de signature à usage unique |
+| `deleted_items` | Corbeille (soft delete) |
+
+---
+
+## Sécurité
+
+- **Sessions** : cookie `HttpOnly`, `SameSite=Lax`, `Secure` en production
+- **CSRF** : token requis sur tous les endpoints JSON authentifiés
+- **CSP** : `script-src 'self'` — aucun script inline autorisé
+- **Rate limiting** : 10 tentatives de login / 10 min par IP, rate limiting sur les endpoints sensibles
+- **Mots de passe** : hashés avec `bcrypt` (coût 12)
+- **IP réelle** : transmise par `X-Real-IP` depuis nginx ou IIS
+
+**Points d'attention :**
+- `SESSION_COOKIE_SECURE=1` obligatoire en HTTPS
+- Ne jamais exposer `backend/users.json` ou `backend/dotation.db` via HTTP
+- `backend/.app_secret_key` doit être en lecture seule pour le compte applicatif
+- Sauvegarder régulièrement `dotation.db` (copie simple du fichier, application arrêtée ou via `VACUUM INTO`)
+
+---
+
+## Limites SQLite
+
+SQLite convient pour un usage interne modéré :
+
+| Charge | Comportement attendu |
+|---|---|
+| < 30 utilisateurs simultanés | Confortable |
+| 30 à 80 simultanés | Possible selon le volume d'écritures |
+| > 80 simultanés ou écritures intensives | Risque de contention — envisager PostgreSQL |
+
+SQLite gère bien les lectures concurrentes. Les écritures sont sérialisées. Pour une organisation de taille importante ou une forte concurrence en écriture, une migration vers PostgreSQL est recommandée.
+
+---
+
+## Développement local
+
+```bash
+# Linux / macOS
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+
+export APP_SECRET_KEY="dev-key"
+export SESSION_COOKIE_SECURE="0"
+python3 backend/app.py
+```
+
+```powershell
+# Windows
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+
+$env:APP_SECRET_KEY="dev-key"
+$env:SESSION_COOKIE_SECURE="0"
 python backend\app.py
 ```
 
-Puis ouvrir :
+Ouvrir `http://127.0.0.1:5000/`
 
-```text
-http://127.0.0.1:5000/
+### Tests
+
+```bash
+pytest backend/tests/ -v
+pytest backend/tests/test_auth.py       # un fichier spécifique
+pytest backend/tests/ -k "test_login"  # filtre par nom
 ```
 
-## Authentification
+### Vérification syntaxe
 
-- la connexion est obligatoire
-- un message d'erreur s'affiche si les identifiants sont incorrects
-- un message specifique s'affiche si la session ne peut pas etre conservee
-
-En environnement proxy `nginx + gunicorn`, il est recommande de definir :
-
-- `APP_SECRET_KEY`
-- `SESSION_COOKIE_SECURE=1` si le contexte HTTPS est stabilise
-
-Et de transmettre correctement au backend :
-
-- `X-Forwarded-For`
-- `X-Real-IP`
-- `X-Forwarded-Proto`
-- `Host`
-
-## Tableau de bord
-
-Le tableau de bord permet de :
-
-- creer un nouveau dossier
-- rechercher et filtrer les dossiers
-- ouvrir un dossier
-- lancer une restitution
-- exporter un `PDF dossier`
-- exporter un `PDF restitution`
-- exporter plusieurs `PDF dossier`
-- exporter plusieurs `PDF restitution`
-- supprimer une selection de dossiers
-- exporter les donnees en Excel
-
-Le tableau de bord se rafraichit automatiquement sans `F5` :
-
-- toutes les 20 secondes si l'onglet est visible
-- au retour de focus
-- avec signal visuel des nouveaux dossiers
-- avec acquittement utilisateur `J'ai vu`
-- avec conservation de la selection pendant le rafraichissement
-
-## Dossier
-
-Un dossier peut contenir :
-
-- les informations de la personne
-- la qualite `Agent` ou `Elu(e)`
-- le type de dossier
-- les ressources attribuees par service
-- la signature de remise
-- un lien de signature a distance a usage unique pour la remise
-- un lien de signature de restitution a usage unique
-- la validation RGPD
-- la tracabilite de reouverture
-
-## Signature a distance
-
-Depuis la fiche dossier, un profil autorise peut :
-
-- generer un lien unique de signature
-- copier ce lien
-- revoquer le lien
-- regenerer un nouveau lien
-
-La page publique de signature permet a la personne concernee de :
-
-- consulter l'identite et les ressources remises
-- prendre connaissance du RGPD
-- signer le dossier sans compte applicatif
-
-Le lien est :
-
-- limite a un seul dossier
-- a usage unique
-- expirable
-- revocable
-
-Un dossier complet passe en `Attribution active`.
-
-Un dossier incomplet reste en `Attribution partielle` et demeure modifiable.
-
-## Restitution
-
-La restitution est geree sur un ecran separe.
-
-Elle permet de :
-
-- saisir une date de restitution
-- definir rapidement l'etat de chaque materiel
-- ajouter un commentaire uniquement si necessaire
-- signer la restitution ou indiquer pourquoi la signature est impossible ou differee
-- exporter un `PDF restitution` distinct
-
-La restitution reste modifiable tant qu'un materiel est `Non restitue`.
-
-## Administration
-
-L'administration permet de :
-
-- creer, modifier, desactiver ou supprimer un compte
-- changer le mot de passe d'un compte
-- creer, modifier, activer ou desactiver un service
-- creer, modifier ou supprimer une ressource attribuable
-- consulter le journal
-- acceder a la corbeille admin
-
-L'administration est maintenant organisee en sous-pages :
-
-- `admin.html` pour la vue d'ensemble
-- `admin-comptes.html` pour les comptes et les groupes
-- `admin-services.html` pour les services
-- `admin-ressources.html` pour les ressources
-
-## Journal et corbeille
-
-- le journal recense les actions systeme et utilisateur
-- la corbeille est reservee au groupe `admin`
-- un dossier, un compte ou une ressource supprime(e) peut etre restaure(e)
-
-## Exports
-
-### PDF dossier
-
-Document officiel de remise avec :
-
-- entete institutionnel
-- informations de la personne
-- ressources attribuees
-- RGPD
-- signature
-- date de signature
-
-Pour un profil non autorise a consulter les signatures, le PDF reste exportable mais la signature est masquee avec une mention reservee aux personnes autorisees.
-
-### PDF restitution
-
-Document distinct avec :
-
-- informations de la personne
-- date de restitution
-- etat de chaque materiel
-- commentaires d'anomalie
-- signature de restitution ou motif d'absence
-
-Pour un profil non autorise a consulter les signatures, la signature de restitution est masquee dans le document exporte.
-
-### Export Excel
-
-L'export Excel fournit un classeur lisible avec :
-
-- une feuille `Dossiers`
-- une feuille `Ressources`
-
-## Verification technique
-
-Controle minimal recommande apres modification :
-
-```powershell
-python -m py_compile backend\app.py
-python -m py_compile backend\auth.py
-python -m py_compile backend\models\workflow.py
-python -m py_compile backend\models\settings.py
-python -m py_compile backend\pdf\attribution.py
-python -m py_compile backend\pdf\restitution.py
+```bash
+python3 -m py_compile backend/app.py
+python3 -m py_compile backend/auth.py backend/models/*.py backend/routes/*.py
 ```
-
-
-
-
