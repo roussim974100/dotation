@@ -769,6 +769,7 @@ function formatDossierTypeLabel(dossierType) {
 async function requestJson(url, options = {}) {
   // Wrapper fetch centralisé :
   // - JSON par défaut
+  // - injection automatique du token CSRF pour les méthodes mutantes
   // - propagation d'un code d'erreur exploitable par le frontend
   const {
     headers = {},
@@ -784,12 +785,19 @@ async function requestJson(url, options = {}) {
     timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   }
 
+  const method = (fetchOptions.method || "GET").toUpperCase();
+  const csrfHeaders = {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && typeof getCsrfToken === "function") {
+    csrfHeaders["X-CSRF-Token"] = await getCsrfToken();
+  }
+
   let response;
   try {
     response = await fetch(url, {
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
+        ...csrfHeaders,
         ...headers
       },
       credentials: "same-origin",

@@ -1,4 +1,25 @@
-﻿function initBackToTop() {
+﻿// ── CSRF token global ─────────────────────────────────────────────────────
+// Chargé une fois par page, partagé par tous les modules (storage.js, admin.js…)
+let _csrfTokenCache = null;
+
+async function getCsrfToken() {
+  if (_csrfTokenCache) return _csrfTokenCache;
+  try {
+    const res = await fetch("/api/csrf-token", { credentials: "same-origin", cache: "no-store" });
+    const data = await res.json();
+    _csrfTokenCache = data.token || "";
+  } catch (_) {
+    _csrfTokenCache = "";
+  }
+  return _csrfTokenCache;
+}
+
+function invalidateCsrfToken() {
+  _csrfTokenCache = null;
+}
+// ─────────────────────────────────────────────────────────────────────────
+
+function initBackToTop() {
   if (!document.body.classList.contains("app-shell")) {
     return;
   }
@@ -632,10 +653,11 @@ async function submitPasswordChange() {
   submitBtn.textContent = "En cours…";
 
   try {
+    const csrfToken = await getCsrfToken();
     const response = await fetch("/api/me/password", {
       method: "POST",
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
       body: JSON.stringify({ current_password: current, new_password: newPw }),
     });
     const data = await response.json();

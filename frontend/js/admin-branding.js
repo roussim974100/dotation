@@ -37,9 +37,15 @@ function pause(ms) {
 }
 
 async function brandingJson(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const csrfHeaders = {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && typeof getCsrfToken === "function") {
+    csrfHeaders["X-CSRF-Token"] = await getCsrfToken();
+  }
   const response = await fetch(url, {
     credentials: "same-origin",
-    ...options
+    ...options,
+    headers: { ...csrfHeaders, ...(options.headers || {}) }
   });
 
   if (!response.ok) {
