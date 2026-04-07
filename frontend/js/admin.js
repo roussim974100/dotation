@@ -51,6 +51,13 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+// Sérialise une valeur pour usage dans un attribut onclick inline.
+// JSON.stringify produit un littéral de chaîne JS correctement échappé ;
+// on échappe ensuite les guillemets doubles pour l'attribut HTML.
+function jsStr(value) {
+  return JSON.stringify(String(value ?? "")).replace(/"/g, "&quot;");
+}
+
 function slugifyFieldKey(value) {
   return String(value || "")
     .trim()
@@ -559,8 +566,8 @@ async function loadUsers() {
   byId("userTableBody").innerHTML = currentUsers.map((user) => {
     const statusMeta = getUserStatusMeta(user);
     const statusAction = user.status === "pending"
-      ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="approveUser('${escapeHtml(user.username)}')">Valider</button>`
-      : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleUserState('${escapeHtml(user.username)}', ${user.is_active ? "false" : "true"})">${user.is_active ? "Desactiver" : "Activer"}</button>`;
+      ? `<button class="btn btn-sm btn-outline-success" type="button" onclick="approveUser(${jsStr(user.username)})">Valider</button>`
+      : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleUserState(${jsStr(user.username)}, ${user.is_active ? "false" : "true"})">${user.is_active ? "Desactiver" : "Activer"}</button>`;
     return `
       <tr>
         <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
@@ -568,9 +575,9 @@ async function loadUsers() {
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
-            <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateUserForm('${escapeHtml(user.username)}')">Modifier</button>
+            <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateUserForm(${jsStr(user.username)})">Modifier</button>
             ${statusAction}
-            <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteUser('${escapeHtml(user.username)}')">Supprimer</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteUser(${jsStr(user.username)})">Supprimer</button>
           </div>
         </td>
       </tr>
@@ -684,9 +691,9 @@ async function loadServices() {
       <td data-label="État"><span class="status-chip status-chip--${service.is_active ? "active" : "cancelled"}">${service.is_active ? "Actif" : "Inactif"}</span></td>
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateServiceForm('${escapeHtml(service.id)}')">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleServiceState('${escapeHtml(service.id)}', ${service.is_active ? "false" : "true"})">${service.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteService('${escapeHtml(service.id)}')">Supprimer</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateServiceForm(${jsStr(service.id)})">Modifier</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleServiceState(${jsStr(service.id)}, ${service.is_active ? "false" : "true"})">${service.is_active ? "Désactiver" : "Activer"}</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteService(${jsStr(service.id)})">Supprimer</button>
         </div>
       </td>
     </tr>
@@ -804,9 +811,9 @@ async function loadResources() {
       <td data-label="État"><span class="status-chip status-chip--${resource.is_active ? "active" : "cancelled"}">${resource.is_active ? "Active" : "Inactive"}</span></td>
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
-          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateResourceForm('${escapeHtml(resource.id)}')">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleResourceState('${escapeHtml(resource.id)}', ${resource.is_active ? "false" : "true"})">${resource.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteResource('${escapeHtml(resource.id)}')">Supprimer</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" onclick="populateResourceForm(${jsStr(resource.id)})">Modifier</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleResourceState(${jsStr(resource.id)}, ${resource.is_active ? "false" : "true"})">${resource.is_active ? "Désactiver" : "Activer"}</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteResource(${jsStr(resource.id)})">Supprimer</button>
         </div>
       </td>
     </tr>

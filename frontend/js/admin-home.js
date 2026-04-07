@@ -2,6 +2,15 @@
 // et affiche les messages flash issus des sous-pages admin.
 const ADMIN_FLASH_NOTICE_KEY = "adminFlashNotice";
 
+function escHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function fetchAdminJson(url) {
   const response = await fetch(url, {
     credentials: "same-origin"
@@ -57,7 +66,7 @@ async function loadUncStats() {
     toggle.classList.remove("d-none");
     data.detail.forEach(e => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${e.prenom} ${e.nom}</td><td>${e.service}</td><td>${e.ref_ad ? `<span class="badge bg-info text-dark">${e.ref_ad}</span>` : ""}</td><td><code>${e.chemin}</code></td><td>${e.acces}</td><td class="${STATUT_CLASS[e.statut] || ""}">${e.statut}</td><td>${e.commentaire}</td>`;
+      tr.innerHTML = `<td>${escHtml(e.prenom)} ${escHtml(e.nom)}</td><td>${escHtml(e.service)}</td><td>${e.ref_ad ? `<span class="badge bg-info text-dark">${escHtml(e.ref_ad)}</span>` : ""}</td><td><code>${escHtml(e.chemin)}</code></td><td>${escHtml(e.acces)}</td><td class="${STATUT_CLASS[e.statut] || ""}">${escHtml(e.statut)}</td><td>${escHtml(e.commentaire)}</td>`;
       tbody.appendChild(tr);
     });
     toggle.addEventListener("click", () => {
