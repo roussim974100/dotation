@@ -52,6 +52,20 @@ def disable_frontend_cache(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    # CSP : self uniquement + CDN Bootstrap/CookieConsent autorisés explicitement
+    # unsafe-inline nécessaire pour les styles Bootstrap injectés dynamiquement
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "frame-ancestors 'self'"
+        ),
+    )
 
     content_type = (response.headers.get("Content-Type") or "").lower()
     if "text/html" in content_type:
