@@ -375,51 +375,48 @@
 
   // ── Initialisation ────────────────────────────────────────────────────────
 
-  async function init() {
-    // Vérifier si setup déjà fait
-    try {
-      const res = await fetch("/api/setup/status", { credentials: "same-origin" });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.setupCompleted) {
-          window.location.href = "admin.html";
-          return;
-        }
-        // Pré-remplir avec settings existants
-        if (data.orgContext) $("setupOrgContext").value = data.orgContext;
-        if (data.beneficiaryTypes) $("setupBeneficiaryTypes").value = data.beneficiaryTypes;
-        if (data.orgName) $("setupOrgName").value = data.orgName;
-        if (data.dpoEmail) $("setupDpoEmail").value = data.dpoEmail;
-        if (data.supportName) $("setupSupportName").value = data.supportName;
-        if (data.supportRole) $("setupSupportRole").value = data.supportRole;
-        if (data.supportEmail) $("setupSupportEmail").value = data.supportEmail;
-      }
-    } catch (_) {}
-
-    const ctx = $("setupOrgContext").value || "public_collectivite";
-    if (!$("setupBeneficiaryTypes").value) {
-      $("setupBeneficiaryTypes").value = BENEFICIARY_PRESETS[ctx] || BENEFICIARY_PRESETS.public_collectivite;
-    }
-    renderPresetChips(ctx);
-
+  function bindEvents() {
     $("setupOrgContext").addEventListener("change", () => {
       const newCtx = $("setupOrgContext").value;
       $("setupBeneficiaryTypes").value = BENEFICIARY_PRESETS[newCtx] || "";
       renderPresetChips(newCtx);
     });
-
     $("setupNextBtn").addEventListener("click", () => {
       if (!validateStep(currentStep)) return;
       if (currentStep < TOTAL_STEPS) showStep(currentStep + 1);
     });
-
     $("setupPrevBtn").addEventListener("click", () => {
       if (currentStep > 1) showStep(currentStep - 1);
     });
-
     $("setupSubmitBtn").addEventListener("click", submitSetup);
+  }
 
+  async function prefillFromApi() {
+    try {
+      const res = await fetch("/api/setup/status", { credentials: "same-origin" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.setupCompleted) { window.location.href = "admin.html"; return; }
+      if (data.orgContext) $("setupOrgContext").value = data.orgContext;
+      if (data.beneficiaryTypes) $("setupBeneficiaryTypes").value = data.beneficiaryTypes;
+      if (data.orgName) $("setupOrgName").value = data.orgName;
+      if (data.dpoEmail) $("setupDpoEmail").value = data.dpoEmail;
+      if (data.supportName) $("setupSupportName").value = data.supportName;
+      if (data.supportRole) $("setupSupportRole").value = data.supportRole;
+      if (data.supportEmail) $("setupSupportEmail").value = data.supportEmail;
+      renderPresetChips($("setupOrgContext").value || "public_collectivite");
+    } catch (_) {}
+  }
+
+  function init() {
+    const ctx = $("setupOrgContext").value || "public_collectivite";
+    if (!$("setupBeneficiaryTypes").value) {
+      $("setupBeneficiaryTypes").value = BENEFICIARY_PRESETS[ctx] || BENEFICIARY_PRESETS.public_collectivite;
+    }
+    renderPresetChips(ctx);
+    bindEvents();
     showStep(1);
+    prefillFromApi(); // async, n'empêche pas la navigation
   }
 
   if (document.readyState === "loading") {
