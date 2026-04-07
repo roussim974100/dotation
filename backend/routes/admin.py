@@ -13,7 +13,7 @@ from auth import (
     login_required, permission_required, admin_required,
     load_auth_config, save_auth_config,
     get_user_record, password_complexity_error, is_valid_username,
-    current_user,
+    current_user, rate_limit,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
@@ -100,6 +100,7 @@ def admin_settings_route():
 @bp.route("/api/admin/settings", methods=["PUT"])
 @login_required
 @permission_required("users.manage")
+@rate_limit(max_requests=20, window_seconds=60, scope="admin_settings_put")
 def update_admin_settings_route():
     payload = request.get_json(silent=True) or {}
     with get_db() as connection:
@@ -156,6 +157,7 @@ def setup_status_route():
 @bp.route("/api/setup/complete", methods=["POST"])
 @login_required
 @permission_required("users.manage")
+@rate_limit(max_requests=5, window_seconds=600, scope="setup_complete")
 def setup_complete_route():
     payload = request.get_json(silent=True) or {}
     updates = {
