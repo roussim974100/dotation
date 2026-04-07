@@ -1,9 +1,15 @@
 ﻿// Module principal des écrans d'administration :
 // comptes, groupes, services et ressources.
 async function adminRequest(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const csrfHeaders = {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && typeof getCsrfToken === "function") {
+    csrfHeaders["X-CSRF-Token"] = await getCsrfToken();
+  }
   const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
+      ...csrfHeaders,
       ...(options.headers || {})
     },
     credentials: "same-origin",

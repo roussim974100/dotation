@@ -1,5 +1,6 @@
-from flask import Flask, request
+from flask import Flask, jsonify, request, session
 import os
+import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import get_app_secret_key
@@ -24,6 +25,26 @@ app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
+
+
+@app.before_request
+def validate_csrf():
+    """Valide le token CSRF sur toutes les mutations JSON des endpoints /api/
+    pour lesquels l'utilisateur est authentifié."""
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    if not request.path.startswith("/api/"):
+        return
+    # Les endpoints publics de signature ne nécessitent pas d'auth ni de CSRF
+    if request.path.startswith("/api/signature/") or request.path.startswith("/api/restitution-signature/"):
+        return
+    # Si pas de session utilisateur, l'endpoint sera rejeté par @login_required — pas besoin de CSRF
+    if not session.get("user"):
+        return
+    token = request.headers.get("X-CSRF-Token", "")
+    expected = session.get("csrf_token", "")
+    if not expected or not token or not secrets.compare_digest(token, expected):
+        return jsonify({"error": "csrf_invalid"}), 403
 
 
 @app.after_request

@@ -121,12 +121,36 @@ def _do_login(client, username, password):
     )
 
 
+def _wrap_csrf(client):
+    """Injecte automatiquement X-CSRF-Token sur les méthodes mutantes du client de test.
+    Évite de modifier chaque test individuellement."""
+    _cache = {}
+
+    def _token():
+        if "t" not in _cache:
+            _cache["t"] = client.get("/api/csrf-token").get_json()["token"]
+        return _cache["t"]
+
+    def _with_csrf(original):
+        def wrapper(*args, **kwargs):
+            headers = dict(kwargs.pop("headers", None) or {})
+            headers.setdefault("X-CSRF-Token", _token())
+            return original(*args, headers=headers, **kwargs)
+        return wrapper
+
+    client.post   = _with_csrf(client.post)
+    client.put    = _with_csrf(client.put)
+    client.delete = _with_csrf(client.delete)
+    client.patch  = _with_csrf(client.patch)
+    return client
+
+
 @pytest.fixture()
 def admin_client(app):
     """Client déjà connecté en tant qu'admin (session indépendante)."""
     c = app.test_client()
     _do_login(c, "testadmin", _ADMIN_PASSWORD)
-    return c
+    return _wrap_csrf(c)
 
 
 @pytest.fixture()
@@ -134,4 +158,4 @@ def redac_client(app):
     """Client connecté avec droits rédaction (session indépendante)."""
     c = app.test_client()
     _do_login(c, "testredac", _REDAC_PASSWORD)
-    return c
+    return _wrap_csrf(c)
