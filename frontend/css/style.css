@@ -3658,6 +3658,63 @@ body.login-shell {
 }
 
 /* ============================================================
+   Bannière setup initial
+   ============================================================ */
+.setup-banner {
+  background: #7c3aed;
+  color: #fff;
+  padding: .6rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+}
+
+.setup-banner__inner {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.setup-banner__text {
+  flex: 1;
+  font-size: .875rem;
+}
+
+.setup-banner__link {
+  white-space: nowrap;
+  font-size: .8rem;
+  padding: .2rem .65rem;
+  background: rgba(255,255,255,.15);
+  border-color: rgba(255,255,255,.4);
+  color: #fff;
+}
+
+.setup-banner__link:hover {
+  background: rgba(255,255,255,.25);
+  color: #fff;
+}
+
+.setup-banner__dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.8);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 .25rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.setup-banner__dismiss:hover {
+  color: #fff;
+}
+
+[data-color-mode="dark"] .setup-banner {
+  background: #5b21b6;
+}
+
+/* ============================================================
    Setup wizard
    ============================================================ */
 .setup-shell {
