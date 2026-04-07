@@ -1154,9 +1154,10 @@ body.login-shell {
 }
 
 .progress-required-label {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .progress-required-badge {
