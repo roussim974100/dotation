@@ -71,9 +71,10 @@ def _make_users_json(path: str) -> None:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter():
-    """Vide le rate limiter entre chaque test."""
+    """Vide les rate limiters entre chaque test."""
     import auth
     auth._login_attempts.clear()
+    auth._API_RATE_STORES.clear()
 
 
 @pytest.fixture()

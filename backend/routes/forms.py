@@ -12,7 +12,7 @@ from utils import (
     dossier_type_label, slugify_filename,
 )
 from database import get_db
-from auth import login_required, has_permission, get_request_client_ip
+from auth import login_required, has_permission, get_request_client_ip, rate_limit
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
     summarize_dynamic_resource, collect_resource_entries,
@@ -420,6 +420,7 @@ def get_form_route(form_id):
 
 @bp.route("/api/forms", methods=["POST"])
 @login_required
+@rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def create_form():
     if not has_permission("forms.create"):
         return jsonify({"error": "forbidden"}), 403

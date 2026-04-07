@@ -107,6 +107,46 @@ def _is_login_rate_limited(ip: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Rate limiting générique par IP + scope (endpoints API sensibles).
+# ---------------------------------------------------------------------------
+
+_API_RATE_STORES: dict[str, dict[str, list[float]]] = {}
+_api_rate_lock = threading.Lock()
+
+
+def _is_api_rate_limited(ip: str, scope: str, max_requests: int, window_seconds: int) -> bool:
+    now = datetime.now().timestamp()
+    with _api_rate_lock:
+        store = _API_RATE_STORES.setdefault(scope, {})
+        attempts = store.get(ip, [])
+        attempts = [t for t in attempts if now - t < window_seconds]
+        if len(attempts) >= max_requests:
+            store[ip] = attempts
+            return True
+        attempts.append(now)
+        store[ip] = attempts
+        return False
+
+
+def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
+    """Décorateur : limite max_requests par IP sur window_seconds secondes.
+    scope identifie le compteur (par défaut = nom de la fonction décorée)."""
+    def decorator(view):
+        _scope = scope or view.__name__
+
+        @wraps(view)
+        def wrapped_view(*args, **kwargs):
+            ip = get_request_client_ip() or "unknown"
+            if _is_api_rate_limited(ip, _scope, max_requests, window_seconds):
+                return jsonify({"error": "rate_limit_exceeded"}), 429
+            return view(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Helpers utilisateur
 # ---------------------------------------------------------------------------
 
