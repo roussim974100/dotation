@@ -28,6 +28,7 @@ DEFAULT_APP_SETTINGS = {
     "support_role": "",
     "org_context": "public_collectivite",
     "beneficiary_types": "agent:Agent,elu:Élu(e)",
+    "setup_completed": "0",
 }
 
 VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
@@ -331,6 +332,7 @@ def build_public_settings_payload(settings=None):
         "supportRole": settings.get("support_role") or "",
         "orgContext": settings.get("org_context") or DEFAULT_APP_SETTINGS["org_context"],
         "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
+        "setupCompleted": settings.get("setup_completed", "0") == "1",
     }
 
 
