@@ -208,11 +208,11 @@ async function submitPublicSignature(signaturePad) {
   const rgpdAccepted = document.getElementById("publicRgpdCheck").checked;
   const signatureDataUrl = signaturePad.toDataUrl();
   if (!rgpdAccepted) {
-    window.alert("La prise de connaissance RGPD est obligatoire.");
+    showToast("La prise de connaissance RGPD est obligatoire.", "error");
     return;
   }
   if (!signatureDataUrl) {
-    window.alert("Merci de signer le dossier avant validation.");
+    showToast("Merci de signer le dossier avant validation.", "error");
     return;
   }
 

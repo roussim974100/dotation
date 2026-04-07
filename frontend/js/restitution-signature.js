@@ -235,11 +235,11 @@ async function submitPublicRestitutionSignature(signaturePad) {
   const signataireDecision = document.querySelector('input[name="publicRestitutionDecision"]:checked')?.value || "confirmed";
   const signataireComment = document.getElementById("publicRestitutionReservationComment")?.value.trim() || "";
   if (!signatureDataUrl) {
-    window.alert("Merci de signer la restitution avant validation.");
+    showToast("Merci de signer la restitution avant validation.", "error");
     return;
   }
   if (signataireDecision === "with_reservation" && !signataireComment) {
-    window.alert("Merci de preciser votre reserve ou votre reclamation avant validation.");
+    showToast("Merci de préciser votre réserve ou réclamation avant validation.", "error");
     return;
   }
 

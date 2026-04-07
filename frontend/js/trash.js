@@ -97,7 +97,7 @@ async function loadTrash() {
 }
 
 async function restoreTrashItem(trashId) {
-  const confirmed = window.confirm("Restaurer cet élément depuis la corbeille ?");
+  const confirmed = await askConfirm("Restaurer cet élément depuis la corbeille ?", { confirmLabel: "Restaurer" });
   if (!confirmed) {
     return;
   }
@@ -108,7 +108,7 @@ async function restoreTrashItem(trashId) {
 }
 
 async function deleteTrashItem(trashId) {
-  const confirmed = window.confirm("Supprimer définitivement cet élément de la corbeille ? Cette action est irréversible.");
+  const confirmed = await askConfirm("Supprimer définitivement cet élément de la corbeille ? Cette action est irréversible.", { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }
@@ -120,10 +120,10 @@ async function deleteTrashItem(trashId) {
 
 async function emptyTrash() {
   if (!trashItems.length) {
-    window.alert("La corbeille est déjà vide.");
+    showToast("La corbeille est déjà vide.", "info");
     return;
   }
-  const confirmed = window.confirm("Vider toute la corbeille ? Toutes les copies de restauration seront supprimées définitivement.");
+  const confirmed = await askConfirm("Vider toute la corbeille ? Toutes les copies de restauration seront supprimées définitivement.", { confirmLabel: "Vider la corbeille", confirmClass: "btn-danger" });
   if (!confirmed) {
     return;
   }
@@ -132,7 +132,7 @@ async function emptyTrash() {
   });
   await loadTrash();
   if (result.deleted_count) {
-    window.alert(`Corbeille vidée : ${result.deleted_count} élément(s) supprimé(s) définitivement.`);
+    showToast(`Corbeille vidée : ${result.deleted_count} élément(s) supprimé(s) définitivement.`, "success");
   }
 }
 
