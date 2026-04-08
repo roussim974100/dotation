@@ -13,6 +13,10 @@ let dashboardLastUpdatedAt = "";
 let dashboardKnownIds = new Set();
 let dashboardPendingNewIds = new Set();
 let dashboardSelectedIds = new Set();
+const DASHBOARD_PAGE_SIZE = 20;
+let assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
+let restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
+let historyDisplayCount = DASHBOARD_PAGE_SIZE;
 let exportProgressFallbackTimer = null;
 let exportProgressValue = 0;
 const dashboardFilters = {
@@ -339,7 +343,10 @@ function buildDashboardRow(draft, permissions) {
         ${(permissions.canExport || permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(title)}">` : ""}
       </td>
       <td data-label="Dossier">
-        <div class="draft-title">${escapeHtml(title)}</div>
+        <div class="draft-title-wrap">
+          <span class="draft-title">${escapeHtml(title)}</span>
+          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
+        </div>
         <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
         <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
         <div class="draft-meta">${startAtLabel}</div>
@@ -960,6 +967,20 @@ function openRestitution(id) {
   window.location.href = `restitution.html?id=${encodeURIComponent(id)}`;
 }
 
+function renderLoadMoreButton(group, total, displayed, permissions) {
+  const containerIds = { assignment: "assignmentLoadMoreWrap", restitution: "restitutionLoadMoreWrap", history: "historyLoadMoreWrap" };
+  const containerId = containerIds[group];
+  let wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const remaining = total - displayed;
+  if (remaining <= 0) {
+    wrap.innerHTML = "";
+    return;
+  }
+  const next = Math.min(remaining, DASHBOARD_PAGE_SIZE);
+  wrap.innerHTML = `<button class="btn btn-outline-secondary btn-sm" type="button" data-load-more="${group}">Voir ${next} de plus <span class="text-muted">(${remaining} restant${remaining > 1 ? "s" : ""})</span></button>`;
+}
+
 async function renderDraftList() {
   if (dashboardRefreshInFlight) {
     return;
@@ -1062,21 +1083,27 @@ async function renderDraftList() {
 
     if (viewMode === "active") {
       if (draftList) {
-        draftList.innerHTML = assignmentDrafts
+        const visibleAssignment = assignmentDrafts.slice(0, assignmentDisplayCount);
+        draftList.innerHTML = visibleAssignment
           .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
           .join("");
+        renderLoadMoreButton("assignment", assignmentDrafts.length, assignmentDisplayCount, { canExport, canDelete, canRestitution, canEdit });
       }
       if (restitutionList) {
-        restitutionList.innerHTML = restitutionDrafts
+        const visibleRestitution = restitutionDrafts.slice(0, restitutionDisplayCount);
+        restitutionList.innerHTML = visibleRestitution
           .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
           .join("");
+        renderLoadMoreButton("restitution", restitutionDrafts.length, restitutionDisplayCount, { canExport, canDelete, canRestitution, canEdit });
       }
       assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
       restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
     } else if (historyList) {
-      historyList.innerHTML = historyDrafts
+      const visibleHistory = historyDrafts.slice(0, historyDisplayCount);
+      historyList.innerHTML = visibleHistory
         .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
         .join("");
+      renderLoadMoreButton("history", historyDrafts.length, historyDisplayCount, { canExport, canDelete, canRestitution, canEdit });
       historyEmptyState?.classList.toggle("d-none", historyDrafts.length > 0);
     }
 
@@ -2300,33 +2327,45 @@ function bindDashboardFilters() {
     return;
   }
 
+  function resetPagination() {
+    assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
+    restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
+    historyDisplayCount = DASHBOARD_PAGE_SIZE;
+  }
+
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();
+    resetPagination();
     void renderDraftList();
   });
 
   statusFilter.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
+    resetPagination();
     void renderDraftList();
   });
 
   timingFilter.addEventListener("change", (event) => {
     dashboardFilters.timing = event.target.value;
+    resetPagination();
     void renderDraftList();
   });
 
   qualiteFilter.addEventListener("change", (event) => {
     dashboardFilters.qualite = event.target.value;
+    resetPagination();
     void renderDraftList();
   });
 
   serviceFilter.addEventListener("change", (event) => {
     dashboardFilters.service = event.target.value;
+    resetPagination();
     void renderDraftList();
   });
 
   sortFilter.addEventListener("change", (event) => {
     dashboardFilters.sort = event.target.value || "recent";
+    resetPagination();
     void renderDraftList();
   });
 
@@ -2500,9 +2539,23 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-    const fn = DRAFT_ACTION_MAP[btn.dataset.action];
-    if (fn) fn(btn.dataset.id);
+    if (btn) {
+      const fn = DRAFT_ACTION_MAP[btn.dataset.action];
+      if (fn) fn(btn.dataset.id);
+      return;
+    }
+    const loadMoreBtn = e.target.closest("[data-load-more]");
+    if (loadMoreBtn) {
+      const group = loadMoreBtn.dataset.loadMore;
+      if (group === "assignment") {
+        assignmentDisplayCount += DASHBOARD_PAGE_SIZE;
+      } else if (group === "restitution") {
+        restitutionDisplayCount += DASHBOARD_PAGE_SIZE;
+      } else if (group === "history") {
+        historyDisplayCount += DASHBOARD_PAGE_SIZE;
+      }
+      void renderDraftList();
+    }
   });
 
   bindDashboardFilters();

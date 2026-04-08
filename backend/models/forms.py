@@ -19,6 +19,66 @@ from models.workflow import (
 )
 from models.dossier import sync_person_and_dossier
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS, get_dpo_email
+from utils import generate_id
+
+# Clés de champs dont les valeurs saisies sont mémorisées pour autocomplete
+_SUGGEST_FIELD_KEYS = {"marque", "modele", "nomPoste", "nomTelephone", "nomTablette"}
+_SUGGEST_LIST_KEYS = {"zones"}
+
+
+def _upsert_field_suggestions(connection, payload):
+    """Mémorise en DB les valeurs saisies pour les champs avec suggest."""
+    now = utc_now()
+    service = (payload.get("beneficiaire") or {}).get("service") or ""
+    to_upsert = []
+
+    # Champs texte des ressources additionnelles
+    for resource in (payload.get("resources") or {}).get("additional") or []:
+        fields = resource.get("fields") or {}
+        for key in _SUGGEST_FIELD_KEYS:
+            val = str(fields.get(key) or "").strip()
+            if val:
+                to_upsert.append(("", key, val, ""))
+        for key in _SUGGEST_LIST_KEYS:
+            items = fields.get(key)
+            if isinstance(items, list):
+                for item in items:
+                    val = str(item or "").strip()
+                    if val:
+                        to_upsert.append(("", key, val, ""))
+
+    # Chemins UNC — scoped par service du dossier
+    for entry in (payload.get("unc_acces") or []):
+        chemin = str(entry.get("chemin") or "").strip()
+        if chemin:
+            to_upsert.append(("", "unc_chemin", chemin, service))
+
+    for _, field_key, value, svc in to_upsert:
+        existing = connection.execute(
+            "SELECT id FROM field_suggestions WHERE field_key = ? AND value = ? AND service = ?",
+            (field_key, value, svc),
+        ).fetchone()
+        if not existing:
+            connection.execute(
+                "INSERT INTO field_suggestions (id, field_key, value, service, created_at) VALUES (?, ?, ?, ?, ?)",
+                (generate_id("sugg"), field_key, value, svc, now),
+            )
+
+
+def migrate_field_suggestions_from_history(connection):
+    """Peuple field_suggestions depuis les dossiers existants (migration one-shot)."""
+    count = connection.execute("SELECT COUNT(*) FROM field_suggestions").fetchone()[0]
+    if count > 0:
+        return  # Déjà peuplé
+    rows = connection.execute(
+        "SELECT payload_json FROM dotation_forms WHERE payload_json IS NOT NULL"
+    ).fetchall()
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        _upsert_field_suggestions(connection, payload)
 
 
 def build_form_export_lines(payload):
@@ -272,6 +332,7 @@ def persist_form(payload, allow_locked_update=False):
             form_id,
             {"dossier_id": dossier_id, "status": status, "title": title},
         )
+        _upsert_field_suggestions(connection, payload)
 
     return get_form(form_id)
 

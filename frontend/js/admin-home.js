@@ -82,15 +82,20 @@ async function loadUncStats() {
 document.addEventListener("DOMContentLoaded", async () => {
   showAdminFlashNotice();
   try {
-    const [users, services, resources] = await Promise.all([
+    const [users, services, resources, session] = await Promise.all([
       fetchAdminJson("/api/admin/users"),
       fetchAdminJson("/api/admin/services"),
-      fetchAdminJson("/api/admin/resources")
+      fetchAdminJson("/api/admin/resources"),
+      fetch("/api/session", { credentials: "same-origin" }).then(r => r.ok ? r.json() : {})
     ]);
     setMetric("adminUsersCount", users.length);
     setMetric("adminPendingCount", users.filter((user) => user.status === "pending").length);
     setMetric("adminServicesCount", services.filter((service) => service.is_active).length);
     setMetric("adminResourcesCount", resources.filter((resource) => resource.is_active).length);
+    const canManageDb = session?.db_manage || session?.permissions?.includes("*");
+    if (canManageDb) {
+      document.getElementById("adminDbCard")?.classList.remove("d-none");
+    }
   } catch (error) {
     console.error(error);
   }

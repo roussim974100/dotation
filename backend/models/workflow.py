@@ -32,6 +32,7 @@ def normalize_resource_field_schema(raw_schema):
             "placeholder": str(field.get("placeholder") or "").strip(),
             "required": bool(field.get("required", False)),
             "options": [str(option).strip() for option in options if str(option or "").strip()],
+            "suggest": bool(field.get("suggest", False)),
         })
     return normalized
 
@@ -272,7 +273,7 @@ def collect_resource_validation_errors(payload):
         ("telephone", materiel.get("telephone", {}), [
             ("Marque téléphone", "marque"),
             ("Modèle téléphone", "modele"),
-            ("IMEI", "imei"),
+            ("N° de série (SN)", "numeroSerie"),
         ]),
         ("tablette", materiel.get("tablette", {}), [
             ("Marque tablette", "marque"),
@@ -493,7 +494,7 @@ def collect_resource_entries(payload):
         add_entry("ecran", "materiel", "DSI", "Écran", [item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)
     if materiel.get("telephone", {}).get("selected"):
         item = materiel["telephone"]
-        add_entry("telephone", "materiel", "DSI", "Téléphone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("imei")], assignment_source=item)
+        add_entry("telephone", "materiel", "DSI", "Téléphone", [item.get("nomTelephone"), item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)
     if materiel.get("tablette", {}).get("selected"):
         item = materiel["tablette"]
         add_entry("tablette", "materiel", "DSI", "Tablette", [item.get("nomTablette"), item.get("marque"), item.get("modele"), item.get("numeroSerie")], assignment_source=item)

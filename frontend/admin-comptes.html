@@ -106,6 +106,29 @@
               <span class="form-check-label">Compte actif</span>
             </label>
           </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_service">Service (optionnel)</label>
+            <input class="form-control" id="admin_service" placeholder="Ex: Informatique, Bâtiment…">
+            <div class="form-text">Restreint les suggestions UNC aux dossiers de ce service.</div>
+          </div>
+          <div class="col-md-4 d-flex align-items-end pb-1">
+            <div>
+              <label class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="admin_unc_view_all">
+                <span class="form-check-label">Accès UNC complet (DSI)</span>
+              </label>
+              <div class="form-text mt-1">Voir tous les chemins UNC, tous services confondus.</div>
+            </div>
+          </div>
+          <div class="col-md-4 d-flex align-items-end pb-1">
+            <div>
+              <label class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="admin_db_manage">
+                <span class="form-check-label">Gestion base de données</span>
+              </label>
+              <div class="form-text mt-1">Export, diagnostic et import de la base.</div>
+            </div>
+          </div>
           <div class="col-12">
             <label class="form-label">Groupes</label>
             <div id="groupSelector" class="choice-group"></div>
@@ -144,6 +167,7 @@
               <tr>
                 <th>Utilisateur</th>
                 <th>Groupes</th>
+                <th>Service</th>
                 <th>État</th>
                 <th class="text-end">Actions</th>
               </tr>

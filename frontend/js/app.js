@@ -401,11 +401,12 @@ function buildDynamicFieldInput(resource, field) {
   }
   if (fieldType === "list") {
     const listId = `dynamic_resource_list_${resource.id}_${field.key}`;
+    const suggestAttr = field.suggest ? ` data-suggest-key="${escapeAttribute(field.key)}"` : "";
     return `
       <div>
         <label class="form-label">${escapeHtml(field.label)}</label>
         <div id="${escapeAttribute(listId)}" class="repeatable-list dynamic-resource-list" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-placeholder="${escapeAttribute(placeholder)}"></div>
-        <button class="btn btn-outline-secondary btn-sm mt-2 dynamic-resource-list-add" type="button" data-list-id="${escapeAttribute(listId)}" data-placeholder="${escapeAttribute(placeholder)}">+ Ajouter</button>
+        <button class="btn btn-outline-secondary btn-sm mt-2 dynamic-resource-list-add" type="button" data-list-id="${escapeAttribute(listId)}" data-placeholder="${escapeAttribute(placeholder)}"${suggestAttr}>+ Ajouter</button>
       </div>
     `;
   }
@@ -421,6 +422,16 @@ function buildDynamicFieldInput(resource, field) {
     `;
   }
   const type = ["date", "number"].includes(fieldType) ? fieldType : "text";
+  if (field.suggest) {
+    const datalistId = `fsugg-${escapeAttribute(field.key)}`;
+    return `
+      <div>
+        <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
+        <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}" list="${datalistId}" autocomplete="off">
+        <datalist id="${datalistId}"></datalist>
+      </div>
+    `;
+  }
   return `
     <div>
       <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
@@ -521,12 +532,14 @@ function initDynamicListFields() {
     button.addEventListener("click", () => {
       const listId = button.dataset.listId;
       const placeholder = button.dataset.placeholder || "";
+      const suggestKey = button.dataset.suggestKey || "";
       const container = document.getElementById(listId);
       if (!container) return;
       const row = document.createElement("div");
       row.className = "repeatable-list__row";
+      const listAttr = suggestKey ? ` list="fsugg-${escapeAttribute(suggestKey)}"` : "";
       row.innerHTML = `
-        <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}">
+        <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}"${listAttr} autocomplete="off">
         <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
       `;
       row.querySelector("button").addEventListener("click", () => row.remove());
@@ -769,6 +782,36 @@ async function loadServiceOptions() {
   }
 }
 
+const _fieldSuggestCache = new Map();
+
+async function loadFieldSuggestions() {
+  // Collecte tous les datalists fsugg-* présents dans le DOM (générés par buildDynamicFieldInput)
+  const datalists = document.querySelectorAll("datalist[id^='fsugg-']");
+  if (!datalists.length) return;
+  const keys = [...new Set([...datalists].map(dl => dl.id.replace("fsugg-", "")))];
+  await Promise.all(keys.map(async (key) => {
+    if (_fieldSuggestCache.has(key)) {
+      fillFieldDatalist(key, _fieldSuggestCache.get(key));
+      return;
+    }
+    try {
+      const values = await requestJson(`/api/forms/field-suggestions?field=${encodeURIComponent(key)}`);
+      _fieldSuggestCache.set(key, values);
+      fillFieldDatalist(key, values);
+    } catch {
+      // silencieux — l'autocomplete est optionnel
+    }
+  }));
+}
+
+function fillFieldDatalist(key, values) {
+  document.querySelectorAll(`datalist#fsugg-${key}`).forEach((dl) => {
+    if (dl.dataset.filled === "1") return;
+    dl.innerHTML = values.map(v => `<option value="${escapeAttribute(v)}">`).join("");
+    dl.dataset.filled = "1";
+  });
+}
+
 async function loadDynamicResourceReferences() {
   const genericMaterialContainer = document.getElementById("dynamicResourcesMaterialGrid");
   const genericImmaterialContainer = document.getElementById("dynamicResourcesImmaterialGrid");
@@ -990,17 +1033,25 @@ function populateAdditionalResources(data = {}) {
     if (notesField) {
       notesField.value = resource.conditionNotes || "";
     }
-    Object.entries(resource.fields || {}).forEach(([fieldKey, value]) => {
+    // Compat ascendante : l'ancien champ "imei" a été renommé en "numeroSerie"
+    const fields = { ...(resource.fields || {}) };
+    if (fields.imei && !fields.numeroSerie) {
+      fields.numeroSerie = fields.imei;
+      delete fields.imei;
+    }
+    Object.entries(fields).forEach(([fieldKey, value]) => {
       // Type list : peupler les lignes répétables
       const listContainer = document.getElementById(`dynamic_resource_list_${resource.id}_${fieldKey}`);
       if (listContainer && Array.isArray(value)) {
         const placeholder = listContainer.dataset.placeholder || "";
+        const suggestKey = document.querySelector(`[data-list-id="${CSS.escape(`dynamic_resource_list_${resource.id}_${fieldKey}`)}"][data-suggest-key]`)?.dataset?.suggestKey || "";
+        const listAttr = suggestKey ? ` list="fsugg-${escapeAttribute(suggestKey)}"` : "";
         value.forEach((v) => {
           if (!String(v).trim()) return;
           const row = document.createElement("div");
           row.className = "repeatable-list__row";
           row.innerHTML = `
-            <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}" value="${escapeAttribute(v)}">
+            <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}" value="${escapeAttribute(v)}"${listAttr} autocomplete="off">
             <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
           `;
           row.querySelector("button").addEventListener("click", () => row.remove());
@@ -2447,11 +2498,18 @@ async function saveDraft(signaturePad, options = {}) {
       return;
     }
 
+    if (!shouldGenerateRemoteLink) {
+      closeSaveProgress();
+      setSaveButtonLoading(false);
+      showToast(`Dossier « ${result.summary.title} » enregistré.`, "success");
+      markFormClean();
+      setTimeout(() => { window.location.href = "index.html"; }, 1400);
+      return;
+    }
+
     await requestSaveDecision({
-      title: shouldGenerateRemoteLink ? "Dossier enregistré et lien prêt" : "Dossier enregistré",
-      text: shouldGenerateRemoteLink
-        ? `La fiche « ${result.summary.title} » est enregistrée et le lien de signature à distance est prêt${generatedSignatureLink?.link?.expiresAt ? ` jusqu'au ${formatDateTime(generatedSignatureLink.link.expiresAt)}` : ""}.`
-        : `La fiche « ${result.summary.title} » est maintenant à jour.`,
+      title: "Dossier enregistré et lien prêt",
+      text: `La fiche « ${result.summary.title} » est enregistrée et le lien de signature à distance est prêt${generatedSignatureLink?.link?.expiresAt ? ` jusqu'au ${formatDateTime(generatedSignatureLink.link.expiresAt)}` : ""}.`,
       steps: workflowLabels.map((label) => ({ label, status: "done" })),
       hideSpinner: true,
       showConfirm: true,
@@ -2551,6 +2609,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation de la signature", "Préparation de la signature...");
     const signaturePad = initSignaturePad();
 
+    // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
+    void loadFieldSuggestions();
+
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
       window._emailDomainsCache = s.emailDomains || [];
     });
@@ -2588,6 +2649,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("saveDraftBtn")?.addEventListener("click", () => {
       void saveDraft(signaturePad);
+    });
+
+    // Ctrl+S / Cmd+S — sauvegarde rapide depuis le formulaire
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        void saveDraft(signaturePad);
+      }
     });
     document.getElementById("saveAndCreateSignatureLinkBtn")?.addEventListener("click", async () => {
       const validityDays = await askSignatureLinkValidityDays();
