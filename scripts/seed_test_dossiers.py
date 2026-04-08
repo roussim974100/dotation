@@ -26,8 +26,12 @@ FAKE_SIG = (
 created = []
 
 
+def get_csrf():
+    return s.get(f"{BASE}/api/csrf-token").json()["token"]
+
+
 def create(payload, label):
-    r = s.post(f"{BASE}/api/forms", json=payload)
+    r = s.post(f"{BASE}/api/forms", json=payload, headers={"X-CSRF-Token": get_csrf()})
     if r.status_code == 201:
         fid = r.json()["summary"]["id"]
         status = r.json()["summary"]["status"]

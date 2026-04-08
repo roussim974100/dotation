@@ -317,7 +317,6 @@ def admin_users():
             "is_active": user.get("is_active", True),
             "status": user.get("status", "active" if user.get("is_active", True) else "disabled"),
             "service": user.get("service") or "",
-            "unc_view_all": bool(user.get("unc_view_all", False)),
             "db_manage": bool(user.get("db_manage", False)),
         }
         for user in config.get("users", [])
@@ -933,7 +932,6 @@ def create_admin_user():
         return jsonify({"error": "user_exists"}), 409
 
     service = (payload.get("service") or "").strip()
-    unc_view_all = bool(payload.get("unc_view_all", False))
     status = "active" if is_active else "disabled"
     new_user = {
         "username": username,
@@ -944,8 +942,6 @@ def create_admin_user():
     }
     if service:
         new_user["service"] = service
-    if unc_view_all:
-        new_user["unc_view_all"] = True
     if bool(payload.get("db_manage", False)):
         new_user["db_manage"] = True
     config["users"].append(new_user)
@@ -987,11 +983,6 @@ def update_admin_user(username):
             user["service"] = service
         else:
             user.pop("service", None)
-    if "unc_view_all" in payload:
-        if payload["unc_view_all"]:
-            user["unc_view_all"] = True
-        else:
-            user.pop("unc_view_all", None)
     if "db_manage" in payload:
         if payload["db_manage"]:
             user["db_manage"] = True

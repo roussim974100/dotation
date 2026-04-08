@@ -356,7 +356,6 @@ function resetUserForm() {
   byId("admin_password").placeholder = "Mot de passe temporaire";
   byId("admin_active").checked = true;
   if (byId("admin_service")) byId("admin_service").value = "";
-  if (byId("admin_unc_view_all")) byId("admin_unc_view_all").checked = false;
   if (byId("admin_db_manage")) byId("admin_db_manage").checked = false;
   setSelectedGroups([]);
 }
@@ -384,7 +383,6 @@ function populateUserForm(username) {
   byId("admin_password").placeholder = "Nouveau mot de passe (optionnel)";
   byId("admin_active").checked = user.status !== "disabled";
   if (byId("admin_service")) byId("admin_service").value = user.service || "";
-  if (byId("admin_unc_view_all")) byId("admin_unc_view_all").checked = Boolean(user.unc_view_all);
   if (byId("admin_db_manage")) byId("admin_db_manage").checked = Boolean(user.db_manage);
   setSelectedGroups(user.groups || []);
 }
@@ -616,7 +614,6 @@ async function saveUser() {
   }
 
   const service = byId("admin_service")?.value.trim() || "";
-  const uncViewAll = Boolean(byId("admin_unc_view_all")?.checked);
   const dbManage = Boolean(byId("admin_db_manage")?.checked);
   if (!editingUsername) {
     await adminRequest("/api/admin/users", {
@@ -624,7 +621,7 @@ async function saveUser() {
       body: JSON.stringify({
         username, password, groups: selectedGroups,
         is_active: isActive, status: isActive ? "active" : "disabled",
-        service, unc_view_all: uncViewAll, db_manage: dbManage
+        service, db_manage: dbManage
       })
     });
   } else {
@@ -633,7 +630,7 @@ async function saveUser() {
       body: JSON.stringify({
         groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password, service, unc_view_all: uncViewAll, db_manage: dbManage
+        password, service, db_manage: dbManage
       })
     });
   }
@@ -688,9 +685,24 @@ async function deleteUser(username) {
   await loadUsers();
 }
 
+function populateServiceSelect() {
+  const sel = byId("admin_service");
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Aucun service —</option>';
+  (currentServices || []).filter((s) => s.is_active).forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.label;
+    opt.textContent = s.label;
+    sel.appendChild(opt);
+  });
+  sel.value = current;
+}
+
 async function loadServices() {
   currentServices = await adminRequest("/api/admin/services");
   renderResourceIssuerOptions(byId("resource_issuer")?.value || "");
+  populateServiceSelect();
   const table = byId("serviceTableBody");
   if (!table) {
     updateAdminMetrics();
