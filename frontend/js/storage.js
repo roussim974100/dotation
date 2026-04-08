@@ -24,6 +24,13 @@ const dashboardFilters = {
   sort: "recent"
 };
 
+function hasActiveFilters() {
+  return Boolean(
+    dashboardFilters.search || dashboardFilters.status || dashboardFilters.timing
+    || dashboardFilters.qualite || dashboardFilters.service
+  );
+}
+
 // Cache navigateur de secours : utile hors backend ou en cas de coupure réseau.
 function getCachedDrafts() {
   try {
@@ -969,6 +976,7 @@ async function renderDraftList() {
   const restitutionDraftCount = document.getElementById("restitutionDraftCount");
   const historyCountValue = document.getElementById("historyCountValue");
   const emptyState = document.getElementById("emptyState");
+  const filterEmptyState = document.getElementById("filterEmptyState");
   const assignmentEmptyState = document.getElementById("assignmentEmptyState");
   const restitutionEmptyState = document.getElementById("restitutionEmptyState");
   const assignmentCountBadge = document.getElementById("assignmentCountBadge");
@@ -1027,20 +1035,16 @@ async function renderDraftList() {
     }
 
     if (filteredDrafts.length === 0) {
-      if (draftList) {
-        draftList.innerHTML = "";
-      }
-      if (restitutionList) {
-        restitutionList.innerHTML = "";
-      }
-      if (historyList) {
-        historyList.innerHTML = "";
-      }
+      if (draftList) draftList.innerHTML = "";
+      if (restitutionList) restitutionList.innerHTML = "";
+      if (historyList) historyList.innerHTML = "";
       dashboardSelectedIds = new Set();
-      emptyState?.classList.toggle("d-none", viewMode !== "active");
+      const filtersActive = hasActiveFilters() && sortedDrafts.length > 0;
+      filterEmptyState?.classList.toggle("d-none", !filtersActive);
+      emptyState?.classList.toggle("d-none", filtersActive || viewMode !== "active");
       assignmentEmptyState?.classList.add("d-none");
       restitutionEmptyState?.classList.add("d-none");
-      historyEmptyState?.classList.toggle("d-none", viewMode === "active");
+      historyEmptyState?.classList.toggle("d-none", filtersActive || viewMode === "active");
       updateDashboardRefreshInfo();
       setDashboardUpdateNotice();
       updateExportSelectedState();
@@ -1048,6 +1052,7 @@ async function renderDraftList() {
     }
 
     emptyState?.classList.add("d-none");
+    filterEmptyState?.classList.add("d-none");
     historyEmptyState?.classList.add("d-none");
     const user = await getSessionInfo();
     const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
@@ -2351,6 +2356,10 @@ function bindDashboardFilters() {
       sortFilter.value = "recent";
     }
     void renderDraftList();
+  });
+
+  document.getElementById("filterEmptyResetBtn")?.addEventListener("click", () => {
+    resetButton?.click();
   });
 }
 

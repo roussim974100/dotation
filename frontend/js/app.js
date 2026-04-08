@@ -2,6 +2,7 @@ const form = document.getElementById("dotationForm");
 const draftStatus = document.getElementById("draftStatus");
 const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
+let formDirty = false;
 const DOSSIER_TYPE_LABELS = {
   arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
@@ -2152,6 +2153,31 @@ function updateSaveProgress(options = {}) {
   showPageLoader(options.text || options.title || "Traitement en cours...");
 }
 
+function setSaveButtonLoading(loading) {
+  const btn = document.getElementById("saveDraftBtn");
+  const btnLink = document.getElementById("saveAndCreateSignatureLinkBtn");
+  [btn, btnLink].forEach((b) => {
+    if (!b) return;
+    if (loading) {
+      b.dataset.originalText = b.textContent;
+      b.disabled = true;
+      b.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${b.dataset.originalText}`;
+    } else {
+      b.disabled = false;
+      b.textContent = b.dataset.originalText || b.textContent;
+      delete b.dataset.originalText;
+    }
+  });
+}
+
+function markFormDirty() {
+  formDirty = true;
+}
+
+function markFormClean() {
+  formDirty = false;
+}
+
 function closeSaveProgress() {
   if (typeof window.closeWorkflowDialog === "function") {
     window.closeWorkflowDialog();
@@ -2318,6 +2344,7 @@ async function saveDraft(signaturePad, options = {}) {
         "Finalisation de l'interface"
       ];
 
+  setSaveButtonLoading(true);
   try {
     updateSaveProgress({
       title: "Enregistrement du dossier",
@@ -2413,6 +2440,7 @@ async function saveDraft(signaturePad, options = {}) {
         showConfirm: true,
         confirmLabel: "OK"
       });
+      markFormClean();
       window.location.href = "index.html";
       return;
     }
@@ -2427,10 +2455,12 @@ async function saveDraft(signaturePad, options = {}) {
       showConfirm: true,
       confirmLabel: "OK"
     });
+    markFormClean();
     window.location.href = "index.html";
   } catch (error) {
     console.error("Erreur lors de l'enregistrement du dossier", error);
     closeSaveProgress();
+    setSaveButtonLoading(false);
     await showSaveInfoDialog(
       "Erreur d'enregistrement",
       error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
@@ -2604,6 +2634,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     refreshProgressIndicators();
+
+    // Dirty tracking — marquer le formulaire modifié dès qu'un champ change
+    form.addEventListener("input", markFormDirty, { passive: true });
+    form.addEventListener("change", markFormDirty, { passive: true });
+
+    // Confirmation départ si modifications non sauvegardées
+    window.addEventListener("beforeunload", (e) => {
+      if (formDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+    document.querySelectorAll("[data-back-to-index]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopImmediatePropagation();
+        if (formDirty) {
+          const ok = await askConfirm("Des modifications non sauvegardées seront perdues. Quitter quand même ?", {
+            confirmLabel: "Quitter sans sauvegarder",
+            confirmClass: "btn-danger",
+            cancelLabel: "Rester"
+          });
+          if (!ok) return;
+        }
+        markFormClean();
+        window.location.href = "index.html";
+      });
+    });
 
     clearFormBootstrapWatchdog();
     if (!new URLSearchParams(window.location.search).get("id")) {
