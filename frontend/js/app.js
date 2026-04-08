@@ -2356,6 +2356,7 @@ async function saveDraft(signaturePad, options = {}) {
     const validationError = validateFormData(formData);
     if (validationError) {
       closeSaveProgress();
+      setSaveButtonLoading(false);
       await showSaveInfoDialog("Enregistrement impossible", validationError);
       return;
     }
@@ -2384,6 +2385,7 @@ async function saveDraft(signaturePad, options = {}) {
 
     if (result.offline && shouldGenerateRemoteLink) {
       closeSaveProgress();
+      setSaveButtonLoading(false);
       await showSaveInfoDialog(
         "Lien à distance indisponible",
         "Le dossier a été enregistré localement. Le lien de signature à distance pourra être généré après un enregistrement en base."
