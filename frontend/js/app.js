@@ -484,7 +484,7 @@ function buildDynamicResourceTrackingFields(resource) {
   if (!inputBlocks.length) {
     return "";
   }
-  return `<div class="subgrid mt-3">${inputBlocks.join("")}</div>`;
+  return `<div class="subgrid">${inputBlocks.join("")}</div>`;
 }
 
 function syncDynamicResourceCard(resourceId) {
@@ -493,7 +493,9 @@ function syncDynamicResourceCard(resourceId) {
   if (!checkbox || !fieldsWrap) {
     return;
   }
-  fieldsWrap.classList.toggle("d-none", !checkbox.checked);
+  const checked = checkbox.checked;
+  fieldsWrap.classList.toggle("d-none", !checked);
+  checkbox.closest(".equipment-item")?.classList.toggle("is-selected", checked);
 }
 
 function bindDynamicResourceToggles() {
@@ -813,29 +815,32 @@ async function loadDynamicResourceReferences() {
   const buildResourceCard = (resource) => {
     const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
     const fieldsMarkup = fieldSchema.length
-      ? `<div class="subgrid mt-3">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
+      ? `<div class="subgrid">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
       : `
-        <div class="single-field mt-3">
-          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="Détails ou précision de l'attribution">
+        <div class="mt-3">
+          <label class="form-label" for="dynamic_resource_details_${escapeAttribute(resource.id)}">Précision / Détails</label>
+          <input class="form-control dynamic-resource-field" id="dynamic_resource_details_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="details" placeholder="Numéro de série, taille, couleur…">
         </div>
       `;
     const trackingMarkup = buildDynamicResourceTrackingFields(resource);
     const descriptionMarkup = resource.description
-      ? `<p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.description)}</p>`
+      ? `<p class="equipment-item__desc">${escapeHtml(resource.description)}</p>`
       : "";
 
     return `
       <div class="equipment-item">
-        <label class="equipment-toggle">
-          <input type="checkbox" id="dynamic_resource_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-resource-trigger="${escapeAttribute(resource.trigger_key || "")}">
-          <span>${escapeHtml(resource.label)}</span>
-        </label>
+        <div class="equipment-item__header">
+          <label class="equipment-toggle">
+            <input type="checkbox" id="dynamic_resource_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}" data-resource-trigger="${escapeAttribute(resource.trigger_key || "")}">
+            <span>${escapeHtml(resource.label)}</span>
+          </label>
+          <span class="equipment-item__hint">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</span>
+        </div>
         ${descriptionMarkup}
-        <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none">
+        <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none equipment-item__body">
           ${fieldsMarkup}
           ${trackingMarkup}
         </div>
-        <p class="equipment-item__hint mt-2 mb-0">${escapeHtml(resource.issuer_service || "Service non renseigné")} · ${escapeHtml(resource.category || "Ressource")}</p>
       </div>
     `;
   };
