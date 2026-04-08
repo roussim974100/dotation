@@ -193,7 +193,6 @@ def build_user_context(username):
         "data_scope": data_scope,
         "is_admin": "admin" in groups or "*" in permissions,
         "service": (user.get("service") or "") if user else "",
-        "unc_view_all": bool(user.get("unc_view_all", False)) if user else False,
         "db_manage": bool(user.get("db_manage", False)) if user else False,
     }
 
@@ -220,7 +219,7 @@ def has_permission(permission):
         return False
     if "*" in user["permissions"] or permission in user["permissions"]:
         return True
-    # Flags individuels qui accordent des permissions spécifiques
+    # Flag individuel pour la gestion de base de données
     if permission == "db.manage" and user.get("db_manage"):
         return True
     return False

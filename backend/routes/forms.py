@@ -195,17 +195,16 @@ def list_unc_paths():
     if not has_permission("forms.read_list"):
         return jsonify({"error": "forbidden"}), 403
     user = current_user()
-    perms = (user or {}).get("permissions", [])
-    can_view_all = "*" in perms or bool((user or {}).get("unc_view_all"))
+    can_view_all = has_permission("unc.view_all")
     user_service = (user or {}).get("service") or ""
 
     if can_view_all:
         rows = get_db().execute(
-            "SELECT value FROM field_suggestions WHERE field_key = 'unc_chemin' ORDER BY value COLLATE NOCASE"
+            "SELECT DISTINCT value FROM field_suggestions WHERE field_key = 'unc_chemin' ORDER BY value COLLATE NOCASE"
         ).fetchall()
     elif user_service:
         rows = get_db().execute(
-            "SELECT value FROM field_suggestions WHERE field_key = 'unc_chemin' AND service = ? ORDER BY value COLLATE NOCASE",
+            "SELECT DISTINCT value FROM field_suggestions WHERE field_key = 'unc_chemin' AND service = ? ORDER BY value COLLATE NOCASE",
             (user_service,),
         ).fetchall()
     else:

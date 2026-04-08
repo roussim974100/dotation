@@ -108,17 +108,10 @@
           </div>
           <div class="col-md-4">
             <label class="form-label" for="admin_service">Service (optionnel)</label>
-            <input class="form-control" id="admin_service" placeholder="Ex: Informatique, Bâtiment…">
+            <select class="form-select" id="admin_service">
+              <option value="">— Aucun service —</option>
+            </select>
             <div class="form-text">Restreint les suggestions UNC aux dossiers de ce service.</div>
-          </div>
-          <div class="col-md-4 d-flex align-items-end pb-1">
-            <div>
-              <label class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="admin_unc_view_all">
-                <span class="form-check-label">Accès UNC complet (DSI)</span>
-              </label>
-              <div class="form-text mt-1">Voir tous les chemins UNC, tous services confondus.</div>
-            </div>
           </div>
           <div class="col-md-4 d-flex align-items-end pb-1">
             <div>
