@@ -38,8 +38,8 @@ def mask_payload(payload):
         data["immateriel"]["email"]["adresse"] = mask_text(data["immateriel"]["email"]["adresse"])
     if data.get("materiel", {}).get("badge", {}).get("numero"):
         data["materiel"]["badge"]["numero"] = mask_text(data["materiel"]["badge"]["numero"])
-    if data.get("materiel", {}).get("telephone", {}).get("imei"):
-        data["materiel"]["telephone"]["imei"] = mask_text(data["materiel"]["telephone"]["imei"])
+    if data.get("materiel", {}).get("telephone", {}).get("numeroSerie"):
+        data["materiel"]["telephone"]["numeroSerie"] = mask_text(data["materiel"]["telephone"]["numeroSerie"])
     if data.get("materiel", {}).get("vehicule", {}).get("immatriculation"):
         data["materiel"]["vehicule"]["immatriculation"] = mask_text(data["materiel"]["vehicule"]["immatriculation"])
     data.setdefault("validation", {})["signatureDataUrl"] = ""

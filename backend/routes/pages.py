@@ -259,6 +259,14 @@ def admin_resources_page():
     return send_from_directory(FRONTEND_DIR, "admin-ressources.html")
 
 
+@bp.route("/admin-db.html")
+@login_required
+def admin_db_page():
+    if not has_permission("db.manage"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "admin-db.html")
+
+
 @bp.route("/admin-ressources-ordre.html")
 @login_required
 def admin_resources_order_page():

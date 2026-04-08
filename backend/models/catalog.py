@@ -28,9 +28,9 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "materiel", "issuer_service": "Informatique", "requires_return": 1, "trigger_key": "digital",
         "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 10,
         "field_schema": [
-            {"key": "nomPoste", "label": "Nom du poste", "type": "text", "required": False, "placeholder": "Ex: PC-DSI-042"},
-            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Dell, Lenovo, HP"},
-            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: Latitude 5540"},
+            {"key": "nomPoste", "label": "Nom du poste", "type": "text", "required": False, "placeholder": "Ex: PC-DSI-042", "suggest": True},
+            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Dell, Lenovo, HP", "suggest": True},
+            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: Latitude 5540", "suggest": True},
             {"key": "numeroSerie", "label": "Numero de serie", "type": "text", "required": True, "placeholder": "Ex: SN-DELL-001"},
         ],
     },
@@ -39,8 +39,8 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "materiel", "issuer_service": "Informatique", "requires_return": 1, "trigger_key": "digital",
         "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 20,
         "field_schema": [
-            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Dell, LG"},
-            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: U2723QE"},
+            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Dell, LG", "suggest": True},
+            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: U2723QE", "suggest": True},
             {"key": "numeroSerie", "label": "Numero de serie", "type": "text", "required": True, "placeholder": ""},
         ],
     },
@@ -49,10 +49,10 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "materiel", "issuer_service": "Informatique", "requires_return": 1, "trigger_key": "digital",
         "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 30,
         "field_schema": [
-            {"key": "nomTelephone", "label": "Nom du telephone", "type": "text", "required": False, "placeholder": ""},
-            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Apple, Samsung"},
-            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: iPhone 15"},
-            {"key": "imei", "label": "IMEI", "type": "text", "required": True, "placeholder": "15 chiffres"},
+            {"key": "nomTelephone", "label": "Nom du telephone", "type": "text", "required": False, "placeholder": "", "suggest": True},
+            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Apple, Samsung", "suggest": True},
+            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: iPhone 15", "suggest": True},
+            {"key": "numeroSerie", "label": "N° de serie (SN)", "type": "text", "required": True, "placeholder": "Ex: SN-APPLE-001"},
         ],
     },
     {
@@ -60,9 +60,9 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "materiel", "issuer_service": "Informatique", "requires_return": 1, "trigger_key": "digital",
         "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 40,
         "field_schema": [
-            {"key": "nomTablette", "label": "Nom de la tablette", "type": "text", "required": False, "placeholder": ""},
-            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Apple, Samsung"},
-            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: iPad Pro"},
+            {"key": "nomTablette", "label": "Nom de la tablette", "type": "text", "required": False, "placeholder": "", "suggest": True},
+            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Apple, Samsung", "suggest": True},
+            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: iPad Pro", "suggest": True},
             {"key": "numeroSerie", "label": "Numero de serie", "type": "text", "required": True, "placeholder": ""},
         ],
     },
@@ -115,7 +115,7 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "immateriel", "issuer_service": "Services generaux", "requires_return": 0, "trigger_key": "",
         "has_assignment_date": 1, "has_assignment_condition": 0, "has_assignment_notes": 0, "display_order": 110,
         "field_schema": [
-            {"key": "zones", "label": "Zone", "type": "list", "required": True, "placeholder": "Nom de la zone"},
+            {"key": "zones", "label": "Zone", "type": "list", "required": True, "placeholder": "Nom de la zone", "suggest": True},
         ],
     },
     {
@@ -123,8 +123,8 @@ DEFAULT_RESOURCE_REFERENCES = [
         "category": "materiel", "issuer_service": "Ressources humaines", "requires_return": 1, "trigger_key": "",
         "has_assignment_date": 1, "has_assignment_condition": 1, "has_assignment_notes": 1, "display_order": 120,
         "field_schema": [
-            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Renault, Citroen"},
-            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: Kangoo"},
+            {"key": "marque", "label": "Marque", "type": "text", "required": True, "placeholder": "Ex: Renault, Citroen", "suggest": True},
+            {"key": "modele", "label": "Modele", "type": "text", "required": True, "placeholder": "Ex: Kangoo", "suggest": True},
             {"key": "immatriculation", "label": "Immatriculation", "type": "text", "required": True, "placeholder": "Format AA-123-AA"},
         ],
     },
@@ -249,6 +249,40 @@ def seed_reference_catalogs(connection):
                 now,
             ),
         )
+
+
+def migrate_suggest_flags(connection):
+    """Ajoute le flag suggest:true aux champs concernés dans les ressources builtin existantes."""
+    # Clés qui bénéficient de l'autocomplétion, par code de ressource
+    SUGGEST_KEYS = {
+        "ordinateur": {"nomPoste", "marque", "modele"},
+        "ecran": {"marque", "modele"},
+        "telephone": {"nomTelephone", "marque", "modele"},
+        "tablette": {"nomTablette", "marque", "modele"},
+        "vehicule": {"marque", "modele"},
+        "zoneAlarme": {"zones"},
+    }
+    rows = connection.execute(
+        "SELECT id, code, field_schema_json FROM resource_catalog WHERE is_builtin = 1"
+    ).fetchall()
+    for row in rows:
+        code = row["code"]
+        if code not in SUGGEST_KEYS:
+            continue
+        try:
+            schema = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            continue
+        changed = False
+        for field in schema:
+            if field.get("key") in SUGGEST_KEYS[code] and not field.get("suggest"):
+                field["suggest"] = True
+                changed = True
+        if changed:
+            connection.execute(
+                "UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?",
+                (json.dumps(schema), row["id"]),
+            )
 
 
 def seed_service_catalog(connection):

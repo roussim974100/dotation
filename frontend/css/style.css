@@ -1612,8 +1612,29 @@ body.login-shell {
   text-align: center;
 }
 
+.draft-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .draft-title {
   font-weight: 700;
+}
+
+.draft-unc-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.1em 0.45em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  cursor: default;
+  white-space: nowrap;
 }
 
 .draft-meta {
@@ -1959,6 +1980,11 @@ body.login-shell {
 .dashboard-group__empty {
   padding: 1rem 0.25rem 0.1rem;
   color: var(--muted);
+}
+
+.dashboard-group__load-more {
+  padding: 0.5rem 0.25rem;
+  text-align: center;
 }
 
 .dashboard-toolbar {
@@ -3398,6 +3424,11 @@ body.login-shell {
 
 [data-color-mode="dark"] .draft-title {
   color: var(--text);
+}
+
+[data-color-mode="dark"] .draft-unc-badge {
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
 }
 
 [data-color-mode="dark"] .app-footer__heading,

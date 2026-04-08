@@ -12,7 +12,7 @@ from utils import (
     dossier_type_label, slugify_filename,
 )
 from database import get_db
-from auth import login_required, has_permission, get_request_client_ip, rate_limit
+from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
     summarize_dynamic_resource, collect_resource_entries,
@@ -168,23 +168,49 @@ def build_excel_workbook(rows, item_rows):
 </Workbook>"""
 
 
+@bp.route("/api/forms/field-suggestions", methods=["GET"])
+@login_required
+def field_suggestions():
+    """Retourne les valeurs mémorisées pour un champ donné (table field_suggestions)."""
+    if not has_permission("forms.read_list"):
+        return jsonify({"error": "forbidden"}), 403
+    field_key = (request.args.get("field") or "").strip()
+    if not field_key or len(field_key) > 64:
+        return jsonify([])
+    rows = get_db().execute(
+        "SELECT value FROM field_suggestions WHERE field_key = ? ORDER BY value COLLATE NOCASE",
+        (field_key,),
+    ).fetchall()
+    return jsonify([row["value"] for row in rows])
+
+
 @bp.route("/api/forms/unc-paths", methods=["GET"])
 @login_required
 def list_unc_paths():
+    """Retourne les chemins UNC mémorisés selon les droits :
+    - admin ou unc.view_all → tous les chemins
+    - utilisateur avec service → chemins de son service uniquement
+    - sinon → liste vide (pas d'accès aux suggestions UNC)
+    """
     if not has_permission("forms.read_list"):
         return jsonify({"error": "forbidden"}), 403
-    rows = get_db().execute("SELECT payload_json FROM dotation_forms WHERE payload_json IS NOT NULL").fetchall()
-    seen = set()
-    for row in rows:
-        try:
-            payload = json.loads(row["payload_json"] or "{}")
-        except (TypeError, ValueError):
-            continue
-        for e in payload.get("unc_acces") or []:
-            chemin = (e.get("chemin") or "").strip()
-            if chemin:
-                seen.add(chemin)
-    return jsonify(sorted(seen, key=str.lower))
+    user = current_user()
+    perms = (user or {}).get("permissions", [])
+    can_view_all = "*" in perms or bool((user or {}).get("unc_view_all"))
+    user_service = (user or {}).get("service") or ""
+
+    if can_view_all:
+        rows = get_db().execute(
+            "SELECT value FROM field_suggestions WHERE field_key = 'unc_chemin' ORDER BY value COLLATE NOCASE"
+        ).fetchall()
+    elif user_service:
+        rows = get_db().execute(
+            "SELECT value FROM field_suggestions WHERE field_key = 'unc_chemin' AND service = ? ORDER BY value COLLATE NOCASE",
+            (user_service,),
+        ).fetchall()
+    else:
+        rows = []
+    return jsonify([row["value"] for row in rows])
 
 
 @bp.route("/api/forms", methods=["GET"])

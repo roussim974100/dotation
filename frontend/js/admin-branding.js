@@ -281,6 +281,21 @@ async function loadBrandingSettings() {
   updateBrandingPreview(payload.logoUrl, raw.org_name || payload.orgName);
 }
 
+async function checkBeneficiaryTypesConflict(previousTypes, newTypes) {
+  if (!newTypes || previousTypes === newTypes) {
+    return null;
+  }
+  try {
+    const params = new URLSearchParams({ beneficiary_types: newTypes });
+    const response = await fetch(`/api/admin/settings/conflict-check?${params}`, { credentials: "same-origin" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.hasConflicts ? data : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 async function saveBrandingSettings() {
   const saveButton = brandingById("saveBrandingBtn");
   const payload = collectBrandingPayload();
@@ -290,6 +305,15 @@ async function saveBrandingSettings() {
   if (!changeLabels.length) {
     showBrandingNotice("Aucune modification à enregistrer.");
     return;
+  }
+
+  const conflict = await checkBeneficiaryTypesConflict(previous.beneficiary_types, payload.beneficiary_types);
+  if (conflict) {
+    const lines = conflict.conflicts.map((c) => `• "${escapeHtml(c.type)}" : ${c.count} dossier${c.count > 1 ? "s" : ""}`).join("\n");
+    const confirmed = window.confirm(
+      `Attention : ${conflict.totalAffected} dossier${conflict.totalAffected > 1 ? "s" : ""} utilisent un type de bénéficiaire qui sera supprimé :\n\n${lines}\n\nCes dossiers ne seront plus filtrables par type. Continuer quand même ?`
+    );
+    if (!confirmed) return;
   }
 
   const steps = buildBrandingSaveSteps(changeLabels);

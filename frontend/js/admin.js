@@ -355,6 +355,9 @@ function resetUserForm() {
   byId("admin_password").value = "";
   byId("admin_password").placeholder = "Mot de passe temporaire";
   byId("admin_active").checked = true;
+  if (byId("admin_service")) byId("admin_service").value = "";
+  if (byId("admin_unc_view_all")) byId("admin_unc_view_all").checked = false;
+  if (byId("admin_db_manage")) byId("admin_db_manage").checked = false;
   setSelectedGroups([]);
 }
 
@@ -380,6 +383,9 @@ function populateUserForm(username) {
   byId("admin_password").value = "";
   byId("admin_password").placeholder = "Nouveau mot de passe (optionnel)";
   byId("admin_active").checked = user.status !== "disabled";
+  if (byId("admin_service")) byId("admin_service").value = user.service || "";
+  if (byId("admin_unc_view_all")) byId("admin_unc_view_all").checked = Boolean(user.unc_view_all);
+  if (byId("admin_db_manage")) byId("admin_db_manage").checked = Boolean(user.db_manage);
   setSelectedGroups(user.groups || []);
 }
 
@@ -578,6 +584,7 @@ async function loadUsers() {
       <tr>
         <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
         <td data-label="Groupes">${escapeHtml((user.groups || []).join(", ") || "-")}</td>
+        <td data-label="Service">${escapeHtml(user.service || "—")}</td>
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
@@ -608,25 +615,25 @@ async function saveUser() {
     return;
   }
 
+  const service = byId("admin_service")?.value.trim() || "";
+  const uncViewAll = Boolean(byId("admin_unc_view_all")?.checked);
+  const dbManage = Boolean(byId("admin_db_manage")?.checked);
   if (!editingUsername) {
     await adminRequest("/api/admin/users", {
       method: "POST",
       body: JSON.stringify({
-        username,
-        password,
-        groups: selectedGroups,
-        is_active: isActive,
-        status: isActive ? "active" : "disabled"
+        username, password, groups: selectedGroups,
+        is_active: isActive, status: isActive ? "active" : "disabled",
+        service, unc_view_all: uncViewAll, db_manage: dbManage
       })
     });
   } else {
     await adminRequest(`/api/admin/users/${encodeURIComponent(editingUsername)}`, {
       method: "PUT",
       body: JSON.stringify({
-        groups: selectedGroups,
-        is_active: isActive,
+        groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password
+        password, service, unc_view_all: uncViewAll, db_manage: dbManage
       })
     });
   }

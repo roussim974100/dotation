@@ -3,6 +3,9 @@ import csv
 import io
 import json
 import os
+import shutil
+import sqlite3
+import tempfile
 import uuid
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
@@ -24,7 +27,7 @@ from models.settings import (
 )
 from models.catalog import normalize_resource_catalog_payload
 from models.forms import persist_form
-from config import CUSTOM_BRANDING_DIR
+from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR
 
 bp = Blueprint("admin", __name__)
 
@@ -185,6 +188,39 @@ def setup_complete_route():
     return jsonify(build_public_settings_payload())
 
 
+@bp.route("/api/admin/settings/conflict-check", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def settings_conflict_check_route():
+    new_types_raw = request.args.get("beneficiary_types", "")
+    new_keys = set()
+    for part in new_types_raw.split(","):
+        part = part.strip()
+        if ":" in part:
+            key = part.split(":")[0].strip()
+            if key:
+                new_keys.add(key)
+    with get_db() as connection:
+        rows = connection.execute(
+            "SELECT beneficiary_type, COUNT(*) as cnt FROM dotation_forms"
+            " WHERE beneficiary_type IS NOT NULL AND beneficiary_type != ''"
+            " GROUP BY beneficiary_type"
+        ).fetchall()
+    conflicts = []
+    total_affected = 0
+    for row in rows:
+        bt = row["beneficiary_type"]
+        if bt not in new_keys:
+            cnt = row["cnt"]
+            conflicts.append({"type": bt, "count": cnt})
+            total_affected += cnt
+    return jsonify({
+        "conflicts": conflicts,
+        "totalAffected": total_affected,
+        "hasConflicts": len(conflicts) > 0,
+    })
+
+
 @bp.route("/api/admin/settings/logo-upload", methods=["POST"])
 @login_required
 @permission_required("users.manage")
@@ -280,6 +316,9 @@ def admin_users():
             "groups": user.get("groups", []),
             "is_active": user.get("is_active", True),
             "status": user.get("status", "active" if user.get("is_active", True) else "disabled"),
+            "service": user.get("service") or "",
+            "unc_view_all": bool(user.get("unc_view_all", False)),
+            "db_manage": bool(user.get("db_manage", False)),
         }
         for user in config.get("users", [])
     ])
@@ -893,14 +932,23 @@ def create_admin_user():
     if get_user_record(username):
         return jsonify({"error": "user_exists"}), 409
 
+    service = (payload.get("service") or "").strip()
+    unc_view_all = bool(payload.get("unc_view_all", False))
     status = "active" if is_active else "disabled"
-    config["users"].append({
+    new_user = {
         "username": username,
         "password_hash": bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
         "groups": [group for group in groups if group in config.get("groups", {})],
         "is_active": is_active,
         "status": status,
-    })
+    }
+    if service:
+        new_user["service"] = service
+    if unc_view_all:
+        new_user["unc_view_all"] = True
+    if bool(payload.get("db_manage", False)):
+        new_user["db_manage"] = True
+    config["users"].append(new_user)
     save_auth_config(config)
     with get_db() as connection:
         insert_app_log(
@@ -933,6 +981,22 @@ def update_admin_user(username):
     else:
         user["is_active"] = bool(payload.get("is_active", user.get("is_active", True)))
         user["status"] = "active" if user.get("is_active", True) else "disabled"
+    if "service" in payload:
+        service = (payload["service"] or "").strip()
+        if service:
+            user["service"] = service
+        else:
+            user.pop("service", None)
+    if "unc_view_all" in payload:
+        if payload["unc_view_all"]:
+            user["unc_view_all"] = True
+        else:
+            user.pop("unc_view_all", None)
+    if "db_manage" in payload:
+        if payload["db_manage"]:
+            user["db_manage"] = True
+        else:
+            user.pop("db_manage", None)
     if payload.get("password"):
         complexity_error = password_complexity_error(payload["password"])
         if complexity_error:
@@ -993,3 +1057,163 @@ def delete_admin_user(username):
             username,
         )
     return jsonify({"deleted": True})
+
+
+
+# ---------------------------------------------------------------------------
+# Gestion de la base de données (export / diagnose / import)
+# ---------------------------------------------------------------------------
+
+_REQUIRED_TABLES = {
+    "dotation_forms", "dotation_items", "resource_catalog",
+    "service_catalog", "app_settings", "app_logs",
+}
+_SQLITE_MAGIC = b"SQLite format 3\x00"
+_DB_MAX_SIZE = 200 * 1024 * 1024  # 200 Mo
+_BACKUP_DIR = os.path.join(BASE_DIR, "db_backups")
+
+
+def _diagnose_db_file(path):
+    issues = []
+    warnings = []
+    stats = {}
+
+    try:
+        with open(path, "rb") as fh:
+            magic = fh.read(16)
+        if magic != _SQLITE_MAGIC:
+            return {"level": "error", "issues": ["Fichier non reconnu comme base SQLite valide."], "warnings": [], "stats": {}}
+    except OSError as exc:
+        return {"level": "error", "issues": [f"Impossible de lire le fichier : {exc}"], "warnings": [], "stats": {}}
+
+    size = os.path.getsize(path)
+    if size > _DB_MAX_SIZE:
+        issues.append(f"Fichier trop volumineux ({size // (1024*1024)} Mo, maximum 200 Mo).")
+
+    try:
+        conn = sqlite3.connect(path)
+        conn.row_factory = sqlite3.Row
+        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        if integrity != "ok":
+            issues.append(f"Echec du controle d'integrite SQLite : {integrity}")
+        existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        missing = _REQUIRED_TABLES - existing
+        if missing:
+            issues.append(f"Tables manquantes : {', '.join(sorted(missing))}")
+        if "dotation_forms" in existing:
+            try:
+                stats["dossiers"] = conn.execute(
+                    "SELECT COUNT(*) FROM dotation_forms WHERE is_deleted = 0"
+                ).fetchone()[0]
+            except Exception:
+                stats["dossiers"] = 0
+        if "app_settings" in existing:
+            try:
+                org = conn.execute(
+                    "SELECT setting_value FROM app_settings WHERE setting_key='org_name'"
+                ).fetchone()
+                stats["org_name"] = (org["setting_value"] if org else "") or ""
+            except Exception:
+                pass
+        if "dotation_forms" in existing:
+            try:
+                cols = {r["name"] for r in conn.execute("PRAGMA table_info(dotation_forms)").fetchall()}
+                for col in ("payload_json", "status", "service", "nom", "prenom"):
+                    if col not in cols:
+                        warnings.append(f"Colonne manquante dans dotation_forms : {col} (migration automatique possible)")
+            except Exception:
+                pass
+        conn.close()
+    except sqlite3.Error as exc:
+        issues.append(f"Erreur SQLite : {exc}")
+
+    level = "error" if issues else ("warning" if warnings else "ok")
+    return {"level": level, "issues": issues, "warnings": warnings, "stats": stats}
+
+
+@bp.route("/api/admin/db/export", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=20, window_seconds=60, scope="db_export")
+def db_export():
+    from datetime import datetime as _dt
+    if not os.path.exists(DB_PATH):
+        return jsonify({"error": "db_not_found"}), 404
+    date_str = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"aquai_db_{date_str}.db"
+    with get_db() as conn:
+        insert_app_log(conn, "admin", "db_exported", "Export base de donnees", details={"filename": filename})
+    with open(DB_PATH, "rb") as fh:
+        data = fh.read()
+    resp = make_response(data)
+    resp.headers["Content-Type"] = "application/octet-stream"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@bp.route("/api/admin/db/diagnose", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=60, scope="db_diagnose")
+def db_diagnose():
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "no_file"}), 400
+    raw = file.read()
+    if len(raw) > _DB_MAX_SIZE:
+        return jsonify({"error": "file_too_large"}), 400
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp_path = tmp.name
+        tmp.write(raw)
+    try:
+        report = _diagnose_db_file(tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    with get_db() as conn:
+        insert_app_log(conn, "admin", "db_diagnosed", "Diagnostic base de donnees", details={"level": report["level"]})
+    return jsonify(report)
+
+
+@bp.route("/api/admin/db/import", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=3, window_seconds=600, scope="db_import")
+def db_import():
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "no_file"}), 400
+    raw = file.read()
+    if len(raw) > _DB_MAX_SIZE:
+        return jsonify({"error": "file_too_large"}), 400
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp_path = tmp.name
+        tmp.write(raw)
+    try:
+        report = _diagnose_db_file(tmp_path)
+        if report["level"] == "error":
+            os.unlink(tmp_path)
+            return jsonify({"error": "diagnose_failed", "report": report}), 422
+        os.makedirs(_BACKUP_DIR, exist_ok=True)
+        from datetime import datetime as _dt
+        backup_name = f"dotation_backup_{_dt.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
+        backup_path = os.path.join(_BACKUP_DIR, backup_name)
+        if os.path.exists(DB_PATH):
+            shutil.copy2(DB_PATH, backup_path)
+        shutil.move(tmp_path, DB_PATH)
+    except Exception as exc:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        return jsonify({"error": "import_failed", "detail": str(exc)}), 500
+    try:
+        with get_db() as conn:
+            insert_app_log(conn, "admin", "db_imported", "Import base de donnees", details={
+                "backup": backup_name, "stats": report.get("stats", {}),
+            })
+    except Exception:
+        pass
+    return jsonify({"imported": True, "backup": backup_name, "stats": report.get("stats", {})})
