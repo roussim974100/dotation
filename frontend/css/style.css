@@ -1358,6 +1358,7 @@ body.login-shell {
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: flex-start;
 }
 
 .draft-actions__menu {
