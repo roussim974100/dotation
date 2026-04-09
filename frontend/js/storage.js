@@ -577,7 +577,7 @@ function buildDraftActionButtons(draft, options) {
       ${canOpenRestitution(draft, options) ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
       ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
       ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
-      ${renderActionGroup("Gestion", "btn-outline-secondary", managementItems)}
+      ${renderActionGroup("Supprimer", "btn-outline-danger", managementItems)}
     </div>
   `;
 }
