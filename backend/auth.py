@@ -66,6 +66,11 @@ def load_auth_config():
             if "is_active" not in user:
                 user["is_active"] = user.get("status") != "disabled"
                 changed = True
+        # Fusionner les groupes par défaut manquants (nouvelles versions)
+        for key, group in DEFAULT_GROUPS.items():
+            if key not in raw["groups"]:
+                raw["groups"][key] = group
+                changed = True
         if changed:
             save_auth_config(raw)
         return raw
