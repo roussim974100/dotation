@@ -523,14 +523,14 @@ function renderActionGroup(shortLabel, tone, items) {
   if (!items.length) return "";
   if (items.length === 1) {
     const item = items[0];
-    return `<button class="btn btn-sm ${escapeAttribute(tone)}" type="button" data-action="${escapeAttribute(item.action)}" data-id="${escapeAttribute(item.id)}">${escapeHtml(shortLabel)}</button>`;
+    return `<button class="btn btn-sm ${tone}" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(shortLabel)}</button>`;
   }
   return `
     <details class="draft-actions__menu" data-action-menu data-label="${escapeHtml(shortLabel)}" data-open-label="${escapeHtml(`${shortLabel} - moins d'actions`)}">
-      <summary class="btn btn-sm ${escapeAttribute(tone)}"><span data-action-menu-label>${escapeHtml(shortLabel)}</span></summary>
+      <summary class="btn btn-sm ${tone}"><span data-action-menu-label>${escapeHtml(shortLabel)}</span></summary>
       <div class="draft-actions__menu-panel">
         <div class="draft-actions__menu-section">
-          ${items.map((item) => `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="${escapeAttribute(item.action)}" data-id="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</button>`).join("")}
+          ${items.map((item) => `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`).join("")}
         </div>
       </div>
     </details>
