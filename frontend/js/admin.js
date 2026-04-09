@@ -207,16 +207,27 @@ function renderGroups() {
   }
 
   if (cards) {
-    cards.innerHTML = Object.entries(groups).map(([key, group]) => `
-      <div class="equipment-item">
-        <div class="draft-title">${escapeHtml(group.label)}</div>
-        <div class="draft-meta">${escapeHtml(group.description || "")}</div>
-        <div class="mt-2"><span class="status-chip status-chip--${group.data_scope === "masked" ? "draft" : "active"}">${escapeHtml(group.data_scope)}</span></div>
-        <ul class="print-list mt-3">
-          ${(group.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("")}
-        </ul>
-      </div>
-    `).join("");
+    cards.innerHTML = Object.entries(groups).map(([key, group]) => {
+      const isAdmin = (group.permissions || []).includes("*");
+      const hasUnc = (group.permissions || []).includes("unc.view_all");
+      const uncToggle = isAdmin
+        ? `<span class="status-chip status-chip--active mt-2">Accès UNC complet (admin)</span>`
+        : `<button class="btn btn-sm mt-2 ${hasUnc ? "btn-success" : "btn-outline-secondary"}"
+             type="button" data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
+             ${hasUnc ? "✓ Accès UNC complet" : "Accès UNC complet : non"}
+           </button>`;
+      return `
+        <div class="equipment-item">
+          <div class="draft-title">${escapeHtml(group.label)}</div>
+          <div class="draft-meta">${escapeHtml(group.description || "")}</div>
+          <div class="mt-2"><span class="status-chip status-chip--${group.data_scope === "masked" ? "draft" : "active"}">${escapeHtml(group.data_scope)}</span></div>
+          <ul class="print-list mt-3">
+            ${(group.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("")}
+          </ul>
+          ${uncToggle}
+        </div>
+      `;
+    }).join("");
   }
 }
 
@@ -909,6 +920,28 @@ async function deleteResource(resourceId) {
   await loadResources();
 }
 
+async function toggleGroupUnc(groupKey, currentValue) {
+  const label = groups[groupKey]?.label || groupKey;
+  const enabling = !currentValue;
+  const msg = enabling
+    ? `Accorder l'accès UNC complet au groupe "${label}" ?`
+    : `Retirer l'accès UNC complet au groupe "${label}" ?`;
+  const confirmed = await askConfirm(msg, {
+    confirmLabel: enabling ? "Accorder" : "Retirer",
+    confirmClass: enabling ? "btn-success" : "btn-danger"
+  });
+  if (!confirmed) return;
+  const updated = await adminRequest(`/api/admin/groups/${encodeURIComponent(groupKey)}`, {
+    method: "PUT",
+    body: JSON.stringify({ "unc.view_all": enabling })
+  });
+  if (updated) {
+    groups = updated;
+    renderGroups();
+    showToast(enabling ? `Accès UNC accordé au groupe "${label}".` : `Accès UNC retiré au groupe "${label}".`, "success");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-admin-action]");
@@ -927,6 +960,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     else if (action === "populateResourceForm") populateResourceForm(id);
     else if (action === "toggleResourceState") toggleResourceState(id, active === "true");
     else if (action === "deleteResource") deleteResource(id);
+    else if (action === "toggleGroupUnc") toggleGroupUnc(btn.dataset.groupKey, btn.dataset.current === "true");
   });
 
   try {
