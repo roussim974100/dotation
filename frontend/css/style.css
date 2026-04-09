@@ -4116,3 +4116,217 @@ body.login-shell {
   border-color: var(--border);
   color: var(--text);
 }
+
+/* ── Panneau d'aperçu rapide (slide-in depuis la droite) ─────────────────── */
+
+.quick-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgba(10, 30, 50, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.quick-panel-overlay--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.quick-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  width: min(420px, 100vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 40px rgba(15, 55, 84, 0.12);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 220ms cubic-bezier(0.32, 0, 0.18, 1);
+  overflow-y: auto;
+}
+
+.quick-panel--open {
+  transform: translateX(0);
+}
+
+.quick-panel__header {
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.quick-panel__close {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 120ms;
+}
+
+.quick-panel__close:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.quick-panel__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.quick-panel__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+
+.quick-panel__meta {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.quick-panel__status {
+  align-self: flex-start;
+}
+
+.quick-panel__body {
+  flex: 1;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.quick-panel__start {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.quick-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.quick-panel__section-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.quick-panel__resource-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.quick-panel__resource-item {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.quick-panel__resource-item code {
+  font-size: 0.82rem;
+  background: var(--surface-alt);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.quick-panel__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.quick-panel__progress-label {
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.quick-panel__progress-track {
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.quick-panel__progress-bar {
+  height: 100%;
+  background: var(--brand);
+  border-radius: 99px;
+  transition: width 300ms ease;
+}
+
+.quick-panel__actions {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.quick-panel__btn {
+  flex: 1;
+  text-align: center;
+  min-width: 120px;
+}
+
+.quick-panel__loading,
+.quick-panel__error {
+  padding: 2rem 1.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* Curseur sur les lignes clickables */
+[data-quick-preview-id] {
+  cursor: pointer;
+}
+
+[data-quick-preview-id]:hover td {
+  background: color-mix(in srgb, var(--brand-soft) 30%, var(--surface-alt));
+}
+
+/* Dark mode */
+[data-color-mode="dark"] .quick-panel {
+  background: var(--surface);
+  border-left-color: var(--border);
+}
+
+[data-color-mode="dark"] .quick-panel__header {
+  background: var(--surface);
+}
+
+[data-color-mode="dark"] .quick-panel__resource-item code {
+  background: var(--surface-alt);
+}
+
+[data-color-mode="dark"] .quick-panel-overlay {
+  background: rgba(0, 0, 0, 0.45);
+}
