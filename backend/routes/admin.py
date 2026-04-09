@@ -2,11 +2,14 @@ import bcrypt
 import csv
 import io
 import json
+import logging
 import os
 import shutil
 import sqlite3
 import tempfile
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
 
@@ -1128,7 +1131,8 @@ def _diagnose_db_file(path):
                 stats["dossiers"] = conn.execute(
                     "SELECT COUNT(*) FROM dotation_forms WHERE is_deleted = 0"
                 ).fetchone()[0]
-            except Exception:
+            except Exception as exc:
+                logger.warning("Diagnostic : impossible de compter les dossiers : %s", exc)
                 stats["dossiers"] = 0
         if "app_settings" in existing:
             try:
@@ -1136,16 +1140,17 @@ def _diagnose_db_file(path):
                     "SELECT setting_value FROM app_settings WHERE setting_key='org_name'"
                 ).fetchone()
                 stats["org_name"] = (org["setting_value"] if org else "") or ""
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Diagnostic : impossible de lire org_name : %s", exc)
+                stats["org_name"] = ""
         if "dotation_forms" in existing:
             try:
                 cols = {r["name"] for r in conn.execute("PRAGMA table_info(dotation_forms)").fetchall()}
                 for col in ("payload_json", "status", "service", "nom", "prenom"):
                     if col not in cols:
                         warnings.append(f"Colonne manquante dans dotation_forms : {col} (migration automatique possible)")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Diagnostic : impossible de verifier le schema dotation_forms : %s", exc)
         conn.close()
     except sqlite3.Error as exc:
         issues.append(f"Erreur SQLite : {exc}")
@@ -1237,6 +1242,6 @@ def db_import():
             insert_app_log(conn, "admin", "db_imported", "Import base de donnees", details={
                 "backup": backup_name, "stats": report.get("stats", {}),
             })
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Import DB : impossible d'ecrire le log d'audit : %s", exc)
     return jsonify({"imported": True, "backup": backup_name, "stats": report.get("stats", {})})
