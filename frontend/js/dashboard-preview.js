@@ -243,8 +243,10 @@ function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
 function buildAttributionTimingPreview(data) {
   const sections = [];
   const startAt = data.meta?.startAt || "";
+  const workflowStatus = data.workflow?.status || "draft";
+  const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(workflowStatus);
   if (startAt) {
-    const offsetLabel = getTimingOffsetLabel(startAt);
+    const offsetLabel = isOnboarded ? "" : getTimingOffsetLabel(startAt);
     sections.push(`Prise de fonction : ${formatShortDate(startAt)}${offsetLabel ? ` (${offsetLabel})` : ""}`);
   } else {
     sections.push("Prise de fonction non renseignée");
