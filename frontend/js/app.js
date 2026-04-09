@@ -1811,32 +1811,6 @@ function formatDateTime(value) {
 
 function updateSignatureLinkUi(link) {
   currentSignatureLink = link || null;
-  const actionBtn = document.getElementById("saveAndCreateSignatureLinkBtn");
-  if (!actionBtn) {
-    return;
-  }
-
-  const canEdit = Boolean(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.edit"));
-  if (!canEdit) {
-    actionBtn.classList.add("d-none");
-    return;
-  }
-  actionBtn.classList.remove("d-none");
-
-  const hasCollectedSignature = Boolean(form.dataset.lockedAt || document.getElementById("signature")?.dataset.signed === "true");
-  if (hasCollectedSignature) {
-    actionBtn.disabled = true;
-    actionBtn.textContent = "Dossier déjà signé";
-    return;
-  }
-
-  actionBtn.disabled = false;
-  if (link?.status === "active") {
-    actionBtn.textContent = "Enregistrer et régénérer le lien";
-    return;
-  }
-
-  actionBtn.textContent = "Enregistrer et générer le lien";
 }
 
 async function loadSignatureLinkState() {
@@ -1992,19 +1966,16 @@ function updateSaveProgress(options = {}) {
 
 function setSaveButtonLoading(loading) {
   const btn = document.getElementById("saveDraftBtn");
-  const btnLink = document.getElementById("saveAndCreateSignatureLinkBtn");
-  [btn, btnLink].forEach((b) => {
-    if (!b) return;
-    if (loading) {
-      b.dataset.originalText = b.textContent;
-      b.disabled = true;
-      b.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${b.dataset.originalText}`;
-    } else {
-      b.disabled = false;
-      b.textContent = b.dataset.originalText || b.textContent;
-      delete b.dataset.originalText;
-    }
-  });
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${btn.dataset.originalText}`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.originalText || btn.textContent;
+    delete btn.dataset.originalText;
+  }
 }
 
 function markFormDirty() {
@@ -2067,28 +2038,6 @@ async function showSaveInfoDialog(title, text, items = []) {
   });
 }
 
-async function askSignatureLinkValidityDays() {
-  if (typeof window.askSignatureValidityDialog !== "function") {
-    const rawValue = window.prompt("Durée de validité du lien de signature à distance (1 à 30 jours) :", "7");
-    if (rawValue === null) {
-      return null;
-    }
-    const parsed = Number.parseInt(rawValue, 10);
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 30) {
-      await showSaveInfoDialog("Durée invalide", "Veuillez saisir une durée comprise entre 1 et 30 jours.");
-      return null;
-    }
-    return parsed;
-  }
-
-  return window.askSignatureValidityDialog({
-    title: "Validité du lien de signature",
-    text: "Choisissez pendant combien de jours le lien de signature à distance restera actif.",
-    defaultValue: 7,
-    maxDays: 30,
-    confirmLabel: "Enregistrer et continuer"
-  });
-}
 
 async function resolveSaveWorkflow(formData) {
   const hasSignature = Boolean(formData.validation.signatureDataUrl);
@@ -2164,22 +2113,13 @@ async function resolveSaveWorkflow(formData) {
   return formData;
 }
 
-async function saveDraft(signaturePad, options = {}) {
-  const shouldGenerateRemoteLink = Boolean(options.generateSignatureLink);
-  const workflowLabels = shouldGenerateRemoteLink
-    ? [
-        "Préparation des informations du dossier",
-        "Analyse de complétude et du workflow",
-        "Enregistrement sécurisé du dossier",
-        "Génération du lien de signature",
-      "Finalisation de l'interface"
-      ]
-    : [
-        "Préparation des informations du dossier",
-        "Analyse de complétude et du workflow",
-        "Enregistrement sécurisé du dossier",
-        "Finalisation de l'interface"
-      ];
+async function saveDraft(signaturePad) {
+  const workflowLabels = [
+    "Préparation des informations du dossier",
+    "Analyse de complétude et du workflow",
+    "Enregistrement sécurisé du dossier",
+    "Finalisation de l'interface"
+  ];
 
   setSaveButtonLoading(true);
   try {
@@ -2220,45 +2160,6 @@ async function saveDraft(signaturePad, options = {}) {
       applyLockState(true);
     }
 
-    if (result.offline && shouldGenerateRemoteLink) {
-      closeSaveProgress();
-      setSaveButtonLoading(false);
-      await showSaveInfoDialog(
-        "Lien à distance indisponible",
-        "Le dossier a été enregistré localement. Le lien de signature à distance pourra être généré après un enregistrement en base."
-      );
-      return;
-    }
-
-    let generatedSignatureLink = null;
-    if (shouldGenerateRemoteLink) {
-      updateSaveProgress({
-        title: "Enregistrement du dossier",
-        text: "Le lien de signature à distance est en cours de génération.",
-        steps: createWorkflowSteps(workflowLabels, 3)
-      });
-      generatedSignatureLink = await createSignatureLink({
-        validityDays: options.validityDays,
-        silentSuccess: true,
-        silentError: true,
-        copyAfterGenerate: true
-      });
-
-      if (generatedSignatureLink?.absoluteUrl) {
-        try {
-          sessionStorage.setItem(DASHBOARD_SIGNATURE_LINK_NOTICE_KEY, JSON.stringify({
-            kind: "assignment",
-            formId: result.summary.id,
-            linkId: generatedSignatureLink.link?.id,
-            title: result.summary.title,
-            url: generatedSignatureLink.absoluteUrl
-          }));
-        } catch (error) {
-          // Rien de bloquant : le tableau de bord reste utilisable sans cette notice.
-        }
-      }
-    }
-
     updateSaveProgress({
       title: "Enregistrement du dossier",
       text: "La fiche a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
@@ -2284,25 +2185,11 @@ async function saveDraft(signaturePad, options = {}) {
       return;
     }
 
-    if (!shouldGenerateRemoteLink) {
-      closeSaveProgress();
-      setSaveButtonLoading(false);
-      showToast(`Dossier « ${result.summary.title} » enregistré.`, "success");
-      markFormClean();
-      setTimeout(() => { window.location.href = "index.html"; }, 1400);
-      return;
-    }
-
-    await requestSaveDecision({
-      title: "Dossier enregistré et lien prêt",
-      text: `La fiche « ${result.summary.title} » est enregistrée et le lien de signature à distance est prêt${generatedSignatureLink?.link?.expiresAt ? ` jusqu'au ${formatDateTime(generatedSignatureLink.link.expiresAt)}` : ""}.`,
-      steps: workflowLabels.map((label) => ({ label, status: "done" })),
-      hideSpinner: true,
-      showConfirm: true,
-      confirmLabel: "OK"
-    });
+    closeSaveProgress();
+    setSaveButtonLoading(false);
+    showToast(`Dossier « ${result.summary.title} » enregistré.`, "success");
     markFormClean();
-    window.location.href = "index.html";
+    setTimeout(() => { window.location.href = "index.html"; }, 1400);
   } catch (error) {
     console.error("Erreur lors de l'enregistrement du dossier", error);
     closeSaveProgress();
@@ -2444,17 +2331,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         void saveDraft(signaturePad);
       }
     });
-    document.getElementById("saveAndCreateSignatureLinkBtn")?.addEventListener("click", async () => {
-      const validityDays = await askSignatureLinkValidityDays();
-      if (validityDays === null) {
-        return;
-      }
-      await saveDraft(signaturePad, {
-        generateSignatureLink: true,
-        validityDays
-      });
-    });
-
     setFormBootstrapStage("initialisation des blocs métier", "Préparation du formulaire...");
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();

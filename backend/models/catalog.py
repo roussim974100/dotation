@@ -148,6 +148,7 @@ DEFAULT_RESOURCE_REFERENCES = [
             {"key": "fonction", "label": "Fonction", "type": "text", "required": True, "placeholder": ""},
             {"key": "telephone", "label": "Telephone", "type": "text", "required": False, "placeholder": ""},
             {"key": "email", "label": "Email", "type": "text", "required": False, "placeholder": ""},
+            {"key": "quantite", "label": "Quantité", "type": "select", "required": False, "placeholder": "", "options": ["100", "200", "300", "500", "1000"]},
         ],
     },
     {
