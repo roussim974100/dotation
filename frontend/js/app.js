@@ -59,31 +59,6 @@ function getFieldValue(id) {
   return field.value.trim() || "";
 }
 
-function setFieldValueIfExists(id, value) {
-  const field = document.getElementById(id);
-  if (!field) {
-    return;
-  }
-  field.value = value || "";
-}
-
-function getRepeatableValues(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) {
-    return [];
-  }
-  return Array.from(container.querySelectorAll("input"))
-    .map((input) => input.value.trim())
-    .filter(Boolean);
-}
-
-function getAssignmentConditionData(prefix) {
-  return {
-    assignedAt: getFieldValue(`${prefix}_assigned_at`),
-    conditionAttribution: getFieldValue(`${prefix}_condition`),
-    conditionNotes: getFieldValue(`${prefix}_condition_notes`)
-  };
-}
 
 function normalizeDateInputValue(value) {
   if (!value) {
@@ -135,25 +110,6 @@ function buildAssignmentConditionSummary(item) {
   return parts.join(" - ");
 }
 
-function buildAssignmentConditionFieldsHtml(prefix, stacked = false, dateOnly = false) {
-  const marginClass = stacked ? " mt-2" : "";
-  if (dateOnly) {
-    return `
-      <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
-    `;
-  }
-  return `
-      <input class="form-control${marginClass}" type="date" id="${prefix}_assigned_at">
-      <select class="form-select${marginClass}" id="${prefix}_condition">
-        <option value="">État à la remise</option>
-      <option value="neuf">Neuf</option>
-      <option value="bon_etat">Bon état</option>
-      <option value="etat_usage">État d'usage</option>
-      <option value="degrade">Dégradé</option>
-    </select>
-    <input class="form-control${marginClass}" placeholder="Observation de remise" id="${prefix}_condition_notes">
-  `;
-}
 
 function ensureAssignmentConditionFields() {
   // Les champs de condition d'attribution sont désormais générés
@@ -173,41 +129,6 @@ function createRepeatableRow(containerId, placeholder, value = "") {
   document.getElementById(containerId)?.appendChild(row);
 }
 
-function ensureRepeatableRow(containerId, placeholder) {
-  const container = document.getElementById(containerId);
-  if (!container) {
-    return;
-  }
-  if (!container.querySelector("input")) {
-    createRepeatableRow(containerId, placeholder);
-  }
-}
-
-function populateRepeatableRows(containerId, placeholder, values = []) {
-  const container = document.getElementById(containerId);
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-  const normalized = Array.isArray(values) ? values.filter((value) => String(value || "").trim()) : [];
-  if (!normalized.length) {
-    return;
-  }
-  normalized.forEach((value) => createRepeatableRow(containerId, placeholder, value));
-}
-
-function matchesPattern(value, pattern) {
-  if (!pattern) {
-    return true;
-  }
-  try {
-    return new RegExp(pattern).test(String(value || ""));
-  } catch (error) {
-    // Une expression invalide ne doit pas bloquer la saisie;
-    // on considère alors la règle comme non bloquante.
-    return true;
-  }
-}
 
 function clearFieldError(field) {
   if (!field) {
@@ -1065,12 +986,6 @@ function syncDossierTypeUi() {
   }
 }
 
-function hasCurrentDsiResources() {
-  // Vérifie si au moins une ressource DSI est cochée parmi les ressources dynamiques.
-  return dynamicResourceReferences
-    .filter((r) => normalizeServiceName(r.issuer_service) === "dsi")
-    .some((r) => document.getElementById(`dynamic_resource_${r.id}`)?.checked);
-}
 
 function applyLockState(locked) {
   // Une fiche signée complète passe en lecture seule.
@@ -1145,91 +1060,6 @@ function failFormBootstrap(error, fallbackMessage) {
   alert(message);
 }
 
-function renderPrintSummary(formData) {
-  // Construit la vue d'impression dediee utilisee par window.print().
-  const container = document.getElementById("printSummary");
-  if (!container) {
-    return;
-  }
-
-  // Collecte des ressources depuis resources.additional (format dynamique unifié)
-  const serviceGroups = new Map();
-  const pushItem = (service, label, detail, conditionSummary = "") => {
-    if (!serviceGroups.has(service)) {
-      serviceGroups.set(service, []);
-    }
-    const parts = [detail, conditionSummary].filter(Boolean);
-    serviceGroups.get(service).push(`<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` : ${escapeHtml(parts.join(" - "))}` : ""}</li>`);
-  };
-
-  (formData.resources?.additional || []).forEach((resource) => {
-    if (!resource.selected) return;
-    const service = resource.issuerService || resource.issuer_service || "Autres";
-    const fields = resource.fields || {};
-    const fieldValues = Object.values(fields).map((v) => Array.isArray(v) ? v.join(", ") : String(v || "")).filter(Boolean);
-    const detail = resource.details || fieldValues.join(" - ");
-    pushItem(service, resource.label || "Ressource", detail, buildAssignmentConditionSummary(resource));
-  });
-
-  const restitutionItems = Object.entries(formData.restitution.items || {}).map(([key, state]) => {
-    const ref = findResourceRefByCode(key);
-    const label = ref?.label || key;
-    const parts = [restitutionStateLabels[state.state] || state.state, state.notes].filter(Boolean);
-    return `<li><strong>${escapeHtml(label)}</strong> : ${escapeHtml(parts.join(" - "))}</li>`;
-  });
-
-  container.innerHTML = `
-    <div class="print-sheet">
-      <div class="print-sheet__header">
-        <h1 class="print-sheet__title">Dossier d'attribution</h1>
-        <p class="print-sheet__subtitle">${escapeHtml(formatStatusLabel(formData.workflow.status))} - ${escapeHtml(formData.beneficiaire.nom)} ${escapeHtml(formData.beneficiaire.prenom)}</p>
-      </div>
-
-      <section class="print-block">
-        <h3>Bénéficiaire</h3>
-        <div class="print-grid">
-          <div class="print-line"><strong>Nom</strong><span>${escapeHtml(formData.beneficiaire.nom || "-")}</span></div>
-          <div class="print-line"><strong>Prénom</strong><span>${escapeHtml(formData.beneficiaire.prenom || "-")}</span></div>
-          <div class="print-line"><strong>Qualité</strong><span>${escapeHtml(formData.beneficiaire.qualite || "-")}</span></div>
-          <div class="print-line"><strong>Mandat / Service</strong><span>${escapeHtml(formData.beneficiaire.mandat || formData.beneficiaire.service || "-")}</span></div>
-          <div class="print-line"><strong>Fonction</strong><span>${escapeHtml(formData.beneficiaire.fonction || "-")}</span></div>
-          <div class="print-line"><strong>Date de remise</strong><span>${escapeHtml(formData.meta.assignedAt || "-")}</span></div>
-          <div class="print-line"><strong>Date de fiche</strong><span>${escapeHtml(new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(formData.meta.savedAt)))}</span></div>
-        </div>
-      </section>
-
-      ${serviceGroups.size ? Array.from(serviceGroups.entries()).map(([service, items]) => `
-      <section class="print-block">
-        <h3>Ressources ${escapeHtml(service)}</h3>
-        <ul class="print-list">${items.join("")}</ul>
-      </section>`).join("") : `
-      <section class="print-block">
-        <h3>Ressources attribuées</h3>
-        <p>Aucune ressource attribuée.</p>
-      </section>`}
-
-      <section class="print-block">
-        <h3>Restitution</h3>
-        <div class="print-grid">
-          <div class="print-line"><strong>Date de restitution</strong><span>${escapeHtml(formData.restitution.returnedAt || "-")}</span></div>
-          <div class="print-line"><strong>Motif</strong><span>${escapeHtml(formData.restitution.reason || "-")}</span></div>
-        </div>
-        <div class="print-line" style="margin-top:0.8rem;"><strong>Observations</strong><span>${escapeHtml(formData.restitution.notes || "-")}</span></div>
-        <div style="margin-top:0.8rem;">
-          ${restitutionItems.length ? `<ul class="print-list">${restitutionItems.join("")}</ul>` : "<p>Aucun détail de restitution.</p>"}
-        </div>
-      </section>
-
-      <section class="print-block">
-        <h3>Conformite et signature</h3>
-        <div class="print-grid">
-          <div class="print-line"><strong>RGPD</strong><span>${formData.validation.rgpdAccepted ? "Validation effectuée" : "Non validée"}</span></div>
-        </div>
-        ${formData.validation.signatureDataUrl ? `<div class="print-signature" style="margin-top:0.9rem;"><img src="${formData.validation.signatureDataUrl}" alt="Signature"></div>` : "<p style='margin-top:0.9rem;'>Aucune signature.</p>"}
-      </section>
-    </div>
-  `;
-}
 
 function toggleField(id, visible) {
   const element = document.getElementById(id);
@@ -1852,20 +1682,6 @@ function getFormData(signaturePad) {
       signatureDataUrl
     }
   };
-}
-
-function setCheckboxAndFields(checkboxId, checked, fields) {
-  const checkbox = document.getElementById(checkboxId);
-  if (checkbox) {
-    checkbox.checked = Boolean(checked);
-  }
-
-  Object.entries(fields).forEach(([fieldId, value]) => {
-    const field = document.getElementById(fieldId);
-    if (field) {
-      field.value = value || "";
-    }
-  });
 }
 
 function populateForm(data, signaturePad) {

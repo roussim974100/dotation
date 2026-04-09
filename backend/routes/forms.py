@@ -452,8 +452,8 @@ def create_form():
     payload = request.get_json(silent=True) or {}
     try:
         form_data = persist_form(payload)
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except ValueError:
+        return jsonify({"error": "invalid_form_data"}), 400
     return jsonify(form_data), 201
 
 
@@ -466,8 +466,8 @@ def update_form(form_id):
     payload.setdefault("meta", {})["id"] = form_id
     try:
         form_data = persist_form(payload)
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except ValueError:
+        return jsonify({"error": "invalid_form_data"}), 400
     return jsonify(form_data)
 
 
