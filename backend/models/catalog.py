@@ -252,6 +252,44 @@ def seed_reference_catalogs(connection):
         )
 
 
+def migrate_missing_builtin_resources(connection):
+    """Insère les ressources builtin absentes de la DB (ajoutées au seed après le premier déploiement)."""
+    existing_codes = {
+        row["code"]
+        for row in connection.execute("SELECT code FROM resource_catalog WHERE is_builtin = 1").fetchall()
+    }
+    now = utc_now()
+    for resource in DEFAULT_RESOURCE_REFERENCES:
+        if resource["code"] in existing_codes:
+            continue
+        connection.execute(
+            """
+            INSERT INTO resource_catalog (
+                id, code, label, description, category, issuer_service, requires_return,
+                has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
+                trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+            """,
+            (
+                generate_id("resource"),
+                resource["code"],
+                resource["label"],
+                resource.get("description", ""),
+                resource["category"],
+                resource["issuer_service"],
+                resource["requires_return"],
+                resource.get("has_assignment_date", 1),
+                resource.get("has_assignment_condition", 0),
+                resource.get("has_assignment_notes", 1),
+                resource.get("display_order", 100),
+                resource["trigger_key"],
+                json.dumps(resource.get("field_schema", [])),
+                now,
+                now,
+            ),
+        )
+
+
 def migrate_suggest_flags(connection):
     """Ajoute le flag suggest:true aux champs concernés dans les ressources builtin existantes."""
     # Clés qui bénéficient de l'autocomplétion, par code de ressource
