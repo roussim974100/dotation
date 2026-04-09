@@ -286,6 +286,33 @@ def migrate_suggest_flags(connection):
             )
 
 
+def migrate_cartes_visite_quantite(connection):
+    """Ajoute le champ Quantité (select) à la ressource cartesVisite si absent."""
+    row = connection.execute(
+        "SELECT id, field_schema_json FROM resource_catalog WHERE code = 'cartesVisite' AND is_builtin = 1"
+    ).fetchone()
+    if not row:
+        return
+    try:
+        schema = json.loads(row["field_schema_json"] or "[]")
+    except (TypeError, ValueError):
+        return
+    if any(f.get("key") == "quantite" for f in schema):
+        return
+    schema.append({
+        "key": "quantite",
+        "label": "Quantité",
+        "type": "select",
+        "required": False,
+        "placeholder": "",
+        "options": ["100", "200", "300", "500", "1000"],
+    })
+    connection.execute(
+        "UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?",
+        (json.dumps(schema), row["id"]),
+    )
+
+
 def seed_service_catalog(connection):
     count = connection.execute("SELECT COUNT(*) FROM service_catalog").fetchone()[0]
     if count > 0:
