@@ -34,6 +34,12 @@ DEFAULT_GROUPS = {
         "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"],
         "data_scope": "full",
     },
+    "direction": {
+        "label": "Direction",
+        "description": "Acces complet aux dossiers avec visibilite sur les chemins reseau UNC. Ideal pour DGS, DRH et encadrement superieur.",
+        "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "unc.view_all"],
+        "data_scope": "full",
+    },
     "admin": {
         "label": "Administration",
         "description": "Controle total et gestion des utilisateurs.",
