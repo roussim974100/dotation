@@ -277,6 +277,38 @@ def admin_groups():
     return jsonify(config.get("groups", {}))
 
 
+TOGGLEABLE_PERMISSIONS = {"unc.view_all"}
+
+@bp.route("/api/admin/groups/<key>", methods=["PUT"])
+@login_required
+@permission_required("users.manage")
+def update_group_permissions(key):
+    config = load_auth_config()
+    groups = config.get("groups", {})
+    if key not in groups:
+        return jsonify({"error": "group_not_found"}), 404
+    if "*" in groups[key].get("permissions", []):
+        return jsonify({"error": "cannot_edit_admin_group"}), 403
+    payload = request.get_json(silent=True) or {}
+    perms = list(groups[key].get("permissions", []))
+    for perm in TOGGLEABLE_PERMISSIONS:
+        if perm in payload:
+            if payload[perm] and perm not in perms:
+                perms.append(perm)
+            elif not payload[perm] and perm in perms:
+                perms.remove(perm)
+    groups[key]["permissions"] = perms
+    save_auth_config(config)
+    with get_db() as connection:
+        insert_app_log(
+            connection, "admin", "group_permissions_updated",
+            f"Permissions du groupe {key} mises a jour",
+            "group", key, {"permissions": perms},
+            actor=current_actor(),
+        )
+    return jsonify(config.get("groups", {}))
+
+
 @bp.route("/api/reference/resources", methods=["GET"])
 @login_required
 def reference_resources():
