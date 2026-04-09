@@ -535,13 +535,6 @@ function renderDraftActionMenu(label, tone, actions) {
 
 function buildDraftActionButtons(draft, options) {
   const id = draft.id;
-  const openActions = [
-    `<button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir dossier</button>`
-  ];
-
-  if (canOpenRestitution(draft, options)) {
-    openActions.push(`<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Ouvrir restitution</button>`);
-  }
 
   const pdfActions = [];
   if (options.canExport) {
@@ -549,15 +542,6 @@ function buildDraftActionButtons(draft, options) {
   }
   if (options.canExport && hasRestitutionData(draft)) {
     pdfActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="exportRestitutionPdf" data-id="${id}">Télécharger le PDF restitution</button>`);
-  }
-
-  const signatureActions = [];
-  if (canRequestAssignmentSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="shareSignatureLink" data-id="${id}">Copier le lien de signature</button>`);
-  }
-
-  if (canRequestRestitutionSignature(draft, options)) {
-    signatureActions.push(`<button class="btn btn-sm btn-outline-secondary" type="button" data-action="copyRestitutionSignatureLink" data-id="${id}">Copier le lien de signature</button>`);
   }
 
   const emailActions = [];
@@ -585,10 +569,10 @@ function buildDraftActionButtons(draft, options) {
 
   return `
     <div class="draft-actions__primary">
-      ${renderDraftActionMenu("Ouvrir", "btn-outline-primary", [openActions.join("")])}
+      <button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir</button>
+      ${canOpenRestitution(draft, options) ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
       ${renderDraftActionMenu("PDF", "btn-outline-success", [pdfActions.join("")])}
       ${renderDraftActionMenu("E-mail", "btn-outline-primary", [emailActions.join("")])}
-      ${renderDraftActionMenu("Signature", "btn-outline-info", [signatureActions.join("")])}
       ${renderDraftActionMenu("Gestion", "btn-outline-secondary", [managementActions.join("")])}
     </div>
   `;
