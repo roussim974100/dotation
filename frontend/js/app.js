@@ -2226,10 +2226,10 @@ function normalizeServiceName(value) {
   if (!normalized) {
     return "";
   }
-  if (normalized === "dsi") {
+  if (normalized === "dsi" || normalized === "informatique") {
     return "dsi";
   }
-  if (normalized === "batiment") {
+  if (normalized === "batiment" || normalized === "services generaux" || normalized === "services_generaux") {
     return "batiment";
   }
   if (normalized === "autres services" || normalized === "autres_service" || normalized === "autres services ") {
