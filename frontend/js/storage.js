@@ -251,12 +251,18 @@ function summarizeDraftProgressFromPayload(payload = {}) {
   const total = requested.length;
   const completed = requested.filter((resource) => resource.isCompleted).length;
   const startAt = payload?.meta?.startAt || "";
+  const workflowStatus = payload?.workflow?.status || "draft";
+  const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(workflowStatus);
 
   if (total === 0) {
     return { completed: 0, total: 0, ratio: 0, timingStatus: "neutral", timingLabel: "À planifier" };
   }
   if (completed >= total) {
     return { completed, total, ratio: 1, timingStatus: "ok", timingLabel: "Prêt" };
+  }
+  // Dossier actif ou restitué : la personne est en poste, ne plus afficher "En retard"
+  if (isOnboarded) {
+    return { completed, total, ratio: completed / total, timingStatus: "neutral", timingLabel: "À compléter" };
   }
   if (!startAt) {
     return { completed, total, ratio: completed / total, timingStatus: "neutral", timingLabel: "À planifier" };
@@ -281,12 +287,20 @@ function summarizeDraftProgressFromPayload(payload = {}) {
 
 function getDraftProgressMetrics(draft) {
   if (Number.isFinite(draft.completedResources) && Number.isFinite(draft.totalResources)) {
+    const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(draft.status);
+    let timingStatus = draft.timingStatus || "neutral";
+    let timingLabel = draft.timingLabel || "À planifier";
+    // Neutraliser le retard pour les dossiers où la personne est en poste
+    if (isOnboarded && timingStatus === "late") {
+      timingStatus = "neutral";
+      timingLabel = draft.completedResources >= draft.totalResources ? "Prêt" : "À compléter";
+    }
     return {
       completed: draft.completedResources,
       total: draft.totalResources,
       ratio: Number.isFinite(draft.resourceProgressRatio) ? draft.resourceProgressRatio : (draft.totalResources ? draft.completedResources / draft.totalResources : 0),
-      timingStatus: draft.timingStatus || "neutral",
-      timingLabel: draft.timingLabel || "À planifier"
+      timingStatus,
+      timingLabel
     };
   }
   return summarizeDraftProgressFromPayload(draft.data || {});
@@ -330,7 +344,10 @@ function buildDashboardRow(draft, permissions) {
   const progressPercent = Math.max(0, Math.min(100, Math.round((progress.ratio || 0) * 100)));
   const title = draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier");
   const dossierTypeLabel = formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || "");
+  const _timingFrozenStatuses = ["active", "returned", "partial_return", "cancelled"];
   const timingOffsetLabel = getDashboardViewMode() === "history_assignments"
+    && !_timingFrozenStatuses.includes(draft.status)
+    && progress.timingLabel !== "Prêt"
     ? getTimingOffsetLabel(draft.startAt)
     : "";
   const startAtLabel = draft.startAt
