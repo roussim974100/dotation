@@ -1451,6 +1451,9 @@ function migrateLegacyResourcesToAdditional(data) {
   }
   const existing = new Set(data.resources.additional.map((r) => r.code));
 
+  // Correspondance clé catalogue courante → ancienne clé stockée dans les dossiers legacy.
+  const LEGACY_FIELD_RENAMES = { numeroSerie: "imei" };
+
   const migrateOne = (code, legacyData) => {
     if (!legacyData || !legacyData.selected || existing.has(code)) {
       return;
@@ -1462,7 +1465,9 @@ function migrateLegacyResourcesToAdditional(data) {
     const fields = {};
     const fieldSchema = Array.isArray(ref.field_schema) ? ref.field_schema : [];
     fieldSchema.forEach((field) => {
-      const value = legacyData[field.key] || "";
+      // Chercher d'abord sous la clé courante, puis sous l'ancienne clé si elle a été renommée.
+      const oldKey = LEGACY_FIELD_RENAMES[field.key];
+      const value = legacyData[field.key] || (oldKey ? legacyData[oldKey] : "") || "";
       if (value) {
         fields[field.key] = value;
       }
