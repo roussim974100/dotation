@@ -81,9 +81,10 @@ def is_dynamic_resource_complete(resource):
         return False
     field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
     field_values = resource.get("fields") or {}
+    field_values_lower = {k.lower(): v for k, v in field_values.items()}
     if field_schema:
         for field in field_schema:
-            value = str(field_values.get(field["key"]) or "").strip()
+            value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
             if field.get("required") and not value:
                 return False
     elif not summarize_dynamic_resource(resource):
@@ -316,9 +317,12 @@ def collect_resource_validation_errors(payload):
             continue
         field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
         field_values = resource.get("fields") or {}
+        # Index insensible à la casse : slugify_field_key passe les clés en minuscules,
+        # mais les valeurs stockées peuvent être en camelCase (ex: "numeroSerie").
+        field_values_lower = {k.lower(): v for k, v in field_values.items()}
         if field_schema:
             for field in field_schema:
-                value = str(field_values.get(field["key"]) or "").strip()
+                value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
                 if field.get("required") and not value:
                     errors.append(f"{resource.get('label') or 'Ressource'} : {field['label']} manquant")
                     continue
