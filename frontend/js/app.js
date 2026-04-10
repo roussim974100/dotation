@@ -984,6 +984,10 @@ function syncDossierTypeUi() {
   if (destinationBlock) {
     destinationBlock.classList.toggle("d-none", dossierType !== "changement_service");
   }
+  const startAtBlock = document.getElementById("startAtBlock");
+  if (startAtBlock) {
+    startAtBlock.classList.toggle("d-none", dossierType === "mise_a_jour");
+  }
 }
 
 
