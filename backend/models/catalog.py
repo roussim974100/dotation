@@ -290,6 +290,31 @@ def migrate_missing_builtin_resources(connection):
         )
 
 
+def migrate_builtin_resource_schemas(connection):
+    """Applique les field_schema_json manquants sur les ressources builtin seedées sans schéma."""
+    seed_by_code = {r["code"]: r for r in DEFAULT_RESOURCE_REFERENCES}
+    rows = connection.execute(
+        "SELECT id, code, field_schema_json FROM resource_catalog WHERE is_builtin = 1"
+    ).fetchall()
+    for row in rows:
+        code = row["code"]
+        if code not in seed_by_code:
+            continue
+        try:
+            current = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            current = []
+        if current:
+            continue  # schéma déjà renseigné, on ne touche pas
+        seed_schema = seed_by_code[code].get("field_schema", [])
+        if not seed_schema:
+            continue
+        connection.execute(
+            "UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?",
+            (json.dumps(seed_schema), row["id"]),
+        )
+
+
 def migrate_suggest_flags(connection):
     """Ajoute le flag suggest:true aux champs concernés dans les ressources builtin existantes."""
     # Clés qui bénéficient de l'autocomplétion, par code de ressource
