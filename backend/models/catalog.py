@@ -316,7 +316,7 @@ def migrate_builtin_resource_schemas(connection):
 
 
 def migrate_builtin_resource_flags(connection):
-    """Applique has_assignment_condition/date/notes manquants sur les ressources builtin seedées sans ces flags."""
+    """Synchronise has_assignment_condition/date/notes des ressources builtin avec le seed (dans les deux sens)."""
     seed_by_code = {r["code"]: r for r in DEFAULT_RESOURCE_REFERENCES}
     rows = connection.execute(
         "SELECT id, code, has_assignment_condition, has_assignment_date, has_assignment_notes FROM resource_catalog WHERE is_builtin = 1"
@@ -327,18 +327,61 @@ def migrate_builtin_resource_flags(connection):
             continue
         seed = seed_by_code[code]
         updates = {}
-        if not row["has_assignment_condition"] and seed.get("has_assignment_condition"):
-            updates["has_assignment_condition"] = 1
-        if not row["has_assignment_date"] and seed.get("has_assignment_date", 1):
-            updates["has_assignment_date"] = 1
-        if not row["has_assignment_notes"] and seed.get("has_assignment_notes", 1):
-            updates["has_assignment_notes"] = 1
+        for flag, default in [("has_assignment_condition", 0), ("has_assignment_date", 1), ("has_assignment_notes", 1)]:
+            seed_val = int(bool(seed.get(flag, default)))
+            prod_val = int(bool(row[flag]))
+            if prod_val != seed_val:
+                updates[flag] = seed_val
         if not updates:
             continue
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         connection.execute(
             f"UPDATE resource_catalog SET {set_clause} WHERE id = ?",
             (*updates.values(), row["id"]),
+        )
+
+
+def migrate_builtin_issuer_service(connection):
+    """Met à jour issuer_service des ressources builtin pour aligner avec les noms Sprint 1 (DSI→Informatique, etc.)."""
+    # Anciens noms → nouveaux noms attendus
+    RENAMES = {
+        "DSI": "Informatique",
+        "Bâtiment": "Services generaux",
+        "Batiment": "Services generaux",
+        "DRH": "Ressources humaines",
+        "Autres services": "Ressources humaines",
+    }
+    seed_issuer = {r["code"]: r["issuer_service"] for r in DEFAULT_RESOURCE_REFERENCES}
+    rows = connection.execute(
+        "SELECT id, code, issuer_service FROM resource_catalog WHERE is_builtin = 1"
+    ).fetchall()
+    for row in rows:
+        code = row["code"]
+        current = row["issuer_service"]
+        expected = seed_issuer.get(code)
+        if not expected:
+            continue
+        if current in RENAMES and RENAMES[current] == expected:
+            connection.execute(
+                "UPDATE resource_catalog SET issuer_service = ? WHERE id = ?",
+                (expected, row["id"]),
+            )
+
+
+def migrate_builtin_display_order(connection):
+    """Corrige les display_order restés à 100 (défaut) pour les ressources builtin."""
+    seed_order = {r["code"]: r.get("display_order", 100) for r in DEFAULT_RESOURCE_REFERENCES}
+    rows = connection.execute(
+        "SELECT id, code, display_order FROM resource_catalog WHERE is_builtin = 1 AND display_order = 100"
+    ).fetchall()
+    for row in rows:
+        code = row["code"]
+        expected = seed_order.get(code)
+        if expected is None or expected == 100:
+            continue
+        connection.execute(
+            "UPDATE resource_catalog SET display_order = ? WHERE id = ?",
+            (expected, row["id"]),
         )
 
 
