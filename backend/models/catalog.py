@@ -385,6 +385,37 @@ def migrate_builtin_display_order(connection):
         )
 
 
+def migrate_telephone_imei_field(connection):
+    """Renomme le champ 'imei' en 'numeroSerie' dans le field_schema du téléphone.
+
+    Le seed initial utilisait key='imei' / label='IMEI'. Renommé ensuite en
+    key='numeroSerie' / label='N° de serie (SN)'. migrate_builtin_resource_schemas
+    ne met pas à jour un schema déjà renseigné, d'où le décalage entre DB et seed.
+    Cette migration corrige le field_schema_json en base pour les dossiers existants.
+    """
+    rows = connection.execute(
+        "SELECT id, field_schema_json FROM resource_catalog WHERE code = 'telephone' AND is_builtin = 1"
+    ).fetchall()
+    for row in rows:
+        try:
+            schema = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            continue
+        changed = False
+        for field in schema:
+            if field.get("key") == "imei":
+                field["key"] = "numeroSerie"
+                field["label"] = "N\u00b0 de serie (SN)"
+                field["placeholder"] = "Ex: SN-APPLE-001"
+                field.pop("suggest", None)
+                changed = True
+        if changed:
+            connection.execute(
+                "UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?",
+                (json.dumps(schema, ensure_ascii=False), row["id"]),
+            )
+
+
 def migrate_suggest_flags(connection):
     """Ajoute le flag suggest:true aux champs concernés dans les ressources builtin existantes."""
     # Clés qui bénéficient de l'autocomplétion, par code de ressource
