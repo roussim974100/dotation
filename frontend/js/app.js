@@ -924,13 +924,33 @@ function populateAdditionalResources(data = {}) {
     if (notesField) {
       notesField.value = resource.conditionNotes || "";
     }
-    // Compat ascendante : l'ancien champ "imei" a été renommé en "numeroSerie"
-    const fields = { ...(resource.fields || {}) };
-    if (fields.imei && !fields.numeroSerie) {
-      fields.numeroSerie = fields.imei;
-      delete fields.imei;
-    }
-    Object.entries(fields).forEach(([fieldKey, value]) => {
+    // Mapping des anciennes clés de champs vers les clés actuelles du catalogue.
+    // Utilisé pour récupérer les valeurs stockées sous un ancien nom (ex: imei → numeroSerie).
+    const FIELD_LEGACY_KEYS = { imei: "numeroSerie" };
+
+    // Construire un index des valeurs stockées normalisées (anciennes clés remappées).
+    const storedFields = resource.fields || {};
+    const normalizedFields = {};
+    Object.entries(storedFields).forEach(([key, value]) => {
+      const mappedKey = FIELD_LEGACY_KEYS[key] || key;
+      if (normalizedFields[mappedKey] === undefined) {
+        normalizedFields[mappedKey] = value;
+      }
+    });
+
+    // Peupler les champs en itérant le schéma catalogue (pas les clés stockées).
+    // Cela garantit que la clé DOM correspond toujours à la clé catalogue courante,
+    // même si les données stockées utilisent une ancienne clé.
+    const catalogRef = dynamicResourceReferences.find((r) => r.id === resource.id);
+    const schemaToUse = catalogRef
+      ? (Array.isArray(catalogRef.field_schema) ? catalogRef.field_schema : [])
+      : Object.keys(normalizedFields).map((k) => ({ key: k, type: "text" }));
+
+    schemaToUse.forEach((fieldDef) => {
+      const fieldKey = fieldDef.key;
+      const value = normalizedFields[fieldKey];
+      if (value === undefined || value === null) return;
+
       // Type list : peupler les lignes répétables
       const listContainer = document.getElementById(`dynamic_resource_list_${resource.id}_${fieldKey}`);
       if (listContainer && Array.isArray(value)) {
@@ -969,7 +989,7 @@ function populateAdditionalResources(data = {}) {
           }
           field.value = value;
         } else {
-          field.value = value || "";
+          field.value = String(value) || "";
         }
       }
     });
