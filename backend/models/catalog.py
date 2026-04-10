@@ -315,6 +315,33 @@ def migrate_builtin_resource_schemas(connection):
         )
 
 
+def migrate_builtin_resource_flags(connection):
+    """Applique has_assignment_condition/date/notes manquants sur les ressources builtin seedées sans ces flags."""
+    seed_by_code = {r["code"]: r for r in DEFAULT_RESOURCE_REFERENCES}
+    rows = connection.execute(
+        "SELECT id, code, has_assignment_condition, has_assignment_date, has_assignment_notes FROM resource_catalog WHERE is_builtin = 1"
+    ).fetchall()
+    for row in rows:
+        code = row["code"]
+        if code not in seed_by_code:
+            continue
+        seed = seed_by_code[code]
+        updates = {}
+        if not row["has_assignment_condition"] and seed.get("has_assignment_condition"):
+            updates["has_assignment_condition"] = 1
+        if not row["has_assignment_date"] and seed.get("has_assignment_date", 1):
+            updates["has_assignment_date"] = 1
+        if not row["has_assignment_notes"] and seed.get("has_assignment_notes", 1):
+            updates["has_assignment_notes"] = 1
+        if not updates:
+            continue
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        connection.execute(
+            f"UPDATE resource_catalog SET {set_clause} WHERE id = ?",
+            (*updates.values(), row["id"]),
+        )
+
+
 def migrate_suggest_flags(connection):
     """Ajoute le flag suggest:true aux champs concernés dans les ressources builtin existantes."""
     # Clés qui bénéficient de l'autocomplétion, par code de ressource
