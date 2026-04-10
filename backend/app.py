@@ -7,7 +7,7 @@ from config import get_app_secret_key
 from database import get_db, ensure_column
 from models.dossier import migrate_forms_to_dossiers
 from models.settings import seed_app_settings
-from models.catalog import seed_reference_catalogs, seed_service_catalog, migrate_suggest_flags, migrate_builtin_resource_schemas, migrate_builtin_resource_flags, migrate_missing_builtin_resources, migrate_cartes_visite_quantite, migrate_builtin_issuer_service, migrate_builtin_display_order
+from models.catalog import seed_reference_catalogs, seed_service_catalog, migrate_suggest_flags, migrate_builtin_resource_schemas, migrate_builtin_resource_flags, migrate_missing_builtin_resources, migrate_cartes_visite_quantite, migrate_builtin_issuer_service, migrate_builtin_display_order, migrate_telephone_imei_field
 from models.forms import migrate_field_suggestions_from_history
 from routes.admin import bp as admin_bp
 from routes.pages import bp as pages_bp
@@ -290,6 +290,7 @@ def init_db():
         migrate_builtin_resource_flags(connection)
         migrate_builtin_issuer_service(connection)
         migrate_builtin_display_order(connection)
+        migrate_telephone_imei_field(connection)
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
