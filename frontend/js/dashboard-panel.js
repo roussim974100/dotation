@@ -105,7 +105,10 @@ async function openQuickPanel(id) {
   const qualite = formatQualiteLabel({ data });
   const statusLabel = formatDraftStatusLabel({ status, data });
   const startAt = data.meta?.startAt || "";
-  const startLabel = startAt ? `Prise de fonction : ${formatShortDate(startAt)}` : "Prise de fonction non renseignée";
+  const dossierType = data.dossier?.type || "";
+  const startLabel = dossierType === "mise_a_jour"
+    ? null
+    : startAt ? `Prise de fonction : ${formatShortDate(startAt)}` : "Prise de fonction non renseignée";
 
   panel.innerHTML = `
     <div class="quick-panel__header">
@@ -117,7 +120,7 @@ async function openQuickPanel(id) {
       <span class="status-chip status-chip--${escapeHtml(status)} quick-panel__status">${escapeHtml(statusLabel)}</span>
     </div>
     <div class="quick-panel__body">
-      <p class="quick-panel__start">${escapeHtml(startLabel)}</p>
+      ${startLabel ? `<p class="quick-panel__start">${escapeHtml(startLabel)}</p>` : ""}
       ${_buildProgressSection(data)}
       ${_buildResourceSection(data)}
       ${_buildUncSection(data)}

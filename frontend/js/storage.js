@@ -350,9 +350,12 @@ function buildDashboardRow(draft, permissions) {
     && progress.timingLabel !== "Prêt"
     ? getTimingOffsetLabel(draft.startAt)
     : "";
-  const startAtLabel = draft.startAt
-    ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
-    : "Prise de fonction non renseignée";
+  const _dossierType = draft.dossierType || draft.data?.dossier?.type || "";
+  const startAtLabel = _dossierType === "mise_a_jour"
+    ? ""
+    : draft.startAt
+      ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
+      : "Prise de fonction non renseignée";
 
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
@@ -366,7 +369,7 @@ function buildDashboardRow(draft, permissions) {
         </div>
         <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
         <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-        <div class="draft-meta">${startAtLabel}</div>
+        ${startAtLabel ? `<div class="draft-meta">${startAtLabel}</div>` : ""}
       </td>
       <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
       <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
@@ -1425,7 +1428,8 @@ function buildAssignmentInfoEmailContent(draft) {
   const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
   const recipientEmail = getDraftRecipientEmail(draft);
   const service = draft?.service || draft?.data?.beneficiaire?.service || "";
-  const startAt = draft?.startAt ? formatShortDate(draft.startAt) : "";
+  const isMiseAJour = (draft?.dossierType || draft?.data?.dossier?.type || "") === "mise_a_jour";
+  const startAt = (!isMiseAJour && draft?.startAt) ? formatShortDate(draft.startAt) : "";
   return {
     recipientEmail,
     subject: `Information sur votre dossier - ${title}`,
