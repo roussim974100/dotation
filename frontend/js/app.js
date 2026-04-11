@@ -1979,8 +1979,10 @@ function validateFormData(formData, options = {}) {
     return "La validation RGPD est obligatoire avant l'export PDF.";
   }
 
-  const resourceIssues = collectResourceValidationIssues();
-  formData.meta.resourceValidationErrors = resourceIssues;
+  // La validation des ressources dynamiques est effectuée côté serveur
+  // (collect_resource_validation_errors dans workflow.py) qui fait autorité.
+  // Le JS ne recalcule plus resourceValidationErrors ici pour éviter toute
+  // divergence entre la validation frontend et backend.
   return null;
 }
 
@@ -2068,78 +2070,77 @@ async function showSaveInfoDialog(title, text, items = []) {
 }
 
 
-async function resolveSaveWorkflow(formData) {
-  const hasSignature = Boolean(formData.validation.signatureDataUrl);
-  const rgpdAccepted = Boolean(formData.validation.rgpdAccepted);
-  const currentStatus = formData.workflow.status;
-  const resourceIssues = formData.meta.resourceValidationErrors || [];
-  const resourceCompletion = summarizeRequestedResourceCompletion(formData);
+async function showPostSaveDialog(result) {
+  // Affiche un retour utilisateur basé sur le statut et les erreurs calculés par le backend.
+  // Le backend est la seule source de vérité pour resourceValidationErrors et le workflow status.
+  const data = result.data || {};
+  const status = result.summary?.status || data.workflow?.status || "draft";
+  const resourceIssues = data.meta?.resourceValidationErrors || [];
+  const resourceCompletion = summarizeRequestedResourceCompletion(data);
 
-  if (["returned", "partial_return", "cancelled"].includes(currentStatus)) {
-    return formData;
+  if (["returned", "partial_return", "cancelled"].includes(status)) {
+    return;
   }
 
-  if (!hasSignature || !rgpdAccepted) {
-    formData.workflow.status = "draft";
-    formData.meta.lockedAt = "";
-    return formData;
+  if (status === "draft") {
+    return;
   }
 
   if (resourceIssues.length > 0) {
-    formData.workflow.status = "partial_assignment";
-    formData.meta.lockedAt = "";
     await showSaveInfoDialog(
       "Attribution partielle",
       "Certaines ressources cochées ne sont pas complètement renseignées. Le dossier reste modifiable.",
       resourceIssues
     );
-    return formData;
+    return;
   }
 
-  if (resourceCompletion.completed < resourceCompletion.total) {
-    formData.workflow.status = "partial_assignment";
-    formData.meta.lockedAt = "";
+  if (status === "partial_assignment" && resourceCompletion.completed < resourceCompletion.total) {
     const missingDetails = resourceCompletion.missing.map((resource) => `${resource.label} : ressource encore à compléter`);
     await showSaveInfoDialog(
       "Attribution partielle",
       `L'attribution n'est pas encore complète : ${resourceCompletion.completed}/${resourceCompletion.total} ressource(s) attribuées.`,
       missingDetails
     );
-    return formData;
+    return;
   }
 
-  if (!hasSignature) {
-    formData.workflow.status = "awaiting_signature";
-    formData.meta.lockedAt = "";
+  if (status === "awaiting_signature") {
     await showSaveInfoDialog(
       "En attente de signature",
       "Le dossier est complet et n'attend plus que la signature finale."
     );
-    return formData;
+    return;
   }
 
-  const choice = await requestSaveDecision({
-    title: "Finalisation du dossier",
-    text: "Toutes les informations sont présentes. Souhaitez-vous verrouiller ce dossier comme attribution complète ?",
-    steps: [
-      { label: "Bénéficiaire, ressources et validation sont complets", status: "done" },
-      { label: "Choisissez entre finalisation complète ou poursuite en mode partiel", status: "active" }
-    ],
-    hideSpinner: true,
-    showConfirm: true,
-    confirmLabel: "Finaliser le dossier",
-    secondaryLabel: "Laisser partiel"
-  });
-
-  if (choice === "confirm") {
-    formData.workflow.status = "active";
-    formData.meta.lockedAt = formData.meta.lockedAt || new Date().toISOString();
-    return formData;
+  // Dossier complet (signature + RGPD + ressources) mais pas encore verrouillé :
+  // proposer la finalisation.
+  const hasSignature = Boolean(data.validation?.signatureDataUrl);
+  const rgpdAccepted = Boolean(data.validation?.rgpdAccepted);
+  if (status === "partial_assignment" && hasSignature && rgpdAccepted && !resourceIssues.length && resourceCompletion.completed >= resourceCompletion.total) {
+    const choice = await requestSaveDecision({
+      title: "Finalisation du dossier",
+      text: "Toutes les informations sont présentes. Souhaitez-vous verrouiller ce dossier comme attribution complète ?",
+      steps: [
+        { label: "Bénéficiaire, ressources et validation sont complets", status: "done" },
+        { label: "Choisissez entre finalisation complète ou poursuite en mode partiel", status: "active" }
+      ],
+      hideSpinner: true,
+      showConfirm: true,
+      confirmLabel: "Finaliser le dossier",
+      secondaryLabel: "Laisser partiel"
+    });
+    if (choice === "confirm") {
+      data.workflow.status = "active";
+      data.meta.lockedAt = data.meta.lockedAt || new Date().toISOString();
+      const finalResult = await saveFormData(data);
+      form.dataset.lockedAt = finalResult.data.meta.lockedAt || "";
+      updateDraftUi(finalResult.summary.updatedAt, false, finalResult.summary.status);
+      if (form.dataset.lockedAt) {
+        applyLockState(true);
+      }
+    }
   }
-
-  formData.workflow.status = "partial_assignment";
-  formData.meta.lockedAt = "";
-  return formData;
 }
 
 async function saveDraft(signaturePad) {
@@ -2169,25 +2170,28 @@ async function saveDraft(signaturePad) {
 
     updateSaveProgress({
       title: "Enregistrement du dossier",
-      text: "Le dossier est en cours d'analyse pour déterminer son état métier.",
-      steps: createWorkflowSteps(workflowLabels, 1)
-    });
-    await resolveSaveWorkflow(formData);
-
-    updateSaveProgress({
-      title: "Enregistrement du dossier",
       text: "Les informations sont en cours d'enregistrement.",
-      steps: createWorkflowSteps(workflowLabels, 2)
+      steps: createWorkflowSteps(workflowLabels, 1)
     });
 
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
-    form.dataset.lockedAt = result.data.meta.lockedAt || formData.meta.lockedAt || "";
+    form.dataset.lockedAt = result.data.meta.lockedAt || "";
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
+
+    updateSaveProgress({
+      title: "Enregistrement du dossier",
+      text: "Analyse du statut du dossier.",
+      steps: createWorkflowSteps(workflowLabels, 2)
+    });
+
     await loadSignatureLinkState();
     if (form.dataset.lockedAt) {
       applyLockState(true);
     }
+
+    // Afficher le retour utilisateur basé sur le statut calculé par le backend.
+    await showPostSaveDialog(result);
 
     updateSaveProgress({
       title: "Enregistrement du dossier",
