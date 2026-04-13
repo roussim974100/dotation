@@ -123,3 +123,116 @@ class TestRestitution:
             json={"reason": "test"},
         )
         assert r.status_code == 403
+
+
+class TestResourceValidationEndToEnd:
+    """Non-régression bug imei/numeroSerie via l'API HTTP complète.
+
+    Vérifie qu'un dossier envoyé avec des clés camelCase dans fields{} n'est
+    pas rejeté par le backend et que meta.resourceValidationErrors reste vide
+    après relecture GET.
+    """
+
+    def _base_payload(self, extra=None):
+        payload = {
+            "beneficiaire": {
+                "nom": "Bernard",
+                "prenom": "Claire",
+                "service": "DSI",
+                "qualite": "agent",
+            },
+            "dossier": {"type": "arrivee"},
+            "meta": {"startAt": "2026-04-01"},
+        }
+        if extra:
+            payload.update(extra)
+        return payload
+
+    def test_camelcase_numeroserie_accepte_par_api(self, admin_client):
+        """POST avec resources.additional + fields.numeroSerie → pas d'erreur backend."""
+        schema = [
+            {"key": "marque", "label": "Marque", "type": "text", "required": True},
+            {"key": "modele", "label": "Modèle", "type": "text", "required": True},
+            {"key": "numeroSerie", "label": "N° de série (SN)", "type": "text", "required": True},
+        ]
+        payload = self._base_payload({
+            "resources": {
+                "additional": [{
+                    "id": "resource_telephone",
+                    "code": "telephone",
+                    "label": "Téléphone",
+                    "selected": True,
+                    "fields": {
+                        "marque": "Apple",
+                        "modele": "iPhone 15",
+                        "numeroSerie": "SN-APPLE-001",
+                    },
+                    "fieldSchema": schema,
+                    "assignedAt": "2026-04-01",
+                    "hasAssignmentDate": True,
+                }],
+            },
+        })
+        r = admin_client.post("/api/forms", json=payload)
+        assert r.status_code == 201
+        form_id = r.get_json()["summary"]["id"]
+
+        # Relecture : aucune erreur de validation persistée
+        r_get = admin_client.get(f"/api/forms/{form_id}")
+        assert r_get.status_code == 200
+        stored = r_get.get_json()
+        errors = stored.get("data", {}).get("meta", {}).get("resourceValidationErrors") or []
+        assert errors == [], f"Erreurs inattendues persistées : {errors}"
+
+    def test_legacy_materiel_telephone_numeroserie_accepte(self, admin_client):
+        """Ancien format materiel.telephone.numeroSerie → accepté sans erreur."""
+        payload = self._base_payload({
+            "materiel": {
+                "telephone": {
+                    "selected": True,
+                    "marque": "Samsung",
+                    "modele": "Galaxy A54",
+                    "numeroSerie": "SN-SAMS-001",
+                    "assignedAt": "2026-04-01",
+                    "hasAssignmentDate": True,
+                },
+            },
+        })
+        r = admin_client.post("/api/forms", json=payload)
+        assert r.status_code == 201
+        form_id = r.get_json()["summary"]["id"]
+
+        r_get = admin_client.get(f"/api/forms/{form_id}")
+        assert r_get.status_code == 200
+        errors = r_get.get_json().get("data", {}).get("meta", {}).get("resourceValidationErrors") or []
+        assert errors == [], f"Erreurs inattendues : {errors}"
+
+    def test_camelcase_champ_requis_manquant_genere_erreur(self, admin_client):
+        """POST avec numeroSerie manquant → meta.resourceValidationErrors non vide après GET."""
+        schema = [
+            {"key": "marque", "label": "Marque", "type": "text", "required": True},
+            {"key": "numeroSerie", "label": "N° de série (SN)", "type": "text", "required": True},
+        ]
+        payload = self._base_payload({
+            "resources": {
+                "additional": [{
+                    "id": "resource_telephone",
+                    "code": "telephone",
+                    "label": "Téléphone",
+                    "selected": True,
+                    "fields": {"marque": "Apple"},  # numeroSerie manquant
+                    "fieldSchema": schema,
+                    "assignedAt": "2026-04-01",
+                    "hasAssignmentDate": True,
+                }],
+            },
+        })
+        r = admin_client.post("/api/forms", json=payload)
+        # Le dossier est créé en draft mais avec des erreurs de validation persistées
+        assert r.status_code == 201
+        form_id = r.get_json()["summary"]["id"]
+
+        r_get = admin_client.get(f"/api/forms/{form_id}")
+        errors = r_get.get_json().get("data", {}).get("meta", {}).get("resourceValidationErrors") or []
+        assert len(errors) == 1
+        assert "N° de série" in errors[0]
