@@ -79,6 +79,14 @@ All API endpoints under `/api/*` return JSON. HTML pages served at root paths. P
 
 Dossier types: `arrivee`, `changement_service`, `mise_a_jour`, `sortie`.
 
+### Dynamic Resource Field Keys
+
+Resource `fields{}` use **camelCase** keys (e.g. `numeroSerie`, `nomTelephone`, `conditionAttribution`). These keys are defined in `resource_catalog.field_schema_json` and stored as-is in `payload_json`.
+
+**Warning:** `slugify_field_key()` in `utils.py` converts keys to lowercase (`numeroSerie` → `numeroserie`). It must only be used to **create** new keys from user labels, never to **look up** values in existing `fields{}` dicts. Any lookup after slugification must use a case-insensitive fallback (see `field_values_lower` pattern in `workflow.py`).
+
+The backend (`collect_resource_validation_errors` in `workflow.py`) is the single source of truth for resource validation. The JS frontend provides inline UX feedback only.
+
 ## Key Environment Variables
 
 | Variable | Purpose | Dev default |

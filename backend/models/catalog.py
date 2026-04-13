@@ -1,6 +1,6 @@
 import json
 
-from utils import generate_id, utc_now, slugify_field_key
+from utils import generate_id, utc_now
 from models.workflow import normalize_resource_field_schema
 
 
