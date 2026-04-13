@@ -5,10 +5,16 @@ Couvre les cas de figure à risque :
 - Champs requis manquants vs renseignés
 - Format legacy (materiel/immateriel) vs nouveau (resources.additional)
 - Non-régression du bug imei/numeroSerie
+- Intégration bout-en-bout via persist_form
 """
 
 import pytest
-from models.workflow import collect_resource_validation_errors, is_dynamic_resource_complete
+from models.workflow import (
+    collect_resource_validation_errors,
+    is_dynamic_resource_complete,
+    compute_effective_workflow_status,
+    normalize_resource_field_schema,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -245,3 +251,114 @@ class TestLegacyFixedRules:
         })
         errors = collect_resource_validation_errors(payload)
         assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# normalize_resource_field_schema — vérifier la transformation slugify
+# ---------------------------------------------------------------------------
+
+class TestNormalizeFieldSchema:
+
+    def test_camelcase_key_slugified(self):
+        """Les clés camelCase sont transformées en minuscules par slugify_field_key."""
+        schema = [{"key": "numeroSerie", "label": "SN", "type": "text", "required": True}]
+        normalized = normalize_resource_field_schema(schema)
+        assert normalized[0]["key"] == "numeroserie"
+
+    def test_already_lowercase_unchanged(self):
+        schema = [{"key": "marque", "label": "Marque", "type": "text", "required": True}]
+        normalized = normalize_resource_field_schema(schema)
+        assert normalized[0]["key"] == "marque"
+
+    def test_accented_key_stripped(self):
+        schema = [{"key": "numéroSérie", "label": "SN", "type": "text"}]
+        normalized = normalize_resource_field_schema(schema)
+        assert normalized[0]["key"] == "numeroserie"
+
+
+# ---------------------------------------------------------------------------
+# Intégration bout-en-bout : workflow status avec ressources camelCase
+# ---------------------------------------------------------------------------
+
+class TestWorkflowStatusIntegration:
+
+    def _full_payload(self, resources, status="draft", signed=True, rgpd=True):
+        return {
+            "beneficiaire": {"nom": "Test", "prenom": "User", "service": "DSI", "qualite": "agent"},
+            "dossier": {"type": "arrivee"},
+            "materiel": {},
+            "immateriel": {},
+            "resources": {"additional": resources},
+            "unc_acces": [],
+            "restitution": {},
+            "validation": {
+                "rgpdAccepted": rgpd,
+                "signatureDataUrl": "data:image/png;base64,abc" if signed else "",
+            },
+            "workflow": {"status": status},
+            "meta": {"startAt": "2026-01-15"},
+        }
+
+    def test_complet_camelcase_donne_partial_assignment_pas_active(self):
+        """Un dossier complet en draft passe en partial_assignment (active nécessite une demande explicite)."""
+        schema = _schema(("marque", "Marque", True), ("numeroserie", "N° de série", True))
+        resource = _resource(
+            fields={"marque": "Apple", "numeroSerie": "SN-001"},
+            field_schema=schema,
+        )
+        payload = self._full_payload([resource])
+        errors = collect_resource_validation_errors(payload)
+        payload["meta"]["resourceValidationErrors"] = errors
+        status = compute_effective_workflow_status(payload)
+        assert errors == [], f"Erreurs inattendues : {errors}"
+        # draft → partial_assignment (pas active sans demande explicite)
+        assert status == "partial_assignment"
+
+    def test_complet_deja_active_reste_active(self):
+        """Un dossier déjà active avec champs camelCase reste active."""
+        schema = _schema(("marque", "Marque", True), ("numeroserie", "N° de série", True))
+        resource = _resource(
+            fields={"marque": "Apple", "numeroSerie": "SN-001"},
+            field_schema=schema,
+        )
+        payload = self._full_payload([resource], status="active")
+        errors = collect_resource_validation_errors(payload)
+        payload["meta"]["resourceValidationErrors"] = errors
+        status = compute_effective_workflow_status(payload)
+        assert errors == []
+        assert status == "active"
+
+    def test_champ_manquant_donne_partial_assignment(self):
+        """Champ requis manquant → partial_assignment."""
+        schema = _schema(("marque", "Marque", True), ("numeroserie", "N° de série", True))
+        resource = _resource(
+            fields={"marque": "Apple"},  # SN manquant
+            field_schema=schema,
+        )
+        payload = self._full_payload([resource])
+        errors = collect_resource_validation_errors(payload)
+        payload["meta"]["resourceValidationErrors"] = errors
+        status = compute_effective_workflow_status(payload)
+        assert len(errors) == 1
+        assert status == "partial_assignment"
+
+    def test_sans_signature_sans_rgpd_ressource_incomplete_donne_draft(self):
+        """Sans signature ni RGPD + ressource incomplète → draft."""
+        schema = _schema(("marque", "Marque", True))
+        resource = _resource(fields={}, field_schema=schema)  # champ requis manquant
+        payload = self._full_payload([resource], signed=False, rgpd=False)
+        errors = collect_resource_validation_errors(payload)
+        payload["meta"]["resourceValidationErrors"] = errors
+        status = compute_effective_workflow_status(payload)
+        assert status == "draft"
+
+    def test_sans_signature_complet_donne_awaiting(self):
+        """Sans signature mais ressources complètes + RGPD → awaiting_signature."""
+        schema = _schema(("marque", "Marque", True))
+        resource = _resource(fields={"marque": "Apple"}, field_schema=schema)
+        payload = self._full_payload([resource], signed=False, rgpd=True)
+        errors = collect_resource_validation_errors(payload)
+        payload["meta"]["resourceValidationErrors"] = errors
+        status = compute_effective_workflow_status(payload)
+        assert errors == []
+        assert status == "awaiting_signature"
