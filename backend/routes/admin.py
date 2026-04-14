@@ -1164,10 +1164,10 @@ def _diagnose_db_file(path):
 @permission_required("db.manage")
 @rate_limit(max_requests=20, window_seconds=60, scope="db_export")
 def db_export():
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone as _tz
     if not os.path.exists(DB_PATH):
         return jsonify({"error": "db_not_found"}), 404
-    date_str = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
+    date_str = _dt.now(_tz.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"aquai_db_{date_str}.db"
     with get_db() as conn:
         insert_app_log(conn, "admin", "db_exported", "Export base de donnees", details={"filename": filename})
@@ -1225,8 +1225,8 @@ def db_import():
             os.unlink(tmp_path)
             return jsonify({"error": "diagnose_failed", "report": report}), 422
         os.makedirs(_BACKUP_DIR, exist_ok=True)
-        from datetime import datetime as _dt
-        backup_name = f"dotation_backup_{_dt.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
+        from datetime import datetime as _dt, timezone as _tz
+        backup_name = f"dotation_backup_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db"
         backup_path = os.path.join(_BACKUP_DIR, backup_name)
         if os.path.exists(DB_PATH):
             shutil.copy2(DB_PATH, backup_path)

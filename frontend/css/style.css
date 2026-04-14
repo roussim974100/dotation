@@ -136,7 +136,6 @@ body.login-shell {
   color: var(--brand-dark);
 }
 
-
 .app-subtitle {
   max-width: 55rem;
   margin: 0.45rem 0 0;
@@ -376,7 +375,6 @@ body.login-shell {
   justify-content: flex-end;
   flex-wrap: wrap;
 }
-
 
 /* Contenants principaux reutilises dans les pages */
 .hero-panel,
@@ -904,17 +902,6 @@ body.login-shell {
   color: var(--muted);
 }
 
-.field-invalid {
-  border-color: #dc3545 !important;
-  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.12);
-}
-
-.field-help {
-  margin-top: 0.4rem;
-  color: #b54708;
-  font-size: 0.84rem;
-}
-
 .progress-required-field {
   border-color: #d6a53a !important;
   box-shadow: 0 0 0 0.18rem rgba(214, 165, 58, 0.14);
@@ -952,7 +939,6 @@ body.login-shell {
 .subgrid + .subgrid {
   margin-top: 0.75rem;
 }
-
 
 .subgrid {
   display: grid;
@@ -1264,13 +1250,11 @@ body.login-shell {
   color: var(--brand-dark);
 }
 
-#cc-main .section__title,
 #cc-main .pm__section-title {
   color: var(--brand-dark);
 }
 
-#cc-main .cm__desc,
-#cc-main .section__desc {
+#cc-main .cm__desc {
   line-height: 1.6;
   font-size: 0.93rem;
 }
@@ -2395,7 +2379,6 @@ body.login-shell {
   font-weight: 700;
 }
 
-
 @keyframes loader-spin {
   to {
     transform: rotate(360deg);
@@ -2437,42 +2420,6 @@ body.login-shell {
   display: none;
 }
 
-/* Vue d'impression dediee: structure propre pour les exports PDF */
-.print-sheet {
-  color: #111827;
-}
-
-.print-sheet__header {
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid #1f4f73;
-}
-
-.print-sheet__title {
-  margin: 0;
-  font-size: 1.9rem;
-  font-weight: 700;
-}
-
-.print-sheet__subtitle {
-  margin: 0.4rem 0 0;
-  color: #4b5563;
-}
-
-.print-block {
-  margin-bottom: 1.25rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  break-inside: avoid;
-}
-
-.print-block h3 {
-  margin: 0 0 0.8rem;
-  font-size: 1.05rem;
-  color: #1f4f73;
-}
-
 .print-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2498,19 +2445,6 @@ body.login-shell {
 
 .print-list li + li {
   margin-top: 0.4rem;
-}
-
-.print-signature {
-  max-width: 360px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 0.4rem;
-  background: #fff;
-}
-
-.print-signature img {
-  display: block;
-  max-width: 100%;
 }
 
 @media (max-width: 991.98px) {
@@ -2829,7 +2763,6 @@ body.login-shell {
   border-color: var(--border);
 }
 
-[data-color-mode="dark"] .login-info-card,
 [data-color-mode="dark"] .login-card {
   background: color-mix(in srgb, var(--surface-alt) 95%, transparent);
   border-color: var(--border);
@@ -2853,13 +2786,6 @@ body.login-shell {
   border-color: var(--border);
 }
 
-/* Formulaire — sous-sections */
-[data-color-mode="dark"] .form-section__header {
-  background: var(--surface);
-  border-color: var(--border);
-}
-
-[data-color-mode="dark"] .equipment-panel,
 [data-color-mode="dark"] .equipment-toggle {
   background: var(--surface);
   border-color: var(--border);
@@ -2912,79 +2838,16 @@ body.login-shell {
   color: #fff;
 }
 
-[data-color-mode="dark"] .dashboard-group__label {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
-}
-
 /* Menu dossier */
 [data-color-mode="dark"] .draft-actions__menu-panel {
   background: var(--surface);
   border-color: var(--border);
 }
 
-/* Badges de statut */
-[data-color-mode="dark"] .status-badge--draft {
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  color: var(--accent);
-}
-
-[data-color-mode="dark"] .status-badge--active,
-[data-color-mode="dark"] .status-badge--returned {
-  background: color-mix(in srgb, #2d8a56 22%, var(--surface));
-  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
-  color: #6bc990;
-}
-
-[data-color-mode="dark"] .status-badge--partial_assignment,
-[data-color-mode="dark"] .status-badge--awaiting_signature,
-[data-color-mode="dark"] .status-badge--partial_return {
-  background: color-mix(in srgb, #c87830 18%, var(--surface));
-  border-color: color-mix(in srgb, #c87830 40%, var(--border));
-  color: #e8a060;
-}
-
-[data-color-mode="dark"] .status-badge--cancelled {
-  background: color-mix(in srgb, #b84a4a 18%, var(--surface));
-  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
-  color: #e88080;
-}
-
-/* Badges pilotage */
-[data-color-mode="dark"] .timing-badge--ok {
-  background: color-mix(in srgb, #2d8a56 22%, var(--surface));
-  border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
-  color: #6bc990;
-}
-
-[data-color-mode="dark"] .timing-badge--warning {
-  background: color-mix(in srgb, #c87830 18%, var(--surface));
-  border-color: color-mix(in srgb, #c87830 40%, var(--border));
-  color: #e8a060;
-}
-
-[data-color-mode="dark"] .timing-badge--late {
-  background: color-mix(in srgb, #b84a4a 18%, var(--surface));
-  border-color: color-mix(in srgb, #b84a4a 40%, var(--border));
-  color: #e88080;
-}
-
-[data-color-mode="dark"] .timing-badge--neutral {
-  background: color-mix(in srgb, var(--brand) 18%, var(--surface));
-  border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
-  color: var(--brand);
-}
-
 /* Hover cards */
 [data-color-mode="dark"] .status-hover-card {
   background: var(--surface);
   border-color: var(--border);
-  color: var(--text);
-}
-
-[data-color-mode="dark"] .status-hover-card__title {
   color: var(--text);
 }
 
@@ -3033,8 +2896,7 @@ body.login-shell {
 }
 
 /* Password generator / help modal */
-[data-color-mode="dark"] .password-generator-modal__dialog,
-[data-color-mode="dark"] .page-help-modal__dialog {
+[data-color-mode="dark"] .password-generator-modal__dialog {
   background: var(--surface);
   border-color: var(--border);
 }
@@ -3044,16 +2906,9 @@ body.login-shell {
   border-color: var(--border);
 }
 
-[data-color-mode="dark"] .page-help-modal__links a {
-  background: var(--surface-alt);
-  border-color: var(--border);
-  color: var(--text);
-}
-
 /* Workflow dialog */
 [data-color-mode="dark"] .workflow-dialog__backdrop,
-[data-color-mode="dark"] .password-generator-modal__backdrop,
-[data-color-mode="dark"] .page-help-modal__backdrop {
+[data-color-mode="dark"] .password-generator-modal__backdrop {
   background: rgba(0, 0, 0, 0.65);
 }
 
@@ -3100,12 +2955,6 @@ body.login-shell {
   color: var(--text);
 }
 
-[data-color-mode="dark"] .app-footer__badge {
-  background: var(--surface-alt);
-  border-color: var(--border);
-  color: var(--muted);
-}
-
 /* Bouton retour en haut */
 [data-color-mode="dark"] .back-to-top {
   background: var(--surface);
@@ -3117,7 +2966,6 @@ body.login-shell {
 [data-color-mode="dark"] .export-progress__value {
   color: var(--text);
 }
-
 
 /* Admin layout */
 [data-color-mode="dark"] .admin-nav__link {
@@ -3323,12 +3171,6 @@ body.login-shell {
   background: var(--surface);
 }
 
-
-/* Form field help & validation */
-[data-color-mode="dark"] .field-help {
-  color: #e8a060;
-}
-
 [data-color-mode="dark"] .progress-required-field {
   border-color: #c89e30 !important;
   box-shadow: 0 0 0 0.18rem rgba(200, 158, 48, 0.18);
@@ -3400,10 +3242,6 @@ body.login-shell {
 /* Misc text colors */
 [data-color-mode="dark"] .panel-text,
 [data-color-mode="dark"] .panel-eyebrow {
-  color: var(--muted);
-}
-
-[data-color-mode="dark"] .draft-subtitle {
   color: var(--muted);
 }
 
