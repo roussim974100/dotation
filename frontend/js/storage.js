@@ -1052,8 +1052,16 @@ function saveBlob(blob, filename) {
 
 function parseDownloadFileName(response, fallback) {
   const disposition = response.headers.get("Content-Disposition") || "";
-  const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
-  return fileNameMatch ? fileNameMatch[1] : fallback;
+  const extMatch = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (extMatch) {
+    try {
+      return decodeURIComponent(extMatch[1].trim());
+    } catch (_err) {
+      // fall through to plain filename / fallback
+    }
+  }
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  return plainMatch ? plainMatch[1] : fallback;
 }
 
 function getPdfEmailRecipient(draft) {
