@@ -37,13 +37,6 @@ const restitutionStateLabels = {
   autre: "Autre"
 };
 
-const ASSIGNMENT_CONDITION_LABELS = {
-  neuf: "Neuf",
-  bon_etat: "Bon état",
-  etat_usage: "État d'usage",
-  degrade: "Dégradé"
-};
-
 let currentLockState = false;
 
 function findResourceRefByCode(code) {
@@ -76,41 +69,6 @@ function normalizeDateInputValue(value) {
   return localDate.toISOString().slice(0, 10);
 }
 
-function formatDisplayDate(value) {
-  if (!value) {
-    return "";
-  }
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(date);
-}
-
-function formatAssignmentConditionLabel(value) {
-  return ASSIGNMENT_CONDITION_LABELS[value] || value || "";
-}
-
-function buildAssignmentConditionSummary(item) {
-  if (!item) {
-    return "";
-  }
-  const parts = [];
-  const conditionLabel = formatAssignmentConditionLabel(item.conditionAttribution);
-  if (conditionLabel) {
-    parts.push(`État à la remise : ${conditionLabel}`);
-  }
-  if (item.assignedAt) {
-    parts.push(`Date d'attribution : ${formatDisplayDate(item.assignedAt)}`);
-  }
-  if (item.conditionNotes) {
-    parts.push(`Observation : ${item.conditionNotes}`);
-  }
-  return parts.join(" - ");
-}
-
-
 function ensureAssignmentConditionFields() {
   // Les champs de condition d'attribution sont désormais générés
   // dynamiquement via buildDynamicResourceTrackingFields dans le rendu catalogue.
@@ -129,32 +87,6 @@ function createRepeatableRow(containerId, placeholder, value = "") {
   document.getElementById(containerId)?.appendChild(row);
 }
 
-
-function clearFieldError(field) {
-  if (!field) {
-    return;
-  }
-  field.classList.remove("field-invalid");
-  field.setCustomValidity("");
-  const help = field.parentElement.querySelector(`.field-help[data-for="${field.id}"]`);
-  if (help) {
-    help.remove();
-  }
-}
-
-function setFieldError(field, message) {
-  if (!field) {
-    return;
-  }
-  clearFieldError(field);
-  field.classList.add("field-invalid");
-  field.setCustomValidity(message);
-  const help = document.createElement("p");
-  help.className = "field-help";
-  help.dataset.for = field.id;
-  help.textContent = message;
-  field.parentElement.appendChild(help);
-}
 
 function clearProgressIndicators() {
   document.querySelectorAll(".progress-required-field").forEach((field) => field.classList.remove("progress-required-field"));
@@ -1208,60 +1140,6 @@ function initQualite() {
     radios[0].checked = true;
   }
   sync();
-}
-
-function validateFixedResourceSelection() {
-  // Toutes les ressources sont désormais validées via validateDynamicResourceSelection.
-  return [];
-}
-
-function validateDynamicResourceSelection() {
-  const issues = [];
-  document.querySelectorAll(".dynamic-resource-field").forEach((field) => clearFieldError(field));
-
-  dynamicResourceReferences.forEach((resource) => {
-    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
-    if (!checkbox || !checkbox.checked) {
-      return;
-    }
-    const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
-    if (!fieldSchema.length) {
-      const detailsField = document.getElementById(`dynamic_resource_details_${resource.id}`);
-      const detailsValue = detailsField ? detailsField.value.trim() || "" : "";
-      if (!detailsValue) {
-        setFieldError(detailsField, "Précision obligatoire.");
-        issues.push(`${resource.label} : précision manquante`);
-      }
-      return;
-    }
-
-    fieldSchema.forEach((fieldDef) => {
-      const field = document.getElementById(`dynamic_resource_${resource.id}_${fieldDef.key}`);
-      const value = getDynamicResourceFieldValue(resource.id, fieldDef.key);
-      if (fieldDef.required && !value) {
-        setFieldError(field, `${fieldDef.label} obligatoire.`);
-        issues.push(`${resource.label} : ${fieldDef.label} manquant`);
-        return;
-      }
-    });
-
-    if (usesDynamicResourceAssignmentDate(resource)) {
-      const assignedAtField = document.getElementById(`dynamic_resource_assigned_at_${resource.id}`);
-      if (!getFieldValue(`dynamic_resource_assigned_at_${resource.id}`)) {
-        setFieldError(assignedAtField, "Date d'attribution obligatoire.");
-        issues.push(`${resource.label} : date d'attribution manquante`);
-      }
-    }
-  });
-
-  return issues;
-}
-
-function collectResourceValidationIssues() {
-  return [
-    ...validateFixedResourceSelection(),
-    ...validateDynamicResourceSelection()
-  ];
 }
 
 function updateStatusInfo(status = "draft") {
