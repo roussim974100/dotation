@@ -4033,8 +4033,8 @@ body.login-shell {
   font-size: 11px;
   padding: 3px 7px;
   border-radius: 6px;
-  background: var(--surface-alt);
-  color: var(--muted);
+  background: var(--surface-alt) !important;
+  color: var(--muted) !important;
   border: 1px solid var(--border);
   font-family: var(--font-ui);
 }
@@ -4119,7 +4119,8 @@ body.login-shell {
   margin: 0 2px;
   font-size: 10px;
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--surface) !important;
+  color: var(--text) !important;
   border: 1px solid var(--border);
   font-family: var(--font-ui);
 }
@@ -4134,7 +4135,8 @@ body.login-shell {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.35);
   font-family: var(--font-ui);
 }
@@ -4169,6 +4171,7 @@ body.global-search-open { overflow: hidden; }
 }
 [data-color-mode="dark"] .global-search__esc,
 [data-color-mode="dark"] .global-search__footer kbd {
-  background: #141d27;
+  background: #141d27 !important;
+  color: #e6edf3 !important;
   border-color: #2d3b4d;
 }
