@@ -256,6 +256,10 @@ def init_db():
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE CASCADE
             );
 
+            CREATE INDEX IF NOT EXISTS idx_dotation_forms_updated_at
+                ON dotation_forms(updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_dotation_forms_status
+                ON dotation_forms(status);
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
