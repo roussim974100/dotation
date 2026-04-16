@@ -2,7 +2,7 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from utils import generate_id, utc_now
+from utils import generate_id, utc_now, AppError
 from models.audit import insert_audit_event, insert_app_log, current_actor
 
 
@@ -146,20 +146,20 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, 
         (form_id,),
     ).fetchone()
     if not form_row:
-        raise ValueError("Dossier introuvable.")
+        raise AppError("not_found", "Dossier introuvable.", 404)
 
     payload = json.loads(form_row["payload_json"] or "{}")
     if link_type == "restitution":
         restitution = payload.get("restitution", {})
         has_restitution = bool(restitution.get("returnedAt"))
         if not has_restitution:
-            raise ValueError("La restitution doit être préparée avant de générer un lien.")
+            raise AppError("restitution_not_ready", "La restitution doit être préparée avant de générer un lien.")
         if restitution.get("signatureDataUrl"):
-            raise ValueError("Cette restitution est déjà signée.")
+            raise AppError("already_signed", "Cette restitution est déjà signée.")
     else:
         validation = payload.get("validation", {})
         if validation.get("signatureDataUrl"):
-            raise ValueError("Ce dossier est déjà signé.")
+            raise AppError("already_signed", "Ce dossier est déjà signé.")
 
     revoke_signature_links_for_form(connection, form_id, actor=actor, link_type=link_type)
     now = utc_now()

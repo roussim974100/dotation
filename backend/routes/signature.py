@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from utils import utc_now
+from utils import utc_now, AppError
 from database import get_db
 from auth import login_required, has_permission, get_request_client_ip
 from models.audit import current_actor, insert_audit_event, insert_app_log
@@ -49,8 +49,8 @@ def create_form_signature_link_route(form_id):
                 expires_in_hours=validity_days * 24,
                 link_type="assignment",
             )
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
     return jsonify({"link": serialize_signature_link(link_row)}), 201
 
 
@@ -87,8 +87,8 @@ def create_form_restitution_signature_link_route(form_id):
                 expires_in_hours=validity_days * 24,
                 link_type="restitution",
             )
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
     return jsonify({"link": serialize_signature_link(link_row)}), 201
 
 
@@ -182,8 +182,8 @@ def submit_signature_token_route(token):
 
     try:
         saved = persist_form(dossier_payload)
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
 
     with get_db() as connection:
         connection.execute(
@@ -290,8 +290,8 @@ def submit_restitution_signature_token_route(token):
 
     try:
         saved = persist_form(dossier_payload, allow_locked_update=True)
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
 
     with get_db() as connection:
         connection.execute(
