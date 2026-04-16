@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, make_response, request, session
 from utils import (
     utc_now, format_export_datetime, format_status_label,
     format_beneficiary_label, format_restitution_state_label,
-    dossier_type_label, slugify_filename,
+    dossier_type_label, slugify_filename, AppError,
 )
 from database import get_db
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
@@ -466,8 +466,8 @@ def create_form():
     payload = request.get_json(silent=True) or {}
     try:
         form_data = persist_form(payload)
-    except ValueError:
-        return jsonify({"error": "invalid_form_data"}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
     return jsonify(form_data), 201
 
 
@@ -480,8 +480,8 @@ def update_form(form_id):
     payload.setdefault("meta", {})["id"] = form_id
     try:
         form_data = persist_form(payload)
-    except ValueError:
-        return jsonify({"error": "invalid_form_data"}), 400
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
     return jsonify(form_data)
 
 

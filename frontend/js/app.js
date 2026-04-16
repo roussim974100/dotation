@@ -2107,8 +2107,8 @@ async function saveDraft(signaturePad) {
     setSaveButtonLoading(false);
     await showSaveInfoDialog(
       "Erreur d'enregistrement",
-      error.message === "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
-        ? error.message
+      error.message === "form_locked"
+        ? "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
         : "Impossible d'enregistrer la fiche."
     );
   }

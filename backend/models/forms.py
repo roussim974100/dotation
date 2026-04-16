@@ -6,7 +6,7 @@ from utils import (
     utc_now, bool_to_int, normalize_dossier_type,
     build_title, format_export_datetime, get_signature_datetime,
     format_beneficiary_label, format_status_label, format_restitution_state_label,
-    dossier_type_label, mask_text, mask_payload,
+    dossier_type_label, mask_text, mask_payload, AppError,
 )
 from database import get_db
 from auth import current_user
@@ -196,7 +196,7 @@ def _sanitize_unc_acces(payload):
 
 def persist_form(payload, allow_locked_update=False):
     if not payload.get("beneficiaire", {}).get("nom") or not payload.get("beneficiaire", {}).get("prenom"):
-        raise ValueError("Les champs nom et prenom sont obligatoires.")
+        raise AppError("invalid_form_data", "Les champs nom et prénom sont obligatoires.")
     payload = _sanitize_unc_acces(payload)
 
     payload = normalize_workflow_before_save(payload)
@@ -246,7 +246,7 @@ def persist_form(payload, allow_locked_update=False):
         if exists:
             existing_payload = json.loads(exists["payload_json"])
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
-                raise ValueError("Cette fiche est signee et verrouillee. Elle ne peut plus etre modifiee.")
+                raise AppError("form_locked", "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
             row["created_at"] = exists["created_at"]
         _, dossier_id = sync_person_and_dossier(connection, payload, exists)
         row["dossier_id"] = dossier_id
