@@ -792,9 +792,29 @@ async function getSessionInfo() {
   return sessionInfo;
 }
 
+let listFormsEtag = null;
 async function listForms() {
   try {
-    const items = await requestJson(API_BASE);
+    const fetchHeaders = {};
+    if (listFormsEtag) {
+      fetchHeaders["If-None-Match"] = listFormsEtag;
+    }
+    const response = await fetch(API_BASE, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", ...fetchHeaders },
+      credentials: "same-origin",
+    });
+    if (response.status === 304) {
+      return getCachedDrafts();
+    }
+    const etag = response.headers.get("ETag");
+    if (etag) {
+      listFormsEtag = etag;
+    }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const items = await response.json();
     const summaries = Array.isArray(items) ? items : [];
     const cachedById = new Map(getCachedDrafts().map((draft) => [draft.id, draft]));
     const merged = summaries.map((summary) => ({
@@ -2204,11 +2224,18 @@ function setDashboardUpdateNotice() {
   notice.classList.add("is-highlighted");
   bindDashboardUpdateNotice();
 }
+let refreshDashboardDebounceTimer = null;
 function refreshDashboardIfVisible() {
   if (document.hidden) {
     return;
   }
-  void renderDraftList();
+  if (refreshDashboardDebounceTimer) {
+    window.clearTimeout(refreshDashboardDebounceTimer);
+  }
+  refreshDashboardDebounceTimer = window.setTimeout(() => {
+    refreshDashboardDebounceTimer = null;
+    void renderDraftList();
+  }, 300);
 }
 
 function startDashboardAutoRefresh() {

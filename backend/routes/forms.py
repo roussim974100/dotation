@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import zipfile
@@ -219,7 +220,8 @@ def list_forms():
         return jsonify({"error": "forbidden"}), 403
     status = request.args.get("status")
     search = request.args.get("search")
-    query = "SELECT * FROM dotation_forms"
+
+    where_clause = ""
     conditions = []
     params = []
 
@@ -233,14 +235,26 @@ def list_forms():
         params.extend([pattern, pattern, pattern])
 
     if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-
-    query += " ORDER BY updated_at DESC"
+        where_clause = " WHERE " + " AND ".join(conditions)
 
     with get_db() as connection:
-        rows = connection.execute(query, params).fetchall()
+        fingerprint = connection.execute(
+            "SELECT COALESCE(MAX(updated_at),''), COUNT(*) FROM dotation_forms" + where_clause,
+            params,
+        ).fetchone()
+        etag = hashlib.md5(f"{fingerprint[0]}:{fingerprint[1]}".encode()).hexdigest()
 
-    return jsonify([row_to_summary(row) for row in rows])
+        if request.headers.get("If-None-Match") == etag:
+            return "", 304
+
+        rows = connection.execute(
+            "SELECT * FROM dotation_forms" + where_clause + " ORDER BY updated_at DESC",
+            params,
+        ).fetchall()
+
+    resp = jsonify([row_to_summary(row) for row in rows])
+    resp.headers["ETag"] = etag
+    return resp
 
 
 @bp.route("/api/forms/export", methods=["GET"])
