@@ -403,7 +403,7 @@ def change_own_password():
             u["password_hash"] = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
             break
     save_auth_config(config)
-    insert_app_log(get_db(), "security", "password_self_change", {
+    insert_app_log(get_db(), "security", "password_self_change", "Changement de mot de passe", details={
         "username": user["username"],
         "ip": get_request_client_ip(),
     })
