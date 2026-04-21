@@ -312,6 +312,78 @@ def update_group_permissions(key):
     return jsonify(config.get("groups", {}))
 
 
+@bp.route("/api/catalog/suggestions/<resource_id>", methods=["GET"])
+@login_required
+def catalog_field_suggestions(resource_id):
+    """Retourne les valeurs historiques pour les champs suggest d'une ressource catalogue.
+
+    Réponse : { values: {fieldKey: [val, ...]}, linked: {fieldKey: {val: {otherKey: [val, ...]}}} }
+    Les valeurs sont triées par fréquence décroissante. linked permet au frontend
+    de filtrer les champs dépendants (ex : modèle selon marque) côté client.
+    """
+    from collections import Counter, defaultdict
+
+    with get_db() as conn:
+        cat_row = conn.execute(
+            "SELECT field_schema_json FROM resource_catalog WHERE id = ? AND is_active = 1",
+            (resource_id,),
+        ).fetchone()
+
+    if not cat_row:
+        return jsonify({"values": {}, "linked": {}})
+
+    try:
+        schema = json.loads(cat_row["field_schema_json"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        schema = []
+
+    suggest_keys = [f["key"] for f in schema if isinstance(f, dict) and f.get("suggest") and f.get("key")]
+    if not suggest_keys:
+        return jsonify({"values": {}, "linked": {}})
+
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT payload_json FROM dotation_forms WHERE status NOT IN ('cancelled')"
+        ).fetchall()
+
+    freq = {k: Counter() for k in suggest_keys}
+    linked: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(Counter)))
+
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        for res in payload.get("resources", {}).get("additional", []):
+            if not isinstance(res, dict) or res.get("id") != resource_id or not res.get("selected"):
+                continue
+            fields = res.get("fields", {})
+            if not isinstance(fields, dict):
+                continue
+            fields_ci = {k.lower(): str(v).strip() for k, v in fields.items() if str(v or "").strip()}
+            present = {}
+            for sk in suggest_keys:
+                val = fields_ci.get(sk.lower(), "")
+                if val:
+                    present[sk] = val
+                    freq[sk][val] += 1
+            for ka, va in present.items():
+                for kb, vb in present.items():
+                    if ka != kb:
+                        linked[ka][va][kb][vb] += 1
+
+    values_out = {k: [v for v, _ in freq[k].most_common(50)] for k in suggest_keys}
+    linked_out: dict = {}
+    for ka, val_map in linked.items():
+        linked_out[ka] = {}
+        for va, dep_map in val_map.items():
+            linked_out[ka][va] = {}
+            for kb, counter in dep_map.items():
+                linked_out[ka][va][kb] = [v for v, _ in counter.most_common(30)]
+
+    return jsonify({"values": values_out, "linked": linked_out})
+
+
 @bp.route("/api/reference/resources", methods=["GET"])
 @login_required
 def reference_resources():
