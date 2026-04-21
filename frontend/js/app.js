@@ -254,7 +254,7 @@ function buildDynamicFieldInput(resource, field) {
   }
   if (fieldType === "list") {
     const listId = `dynamic_resource_list_${resource.id}_${field.key}`;
-    const suggestAttr = field.suggest ? ` data-suggest-key="${escapeAttribute(field.key)}"` : "";
+    const suggestAttr = field.suggest ? ` data-suggest-key="${escapeAttribute(field.key)}" data-suggest-resource="${escapeAttribute(resource.id)}"` : "";
     return `
       <div>
         <label class="form-label">${escapeHtml(field.label)}</label>
@@ -276,11 +276,11 @@ function buildDynamicFieldInput(resource, field) {
   }
   const type = ["date", "number"].includes(fieldType) ? fieldType : "text";
   if (field.suggest) {
-    const datalistId = `fsugg-${escapeAttribute(field.key)}`;
+    const datalistId = `fsugg-${escapeAttribute(resource.id)}-${escapeAttribute(field.key)}`;
     return `
       <div>
         <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
-        <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}" list="${datalistId}" autocomplete="off">
+        <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-suggest-field="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}" list="${datalistId}" autocomplete="off">
         <datalist id="${datalistId}"></datalist>
       </div>
     `;
@@ -386,11 +386,12 @@ function initDynamicListFields() {
       const listId = button.dataset.listId;
       const placeholder = button.dataset.placeholder || "";
       const suggestKey = button.dataset.suggestKey || "";
+      const suggestResource = button.dataset.suggestResource || "";
       const container = document.getElementById(listId);
       if (!container) return;
       const row = document.createElement("div");
       row.className = "repeatable-list__row";
-      const listAttr = suggestKey ? ` list="fsugg-${escapeAttribute(suggestKey)}"` : "";
+      const listAttr = (suggestKey && suggestResource) ? ` list="fsugg-${escapeAttribute(suggestResource)}-${escapeAttribute(suggestKey)}"` : "";
       row.innerHTML = `
         <input class="form-control" type="text" placeholder="${escapeAttribute(placeholder)}"${listAttr} autocomplete="off">
         <button class="btn btn-outline-danger btn-sm" type="button">Supprimer</button>
@@ -400,6 +401,65 @@ function initDynamicListFields() {
     });
     button.dataset.boundListAdd = "true";
   });
+}
+
+// ---------------------------------------------------------------------------
+// Suggestions de champs (marque → modèle, etc.)
+// Chargées une seule fois à l'ouverture, filtrées côté client ensuite.
+// ---------------------------------------------------------------------------
+const _fieldSuggestCache = {};
+
+async function _fetchResourceSuggestions(resourceId) {
+  if (_fieldSuggestCache[resourceId]) return _fieldSuggestCache[resourceId];
+  try {
+    const r = await fetch(`/api/catalog/suggestions/${encodeURIComponent(resourceId)}`, { credentials: "same-origin" });
+    if (!r.ok) return null;
+    const data = await r.json();
+    _fieldSuggestCache[resourceId] = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function _fillDatalist(datalistId, values) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
+  dl.innerHTML = (values || [])
+    .map((v) => `<option value="${escapeAttribute(String(v))}"></option>`)
+    .join("");
+}
+
+function _bindSuggestFieldListeners(resourceId, suggestions) {
+  document.querySelectorAll(`[data-suggest-field][data-resource-id="${CSS.escape(resourceId)}"]`).forEach((input) => {
+    if (input.dataset.boundSuggest) return;
+    input.addEventListener("input", () => {
+      const val = input.value.trim();
+      const linkedForVal = suggestions.linked?.[input.dataset.suggestField]?.[val];
+      Object.keys(suggestions.values || {}).forEach((otherKey) => {
+        if (otherKey === input.dataset.suggestField) return;
+        _fillDatalist(
+          `fsugg-${resourceId}-${otherKey}`,
+          linkedForVal?.[otherKey] || suggestions.values[otherKey]
+        );
+      });
+    });
+    input.dataset.boundSuggest = "true";
+  });
+}
+
+async function loadFieldSuggestions() {
+  const targets = (dynamicResourceReferences || []).filter(
+    (r) => Array.isArray(r.field_schema) && r.field_schema.some((f) => f.suggest)
+  );
+  await Promise.all(targets.map(async (resource) => {
+    const suggestions = await _fetchResourceSuggestions(resource.id);
+    if (!suggestions?.values) return;
+    Object.entries(suggestions.values).forEach(([fieldKey, values]) => {
+      _fillDatalist(`fsugg-${resource.id}-${fieldKey}`, values);
+    });
+    _bindSuggestFieldListeners(resource.id, suggestions);
+  }));
 }
 
 function initDynamicEmailDomainFields() {
@@ -887,8 +947,10 @@ function populateAdditionalResources(data = {}) {
       const listContainer = document.getElementById(`dynamic_resource_list_${resource.id}_${fieldKey}`);
       if (listContainer && Array.isArray(value)) {
         const placeholder = listContainer.dataset.placeholder || "";
-        const suggestKey = document.querySelector(`[data-list-id="${CSS.escape(`dynamic_resource_list_${resource.id}_${fieldKey}`)}"][data-suggest-key]`)?.dataset?.suggestKey || "";
-        const listAttr = suggestKey ? ` list="fsugg-${escapeAttribute(suggestKey)}"` : "";
+        const suggestBtn = document.querySelector(`[data-list-id="${CSS.escape(`dynamic_resource_list_${resource.id}_${fieldKey}`)}"][data-suggest-key]`);
+        const suggestKey = suggestBtn?.dataset?.suggestKey || "";
+        const suggestResource = suggestBtn?.dataset?.suggestResource || "";
+        const listAttr = (suggestKey && suggestResource) ? ` list="fsugg-${escapeAttribute(suggestResource)}-${escapeAttribute(suggestKey)}"` : "";
         value.forEach((v) => {
           if (!String(v).trim()) return;
           const row = document.createElement("div");
