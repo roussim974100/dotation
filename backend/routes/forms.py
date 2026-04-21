@@ -587,6 +587,7 @@ def update_restitution(form_id):
         payload["restitution"].get("signatureStatus") or "",
         payload["restitution"].get("signatureDataUrl") or "",
     )
+    payload["restitution"]["pendingFinalization"] = bool(patch.get("keepPending"))
     payload["workflow"]["status"] = "partial_return" if patch.get("keepPending") else computed_status
 
     form_data = persist_form(payload, allow_locked_update=True)
