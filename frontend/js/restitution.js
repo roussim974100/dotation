@@ -2,10 +2,16 @@ const restitutionLoader = document.getElementById("restitutionLoader");
 const restitutionDetailList = document.getElementById("restitutionDetailList");
 
 async function requestJson(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const csrfHeaders = {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && typeof getCsrfToken === "function") {
+    csrfHeaders["X-CSRF-Token"] = await getCsrfToken();
+  }
   const response = await fetch(url, {
     cache: "no-store",
     headers: {
       "Content-Type": "application/json",
+      ...csrfHeaders,
       ...(options.headers || {})
     },
     credentials: "same-origin",
