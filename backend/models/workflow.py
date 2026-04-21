@@ -372,6 +372,11 @@ def compute_effective_workflow_status(payload):
             or restitution.get("signatureStatus") == "deferred"
         )
     ):
+        # Respect l'intention "en attente de finalisation" : si l'utilisateur a
+        # explicitement enregistré en attente (pendingFinalization), on ne recalcule
+        # pas vers "returned" tant que ce flag est présent.
+        if current_status == "partial_return" and restitution.get("pendingFinalization"):
+            return "partial_return"
         return derive_restitution_workflow_status(
             restitution.get("items", {}),
             restitution.get("signatureStatus") or "",
