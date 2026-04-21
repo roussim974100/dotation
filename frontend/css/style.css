@@ -1432,6 +1432,63 @@ body.login-shell {
   text-decoration: none;
 }
 
+button.export-menu__item {
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Modale filtre export Excel */
+.export-filter-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.export-filter-modal.is-hidden {
+  display: none;
+}
+
+.export-filter-modal__dialog {
+  width: min(480px, 100%);
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(15, 55, 84, 0.14);
+}
+
+.export-filter-modal__dialog h3 {
+  margin: 0 0 1.1rem;
+  font-size: 1.1rem;
+}
+
+.export-filter-modal__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.export-filter-modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+[data-color-mode="dark"] .export-filter-modal__dialog {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
 /* Menu utilisateur (header, details/summary) */
 .user-menu {
   position: relative;
