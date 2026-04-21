@@ -1385,6 +1385,78 @@ body.login-shell {
   width: 100%;
 }
 
+/* Menu filtres dans le header (details/summary natif) */
+.filter-menu {
+  position: relative;
+}
+
+.filter-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.filter-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-menu__panel {
+  position: absolute;
+  right: 0;
+  z-index: 25;
+  width: 440px;
+  max-width: calc(100vw - 1rem);
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 16px 34px rgba(15, 55, 84, 0.14);
+  display: grid;
+  gap: 0.8rem;
+}
+
+.filter-menu__search .form-control {
+  width: 100%;
+}
+
+.filter-menu__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.filter-menu__label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.filter-menu__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3em;
+  height: 1.3em;
+  padding: 0 0.3em;
+  border-radius: 99px;
+  background: #fff;
+  color: var(--brand);
+  font-size: 0.68em;
+  font-weight: 800;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.filter-menu__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
 /* Menu export regroupé (details/summary natif) */
 .export-menu {
   position: relative;
@@ -1404,6 +1476,7 @@ body.login-shell {
   right: 0;
   z-index: 20;
   min-width: 200px;
+  max-width: calc(100vw - 1rem);
   margin-top: 0.45rem;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -1508,6 +1581,7 @@ button.export-menu__item {
   right: 0;
   z-index: 30;
   min-width: 240px;
+  max-width: calc(100vw - 1rem);
   margin-top: 0.55rem;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -2631,6 +2705,21 @@ button.export-menu__item {
     padding-top: 0.5rem;
   }
 
+  /* Dropdowns flottants (position:absolute right:0) : éviter le débordement viewport */
+  .user-menu__panel,
+  .export-menu__panel,
+  .filter-menu__panel {
+    right: auto;
+    left: 0;
+    width: calc(100vw - 1.5rem);
+    max-width: 320px;
+    min-width: 0;
+  }
+
+  .filter-menu__grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -2841,6 +2930,16 @@ button.export-menu__item {
 [data-color-mode="dark"] .filter-toolbar {
   background: var(--surface);
   border-color: var(--border);
+}
+
+[data-color-mode="dark"] .filter-menu__panel {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .filter-menu__badge {
+  background: var(--brand-dark);
+  color: #fff;
 }
 
 [data-color-mode="dark"] .equipment-toggle {
