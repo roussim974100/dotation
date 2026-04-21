@@ -79,7 +79,6 @@ class TestExcelExport:
         _create(admin_client)
         r = admin_client.get("/api/forms/export")
         assert r.status_code == 200
-        # Excel XML format
         assert "excel" in r.content_type or "xml" in r.content_type or "spreadsheet" in r.content_type
 
     def test_export_excel_empty(self, admin_client):
@@ -89,6 +88,67 @@ class TestExcelExport:
     def test_export_requires_auth(self, client):
         r = client.get("/api/forms/export")
         assert r.status_code == 401
+
+    def test_filter_status_active(self, admin_client):
+        _create(admin_client)
+        r = admin_client.get("/api/forms/export?status=active")
+        assert r.status_code == 200
+        # aucun dossier actif → ligne header uniquement (pas de bénéficiaire dans le XML)
+        assert b"Durand" not in r.data
+
+    def test_filter_status_draft_includes_form(self, admin_client):
+        _create(admin_client)
+        r = admin_client.get("/api/forms/export?status=draft")
+        assert r.status_code == 200
+        assert b"Dupont" in r.data
+
+    def test_filter_service(self, admin_client):
+        _create(admin_client, {"beneficiaire": {"nom": "Martin", "prenom": "Paul", "service": "DSI"}})
+        _create(admin_client, {"beneficiaire": {"nom": "Girard", "prenom": "Sophie", "service": "RH"}})
+        r = admin_client.get("/api/forms/export?service=DSI")
+        assert r.status_code == 200
+        assert b"Martin" in r.data
+        assert b"Girard" not in r.data
+
+    def test_filter_service_case_insensitive(self, admin_client):
+        _create(admin_client, {"beneficiaire": {"nom": "Leblanc", "prenom": "Anne", "service": "Informatique"}})
+        r = admin_client.get("/api/forms/export?service=informatique")
+        assert r.status_code == 200
+        assert b"Leblanc" in r.data
+
+    def test_filter_date_from_excludes_old(self, admin_client, app):
+        import database
+        form_id = _create(admin_client)
+        with app.app_context():
+            with database.get_db() as conn:
+                conn.execute(
+                    "UPDATE dotation_forms SET updated_at = '2020-01-01T00:00:00' WHERE id = ?",
+                    (form_id,),
+                )
+        r = admin_client.get("/api/forms/export?date_from=2025-01-01")
+        assert r.status_code == 200
+        assert b"Dupont" not in r.data
+
+    def test_filter_date_to_includes_old(self, admin_client, app):
+        import database
+        form_id = _create(admin_client)
+        with app.app_context():
+            with database.get_db() as conn:
+                conn.execute(
+                    "UPDATE dotation_forms SET updated_at = '2020-06-15T00:00:00' WHERE id = ?",
+                    (form_id,),
+                )
+        r = admin_client.get("/api/forms/export?date_from=2020-01-01&date_to=2020-12-31")
+        assert r.status_code == 200
+        assert b"Dupont" in r.data
+
+    def test_no_filter_returns_all(self, admin_client):
+        _create(admin_client, {"beneficiaire": {"nom": "Moreau", "prenom": "Louis"}})
+        _create(admin_client, {"beneficiaire": {"nom": "Bernard", "prenom": "Claire"}})
+        r = admin_client.get("/api/forms/export")
+        assert r.status_code == 200
+        assert b"Moreau" in r.data
+        assert b"Bernard" in r.data
 
 
 class TestUNCExport:

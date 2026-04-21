@@ -263,24 +263,50 @@ def export_forms():
     if not has_permission("forms.export"):
         return jsonify({"error": "forbidden"}), 403
 
+    status_filter = (request.args.get("status") or "").strip()
+    service_filter = (request.args.get("service") or "").strip().lower()
+    date_from = (request.args.get("date_from") or "").strip()
+    date_to = (request.args.get("date_to") or "").strip()
+
+    query = """
+        SELECT id, title, status, beneficiary_type, nom, prenom, service, fonction,
+               mandat, dossier_type, rgpd_accepted, assigned_at, returned_at, return_reason,
+               return_notes, created_at, updated_at, payload_json
+        FROM dotation_forms
+        WHERE 1=1
+    """
+    params = []
+    if status_filter:
+        query += " AND status = ?"
+        params.append(status_filter)
+    if service_filter:
+        query += " AND LOWER(service) LIKE ?"
+        params.append(f"%{service_filter}%")
+    if date_from:
+        query += " AND DATE(updated_at) >= DATE(?)"
+        params.append(date_from)
+    if date_to:
+        query += " AND DATE(updated_at) <= DATE(?)"
+        params.append(date_to)
+    query += " ORDER BY updated_at DESC"
+
     with get_db() as connection:
-        rows = connection.execute(
-            """
-            SELECT id, title, status, beneficiary_type, nom, prenom, service, fonction,
-                   mandat, dossier_type, rgpd_accepted, assigned_at, returned_at, return_reason,
-                   return_notes, created_at, updated_at, payload_json
-            FROM dotation_forms
-            ORDER BY updated_at DESC
-            """
-        ).fetchall()
-        item_rows = connection.execute(
-            """
-            SELECT di.*, df.title
-            FROM dotation_items di
-            JOIN dotation_forms df ON df.id = di.form_id
-            ORDER BY df.updated_at DESC, di.id ASC
-            """
-        ).fetchall()
+        rows = connection.execute(query, params).fetchall()
+        form_ids = [r["id"] for r in rows]
+        if form_ids:
+            placeholders = ",".join("?" * len(form_ids))
+            item_rows = connection.execute(
+                f"""
+                SELECT di.*, df.title
+                FROM dotation_items di
+                JOIN dotation_forms df ON df.id = di.form_id
+                WHERE di.form_id IN ({placeholders})
+                ORDER BY df.updated_at DESC, di.id ASC
+                """,
+                form_ids,
+            ).fetchall()
+        else:
+            item_rows = []
 
     workbook_xml = build_excel_workbook(rows, item_rows)
     response = make_response(workbook_xml)

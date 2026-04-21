@@ -2247,11 +2247,92 @@ function startDashboardAutoRefresh() {
   }, DASHBOARD_REFRESH_INTERVAL_MS);
 }
 
+function initExportExcelModal() {
+  const btn = document.getElementById("exportExcelBtn");
+  if (!btn) return;
+
+  const STATUS_OPTIONS = [
+    ["", "Tous les statuts"],
+    ["draft", "À compléter"],
+    ["partial_assignment", "Attribution partielle"],
+    ["awaiting_signature", "En attente de signature"],
+    ["active", "Attribution active"],
+    ["returned", "Restitution terminée"],
+    ["partial_return", "Restitution partielle"],
+    ["cancelled", "Dossier annulé"],
+  ];
+
+  const modal = document.createElement("div");
+  modal.className = "export-filter-modal is-hidden";
+  modal.id = "exportFilterModal";
+  modal.innerHTML = `
+    <div class="export-filter-modal__dialog">
+      <h3>Exporter les dossiers (Excel)</h3>
+      <div class="mb-3">
+        <label class="form-label" for="exportFilterStatus">Statut</label>
+        <select id="exportFilterStatus" class="form-select form-select-sm">
+          ${STATUS_OPTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="exportFilterService">Service (contient)</label>
+        <input id="exportFilterService" class="form-control form-control-sm" type="text" placeholder="ex : DSI, Bâtiment…">
+      </div>
+      <div class="export-filter-modal__row mb-3">
+        <div>
+          <label class="form-label" for="exportFilterDateFrom">Mis à jour depuis</label>
+          <input id="exportFilterDateFrom" class="form-control form-control-sm" type="date">
+        </div>
+        <div>
+          <label class="form-label" for="exportFilterDateTo">jusqu'au</label>
+          <input id="exportFilterDateTo" class="form-control form-control-sm" type="date">
+        </div>
+      </div>
+      <div class="export-filter-modal__actions">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="exportFilterCancelBtn">Annuler</button>
+        <button type="button" class="btn btn-primary btn-sm" id="exportFilterConfirmBtn">Exporter</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  btn.addEventListener("click", () => {
+    modal.classList.remove("is-hidden");
+    document.getElementById("exportFilterStatus").value = "";
+    document.getElementById("exportFilterService").value = "";
+    document.getElementById("exportFilterDateFrom").value = "";
+    document.getElementById("exportFilterDateTo").value = "";
+  });
+
+  document.getElementById("exportFilterCancelBtn").addEventListener("click", () => {
+    modal.classList.add("is-hidden");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("is-hidden");
+  });
+
+  document.getElementById("exportFilterConfirmBtn").addEventListener("click", () => {
+    const params = new URLSearchParams();
+    const status = document.getElementById("exportFilterStatus").value;
+    const service = document.getElementById("exportFilterService").value.trim();
+    const dateFrom = document.getElementById("exportFilterDateFrom").value;
+    const dateTo = document.getElementById("exportFilterDateTo").value;
+    if (status) params.set("status", status);
+    if (service) params.set("service", service);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const url = "/api/forms/export" + (params.toString() ? "?" + params.toString() : "");
+    window.location.href = url;
+    modal.classList.add("is-hidden");
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Initialisation d'accueil : session, liste et masquage du hover au scroll.
   if (!document.getElementById("draftList") && !document.getElementById("historyList")) {
     return;
   }
+  initExportExcelModal();
   dashboardPendingNewIds = loadPendingDashboardUpdates();
   renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
