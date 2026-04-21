@@ -35,6 +35,21 @@ function hasActiveFilters() {
   );
 }
 
+function updateFilterBadge() {
+  const badge = document.getElementById("filterActiveBadge");
+  if (!badge) return;
+  const count = [
+    dashboardFilters.search,
+    dashboardFilters.status,
+    dashboardFilters.timing,
+    dashboardFilters.qualite,
+    dashboardFilters.service,
+    dashboardFilters.sort !== "recent" ? dashboardFilters.sort : "",
+  ].filter(Boolean).length;
+  badge.textContent = count;
+  badge.classList.toggle("d-none", count === 0);
+}
+
 // Cache navigateur de secours : utile hors backend ou en cas de coupure réseau.
 function getCachedDrafts() {
   try {
@@ -2070,36 +2085,42 @@ function bindDashboardFilters() {
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
   statusFilter.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
   timingFilter.addEventListener("change", (event) => {
     dashboardFilters.timing = event.target.value;
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
   qualiteFilter.addEventListener("change", (event) => {
     dashboardFilters.qualite = event.target.value;
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
   serviceFilter.addEventListener("change", (event) => {
     dashboardFilters.service = event.target.value;
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
   sortFilter.addEventListener("change", (event) => {
     dashboardFilters.sort = event.target.value || "recent";
     resetPagination();
+    updateFilterBadge();
     void renderDraftList();
   });
 
@@ -2110,24 +2131,13 @@ function bindDashboardFilters() {
     dashboardFilters.qualite = "";
     dashboardFilters.service = "";
     dashboardFilters.sort = "recent";
-    if (searchInput) {
-      searchInput.value = "";
-    }
-    if (statusFilter) {
-      statusFilter.value = "";
-    }
-    if (timingFilter) {
-      timingFilter.value = "";
-    }
-    if (qualiteFilter) {
-      qualiteFilter.value = "";
-    }
-    if (serviceFilter) {
-      serviceFilter.value = "";
-    }
-    if (sortFilter) {
-      sortFilter.value = "recent";
-    }
+    if (searchInput) searchInput.value = "";
+    if (statusFilter) statusFilter.value = "";
+    if (timingFilter) timingFilter.value = "";
+    if (qualiteFilter) qualiteFilter.value = "";
+    if (serviceFilter) serviceFilter.value = "";
+    if (sortFilter) sortFilter.value = "recent";
+    updateFilterBadge();
     void renderDraftList();
   });
 

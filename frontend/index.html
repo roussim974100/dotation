@@ -21,6 +21,67 @@
       </div>
     </div>
     <div class="header-actions">
+      <details id="filterMenu" class="filter-menu">
+        <summary class="btn btn-outline-light" aria-label="Ouvrir les filtres">
+          Filtres
+          <span id="filterActiveBadge" class="filter-menu__badge d-none">0</span>
+        </summary>
+        <div class="filter-menu__panel">
+          <div class="filter-menu__search">
+            <input id="searchInput" class="form-control form-control-sm" type="search"
+                   placeholder="Nom, prénom, service, titre…" autocomplete="off">
+          </div>
+          <div class="filter-menu__grid">
+            <div>
+              <label class="filter-menu__label" for="statusFilter">Avancement</label>
+              <select id="statusFilter" class="form-select form-select-sm">
+                <option value="">Tous les avancements</option>
+                <option value="draft">À compléter</option>
+                <option value="partial_assignment">Attribution partielle</option>
+                <option value="awaiting_signature">En attente de signature</option>
+                <option value="active">Attribution active</option>
+                <option value="returned">Restitution terminée</option>
+                <option value="partial_return">Restitution partielle</option>
+                <option value="cancelled">Dossier annulé</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-menu__label" for="timingFilter">Pilotage</label>
+              <select id="timingFilter" class="form-select form-select-sm">
+                <option value="">Tous les pilotages</option>
+                <option value="ok">Prêt / Dans les temps</option>
+                <option value="warning">En danger</option>
+                <option value="late">En retard</option>
+                <option value="neutral">À planifier</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-menu__label" for="qualiteFilter">État</label>
+              <select id="qualiteFilter" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                <option value="agent">Agent</option>
+                <option value="elu">Élu(e)</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-menu__label" for="serviceFilter">Service</label>
+              <select id="serviceFilter" class="form-select form-select-sm">
+                <option value="">Tous les services</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-menu__label" for="sortFilter">Ancienneté</label>
+              <select id="sortFilter" class="form-select form-select-sm">
+                <option value="recent">Plus récents d'abord</option>
+                <option value="oldest">Plus anciens d'abord</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-menu__footer">
+            <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary" type="button">Réinitialiser</button>
+          </div>
+        </div>
+      </details>
       <a class="btn btn-outline-light" data-help-page="dashboard" href="help.html?page=dashboard">Aide</a>
       <a id="adminLink" class="btn btn-outline-light d-none" href="admin.html">Administration</a>
       <details id="userMenu" class="user-menu">
@@ -77,66 +138,6 @@
   <section class="content-card">
     <div id="signatureLinkNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
     <div id="dashboardUpdateNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
-
-    <div class="filter-toolbar">
-      <div class="filter-toolbar__search">
-        <div>
-          <label class="form-label" for="searchInput">Recherche</label>
-          <input id="searchInput" class="form-control" type="search" placeholder="Nom, prénom, service, titre...">
-        </div>
-      </div>
-      <div class="filter-toolbar__filters">
-        <div class="filter-toolbar__grid">
-          <div>
-            <label class="form-label" for="statusFilter">Avancement</label>
-            <select id="statusFilter" class="form-select">
-              <option value="">Tous les avancements</option>
-              <option value="draft">À compléter</option>
-              <option value="partial_assignment">Attribution partielle</option>
-              <option value="awaiting_signature">En attente de signature</option>
-              <option value="active">Attribution active</option>
-              <option value="returned">Restitution terminée</option>
-              <option value="partial_return">Restitution partielle</option>
-              <option value="cancelled">Dossier annulé</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="timingFilter">Pilotage</label>
-            <select id="timingFilter" class="form-select">
-              <option value="">Tous les pilotages</option>
-              <option value="ok">Prêt / Dans les temps</option>
-              <option value="warning">En danger</option>
-              <option value="late">En retard</option>
-              <option value="neutral">À planifier</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="qualiteFilter">État</label>
-            <select id="qualiteFilter" class="form-select">
-              <option value="">Tous</option>
-              <option value="agent">Agent</option>
-              <option value="elu">Élu(e)</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="serviceFilter">Service</label>
-            <select id="serviceFilter" class="form-select">
-              <option value="">Tous les services</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="sortFilter">Ancienneté</label>
-            <select id="sortFilter" class="form-select">
-              <option value="recent">Plus récents d'abord</option>
-              <option value="oldest">Plus anciens d'abord</option>
-            </select>
-          </div>
-        </div>
-        <div class="filter-toolbar__actions">
-          <button id="resetFiltersBtn" class="btn btn-outline-secondary" type="button">Réinitialiser</button>
-        </div>
-      </div>
-    </div>
 
     <div class="dashboard-toolbar mb-3">
       <div>
