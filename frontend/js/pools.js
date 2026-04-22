@@ -19,14 +19,14 @@ const ITEM_TYPE_LABELS = {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    const [meRes, tokenRes] = await Promise.all([
-      fetch("/api/me", { credentials: "same-origin" }),
+    const [sessionRes, tokenRes] = await Promise.all([
+      fetch("/api/session", { credentials: "same-origin" }),
       fetch("/api/csrf-token", { credentials: "same-origin" }),
     ]);
-    if (!meRes.ok) { window.location.href = "/login.html"; return; }
-    const me = await meRes.json();
+    if (!sessionRes.ok) { window.location.href = "/login"; return; }
+    const me = await sessionRes.json();
     const tokenData = await tokenRes.json();
-    _csrfToken = tokenData.csrf_token || "";
+    _csrfToken = tokenData.token || tokenData.csrf_token || "";
 
     const perms = me.permissions || [];
     _canManage = perms.includes("pools.manage") || perms.includes("*");
