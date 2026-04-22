@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<title>A quai</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo application">
+      <div>
+        <h1 class="app-title">Parc mutualisé</h1>
+        <p class="app-subtitle">Équipements partagés entre plusieurs agents ou élus.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="index.html">Accueil</a>
+      <a id="adminLink" class="btn btn-outline-light d-none" href="admin.html">Administration</a>
+      <a class="btn btn-outline-light" data-help-page="dashboard" href="help.html?page=dashboard">Aide</a>
+      <details id="userMenu" class="user-menu">
+        <summary class="btn btn-outline-light" id="userMenuBtn">Mon compte</summary>
+        <div class="user-menu__panel">
+          <div class="user-menu__header">
+            <span class="user-menu__name" id="userMenuName"></span>
+            <span class="user-menu__role" id="userMenuRole"></span>
+          </div>
+          <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+          <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+          <a class="user-menu__item" href="about.html">À propos</a>
+          <div class="user-menu__sep"></div>
+          <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <section class="hero-panel mb-4">
+    <div>
+      <h2 class="panel-title">Équipements mutualisés</h2>
+      <p class="panel-text">Gérez les saccoches, PC portables et accessoires partagés entre plusieurs agents en télétravail.</p>
+    </div>
+    <div class="hero-panel__meta">
+      <div class="hero-panel__stats hero-panel__stats--single">
+        <div class="stat-card">
+          <span class="stat-card__label">Parcs créés</span>
+          <strong class="stat-card__value" id="poolsCountValue">0</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-card">
+    <div class="dashboard-toolbar mb-3">
+      <div>
+        <p class="panel-eyebrow">Parc mutualisé</p>
+        <h3 class="section-title">Liste des parcs</h3>
+      </div>
+      <div class="dashboard-toolbar__actions">
+        <button id="newPoolBtn" class="btn btn-primary d-none" type="button">Nouveau parc</button>
+      </div>
+    </div>
+
+    <div id="poolsList"></div>
+
+    <div id="poolsEmptyState" class="dashboard-group__empty d-none">
+      <p class="mb-2">Aucun parc mutualisé n'a encore été créé.</p>
+      <button id="newPoolBtnEmpty" class="btn btn-primary d-none" type="button">Créer le premier parc</button>
+    </div>
+  </section>
+</main>
+
+<!-- Modal parc -->
+<div class="modal fade" id="poolModal" tabindex="-1" aria-labelledby="poolModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="poolModalLabel">Nouveau parc</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="poolModalId">
+        <div class="mb-3">
+          <label class="form-label" for="poolModalLabel2">Nom du parc <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" id="poolModalLabel2" placeholder="Ex : Saccoche TT-01, PC mutualisé RH…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="poolModalNotes">Notes</label>
+          <textarea class="form-control" id="poolModalNotes" rows="2" placeholder="Description, emplacement, remarques…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="poolModalSaveBtn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal équipement -->
+<div class="modal fade" id="itemModal" tabindex="-1" aria-labelledby="itemModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="itemModalLabel">Équipement</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="itemModalPoolId">
+        <input type="hidden" id="itemModalItemId">
+        <div class="mb-3">
+          <label class="form-label" for="itemModalType">Type <span class="text-danger">*</span></label>
+          <select class="form-select" id="itemModalType">
+            <option value="">— Choisir —</option>
+            <option value="ordinateur">PC portable</option>
+            <option value="clavier">Clavier</option>
+            <option value="souris">Souris</option>
+            <option value="ecran">Écran</option>
+            <option value="saccoche">Saccoche / Housse</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="itemModalLabel2">Libellé <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" id="itemModalLabel2" placeholder="Ex : Dell Latitude 5540, Saccoche noire…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="itemModalSerial">N° de série</label>
+          <input class="form-control" type="text" id="itemModalSerial" placeholder="Ex : SN-DELL-042">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="itemModalNotes">Notes</label>
+          <input class="form-control" type="text" id="itemModalNotes" placeholder="Remarques, état, accessoires…">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="itemModalSaveBtn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal membre -->
+<div class="modal fade" id="memberModal" tabindex="-1" aria-labelledby="memberModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="memberModalLabel">Ajouter un utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="memberModalPoolId">
+        <p class="panel-text">Associez un dossier existant ou renseignez un nom pour les agents sans dossier.</p>
+        <div class="mb-3">
+          <label class="form-label" for="memberModalFormSearch">Rechercher un dossier</label>
+          <input class="form-control" type="search" id="memberModalFormSearch" placeholder="Nom, prénom, service…" autocomplete="off">
+          <div id="memberModalFormResults" class="pool-form-results d-none"></div>
+          <input type="hidden" id="memberModalFormId">
+          <div id="memberModalFormChosen" class="pool-form-chosen d-none"></div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label" for="memberModalName">Ou saisir un nom libre <span class="text-muted">(agent sans dossier)</span></label>
+          <input class="form-control" type="text" id="memberModalName" placeholder="Ex : Dupont Jean">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="memberModalSaveBtn">Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal liaison dossier -->
+<div class="modal fade" id="linkModal" tabindex="-1" aria-labelledby="linkModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="linkModalLabel">Lier à un dossier</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="linkModalPoolId">
+        <input type="hidden" id="linkModalMemberId">
+        <p class="panel-text">Associez ce membre à un dossier existant.</p>
+        <div class="mb-0">
+          <label class="form-label" for="linkModalSearch">Rechercher un dossier</label>
+          <input class="form-control" type="search" id="linkModalSearch" placeholder="Nom, prénom, service…" autocomplete="off">
+          <div id="linkModalResults" class="pool-form-results d-none"></div>
+          <input type="hidden" id="linkModalFormId">
+          <div id="linkModalChosen" class="pool-form-chosen d-none"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="linkModalSaveBtn">Lier</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/branding.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/global-search.js"></script>
+<script src="js/pools.js"></script>
+</body>
+</html>
