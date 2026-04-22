@@ -1565,7 +1565,7 @@ function initRetraitsSection() {
       return;
     }
     try {
-      const resp = await fetch(`/api/forms?q=${encodeURIComponent(query)}&status=active`);
+      const resp = await fetch(`/api/forms?search=${encodeURIComponent(query)}&status=active`);
       const forms = resp.ok ? await resp.json() : [];
       resultsDiv.innerHTML = forms
         .map(
