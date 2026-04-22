@@ -1591,6 +1591,30 @@ function initRetraitsSection() {
     searchInput.value = "";
 
     try {
+      // Pré-remplir l'identité du bénéficiaire depuis le dossier source
+      const formResp = await fetch(`/api/forms/${formId}`);
+      if (formResp.ok) {
+        const formData = await formResp.json();
+        const bene = formData.data?.beneficiaire || {};
+        if (bene.nom) document.getElementById("nom").value = bene.nom;
+        if (bene.prenom) document.getElementById("prenom").value = bene.prenom;
+        if (bene.service) {
+          const serviceSelect = document.getElementById("service");
+          const option = Array.from(serviceSelect.options).find(o => o.value === bene.service);
+          if (option) {
+            serviceSelect.value = bene.service;
+          } else if (bene.service) {
+            document.getElementById("service_custom").value = bene.service;
+          }
+        }
+        if (bene.fonction) document.getElementById("fonction").value = bene.fonction;
+        if (bene.mandat) {
+          const mandatSelect = document.getElementById("mandat");
+          const option = Array.from(mandatSelect.options).find(o => o.value === bene.mandat);
+          if (option) mandatSelect.value = bene.mandat;
+        }
+      }
+
       const resp = await fetch(`/api/forms/${formId}/retrait-items`);
       const items = resp.ok ? await resp.json() : [];
       itemsList.innerHTML = items

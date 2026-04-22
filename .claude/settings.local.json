@@ -128,7 +128,8 @@
       "Bash(pkill -f \"python backend/app.py\")",
       "Bash(cd C:\\\\\\\\www\\\\\\\\dotation)",
       "Bash(pkill -f \"python.*backend/app.py\")",
-      "Bash(APP_SECRET_KEY=\"test-key\" SESSION_COOKIE_SECURE=\"0\" python3 backend/app.py)"
+      "Bash(APP_SECRET_KEY=\"test-key\" SESSION_COOKIE_SECURE=\"0\" python3 backend/app.py)",
+      "Bash(head *)"
     ]
   }
 }
