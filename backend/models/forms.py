@@ -331,6 +331,7 @@ def persist_form(payload, allow_locked_update=False):
             "form",
             form_id,
             {"dossier_id": dossier_id, "status": status, "title": title},
+            target_label=title,
         )
         _upsert_field_suggestions(connection, payload)
 

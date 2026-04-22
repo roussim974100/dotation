@@ -209,6 +209,7 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, 
         form_id,
         {"title": form_row["title"], "expires_at": row["expires_at"], "link_type": link_type},
         actor=actor,
+        target_label=form_row["title"],
     )
     return row
 
@@ -248,5 +249,6 @@ def revoke_signature_link(connection, link_id, actor=None):
             row["form_id"],
             {"title": form_row["title"], "link_type": row["link_type"]},
             actor=actor,
+            target_label=form_row["title"],
         )
     return get_signature_link_by_id(connection, link_id)

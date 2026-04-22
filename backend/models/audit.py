@@ -147,11 +147,11 @@ def insert_audit_event(connection, dossier_id, event_type, event_label, details=
     )
 
 
-def insert_app_log(connection, scope, action_type, action_label, target_type=None, target_id=None, details=None, actor=None):
+def insert_app_log(connection, scope, action_type, action_label, target_type=None, target_id=None, details=None, actor=None, target_label=None):
     connection.execute(
         """
-        INSERT INTO app_logs (id, actor, scope, action_type, action_label, target_type, target_id, details_json, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO app_logs (id, actor, scope, action_type, action_label, target_type, target_id, target_label, details_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             generate_id("log"),
@@ -161,6 +161,7 @@ def insert_app_log(connection, scope, action_type, action_label, target_type=Non
             action_label,
             target_type,
             target_id,
+            (target_label or "").strip() or None,
             json.dumps(merge_app_log_details(details), ensure_ascii=False),
             utc_now(),
         ),

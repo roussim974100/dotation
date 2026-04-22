@@ -285,6 +285,7 @@ def init_db():
             """
         )
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
+        ensure_column(connection, "app_logs", "target_label", "target_label TEXT")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)
