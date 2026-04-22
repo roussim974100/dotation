@@ -435,46 +435,52 @@ def admin_users():
 @permission_required("users.manage")
 def admin_logs():
     search = (request.args.get("q") or "").strip()
-    limit = request.args.get("limit", default=200, type=int) or 200
+    limit = request.args.get("limit", default=100, type=int) or 100
     limit = max(1, min(limit, 500))
-    query = """
-        SELECT * FROM app_logs
-    """
+    offset = max(0, request.args.get("offset", default=0, type=int))
+    where_clause = ""
     params = []
     if search:
-        query += """
+        where_clause = """
             WHERE actor LIKE ?
                OR scope LIKE ?
                OR action_type LIKE ?
                OR action_label LIKE ?
                OR target_type LIKE ?
                OR target_id LIKE ?
+               OR target_label LIKE ?
                OR details_json LIKE ?
         """
         pattern = f"%{search}%"
-        params.extend([pattern, pattern, pattern, pattern, pattern, pattern, pattern])
-    query += """
-        ORDER BY datetime(created_at) DESC, created_at DESC
-        LIMIT ?
-    """
-    params.append(limit)
+        params.extend([pattern] * 8)
     with get_db() as connection:
-        rows = connection.execute(query, tuple(params)).fetchall()
-    return jsonify([
-        {
-            "id": row["id"],
-            "actor": row["actor"],
-            "scope": row["scope"],
-            "action_type": row["action_type"],
-            "action_label": row["action_label"],
-            "target_type": row["target_type"],
-            "target_id": row["target_id"],
-            "target_label": row["target_label"],
-            "details": json.loads(row["details_json"] or "{}"),
-            "created_at": row["created_at"],
-        }
-        for row in rows
-    ])
+        total = connection.execute(
+            f"SELECT COUNT(*) FROM app_logs {where_clause}", tuple(params)
+        ).fetchone()[0]
+        rows = connection.execute(
+            f"SELECT * FROM app_logs {where_clause} ORDER BY datetime(created_at) DESC, created_at DESC LIMIT ? OFFSET ?",
+            tuple(params) + (limit, offset),
+        ).fetchall()
+    return jsonify({
+        "items": [
+            {
+                "id": row["id"],
+                "actor": row["actor"],
+                "scope": row["scope"],
+                "action_type": row["action_type"],
+                "action_label": row["action_label"],
+                "target_type": row["target_type"],
+                "target_id": row["target_id"],
+                "target_label": row["target_label"],
+                "details": json.loads(row["details_json"] or "{}"),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    })
 
 
 @bp.route("/api/admin/trash", methods=["GET"])

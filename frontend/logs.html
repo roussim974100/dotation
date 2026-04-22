@@ -91,11 +91,11 @@
           <input id="logSearchInput" class="form-control" type="search" placeholder="acteur, action, dossier, ressource, détail...">
         </div>
         <div>
-          <label class="form-label" for="logLimitSelect">Volume</label>
+          <label class="form-label" for="logLimitSelect">Par page</label>
           <select id="logLimitSelect" class="form-select">
-            <option value="100">100 dernières entrées</option>
-            <option value="200" selected>200 dernières entrées</option>
-            <option value="500">500 dernières entrées</option>
+            <option value="50">50 par page</option>
+            <option value="100" selected>100 par page</option>
+            <option value="200">200 par page</option>
           </select>
         </div>
       </div>
@@ -125,6 +125,8 @@
       <h3>Aucune entrée trouvée</h3>
       <p>Ajustez votre recherche ou rechargez le journal pour afficher d'autres traces.</p>
     </div>
+
+    <div id="logsPagination" class="logs-pagination d-none" role="navigation" aria-label="Pagination du journal"></div>
   </section>
 </main>
 
