@@ -4251,6 +4251,54 @@ body.global-search-open { overflow: hidden; }
 }
 
 /* ============================================================
+   Matériel mutualisé — inline dans la carte ressource
+   ============================================================ */
+.shared-resource-block {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px dashed var(--border-color, #e5e7eb);
+}
+.shared-toggle {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  cursor: pointer;
+  font-size: .875rem;
+  font-weight: 500;
+  user-select: none;
+}
+.shared-toggle input { cursor: pointer; }
+.shared-panel { margin-top: .5rem; padding-left: .25rem; }
+.shared-members-list { list-style: none; padding: 0; margin: 0 0 .5rem; }
+.shared-member-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  flex-wrap: wrap;
+  font-size: .85rem;
+}
+.shared-member-row:last-child { border-bottom: none; }
+.shared-member-name { font-weight: 500; }
+.shared-member-service { color: var(--text-muted); font-size: .78rem; }
+.shared-member-badge {
+  background: #e0f0e7;
+  color: #1a6b3a;
+  font-size: .7rem;
+  padding: .1rem .4rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.shared-member-link { font-size: .78rem; color: var(--brand); text-decoration: none; }
+.shared-member-link:hover { text-decoration: underline; }
+.shared-member-remove { margin-left: auto; }
+
+[data-color-mode="dark"] .shared-resource-block { border-color: #2d3b4d; }
+[data-color-mode="dark"] .shared-member-row { border-color: #2d3b4d; }
+[data-color-mode="dark"] .shared-member-badge { background: #1a3a2a; color: #5dd68c; }
+
+/* ============================================================
    Parc mutualisé
    ============================================================ */
 .btn-xs {

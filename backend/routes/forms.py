@@ -20,6 +20,7 @@ from models.workflow import (
     derive_restitution_workflow_status, collect_resource_validation_errors,
 )
 from models.forms import persist_form, row_to_summary, get_form
+from models.pools import sync_shared_pools_for_form
 from pdf.attribution import build_pdf_bytes
 from pdf.restitution import build_restitution_pdf_bytes
 import urllib.parse
@@ -483,6 +484,35 @@ def get_form_route(form_id):
     return jsonify(form_data)
 
 
+@bp.route("/api/forms/quick-draft", methods=["POST"])
+@login_required
+@rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
+def quick_draft():
+    """Crée un dossier brouillon minimal (nom + prénom requis).
+    Utilisé pour générer automatiquement un dossier co-utilisateur
+    lors de la déclaration d'un matériel mutualisé."""
+    if not has_permission("forms.create"):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    nom = (data.get("nom") or "").strip()
+    prenom = (data.get("prenom") or "").strip()
+    if not nom or not prenom:
+        return jsonify({"error": "nom_prenom_required"}), 400
+    service = (data.get("service") or "").strip() or None
+    qualite = (data.get("qualite") or "agent").strip()
+    payload = {
+        "dossier": {"type": "arrivee"},
+        "beneficiaire": {"nom": nom, "prenom": prenom, "service": service, "qualite": qualite},
+        "resources": {"additional": []},
+        "meta": {"status": "draft"},
+    }
+    try:
+        form_data = persist_form(payload)
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+    return jsonify({"form_id": form_data["id"], "title": form_data["title"]}), 201
+
+
 @bp.route("/api/forms", methods=["POST"])
 @login_required
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
@@ -494,6 +524,9 @@ def create_form():
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
+    saved_id = form_data["summary"]["id"]
+    with get_db() as conn:
+        sync_shared_pools_for_form(conn, saved_id, payload.get("resources", {}).get("additional", []))
     return jsonify(form_data), 201
 
 
@@ -508,6 +541,8 @@ def update_form(form_id):
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
+    with get_db() as conn:
+        sync_shared_pools_for_form(conn, form_id, payload.get("resources", {}).get("additional", []))
     return jsonify(form_data)
 
 

@@ -1,6 +1,83 @@
 from utils import generate_id, utc_now
 
 
+# ---------------------------------------------------------------------------
+# Sync automatique depuis les ressources partagées d'un dossier
+# ---------------------------------------------------------------------------
+
+def sync_shared_pools_for_form(conn, form_id, resources):
+    """Crée ou met à jour les pools partagés pour toutes les ressources
+    marquées shared=True dans le payload d'un dossier.
+
+    Appelé à chaque sauvegarde de dossier. Idempotent.
+    """
+    for resource in resources:
+        resource_catalog_id = resource.get("id") or resource.get("code")
+        shared = resource.get("shared") or False
+        shared_with = resource.get("sharedWith") or []
+
+        if not shared or not resource_catalog_id:
+            continue
+
+        # Trouver ou créer le pool pour ce dossier + ressource
+        pool_row = conn.execute(
+            "SELECT id FROM shared_pools WHERE owner_form_id = ? AND resource_catalog_id = ?",
+            (form_id, resource_catalog_id),
+        ).fetchone()
+
+        if pool_row:
+            pool_id = pool_row["id"]
+        else:
+            pool_id = generate_id("pool")
+            now = utc_now()
+            label = resource.get("label") or resource_catalog_id
+            conn.execute(
+                """INSERT INTO shared_pools
+                   (id, label, notes, owner_form_id, resource_catalog_id, created_at, updated_at)
+                   VALUES (?, ?, NULL, ?, ?, ?, ?)""",
+                (pool_id, label, form_id, resource_catalog_id, now, now),
+            )
+            # Ajouter le dossier propriétaire comme membre
+            conn.execute(
+                "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
+                (pool_id, form_id, now),
+            )
+
+        # Synchroniser les co-utilisateurs
+        # Récupérer les form_ids déjà membres (hors propriétaire)
+        existing_members = {
+            row["form_id"]: row["id"]
+            for row in conn.execute(
+                "SELECT id, form_id FROM shared_pool_members WHERE pool_id = ? AND form_id != ?",
+                (pool_id, form_id),
+            ).fetchall()
+            if row["form_id"]
+        }
+
+        desired_form_ids = {
+            entry["formId"]
+            for entry in shared_with
+            if entry.get("formId")
+        }
+
+        # Ajouter les nouveaux membres
+        for entry in shared_with:
+            fid = entry.get("formId")
+            if fid and fid not in existing_members:
+                conn.execute(
+                    "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
+                    (pool_id, fid, utc_now()),
+                )
+
+        # Retirer les membres qui ne sont plus dans sharedWith
+        for fid, member_id in existing_members.items():
+            if fid not in desired_form_ids:
+                conn.execute("DELETE FROM shared_pool_members WHERE id = ?", (member_id,))
+
+        # Mettre à jour le timestamp du pool
+        conn.execute("UPDATE shared_pools SET updated_at = ? WHERE id = ?", (utc_now(), pool_id))
+
+
 def get_pool(conn, pool_id):
     row = conn.execute("SELECT * FROM shared_pools WHERE id = ?", (pool_id,)).fetchone()
     if not row:

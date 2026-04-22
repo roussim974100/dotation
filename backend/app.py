@@ -267,6 +267,8 @@ def init_db():
                 id TEXT PRIMARY KEY,
                 label TEXT NOT NULL,
                 notes TEXT,
+                owner_form_id TEXT,
+                resource_catalog_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -317,6 +319,8 @@ def init_db():
         )
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         ensure_column(connection, "app_logs", "target_label", "target_label TEXT")
+        ensure_column(connection, "shared_pools", "owner_form_id", "owner_form_id TEXT")
+        ensure_column(connection, "shared_pools", "resource_catalog_id", "resource_catalog_id TEXT")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)
