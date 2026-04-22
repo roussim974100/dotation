@@ -453,7 +453,7 @@ function openSharedMemberModal(resourceId) {
   document.getElementById("sharedModalPrenom").value = "";
   document.getElementById("sharedModalService").value = "";
   document.getElementById("sharedModalError").classList.add("d-none");
-  bootstrap.Modal.getOrCreate(modal).show();
+  bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 async function saveSharedMember() {

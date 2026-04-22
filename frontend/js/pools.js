@@ -207,7 +207,7 @@ function openPoolModal(pool) {
   document.getElementById("poolModalLabel2").value = pool?.label || "";
   document.getElementById("poolModalNotes").value = pool?.notes || "";
   document.getElementById("poolModalLabel").textContent = pool ? "Modifier le parc" : "Nouveau parc";
-  const modal = bootstrap.Modal.getOrCreate(document.getElementById("poolModal"));
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("poolModal"));
   modal.show();
   setTimeout(() => document.getElementById("poolModalLabel2").focus(), 300);
 }
@@ -258,7 +258,7 @@ function openItemModal(poolId, item) {
   document.getElementById("itemModalSerial").value = item?.serial_number || "";
   document.getElementById("itemModalNotes").value = item?.notes || "";
   document.getElementById("itemModalLabel").textContent = item ? "Modifier l'équipement" : "Ajouter un équipement";
-  bootstrap.Modal.getOrCreate(document.getElementById("itemModal")).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("itemModal")).show();
 }
 
 async function saveItem() {
@@ -308,7 +308,7 @@ function openMemberModal(poolId) {
   document.getElementById("memberModalFormId").value = "";
   document.getElementById("memberModalFormChosen").classList.add("d-none");
   document.getElementById("memberModalName").value = "";
-  bootstrap.Modal.getOrCreate(document.getElementById("memberModal")).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("memberModal")).show();
 }
 
 async function saveMember() {
@@ -351,7 +351,7 @@ function openLinkModal(poolId, memberId) {
   document.getElementById("linkModalResults").classList.add("d-none");
   document.getElementById("linkModalFormId").value = "";
   document.getElementById("linkModalChosen").classList.add("d-none");
-  bootstrap.Modal.getOrCreate(document.getElementById("linkModal")).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("linkModal")).show();
 }
 
 async function saveLinkMember() {
