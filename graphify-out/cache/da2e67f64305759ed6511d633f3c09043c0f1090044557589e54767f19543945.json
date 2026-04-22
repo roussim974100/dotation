@@ -1,0 +1,1 @@
+{"nodes": [], "edges": [{"source": "version_2.7.1", "target": "version_2.11.4", "relation": "predecessor_of", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "version/versions/2.7.1/LIVRAISON-2.7.1.md", "source_location": null, "weight": 1.0}], "hyperedges": []}

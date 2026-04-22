@@ -145,6 +145,46 @@
         </div>
       </section>
 
+      <section class="content-card d-none" id="section-retraits">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Retraits</p>
+            <h3 class="section-title">Ressources à récupérer</h3>
+          </div>
+        </div>
+        <p class="panel-text">Sélectionnez le dossier précédent, puis cochez les ressources à retirer.</p>
+
+        <div class="mb-4">
+          <label class="form-label" for="retraitsSourceSearch">Dossier précédent</label>
+          <input class="form-control" type="search" id="retraitsSourceSearch" placeholder="Rechercher un dossier…" autocomplete="off">
+          <div id="retraitsSourceResults" class="list-group shadow-sm position-absolute w-100 d-none" style="z-index:200;top:100%;"></div>
+          <input type="hidden" id="retraitsSourceFormId">
+          <div id="retraitsSourceChosen" class="mt-2 d-none">
+            <div class="alert alert-info py-2 mb-0" id="retraitsSourceLabel"></div>
+            <button type="button" id="retraitsSourceClear" class="btn btn-link btn-sm p-0 text-muted mt-2">Changer de dossier</button>
+          </div>
+        </div>
+
+        <div id="retraitsItemsContainer" class="d-none">
+          <h5 class="mb-3">Ressources à retirer</h5>
+          <div id="retraitsItemsList" class="d-flex flex-column gap-3"></div>
+        </div>
+
+        <div id="retraitsSignatureBlock" class="mt-4 d-none">
+          <label class="form-label">Signature des retraits</label>
+          <div class="signature-wrap">
+            <canvas id="retraitsSignature" class="signature-box"></canvas>
+          </div>
+          <div class="d-flex gap-2 mt-3 no-print">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="clearRetraitsSignatureBtn">Effacer</button>
+          </div>
+        </div>
+
+        <button type="button" id="downloadRetraitsPdfBtn" class="btn btn-outline-secondary mt-4 d-none">
+          📄 Télécharger la fiche de restitution
+        </button>
+      </section>
+
       <section class="content-card" id="section-unc">
         <div class="section-heading">
           <div>

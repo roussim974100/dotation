@@ -81,6 +81,65 @@ def migrate_field_suggestions_from_history(connection):
         _upsert_field_suggestions(connection, payload)
 
 
+def _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items):
+    """Quand dossier mise_a_jour passe active, marquer items du source comme returned."""
+    if not source_form_id or not retraits_items:
+        return
+
+    now = utc_now()
+    condition_map = {"Bon": "conforme", "Dégâts": "degrade", "Autre": "autre"}
+
+    # Mettre à jour dotation_items du source
+    for item_key, item_data in retraits_items.items():
+        if not item_data.get("selected"):
+            continue
+        etat = item_data.get("etat", "Bon")
+        notes = item_data.get("notes", "")
+        return_condition = condition_map.get(etat, "conforme")
+        connection.execute(
+            """
+            UPDATE dotation_items
+            SET returned = 1, returned_at = ?, return_condition = ?, notes = ?
+            WHERE form_id = ? AND item_key = ?
+            """,
+            (now, return_condition, notes, source_form_id, item_key),
+        )
+
+    # Charger et mettre à jour le payload du source
+    source_row = connection.execute(
+        "SELECT payload_json, dossier_id FROM dotation_forms WHERE id = ?",
+        (source_form_id,),
+    ).fetchone()
+    if source_row:
+        source_payload = json.loads(source_row["payload_json"] or "{}")
+        restitution = source_payload.setdefault("restitution", {})
+        items = restitution.setdefault("items", {})
+        for item_key, item_data in retraits_items.items():
+            if not item_data.get("selected"):
+                continue
+            etat = item_data.get("etat", "Bon")
+            notes = item_data.get("notes", "")
+            return_condition = condition_map.get(etat, "conforme")
+            items[item_key] = {
+                "state": return_condition,
+                "notes": notes,
+                "returnedAt": now,
+            }
+        connection.execute(
+            "UPDATE dotation_forms SET payload_json = ? WHERE id = ?",
+            (json.dumps(source_payload, ensure_ascii=False), source_form_id),
+        )
+        source_dossier_id = source_row["dossier_id"]
+        if source_dossier_id:
+            insert_audit_event(
+                connection,
+                source_dossier_id,
+                "form_retrait",
+                f"Ressources retirees via dossier de mise a jour #{form_id}",
+                {"source_form_id": form_id, "items": list(retraits_items.keys())},
+            )
+
+
 def build_form_export_lines(payload):
     beneficiaire = payload.get("beneficiaire", {})
     workflow = payload.get("workflow", {})
@@ -231,6 +290,7 @@ def persist_form(payload, allow_locked_update=False):
         "returned_at": restitution.get("returnedAt"),
         "return_reason": restitution.get("reason"),
         "return_notes": restitution.get("notes"),
+        "source_form_id": dossier.get("sourceFormId"),
         "payload_json": "",
         "created_at": payload.get("meta", {}).get("createdAt") or payload["meta"]["savedAt"],
         "updated_at": payload["meta"]["savedAt"],
@@ -273,6 +333,7 @@ def persist_form(payload, allow_locked_update=False):
                     returned_at = :returned_at,
                     return_reason = :return_reason,
                     return_notes = :return_notes,
+                    source_form_id = :source_form_id,
                     payload_json = :payload_json,
                     updated_at = :updated_at
                 WHERE id = :id
@@ -285,11 +346,11 @@ def persist_form(payload, allow_locked_update=False):
                 INSERT INTO dotation_forms (
                     id, dossier_id, dossier_type, title, status, beneficiary_type, nom, prenom, service, fonction, mandat,
                     rgpd_accepted, signature_data, assigned_at, returned_at, return_reason,
-                    return_notes, payload_json, created_at, updated_at
+                    return_notes, source_form_id, payload_json, created_at, updated_at
                 ) VALUES (
                     :id, :dossier_id, :dossier_type, :title, :status, :beneficiary_type, :nom, :prenom, :service, :fonction, :mandat,
                     :rgpd_accepted, :signature_data, :assigned_at, :returned_at, :return_reason,
-                    :return_notes, :payload_json, :created_at, :updated_at
+                    :return_notes, :source_form_id, :payload_json, :created_at, :updated_at
                 )
                 """,
                 row,
@@ -334,6 +395,13 @@ def persist_form(payload, allow_locked_update=False):
             target_label=title,
         )
         _upsert_field_suggestions(connection, payload)
+
+        # Apply retraits if this is a mise_a_jour form transitioning to active
+        if status == "active" and dossier.get("type") == "mise_a_jour":
+            source_form_id = dossier.get("sourceFormId")
+            retraits_items = (payload.get("retraits") or {}).get("items") or {}
+            if source_form_id and retraits_items:
+                _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items)
 
     return get_form(form_id)
 
