@@ -1152,6 +1152,10 @@ function syncDossierTypeUi() {
   if (startAtBlock) {
     startAtBlock.classList.toggle("d-none", dossierType === "mise_a_jour");
   }
+  const sourceFormPickerBlock = document.getElementById("sourceFormPickerBlock");
+  if (sourceFormPickerBlock) {
+    sourceFormPickerBlock.classList.toggle("d-none", dossierType !== "mise_a_jour");
+  }
   const retraitsSection = document.getElementById("section-retraits");
   if (retraitsSection) {
     retraitsSection.classList.toggle("d-none", dossierType !== "mise_a_jour");

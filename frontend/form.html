@@ -92,6 +92,18 @@
               <option value="sortie">Sortie / restitution</option>
             </select>
           </div>
+          <div class="col-md-6 col-lg-4 d-none" id="sourceFormPickerBlock">
+            <label class="form-label" for="retraitsSourceSearch">Dossier précédent</label>
+            <div class="position-relative">
+              <input class="form-control" type="search" id="retraitsSourceSearch" placeholder="Chercher dossier…" autocomplete="off">
+              <div class="list-group position-absolute w-100 mt-1 d-none" id="retraitsSourceResults" style="z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+            </div>
+            <div id="retraitsSourceChosen" class="d-none mt-2">
+              <small class="text-success" id="retraitsSourceLabel"></small>
+              <button type="button" class="btn btn-sm btn-link ps-0" id="retraitsSourceClear">Changer</button>
+            </div>
+            <input type="hidden" id="retraitsSourceFormId">
+          </div>
           <div class="col-md-6 col-lg-3">
             <label class="form-label" for="nom">Nom</label>
             <input class="form-control" id="nom" name="nom" placeholder="Dupont" required>
@@ -149,24 +161,11 @@
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Retraits</p>
-            <h3 class="section-title">Ressources à récupérer</h3>
-          </div>
-        </div>
-        <p class="panel-text">Sélectionnez le dossier précédent, puis cochez les ressources à retirer.</p>
-
-        <div class="mb-4">
-          <label class="form-label" for="retraitsSourceSearch">Dossier précédent</label>
-          <input class="form-control" type="search" id="retraitsSourceSearch" placeholder="Rechercher un dossier…" autocomplete="off">
-          <div id="retraitsSourceResults" class="list-group shadow-sm position-absolute w-100 d-none" style="z-index:200;top:100%;"></div>
-          <input type="hidden" id="retraitsSourceFormId">
-          <div id="retraitsSourceChosen" class="mt-2 d-none">
-            <div class="alert alert-info py-2 mb-0" id="retraitsSourceLabel"></div>
-            <button type="button" id="retraitsSourceClear" class="btn btn-link btn-sm p-0 text-muted mt-2">Changer de dossier</button>
+            <h3 class="section-title">Ressources à retirer</h3>
           </div>
         </div>
 
         <div id="retraitsItemsContainer" class="d-none">
-          <h5 class="mb-3">Ressources à retirer</h5>
           <div id="retraitsItemsList" class="d-flex flex-column gap-3"></div>
         </div>
 
