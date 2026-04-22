@@ -74,6 +74,29 @@ def sync_shared_pools_for_form(conn, form_id, resources):
             if fid not in desired_form_ids:
                 conn.execute("DELETE FROM shared_pool_members WHERE id = ?", (member_id,))
 
+        # Synchroniser l'équipement (1 item par ressource, mis à jour à chaque save)
+        fields = resource.get("fields") or {}
+        serial = (fields.get("numeroSerie") or fields.get("imei") or "").strip() or None
+        marque = (fields.get("marque") or "").strip()
+        modele = (fields.get("modele") or "").strip()
+        item_label = " ".join(filter(None, [marque, modele])) or resource.get("label") or resource_catalog_id
+
+        existing_item = conn.execute(
+            "SELECT id FROM shared_pool_items WHERE pool_id = ?", (pool_id,)
+        ).fetchone()
+        if existing_item:
+            conn.execute(
+                "UPDATE shared_pool_items SET label = ?, serial_number = ? WHERE id = ?",
+                (item_label, serial, existing_item["id"]),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO shared_pool_items
+                   (pool_id, resource_type, label, serial_number, notes, created_at)
+                   VALUES (?, ?, ?, ?, NULL, ?)""",
+                (pool_id, resource.get("code") or resource_catalog_id, item_label, serial, utc_now()),
+            )
+
         # Mettre à jour le timestamp du pool
         conn.execute("UPDATE shared_pools SET updated_at = ? WHERE id = ?", (utc_now(), pool_id))
 
