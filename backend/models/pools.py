@@ -81,25 +81,84 @@ def _inject_resource_into_form(conn, target_form_id, source_resource):
 # Sync automatique depuis les ressources partagées d'un dossier
 # ---------------------------------------------------------------------------
 
+def _deselect_resource_from_form(conn, form_id, resource_catalog_id):
+    """Décoche et désactive la mutualisation d'une ressource dans le dossier d'un membre retiré."""
+    row = conn.execute(
+        "SELECT payload_json FROM dotation_forms WHERE id = ?", (form_id,)
+    ).fetchone()
+    if not row:
+        return
+    try:
+        payload = _json.loads(row["payload_json"] or "{}")
+    except (TypeError, _json.JSONDecodeError):
+        return
+
+    additional = (payload.get("resources") or {}).get("additional") or []
+    changed = False
+    for resource in additional:
+        rid = resource.get("id") or resource.get("code")
+        if rid == resource_catalog_id:
+            resource["selected"] = False
+            resource["shared"] = False
+            resource.pop("poolId", None)
+            resource.pop("sharedWith", None)
+            changed = True
+
+    if changed:
+        payload.setdefault("resources", {})["additional"] = additional
+        conn.execute(
+            "UPDATE dotation_forms SET payload_json = ?, updated_at = ? WHERE id = ?",
+            (_json.dumps(payload, ensure_ascii=False), utc_now(), form_id),
+        )
+
+
 def sync_shared_pools_for_form(conn, form_id, resources):
     """Crée ou met à jour les pools partagés pour toutes les ressources
     marquées shared=True dans le payload d'un dossier.
 
+    Modèle symétrique : n'importe quel membre peut gérer la liste.
     Appelé à chaque sauvegarde de dossier. Idempotent.
     """
     for resource in resources:
         resource_catalog_id = resource.get("id") or resource.get("code")
         shared = resource.get("shared") or False
         shared_with = resource.get("sharedWith") or []
+        pool_id_hint = resource.get("poolId")
 
-        if not shared or not resource_catalog_id:
+        if not resource_catalog_id:
             continue
 
-        # Trouver ou créer le pool pour ce dossier + ressource
-        pool_row = conn.execute(
-            "SELECT id FROM shared_pools WHERE owner_form_id = ? AND resource_catalog_id = ?",
-            (form_id, resource_catalog_id),
-        ).fetchone()
+        # Cas "décoché avec poolId" : l'utilisateur quitte volontairement le pool
+        if not shared and pool_id_hint:
+            conn.execute(
+                "UPDATE shared_pool_members SET removed_at = ? WHERE pool_id = ? AND form_id = ?",
+                (utc_now(), pool_id_hint, form_id),
+            )
+            # Supprimer le pool s'il n'a plus de membres ACTIFS
+            remaining = conn.execute(
+                "SELECT COUNT(*) as n FROM shared_pool_members WHERE pool_id = ? AND removed_at IS NULL",
+                (pool_id_hint,),
+            ).fetchone()
+            if remaining and remaining["n"] == 0:
+                conn.execute("DELETE FROM shared_pools WHERE id = ?", (pool_id_hint,))
+            continue
+
+        if not shared:
+            continue
+
+        # Chercher le pool : par poolId d'abord, puis par appartenance de ce dossier
+        pool_row = None
+        if pool_id_hint:
+            pool_row = conn.execute(
+                "SELECT id FROM shared_pools WHERE id = ?", (pool_id_hint,)
+            ).fetchone()
+        if not pool_row:
+            pool_row = conn.execute(
+                """SELECT p.id FROM shared_pools p
+                   JOIN shared_pool_members m ON m.pool_id = p.id
+                   WHERE m.form_id = ? AND m.removed_at IS NULL AND p.resource_catalog_id = ?""",
+                (form_id, resource_catalog_id),
+            ).fetchone()
 
         if pool_row:
             pool_id = pool_row["id"]
@@ -113,45 +172,75 @@ def sync_shared_pools_for_form(conn, form_id, resources):
                    VALUES (?, ?, NULL, ?, ?, ?, ?)""",
                 (pool_id, label, form_id, resource_catalog_id, now, now),
             )
-            # Ajouter le dossier propriétaire comme membre
             conn.execute(
                 "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
                 (pool_id, form_id, now),
             )
 
-        # Synchroniser les co-utilisateurs
-        # Récupérer les form_ids déjà membres (hors propriétaire)
+        # S'assurer que le dossier qui sauvegarde est bien membre actif
+        self_member = conn.execute(
+            "SELECT id, removed_at FROM shared_pool_members WHERE pool_id = ? AND form_id = ?",
+            (pool_id, form_id),
+        ).fetchone()
+        if self_member:
+            # Réactiver si avait été retiré
+            if self_member["removed_at"]:
+                conn.execute(
+                    "UPDATE shared_pool_members SET removed_at = NULL, added_at = ? WHERE id = ?",
+                    (utc_now(), self_member["id"]),
+                )
+        else:
+            # Nouveau membre
+            conn.execute(
+                "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
+                (pool_id, form_id, utc_now()),
+            )
+
+        # Synchroniser les autres membres depuis sharedWith
+        # (exclure les members déjà retirés pour ne pas les reconsidérer)
         existing_members = {
             row["form_id"]: row["id"]
             for row in conn.execute(
-                "SELECT id, form_id FROM shared_pool_members WHERE pool_id = ? AND form_id != ?",
+                "SELECT id, form_id FROM shared_pool_members WHERE pool_id = ? AND form_id != ? AND removed_at IS NULL",
                 (pool_id, form_id),
             ).fetchall()
             if row["form_id"]
         }
 
-        desired_form_ids = {
-            entry["formId"]
-            for entry in shared_with
-            if entry.get("formId")
-        }
+        desired_form_ids = {entry["formId"] for entry in shared_with if entry.get("formId")}
 
-        # Ajouter les nouveaux membres + propager la ressource dans leur dossier
+        # Ajouter les nouveaux membres et propager la ressource dans leur dossier
         for entry in shared_with:
             fid = entry.get("formId")
             if not fid:
                 continue
-            if fid not in existing_members:
+            # Réactiver un membre retiré s'il est ajouté de nouveau
+            existing = conn.execute(
+                "SELECT id, removed_at FROM shared_pool_members WHERE pool_id = ? AND form_id = ?",
+                (pool_id, fid),
+            ).fetchone()
+            if existing and existing["removed_at"]:
+                # Réactiver
+                conn.execute(
+                    "UPDATE shared_pool_members SET removed_at = NULL, added_at = ? WHERE id = ?",
+                    (utc_now(), existing["id"]),
+                )
+            elif not existing:
+                # Nouveau membre
                 conn.execute(
                     "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
                     (pool_id, fid, utc_now()),
                 )
             _inject_resource_into_form(conn, fid, resource)
 
-        # Retirer les membres qui ne sont plus dans sharedWith
+        # Marquer comme retiré les membres absents de sharedWith (soft-delete)
         for fid, member_id in existing_members.items():
             if fid not in desired_form_ids:
-                conn.execute("DELETE FROM shared_pool_members WHERE id = ?", (member_id,))
+                conn.execute(
+                    "UPDATE shared_pool_members SET removed_at = ? WHERE id = ?",
+                    (utc_now(), member_id),
+                )
+                _deselect_resource_from_form(conn, fid, resource_catalog_id)
 
         # Synchroniser l'équipement (1 item par ressource, mis à jour à chaque save)
         fields = resource.get("fields") or {}
@@ -176,7 +265,6 @@ def sync_shared_pools_for_form(conn, form_id, resources):
                 (pool_id, resource.get("code") or resource_catalog_id, item_label, serial, utc_now()),
             )
 
-        # Mettre à jour le timestamp du pool
         conn.execute("UPDATE shared_pools SET updated_at = ? WHERE id = ?", (utc_now(), pool_id))
 
 
@@ -201,7 +289,7 @@ def _serialize_pool(conn, row):
     ).fetchall()
     members = conn.execute(
         """
-        SELECT m.id, m.pool_id, m.form_id, m.beneficiary_name, m.added_at,
+        SELECT m.id, m.pool_id, m.form_id, m.beneficiary_name, m.added_at, m.removed_at,
                f.nom, f.prenom, f.service, f.status
         FROM shared_pool_members m
         LEFT JOIN dotation_forms f ON f.id = m.form_id
@@ -210,6 +298,9 @@ def _serialize_pool(conn, row):
         """,
         (row["id"],),
     ).fetchall()
+
+    active_members = [m for m in members if not m["removed_at"]]
+    removed_members = [m for m in members if m["removed_at"]]
 
     return {
         "id": row["id"],
@@ -236,8 +327,21 @@ def _serialize_pool(conn, row):
                 "service": m["service"],
                 "form_status": m["status"],
                 "added_at": m["added_at"],
+                "removed_at": m["removed_at"],
             }
-            for m in members
+            for m in active_members
+        ],
+        "history": [
+            {
+                "id": m["id"],
+                "form_id": m["form_id"],
+                "beneficiary_name": m["beneficiary_name"]
+                    or (f"{m['prenom']} {m['nom']}" if m["nom"] else None),
+                "service": m["service"],
+                "added_at": m["added_at"],
+                "removed_at": m["removed_at"],
+            }
+            for m in removed_members
         ],
     }
 
@@ -325,9 +429,10 @@ def link_member_to_form(conn, member_id, pool_id, form_id):
 
 
 def delete_member(conn, member_id, pool_id):
+    """Marque un membre comme retiré (soft-delete pour traçabilité)."""
     conn.execute(
-        "DELETE FROM shared_pool_members WHERE id = ? AND pool_id = ?",
-        (member_id, pool_id),
+        "UPDATE shared_pool_members SET removed_at = ? WHERE id = ? AND pool_id = ?",
+        (utc_now(), member_id, pool_id),
     )
 
 

@@ -290,6 +290,7 @@ def init_db():
                 form_id TEXT,
                 beneficiary_name TEXT,
                 added_at TEXT NOT NULL,
+                removed_at TEXT,
                 FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
             );
@@ -321,6 +322,7 @@ def init_db():
         ensure_column(connection, "app_logs", "target_label", "target_label TEXT")
         ensure_column(connection, "shared_pools", "owner_form_id", "owner_form_id TEXT")
         ensure_column(connection, "shared_pools", "resource_catalog_id", "resource_catalog_id TEXT")
+        ensure_column(connection, "shared_pool_members", "removed_at", "removed_at TEXT")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)

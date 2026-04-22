@@ -7,6 +7,7 @@ from database import get_db
 from models.audit import insert_app_log
 from models.audit import current_actor
 from models import pools as pool_model
+from models.pools import _deselect_resource_from_form
 from utils import generate_id
 
 bp = Blueprint("pools", __name__)
@@ -219,7 +220,23 @@ def delete_member(pool_id, member_id):
         pool = pool_model.get_pool(conn, pool_id)
         if not pool:
             return jsonify({"error": "not_found"}), 404
+
+        # Récupérer le form_id du membre avant de le retirer
+        member = conn.execute(
+            "SELECT form_id FROM shared_pool_members WHERE id = ? AND pool_id = ?",
+            (member_id, pool_id),
+        ).fetchone()
+
         pool_model.delete_member(conn, member_id, pool_id)
+
+        # Décoche la ressource du dossier du membre retiré
+        if member and member["form_id"]:
+            pool_data = conn.execute(
+                "SELECT resource_catalog_id FROM shared_pools WHERE id = ?", (pool_id,)
+            ).fetchone()
+            if pool_data and pool_data["resource_catalog_id"]:
+                _deselect_resource_from_form(conn, member["form_id"], pool_data["resource_catalog_id"])
+
     return jsonify({"ok": True})
 
 

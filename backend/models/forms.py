@@ -396,7 +396,42 @@ def get_form(form_id):
             (form_id,),
         ).fetchall()
 
+        # Charger tous les pools dont ce dossier est membre (propriétaire ou co-utilisateur)
+        # Modèle symétrique : tous les membres voient le même état
+        pool_by_resource = {}  # resource_catalog_id -> {pool_id, other_members[]}
+        for pool in connection.execute(
+            """SELECT p.id, p.resource_catalog_id
+               FROM shared_pools p
+               JOIN shared_pool_members m ON m.pool_id = p.id
+               WHERE m.form_id = ?""",
+            (form_id,),
+        ).fetchall():
+            other_members = connection.execute(
+                """SELECT m.form_id, f.nom, f.prenom, f.service
+                   FROM shared_pool_members m
+                   LEFT JOIN dotation_forms f ON f.id = m.form_id
+                   WHERE m.pool_id = ? AND m.form_id != ?""",
+                (pool["id"], form_id),
+            ).fetchall()
+            pool_by_resource[pool["resource_catalog_id"]] = {
+                "poolId": pool["id"],
+                "members": [
+                    {"formId": m["form_id"], "nom": m["nom"], "prenom": m["prenom"], "service": m["service"]}
+                    for m in other_members if m["form_id"]
+                ],
+            }
+
     payload = json.loads(form_row["payload_json"])
+
+    # Injecter l'état mutualisé depuis la DB (source de vérité) pour tous les membres
+    for resource in payload.get("resources", {}).get("additional", []):
+        rid = resource.get("id") or resource.get("code")
+        if rid in pool_by_resource:
+            pool_info = pool_by_resource[rid]
+            resource["shared"] = True
+            resource["poolId"] = pool_info["poolId"]
+            resource["sharedWith"] = pool_info["members"]
+
     payload.setdefault("meta", {})
     payload.setdefault("dossier", {})
     payload["meta"]["id"] = form_row["id"]
