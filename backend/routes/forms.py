@@ -473,6 +473,54 @@ def export_restitution_forms_pdf_batch():
     return download_response(archive.getvalue(), f"restitutions_pdf_{timestamp}.zip", "application/zip")
 
 
+@bp.route("/api/forms/<form_id>/retrait-items", methods=["GET"])
+@login_required
+def get_retrait_items(form_id):
+    if not has_permission("forms.read_list"):
+        return jsonify({"error": "forbidden"}), 403
+    with get_db() as conn:
+        items = conn.execute(
+            """
+            SELECT item_key, label, category, details_json
+            FROM dotation_items
+            WHERE form_id = ? AND assigned = 1 AND returned = 0
+            ORDER BY item_key
+            """,
+            (form_id,),
+        ).fetchall()
+
+        result = []
+        for item in items:
+            result.append({
+                "item_key": item["item_key"],
+                "label": item["label"],
+                "category": item["category"],
+                "details": json.loads(item["details_json"] or "{}"),
+            })
+        return jsonify(result)
+
+
+@bp.route("/api/forms/<form_id>/pdf/retraits", methods=["GET"])
+@login_required
+def get_retraits_pdf(form_id):
+    if not has_permission("forms.export"):
+        return jsonify({"error": "forbidden"}), 403
+    form_data = get_form(form_id)
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+    dossier = form_data.get("data", {}).get("dossier", {})
+    if dossier.get("type") != "mise_a_jour":
+        return jsonify({"error": "not_a_mise_a_jour"}), 400
+    try:
+        from pdf.restitution import build_retraits_pdf_bytes
+        pdf_bytes = build_retraits_pdf_bytes(form_data.get("data", {}))
+        beneficiaire = form_data.get("data", {}).get("beneficiaire", {})
+        filename = slugify_filename(f"retraits_{beneficiaire.get('nom')}_{beneficiaire.get('prenom')}")
+        return download_response(pdf_bytes, f"{filename}.pdf", "application/pdf")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/api/forms/<form_id>", methods=["GET"])
 @login_required
 def get_form_route(form_id):

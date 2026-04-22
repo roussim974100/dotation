@@ -1,0 +1,1 @@
+{"nodes": [{"id": "feature:export_excel", "label": "Export Excel", "type": "feature", "source_file": "version/versions/2.11.4/LIVRAISON-2.11.4.md", "properties": {"sheets": ["Dossiers", "Ressources"]}}, {"id": "component:flask_backend", "label": "Flask Backend", "type": "component", "source_file": "version/versions/2.11.4/LIVRAISON-2.11.4.md"}], "edges": [], "hyperedges": []}

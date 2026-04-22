@@ -398,6 +398,7 @@ function bindDynamicResourceToggles() {
 // ---------------------------------------------------------------------------
 
 const _sharedState = new Map(); // resourceId → { enabled: bool, poolId: string|null, members: [{formId, nom, prenom, service, auto}] }
+let retraitsSignaturePad = null; // Global reference to retraits signature pad
 
 function _getShared(resourceId) {
   if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, poolId: null, members: [] });
@@ -1151,6 +1152,10 @@ function syncDossierTypeUi() {
   if (startAtBlock) {
     startAtBlock.classList.toggle("d-none", dossierType === "mise_a_jour");
   }
+  const retraitsSection = document.getElementById("section-retraits");
+  if (retraitsSection) {
+    retraitsSection.classList.toggle("d-none", dossierType !== "mise_a_jour");
+  }
 }
 
 
@@ -1430,10 +1435,10 @@ function renderRestitutionSummary() {
   summary.classList.remove("d-none");
 }
 
-function initSignaturePad() {
-  // Signature canvas simple, compatible souris et tactile.
-  const canvas = document.getElementById("signature");
-  const clearButton = document.getElementById("clearSignatureBtn");
+function createSignaturePad(canvasId, clearButtonId) {
+  // Reusable signature pad creator for any canvas element
+  const canvas = document.getElementById(canvasId);
+  const clearButton = clearButtonId ? document.getElementById(clearButtonId) : null;
 
   if (!canvas) {
     return { clear: () => {}, restore: () => {}, toDataUrl: () => "" };
@@ -1504,7 +1509,9 @@ function initSignaturePad() {
     hasDrawn = false;
   }
 
-  clearButton.addEventListener("click", clear);
+  if (clearButton) {
+    clearButton.addEventListener("click", clear);
+  }
   canvas.addEventListener("mousedown", startDrawing);
   canvas.addEventListener("mousemove", draw);
   canvas.addEventListener("mouseup", stopDrawing);
@@ -1531,6 +1538,139 @@ function initSignaturePad() {
     },
     toDataUrl: () => (hasDrawn ? canvas.toDataURL("image/png") : "")
   };
+}
+
+function initSignaturePad() {
+  return createSignaturePad("signature", "clearSignatureBtn");
+}
+
+function initRetraitsSection() {
+  const searchInput = document.getElementById("retraitsSourceSearch");
+  const resultsDiv = document.getElementById("retraitsSourceResults");
+  const formIdInput = document.getElementById("retraitsSourceFormId");
+  const chosenDiv = document.getElementById("retraitsSourceChosen");
+  const chosenLabel = document.getElementById("retraitsSourceLabel");
+  const clearBtn = document.getElementById("retraitsSourceClear");
+  const itemsContainer = document.getElementById("retraitsItemsContainer");
+  const itemsList = document.getElementById("retraitsItemsList");
+  const signatureBlock = document.getElementById("retraitsSignatureBlock");
+  const downloadBtn = document.getElementById("downloadRetraitsPdfBtn");
+
+  if (!searchInput) return;
+
+  searchInput.addEventListener("input", async (e) => {
+    const query = e.target.value.trim();
+    if (!query) {
+      resultsDiv.classList.add("d-none");
+      return;
+    }
+    try {
+      const resp = await fetch(`/api/forms?q=${encodeURIComponent(query)}&status=active`);
+      const forms = resp.ok ? await resp.json() : [];
+      resultsDiv.innerHTML = forms
+        .map(
+          (f) =>
+            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${f.id}">${f.title}</button>`
+        )
+        .join("");
+      resultsDiv.classList.toggle("d-none", forms.length === 0);
+    } catch (err) {
+      console.error("Erreur recherche retraits:", err);
+    }
+  });
+
+  resultsDiv.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".retrait-form-option");
+    if (!btn) return;
+    const formId = btn.dataset.formId;
+    const title = btn.textContent.trim();
+    formIdInput.value = formId;
+    chosenLabel.textContent = `Retraits du dossier : ${title}`;
+    chosenDiv.classList.remove("d-none");
+    resultsDiv.classList.add("d-none");
+    searchInput.value = "";
+
+    try {
+      const resp = await fetch(`/api/forms/${formId}/retrait-items`);
+      const items = resp.ok ? await resp.json() : [];
+      itemsList.innerHTML = items
+        .map(
+          (item) =>
+            `
+        <div class="card">
+          <div class="card-body">
+            <div class="form-check mb-2">
+              <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}">
+              <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small text-muted">État</label>
+                <select class="form-select form-select-sm retrait-etat" data-item-key="${item.item_key}">
+                  <option value="Bon">Bon</option>
+                  <option value="Dégâts">Dégâts</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Notes</label>
+                <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${item.item_key}" placeholder="Observations…">
+              </div>
+            </div>
+          </div>
+        </div>
+        `
+        )
+        .join("");
+      itemsContainer.classList.toggle("d-none", items.length === 0);
+      if (items.length > 0) {
+        signatureBlock.classList.remove("d-none");
+      }
+    } catch (err) {
+      console.error("Erreur chargement retraits:", err);
+    }
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    formIdInput.value = "";
+    chosenDiv.classList.add("d-none");
+    itemsContainer.classList.add("d-none");
+    signatureBlock.classList.add("d-none");
+    itemsList.innerHTML = "";
+    searchInput.value = "";
+    searchInput.focus();
+  });
+
+  // Initialize retraits signature pad when items are loaded
+  const observer = new MutationObserver(() => {
+    if (!retraitsSignaturePad && document.getElementById("retraitsSignature")) {
+      setTimeout(() => {
+        window.retraitsSignaturePad = createSignaturePad("retraitsSignature", "clearRetraitsSignatureBtn");
+      }, 100);
+    }
+  });
+  observer.observe(itemsList, { childList: true, subtree: true });
+
+  downloadBtn?.addEventListener("click", async () => {
+    const formId = document.querySelector("[data-form-id]")?.dataset.formId;
+    if (!formId) return;
+    try {
+      const resp = await fetch(`/api/forms/${formId}/pdf/retraits`);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `retraits_${formId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error("Erreur téléchargement PDF retraits:", err);
+    }
+  });
 }
 
 function migrateLegacyResourcesToAdditional(data) {
@@ -1768,6 +1908,21 @@ function getFormData(signaturePad) {
   const assignedAt = document.getElementById("assigned_at").value || getCurrentDateTimeLocal();
   const startAt = document.getElementById("start_at").value || "";
 
+  // Collect retraits data (for mise_a_jour dossiers)
+  const retraitsData = {};
+  const retraitsCheckboxes = document.querySelectorAll(".retrait-checkbox");
+  retraitsCheckboxes.forEach((cb) => {
+    const itemKey = cb.dataset.itemKey;
+    const etat = document.querySelector(`.retrait-etat[data-item-key="${itemKey}"]`)?.value || "Bon";
+    const notes = document.querySelector(`.retrait-notes[data-item-key="${itemKey}"]`)?.value || "";
+    retraitsData[itemKey] = {
+      selected: cb.checked,
+      etat,
+      notes
+    };
+  });
+  const retraitsSignatureDataUrl = window.retraitsSignaturePad ? window.retraitsSignaturePad.toDataUrl() : "";
+
   return {
     meta: {
       id: currentDraftId,
@@ -1781,7 +1936,8 @@ function getFormData(signaturePad) {
       },
       dossier: {
         type: normalizeDossierType(document.getElementById("dossier_type").value || "arrivee"),
-        serviceDestination: getServiceDestinationValue()
+        serviceDestination: getServiceDestinationValue(),
+        sourceFormId: document.getElementById("retraitsSourceFormId")?.value || ""
       },
     beneficiaire: {
       nom: document.getElementById("nom").value.trim(),
@@ -1799,6 +1955,11 @@ function getFormData(signaturePad) {
     unc_acces: getUncAccesData(),
     unc_ref_ad: getUncRefAd(),
     restitution: currentRestitutionData,
+    retraits: {
+      items: retraitsData,
+      signatureDataUrl: retraitsSignatureDataUrl,
+      signedAt: Object.values(retraitsData).some((r) => r.selected) && retraitsSignatureDataUrl ? now : ""
+    },
     validation: {
       rgpdAccepted: document.getElementById("rgpdCheck").checked,
       signatureDataUrl
@@ -1839,6 +2000,78 @@ function populateForm(data, signaturePad) {
 
   populateUncAcces(data.unc_acces || []);
   setUncRefAd(data.unc_ref_ad || "");
+
+  // Restore retraits data if present (for mise_a_jour dossiers)
+  const sourceFormId = data.dossier?.sourceFormId;
+  const retraitsData = data.retraits || {};
+  if (sourceFormId && Object.keys(retraitsData.items || {}).length > 0) {
+    document.getElementById("retraitsSourceFormId").value = sourceFormId;
+    // Need to load retraits items to restore state
+    (async () => {
+      try {
+        const resp = await fetch(`/api/forms/${sourceFormId}/retrait-items`);
+        const items = resp.ok ? await resp.json() : [];
+        const itemsList = document.getElementById("retraitsItemsList");
+        if (itemsList) {
+          itemsList.innerHTML = items
+            .map(
+              (item) =>
+                `
+            <div class="card">
+              <div class="card-body">
+                <div class="form-check mb-2">
+                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
+                  <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted">État</label>
+                    <select class="form-select form-select-sm retrait-etat" data-item-key="${item.item_key}">
+                      <option value="Bon" ${retraitsData.items?.[item.item_key]?.etat === "Bon" ? "selected" : ""}>Bon</option>
+                      <option value="Dégâts" ${retraitsData.items?.[item.item_key]?.etat === "Dégâts" ? "selected" : ""}>Dégâts</option>
+                      <option value="Autre" ${retraitsData.items?.[item.item_key]?.etat === "Autre" ? "selected" : ""}>Autre</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted">Notes</label>
+                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${item.item_key}" placeholder="Observations…" value="${retraitsData.items?.[item.item_key]?.notes || ""}">
+                  </div>
+                </div>
+              </div>
+            </div>
+            `
+            )
+            .join("");
+        }
+        const itemsContainer = document.getElementById("retraitsItemsContainer");
+        if (itemsContainer && items.length > 0) {
+          itemsContainer.classList.remove("d-none");
+        }
+        const signatureBlock = document.getElementById("retraitsSignatureBlock");
+        if (signatureBlock && items.length > 0) {
+          signatureBlock.classList.remove("d-none");
+          const retraitsCanvas = document.getElementById("retraitsSignature");
+          if (retraitsCanvas && retraitsData.signatureDataUrl) {
+            const context = retraitsCanvas.getContext("2d");
+            const image = new Image();
+            image.onload = () => {
+              context.drawImage(image, 0, 0, retraitsCanvas.width, retraitsCanvas.height);
+            };
+            image.src = retraitsData.signatureDataUrl;
+          }
+        }
+        const chosenDiv = document.getElementById("retraitsSourceChosen");
+        const chosenLabel = document.getElementById("retraitsSourceLabel");
+        if (chosenDiv && chosenLabel) {
+          chosenDiv.classList.remove("d-none");
+          // Find the form title from data
+          chosenLabel.textContent = `Retraits du dossier : ${data.meta?.id || sourceFormId}`;
+        }
+      } catch (err) {
+        console.error("Erreur restauration retraits:", err);
+      }
+    })();
+  }
 
   // Migration : convertir les anciennes données materiel/immateriel en resources.additional
   // pour les dossiers sauvegardés avant le rendu dynamique.
@@ -2411,6 +2644,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
     void loadFieldSuggestions();
     initSharedMemberModal();
+    initRetraitsSection();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
       window._emailDomainsCache = s.emailDomains || [];

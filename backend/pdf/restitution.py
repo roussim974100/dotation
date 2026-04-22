@@ -200,3 +200,102 @@ def build_restitution_pdf_bytes(title, payload):
         )
 
     return bytes(pdf.output())
+
+
+def build_retraits_pdf_bytes(payload):
+    """Génère un PDF de fiche de retraits pour un dossier mise_a_jour."""
+    settings = get_app_settings()
+    org_name = settings.get("org_name") or DEFAULT_APP_SETTINGS["org_name"]
+
+    beneficiaire = payload.get("beneficiaire", {})
+    dossier = payload.get("dossier", {})
+    retraits = payload.get("retraits", {})
+    retraits_items = retraits.get("items", {})
+    retraits_signature_data = retraits.get("signatureDataUrl")
+    retraits_signed_at = retraits.get("signedAt")
+    signature_export_allowed = can_export_signature_assets()
+
+    # Prepare list of withdrawn items
+    retraits_lines = []
+    for item_key, item_data in retraits_items.items():
+        if not item_data.get("selected"):
+            continue
+        etat = item_data.get("etat", "Bon")
+        notes = item_data.get("notes") or "-"
+        etat_label = {
+            "Bon": "Bon état",
+            "Dégâts": "Dégâts constatés",
+            "Autre": "Autre condition"
+        }.get(etat, etat)
+        # item_key is the label typically  (ordinateur, telephone, etc.)
+        retraits_lines.append(f"{item_key} : {etat_label} / {notes}")
+
+    if not retraits_lines:
+        retraits_lines.append("Aucun matériel n'a été signalé pour retrait.")
+
+    title = f"Retrait de matériel - {beneficiaire.get('nom')} {beneficiaire.get('prenom')}"
+
+    sections = [
+        (
+            "Identification de la fiche de retrait",
+            [
+                f"Bénéficiaire : {beneficiaire.get('nom') or '-'} {beneficiaire.get('prenom') or '-'}",
+                f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
+                f"Service : {beneficiaire.get('service') or '-'}",
+                f"Type d'opération : {dossier.get('type') or 'mise_a_jour'}",
+            ],
+        ),
+        (
+            "Matériels à retirer",
+            retraits_lines,
+        ),
+    ]
+
+    if signature_export_allowed and retraits_signature_data:
+        sig_bytes = extract_signature_image(retraits_signature_data)
+        signature_datetime = format_export_datetime(retraits_signed_at) if retraits_signed_at else "Date non disponible"
+
+        brand_logo = load_brand_logo_image()
+        aq_logo = load_a_quai_pdf_logo_image()
+
+        pdf = _AQuaiDoc(
+            normalize_pdf_text(title),
+            "Fiche de retrait de matériel",
+            org_name,
+            brand_logo,
+            aq_logo,
+        )
+        pdf.add_page()
+        y = _AQuaiDoc._CONTENT_START
+        for sec_title, sec_lines in sections:
+            y = pdf._draw_section(y, sec_title, sec_lines)
+
+        if sig_bytes:
+            pdf._draw_signature_box(
+                y,
+                "Signature de retrait",
+                signature_datetime,
+                "Signature recueillie lors du retrait des matériels.",
+                sig_bytes=sig_bytes,
+                reservation_lines=[],
+            )
+
+        return bytes(pdf.output())
+    else:
+        # Without signature, still create a PDF
+        brand_logo = load_brand_logo_image()
+        aq_logo = load_a_quai_pdf_logo_image()
+
+        pdf = _AQuaiDoc(
+            normalize_pdf_text(title),
+            "Fiche de retrait de matériel (sans signature)",
+            org_name,
+            brand_logo,
+            aq_logo,
+        )
+        pdf.add_page()
+        y = _AQuaiDoc._CONTENT_START
+        for sec_title, sec_lines in sections:
+            y = pdf._draw_section(y, sec_title, sec_lines)
+
+        return bytes(pdf.output())
