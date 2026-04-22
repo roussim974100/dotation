@@ -134,24 +134,26 @@ class TestLogoUpload:
 # ---------------------------------------------------------------------------
 
 class TestAdminLogs:
-    def test_empty_returns_list(self, admin_client):
+    def test_empty_returns_paginated(self, admin_client):
         r = admin_client.get("/api/admin/logs")
         assert r.status_code == 200
-        assert isinstance(r.get_json(), list)
+        data = r.get_json()
+        assert "items" in data and "total" in data and "limit" in data and "offset" in data
+        assert isinstance(data["items"], list)
 
     def test_logs_after_login(self, admin_client):
-        # La connexion admin génère un log — il doit être visible
         r = admin_client.get("/api/admin/logs")
         assert r.status_code == 200
-        logs = r.get_json()
-        assert len(logs) >= 1
-        assert all("actor" in l and "action_type" in l for l in logs)
+        data = r.get_json()
+        items = data["items"]
+        assert data["total"] >= 1
+        assert all("actor" in l and "action_type" in l for l in items)
 
     def test_search_filter(self, admin_client):
         r = admin_client.get("/api/admin/logs?q=login")
         assert r.status_code == 200
-        logs = r.get_json()
-        for log in logs:
+        items = r.get_json()["items"]
+        for log in items:
             fields = [
                 log.get("actor", ""), log.get("scope", ""), log.get("action_type", ""),
                 log.get("action_label", ""), log.get("target_type", ""), log.get("target_id", ""),
@@ -161,7 +163,19 @@ class TestAdminLogs:
     def test_limit_param(self, admin_client):
         r = admin_client.get("/api/admin/logs?limit=1")
         assert r.status_code == 200
-        assert len(r.get_json()) <= 1
+        data = r.get_json()
+        assert len(data["items"]) <= 1
+        assert "total" in data
+
+    def test_offset_param(self, admin_client):
+        r_all = admin_client.get("/api/admin/logs?limit=100&offset=0")
+        r_offset = admin_client.get("/api/admin/logs?limit=100&offset=1")
+        assert r_all.status_code == 200
+        assert r_offset.status_code == 200
+        all_items = r_all.get_json()["items"]
+        offset_items = r_offset.get_json()["items"]
+        if len(all_items) > 1:
+            assert offset_items[0]["id"] == all_items[1]["id"]
 
     def test_requires_auth(self, client):
         r = client.get("/api/admin/logs")
