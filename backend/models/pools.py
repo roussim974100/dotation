@@ -1,4 +1,80 @@
+import json as _json
+
 from utils import generate_id, utc_now
+
+
+# ---------------------------------------------------------------------------
+# Injection de la ressource partagée dans le dossier co-utilisateur
+# ---------------------------------------------------------------------------
+
+def _inject_resource_into_form(conn, target_form_id, source_resource):
+    """Copie les champs matériels (marque, modèle, SN…) de la ressource partagée
+    dans le dossier cible, sans écraser les données propres au co-utilisateur
+    (date d'attribution, condition, notes, signature…).
+
+    - Si la ressource est absente du dossier cible : on l'ajoute sélectionnée.
+    - Si elle est déjà présente mais sans détails : on complète les champs.
+    - Si elle est déjà remplie : on ne touche à rien.
+    """
+    row = conn.execute(
+        "SELECT payload_json, updated_at FROM dotation_forms WHERE id = ?",
+        (target_form_id,),
+    ).fetchone()
+    if not row:
+        return
+
+    try:
+        payload = _json.loads(row["payload_json"] or "{}")
+    except (TypeError, _json.JSONDecodeError):
+        payload = {}
+
+    additional = (payload.get("resources") or {}).get("additional") or []
+    resource_id = source_resource.get("id") or source_resource.get("code")
+    source_fields = source_resource.get("fields") or {}
+
+    # Champs à propager (identification matérielle uniquement, pas les champs usage)
+    SHARED_FIELD_KEYS = {
+        "marque", "modele", "numeroSerie", "imei", "nomPoste",
+        "nomTelephone", "nomTablette",
+    }
+    propagated_fields = {k: v for k, v in source_fields.items() if k in SHARED_FIELD_KEYS and v}
+
+    if not propagated_fields:
+        return  # Rien à propager
+
+    existing = next((r for r in additional if (r.get("id") or r.get("code")) == resource_id), None)
+
+    if existing is None:
+        # Ajouter la ressource en copiant les métadonnées du catalogue (sans données usage)
+        new_resource = {k: v for k, v in source_resource.items()
+                        if k not in ("sharedWith", "shared", "assignedAt",
+                                     "conditionAttribution", "conditionNotes")}
+        new_resource["selected"] = True
+        new_resource["fields"] = propagated_fields
+        new_resource["sharedWith"] = []
+        new_resource["shared"] = False  # le co-user n'est pas lui-même l'owner de la mutualisation
+        additional.append(new_resource)
+        changed = True
+    else:
+        # Compléter les champs vides seulement (ne pas écraser ce que l'utilisateur a saisi)
+        existing_fields = existing.get("fields") or {}
+        changed = False
+        for key, val in propagated_fields.items():
+            if not existing_fields.get(key):
+                existing_fields[key] = val
+                changed = True
+        if changed:
+            existing["fields"] = existing_fields
+            existing["selected"] = True
+
+    if not changed:
+        return
+
+    payload.setdefault("resources", {})["additional"] = additional
+    conn.execute(
+        "UPDATE dotation_forms SET payload_json = ?, updated_at = ? WHERE id = ?",
+        (_json.dumps(payload, ensure_ascii=False), utc_now(), target_form_id),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -60,14 +136,17 @@ def sync_shared_pools_for_form(conn, form_id, resources):
             if entry.get("formId")
         }
 
-        # Ajouter les nouveaux membres
+        # Ajouter les nouveaux membres + propager la ressource dans leur dossier
         for entry in shared_with:
             fid = entry.get("formId")
-            if fid and fid not in existing_members:
+            if not fid:
+                continue
+            if fid not in existing_members:
                 conn.execute(
                     "INSERT INTO shared_pool_members (pool_id, form_id, beneficiary_name, added_at) VALUES (?, ?, NULL, ?)",
                     (pool_id, fid, utc_now()),
                 )
+            _inject_resource_into_form(conn, fid, resource)
 
         # Retirer les membres qui ne sont plus dans sharedWith
         for fid, member_id in existing_members.items():
