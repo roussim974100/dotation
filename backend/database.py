@@ -8,6 +8,7 @@ _KNOWN_TABLES = {
     "dotation_forms", "dotation_items", "onboarding_dossiers",
     "resource_catalog", "service_catalog", "signature_links",
     "app_settings", "app_logs", "deleted_items",
+    "shared_pools",
 }
 
 

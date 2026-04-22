@@ -346,10 +346,23 @@ function buildDynamicResourceTrackingFields(resource) {
       </div>
     `);
   }
-  if (!inputBlocks.length) {
+  const sharedBlock = resource.category !== "immateriel"
+    ? `<div class="shared-resource-block" id="shared_block_${escapeAttribute(resource.id)}">
+        <label class="shared-toggle">
+          <input type="checkbox" class="shared-resource-toggle" id="shared_toggle_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
+          <span>Matériel mutualisé</span>
+        </label>
+        <div id="shared_panel_${escapeAttribute(resource.id)}" class="shared-panel d-none">
+          <ul class="shared-members-list" id="shared_members_${escapeAttribute(resource.id)}"></ul>
+          <button type="button" class="btn btn-xs btn-outline-primary mt-1 shared-add-btn" data-resource-id="${escapeAttribute(resource.id)}">+ Ajouter un co-utilisateur</button>
+        </div>
+       </div>`
+    : "";
+
+  if (!inputBlocks.length && !sharedBlock) {
     return "";
   }
-  return `<div class="subgrid">${inputBlocks.join("")}</div>`;
+  return (inputBlocks.length ? `<div class="subgrid">${inputBlocks.join("")}</div>` : "") + sharedBlock;
 }
 
 function syncDynamicResourceCard(resourceId) {
@@ -375,8 +388,172 @@ function bindDynamicResourceToggles() {
     }
     syncDynamicResourceCard(resource.id);
   });
+  bindSharedResourceToggles();
   initDynamicListFields();
   initDynamicEmailDomainFields();
+}
+
+// ---------------------------------------------------------------------------
+// Matériel mutualisé — état en mémoire et rendu inline
+// ---------------------------------------------------------------------------
+
+const _sharedState = new Map(); // resourceId → { enabled: bool, members: [{formId, nom, prenom, service, auto}] }
+
+function _getShared(resourceId) {
+  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, members: [] });
+  return _sharedState.get(resourceId);
+}
+
+function bindSharedResourceToggles() {
+  document.querySelectorAll(".shared-resource-toggle").forEach((toggle) => {
+    if (toggle.dataset.bound) return;
+    toggle.addEventListener("change", () => {
+      const rid = toggle.dataset.resourceId;
+      _getShared(rid).enabled = toggle.checked;
+      document.getElementById(`shared_panel_${rid}`)?.classList.toggle("d-none", !toggle.checked);
+    });
+    toggle.dataset.bound = "true";
+  });
+  document.querySelectorAll(".shared-add-btn").forEach((btn) => {
+    if (btn.dataset.bound) return;
+    btn.addEventListener("click", () => openSharedMemberModal(btn.dataset.resourceId));
+    btn.dataset.bound = "true";
+  });
+}
+
+function renderSharedMembers(resourceId) {
+  const list = document.getElementById(`shared_members_${resourceId}`);
+  if (!list) return;
+  const state = _getShared(resourceId);
+  list.innerHTML = state.members.map((m, idx) => `
+    <li class="shared-member-row">
+      <span class="shared-member-name">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</span>
+      ${m.service ? `<span class="shared-member-service">${escapeHtml(m.service)}</span>` : ""}
+      ${m.auto ? `<span class="shared-member-badge">Brouillon créé</span>` : ""}
+      ${m.formId ? `<a class="shared-member-link" href="form.html?id=${escapeAttribute(m.formId)}" target="_blank">Voir</a>` : ""}
+      <button type="button" class="btn btn-xs btn-outline-danger shared-member-remove" data-resource-id="${escapeAttribute(resourceId)}" data-index="${idx}">×</button>
+    </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur</li>`;
+  list.querySelectorAll(".shared-member-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _getShared(btn.dataset.resourceId).members.splice(Number(btn.dataset.index), 1);
+      renderSharedMembers(btn.dataset.resourceId);
+    });
+  });
+}
+
+function openSharedMemberModal(resourceId) {
+  const modal = document.getElementById("sharedMemberModal");
+  if (!modal) return;
+  modal.dataset.resourceId = resourceId;
+  document.getElementById("sharedModalFormId").value = "";
+  document.getElementById("sharedModalFormSearch").value = "";
+  document.getElementById("sharedModalFormResults").classList.add("d-none");
+  document.getElementById("sharedModalFormChosen").classList.add("d-none");
+  document.getElementById("sharedModalNom").value = "";
+  document.getElementById("sharedModalPrenom").value = "";
+  document.getElementById("sharedModalService").value = "";
+  document.getElementById("sharedModalError").classList.add("d-none");
+  bootstrap.Modal.getOrCreate(modal).show();
+}
+
+async function saveSharedMember() {
+  const modal = document.getElementById("sharedMemberModal");
+  const resourceId = modal?.dataset.resourceId;
+  if (!resourceId) return;
+  const errorEl = document.getElementById("sharedModalError");
+  errorEl.classList.add("d-none");
+
+  const existingFormId = document.getElementById("sharedModalFormId").value.trim();
+  const nom = document.getElementById("sharedModalNom").value.trim();
+  const prenom = document.getElementById("sharedModalPrenom").value.trim();
+  const service = document.getElementById("sharedModalService").value.trim();
+
+  if (!existingFormId && (!nom || !prenom)) {
+    errorEl.textContent = "Sélectionnez un dossier ou renseignez nom et prénom.";
+    errorEl.classList.remove("d-none");
+    return;
+  }
+
+  const state = _getShared(resourceId);
+
+  if (existingFormId) {
+    // Utiliser le dossier existant sélectionné
+    const chosenText = document.getElementById("sharedModalFormChosen").textContent || "";
+    const parts = chosenText.split(" ");
+    const member = { formId: existingFormId, nom: parts.slice(1).join(" ") || "?", prenom: parts[0] || "?", service: service || "", auto: false };
+    state.members.push(member);
+    bootstrap.Modal.getInstance(modal)?.hide();
+    renderSharedMembers(resourceId);
+    return;
+  }
+
+  // Créer un brouillon automatique
+  const btn = document.getElementById("sharedModalSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "Création…";
+  try {
+    const csrf = await getCsrfToken();
+    const r = await fetch("/api/forms/quick-draft", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ nom, prenom, service }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Erreur serveur");
+    state.members.push({ formId: data.form_id, nom, prenom, service, auto: true });
+    bootstrap.Modal.getInstance(modal)?.hide();
+    renderSharedMembers(resourceId);
+  } catch (e) {
+    errorEl.textContent = `Erreur : ${e.message}`;
+    errorEl.classList.remove("d-none");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Ajouter";
+  }
+}
+
+function initSharedMemberModal() {
+  document.getElementById("sharedModalSaveBtn")?.addEventListener("click", saveSharedMember);
+  bindSharedFormSearch();
+}
+
+function bindSharedFormSearch() {
+  const input = document.getElementById("sharedModalFormSearch");
+  const resultsEl = document.getElementById("sharedModalFormResults");
+  const hiddenEl = document.getElementById("sharedModalFormId");
+  const chosenEl = document.getElementById("sharedModalFormChosen");
+  if (!input) return;
+  let deb = null;
+  input.addEventListener("input", () => {
+    clearTimeout(deb);
+    hiddenEl.value = "";
+    chosenEl.classList.add("d-none");
+    const q = input.value.trim();
+    if (q.length < 2) { resultsEl.classList.add("d-none"); return; }
+    deb = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/forms?search=${encodeURIComponent(q)}`, { credentials: "same-origin" });
+        const rows = (await r.json()).slice(0, 8);
+        if (!rows.length) { resultsEl.innerHTML = `<div class="pool-form-result pool-form-result--empty">Aucun dossier</div>`; resultsEl.classList.remove("d-none"); return; }
+        resultsEl.innerHTML = rows.map((f) =>
+          `<div class="pool-form-result" data-id="${escapeAttribute(f.id)}" data-prenom="${escapeAttribute(f.prenom)}" data-nom="${escapeAttribute(f.nom)}">
+            <strong>${escapeHtml(f.prenom)} ${escapeHtml(f.nom)}</strong>
+            ${f.service ? ` — <span class="text-muted">${escapeHtml(f.service)}</span>` : ""}
+          </div>`).join("");
+        resultsEl.classList.remove("d-none");
+        resultsEl.querySelectorAll(".pool-form-result[data-id]").forEach((row) => {
+          row.addEventListener("click", () => {
+            hiddenEl.value = row.dataset.id;
+            input.value = "";
+            resultsEl.classList.add("d-none");
+            chosenEl.textContent = `${row.dataset.prenom} ${row.dataset.nom}`;
+            chosenEl.classList.remove("d-none");
+          });
+        });
+      } catch { resultsEl.classList.add("d-none"); }
+    }, 280);
+  });
 }
 
 function initDynamicListFields() {
@@ -821,6 +998,8 @@ function getAdditionalResourcesData() {
         .filter(([, value]) => value)
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
+    shared: _getShared(resource.id).enabled,
+    sharedWith: _getShared(resource.id).members,
     ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
     ...resource,
@@ -929,6 +1108,19 @@ function populateAdditionalResources(data = {}) {
         }
       }
     });
+
+    // Restaurer l'état mutualisé
+    if (resource.shared) {
+      const toggle = document.getElementById(`shared_toggle_${resource.id}`);
+      if (toggle) {
+        toggle.checked = true;
+        document.getElementById(`shared_panel_${resource.id}`)?.classList.remove("d-none");
+      }
+      const state = _getShared(resource.id);
+      state.enabled = true;
+      state.members = Array.isArray(resource.sharedWith) ? resource.sharedWith : [];
+      renderSharedMembers(resource.id);
+    }
   });
   bindDynamicResourceToggles();
   refreshProgressIndicators();
@@ -2199,6 +2391,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
     void loadFieldSuggestions();
+    initSharedMemberModal();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
       window._emailDomainsCache = s.emailDomains || [];
