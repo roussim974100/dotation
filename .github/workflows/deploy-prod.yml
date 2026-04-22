@@ -1,0 +1,36 @@
+name: Sync branche prod
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  filter-and-push-prod:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Supprimer les fichiers dev-only
+        run: |
+          rm -rf backend/tests/
+          rm -f test_e2e.py
+          rm -rf scripts/
+          rm -rf graphify-out/
+          rm -rf .claude/
+          rm -rf .memory/
+          rm -f CLAUDE.md
+          rm -f .github/workflows/deploy-prod.yml
+
+      - name: Pousser sur la branche prod
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "deploy: sync prod depuis main $(echo $GITHUB_SHA | cut -c1-7)" --allow-empty
+          git push origin HEAD:prod --force
