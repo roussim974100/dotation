@@ -469,6 +469,7 @@ def admin_logs():
             "action_label": row["action_label"],
             "target_type": row["target_type"],
             "target_id": row["target_id"],
+            "target_label": row["target_label"],
             "details": json.loads(row["details_json"] or "{}"),
             "created_at": row["created_at"],
         }
@@ -567,6 +568,7 @@ def restore_trash_item(trash_id):
             item_type,
             item_key,
             {"label": item_label},
+            target_label=item_label or item_key,
         )
     return jsonify({"restored": True, "item_type": item_type, "item_key": item_key, "data": form_data})
 
@@ -595,6 +597,7 @@ def delete_trash_item(trash_id):
                 row["item_type"],
                 row["item_key"],
                 {"label": row["item_label"] or row["item_key"]},
+                target_label=row["item_label"] or row["item_key"],
             )
 
     return jsonify({"deleted": bool(deleted)})
@@ -913,6 +916,7 @@ def create_admin_resource():
                 "issuer_service": resource_data["issuer_service"],
                 "field_count": len(resource_data["field_schema"]),
             },
+            target_label=resource_data["label"],
         )
     return jsonify({"created": True, "resource": normalize_reference_row(created_row)}), 201
 
@@ -977,6 +981,7 @@ def update_admin_resource(resource_id):
                 "category": resource_data["category"],
                 "field_count": len(resource_data["field_schema"]),
             },
+            target_label=resource_data["label"],
         )
     return jsonify({"updated": True, "resource": normalize_reference_row(updated_row)})
 

@@ -136,6 +136,7 @@ def get_signature_token_route(token):
                 link_row["form_id"],
                 {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": link_row["link_type"]},
                 actor=signature_link_public_actor(link_row["link_type"]),
+                target_label=form_row["title"],
             )
 
     form_data = get_form(link_row["form_id"])
@@ -209,6 +210,7 @@ def submit_signature_token_route(token):
                 "form", link_row["form_id"],
                 {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": link_row["link_type"]},
                 actor=signature_link_public_actor(link_row["link_type"]),
+                target_label=form_row["title"],
             )
 
     return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})
@@ -238,6 +240,7 @@ def get_restitution_signature_token_route(token):
                 "form", link_row["form_id"],
                 {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "restitution"},
                 actor=signature_link_public_actor("restitution"),
+                target_label=form_row["title"],
             )
 
     form_data = get_form(link_row["form_id"])
@@ -315,6 +318,7 @@ def submit_restitution_signature_token_route(token):
                 "form", link_row["form_id"],
                 {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "restitution"},
                 actor=signature_link_public_actor("restitution"),
+                target_label=form_row["title"],
             )
 
     return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})

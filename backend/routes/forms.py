@@ -554,6 +554,7 @@ def reopen_form(form_id):
             "form",
             form_id,
             {"title": row["title"], "reopen_count": payload["meta"]["reopenCount"]},
+            target_label=row["title"],
         )
 
     return jsonify({"meta": payload["meta"]})
@@ -603,6 +604,7 @@ def update_restitution(form_id):
                 "status": payload.get("workflow", {}).get("status"),
                 "returned_at": payload.get("restitution", {}).get("returnedAt"),
             },
+            target_label=form_data.get("summary", {}).get("title"),
         )
     return jsonify(form_data)
 
@@ -638,6 +640,7 @@ def delete_form(form_id):
                 "form",
                 form_id,
                 {"title": row["title"] if row else "", "dossier_id": row["dossier_id"] if row else ""},
+                target_label=row["title"] if row else None,
             )
 
     if not deleted:

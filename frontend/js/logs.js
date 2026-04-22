@@ -80,6 +80,17 @@ function formatLogDetails(details) {
     .join(" | ");
 }
 
+function formatLogTarget(log) {
+  const type = log.target_type || "";
+  const label = log.target_label || log.details?.title || log.details?.label || "";
+  const id = log.target_id || "";
+  if (!type && !id) return "-";
+  if (label) {
+    return `<span class="log-target__type">${escapeHtml(type)}</span><span class="log-target__label">${escapeHtml(label)}</span>`;
+  }
+  return escapeHtml([type, id].filter(Boolean).join(" · "));
+}
+
 function normalizeLogLabel(value) {
   const label = String(value || "").trim();
   const legacyMap = {
@@ -119,7 +130,7 @@ async function loadLogs() {
       <td data-label="Acteur">${escapeHtml(log.actor || "system")}</td>
       <td data-label="Périmètre">${escapeHtml(log.scope || "-")}</td>
       <td data-label="Action">${escapeHtml(normalizeLogLabel(log.action_label || log.action_type || "-"))}</td>
-      <td data-label="Cible">${escapeHtml([log.target_type, log.target_id].filter(Boolean).join(" / ") || "-")}</td>
+      <td data-label="Cible">${formatLogTarget(log)}</td>
       <td data-label="Détail">${escapeHtml(formatLogDetails(log.details))}</td>
     </tr>
   `).join("");

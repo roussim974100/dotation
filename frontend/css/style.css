@@ -1282,6 +1282,22 @@ body.login-shell {
   margin-bottom: 0;
 }
 
+/* Colonne Cible dans le journal */
+.log-target__type {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 0.35rem;
+}
+
+.log-target__label {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .draft-table th {
   font-size: 0.82rem;
   letter-spacing: 0.06em;
