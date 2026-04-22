@@ -397,10 +397,10 @@ function bindDynamicResourceToggles() {
 // Matériel mutualisé — état en mémoire et rendu inline
 // ---------------------------------------------------------------------------
 
-const _sharedState = new Map(); // resourceId → { enabled: bool, members: [{formId, nom, prenom, service, auto}] }
+const _sharedState = new Map(); // resourceId → { enabled: bool, poolId: string|null, members: [{formId, nom, prenom, service, auto}] }
 
 function _getShared(resourceId) {
-  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, members: [] });
+  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, poolId: null, members: [] });
   return _sharedState.get(resourceId);
 }
 
@@ -425,20 +425,33 @@ function renderSharedMembers(resourceId) {
   const list = document.getElementById(`shared_members_${resourceId}`);
   if (!list) return;
   const state = _getShared(resourceId);
+  const hasMembers = state.members.length > 0;
+
   list.innerHTML = state.members.map((m, idx) => `
     <li class="shared-member-row">
-      <span class="shared-member-name">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</span>
+      <span class="shared-member-name">${escapeHtml(m.prenom || "")} ${escapeHtml(m.nom || "")}</span>
       ${m.service ? `<span class="shared-member-service">${escapeHtml(m.service)}</span>` : ""}
       ${m.auto ? `<span class="shared-member-badge">Brouillon créé</span>` : ""}
       ${m.formId ? `<a class="shared-member-link" href="form.html?id=${escapeAttribute(m.formId)}" target="_blank">Voir</a>` : ""}
-      <button type="button" class="btn btn-xs btn-outline-danger shared-member-remove" data-resource-id="${escapeAttribute(resourceId)}" data-index="${idx}">×</button>
-    </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur</li>`;
+    </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur — décochez pour arrêter la mutualisation</li>`;
+
   list.querySelectorAll(".shared-member-remove").forEach((btn) => {
     btn.addEventListener("click", () => {
       _getShared(btn.dataset.resourceId).members.splice(Number(btn.dataset.index), 1);
       renderSharedMembers(btn.dataset.resourceId);
     });
   });
+
+  // Bloquer le toggle tant qu'il y a des membres.
+  // data-members-locked permet à applyLockState de ne pas écraser cet état.
+  const toggle = document.getElementById(`shared_toggle_${resourceId}`);
+  if (toggle) {
+    toggle.disabled = hasMembers;
+    toggle.dataset.membersLocked = hasMembers ? "true" : "";
+    toggle.title = hasMembers
+      ? "Retirez d'abord tous les co-utilisateurs pour arrêter la mutualisation"
+      : "";
+  }
 }
 
 function openSharedMemberModal(resourceId) {
@@ -999,6 +1012,7 @@ function getAdditionalResourcesData() {
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
     shared: _getShared(resource.id).enabled,
+    poolId: _getShared(resource.id).poolId || null,
     sharedWith: _getShared(resource.id).members,
     ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
@@ -1109,7 +1123,7 @@ function populateAdditionalResources(data = {}) {
       }
     });
 
-    // Restaurer l'état mutualisé
+    // Restaurer l'état mutualisé (symétrique : tous les membres voient le même toggle)
     if (resource.shared) {
       const toggle = document.getElementById(`shared_toggle_${resource.id}`);
       if (toggle) {
@@ -1118,6 +1132,7 @@ function populateAdditionalResources(data = {}) {
       }
       const state = _getShared(resource.id);
       state.enabled = true;
+      state.poolId = resource.poolId || null;
       state.members = Array.isArray(resource.sharedWith) ? resource.sharedWith : [];
       renderSharedMembers(resource.id);
     }
@@ -1152,6 +1167,10 @@ function applyLockState(locked) {
     }
     if (element.getAttribute("onclick")) {
       element.disabled = false;
+      return;
+    }
+    // Ne pas réactiver un toggle mutualisé bloqué par la présence de membres
+    if (!locked && element.dataset.membersLocked === "true") {
       return;
     }
     element.disabled = locked;

@@ -4268,6 +4268,8 @@ body.global-search-open { overflow: hidden; }
   user-select: none;
 }
 .shared-toggle input { cursor: pointer; }
+.shared-toggle:has(input:disabled) { opacity: 0.55; cursor: not-allowed; }
+.shared-toggle input:disabled { cursor: not-allowed; pointer-events: none; }
 .shared-panel { margin-top: .5rem; padding-left: .25rem; }
 .shared-members-list { list-style: none; padding: 0; margin: 0 0 .5rem; }
 .shared-member-row {
@@ -4293,6 +4295,9 @@ body.global-search-open { overflow: hidden; }
 .shared-member-link { font-size: .78rem; color: var(--brand); text-decoration: none; }
 .shared-member-link:hover { text-decoration: underline; }
 .shared-member-remove { margin-left: auto; }
+
+.shared-couser-badge { margin-top: .4rem; }
+.shared-couser-badge .badge { font-size: .78rem; font-weight: 500; }
 
 [data-color-mode="dark"] .shared-resource-block { border-color: #2d3b4d; }
 [data-color-mode="dark"] .shared-member-row { border-color: #2d3b4d; }
