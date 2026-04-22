@@ -13,6 +13,7 @@ from routes.admin import bp as admin_bp
 from routes.pages import bp as pages_bp
 from routes.forms import bp as forms_bp
 from routes.signature import bp as signature_bp
+from routes.pools import bp as pools_bp
 
 
 app = Flask(__name__, static_folder=None)
@@ -22,6 +23,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(pages_bp)
 app.register_blueprint(forms_bp)
 app.register_blueprint(signature_bp)
+app.register_blueprint(pools_bp)
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -260,6 +262,35 @@ def init_db():
                 ON dotation_forms(updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_dotation_forms_status
                 ON dotation_forms(status);
+
+            CREATE TABLE IF NOT EXISTS shared_pools (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS shared_pool_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pool_id TEXT NOT NULL,
+                resource_type TEXT NOT NULL,
+                label TEXT NOT NULL,
+                serial_number TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS shared_pool_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pool_id TEXT NOT NULL,
+                form_id TEXT,
+                beneficiary_name TEXT,
+                added_at TEXT NOT NULL,
+                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
+                FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
+            );
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")

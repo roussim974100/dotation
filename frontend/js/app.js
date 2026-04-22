@@ -1633,7 +1633,7 @@ function populateForm(data, signaturePad) {
   // pour les dossiers sauvegardés avant le rendu dynamique.
   migrateLegacyResourcesToAdditional(data);
 
-  document.getElementById("rgpdCheck").checked = Boolean(data.validation.rgpdAccepted);
+  document.getElementById("rgpdCheck").checked = Boolean(data.validation?.rgpdAccepted);
   populateAdditionalResources(data);
 
   initQualite();
@@ -1642,7 +1642,7 @@ function populateForm(data, signaturePad) {
   updateStatusInfo(form.dataset.workflowStatus || "draft");
   renderRestitutionSummary();
   renderReopenInfo(data.meta || {});
-  signaturePad.restore(data.validation.signatureDataUrl || "");
+  signaturePad.restore(data.validation?.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
   applyLockState(Boolean(data.meta.lockedAt));
 }
@@ -1857,7 +1857,7 @@ function validateFormData(formData, options = {}) {
     return "Veuillez renseigner le mandat de l'élu.";
   }
 
-  if (options.requireRgpd && !formData.validation.rgpdAccepted) {
+  if (options.requireRgpd && !formData.validation?.rgpdAccepted) {
     return "La validation RGPD est obligatoire avant l'export PDF.";
   }
 
