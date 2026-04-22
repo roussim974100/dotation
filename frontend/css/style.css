@@ -4379,3 +4379,31 @@ body.global-search-open { overflow: hidden; }
 }
 [data-color-mode="dark"] .pool-form-result:hover { background: rgba(15,91,141,.25); }
 [data-color-mode="dark"] .pool-member { border-color: #2d3b4d; }
+
+/* Champs verrouillés depuis le dossier source (mise_à_jour) */
+input[data-locked-from-source],
+select[data-locked-from-source] {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+  border-color: #dee2e6;
+  opacity: 0.9;
+}
+
+input[readonly][data-locked-from-source]::placeholder {
+  color: #adb5bd;
+}
+
+input[data-locked-from-source]:focus,
+select[data-locked-from-source]:focus {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Badge visuel pour indiquer les champs verrouillés */
+.section-personne [data-locked-from-source]::after {
+  content: " 🔒";
+  font-size: 0.75rem;
+}

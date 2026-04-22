@@ -1600,6 +1600,67 @@ function initRetraitsSection() {
       if (formResp.ok) {
         const formData = await formResp.json();
         const bene = formData.data?.beneficiaire || {};
+
+        // Fonction helper pour marquer les champs comme venant du source
+        const lockIdentityFields = () => {
+          const nomField = document.getElementById("nom");
+          const prenomField = document.getElementById("prenom");
+          const serviceField = document.getElementById("service");
+          const fonctionField = document.getElementById("fonction");
+          const mandatField = document.getElementById("mandat");
+
+          if (nomField) {
+            nomField.readOnly = true;
+            nomField.setAttribute("data-locked-from-source", "true");
+          }
+          if (prenomField) {
+            prenomField.readOnly = true;
+            prenomField.setAttribute("data-locked-from-source", "true");
+          }
+          if (serviceField) {
+            serviceField.disabled = true;
+            serviceField.setAttribute("data-locked-from-source", "true");
+          }
+          if (fonctionField) {
+            fonctionField.readOnly = true;
+            fonctionField.setAttribute("data-locked-from-source", "true");
+          }
+          if (mandatField) {
+            mandatField.disabled = true;
+            mandatField.setAttribute("data-locked-from-source", "true");
+          }
+        };
+
+        // Fonction helper pour déverrouiller les champs
+        const unlockIdentityFields = () => {
+          const nomField = document.getElementById("nom");
+          const prenomField = document.getElementById("prenom");
+          const serviceField = document.getElementById("service");
+          const fonctionField = document.getElementById("fonction");
+          const mandatField = document.getElementById("mandat");
+
+          if (nomField) {
+            nomField.readOnly = false;
+            nomField.removeAttribute("data-locked-from-source");
+          }
+          if (prenomField) {
+            prenomField.readOnly = false;
+            prenomField.removeAttribute("data-locked-from-source");
+          }
+          if (serviceField) {
+            serviceField.disabled = false;
+            serviceField.removeAttribute("data-locked-from-source");
+          }
+          if (fonctionField) {
+            fonctionField.readOnly = false;
+            fonctionField.removeAttribute("data-locked-from-source");
+          }
+          if (mandatField) {
+            mandatField.disabled = false;
+            mandatField.removeAttribute("data-locked-from-source");
+          }
+        };
+
         if (bene.nom) document.getElementById("nom").value = bene.nom;
         if (bene.prenom) document.getElementById("prenom").value = bene.prenom;
         if (bene.service) {
@@ -1617,6 +1678,12 @@ function initRetraitsSection() {
           const option = Array.from(mandatSelect.options).find(o => o.value === bene.mandat);
           if (option) mandatSelect.value = bene.mandat;
         }
+
+        // Verrouiller les champs identité
+        lockIdentityFields();
+
+        // Stocker la fonction de déverrouillage pour le bouton "Changer"
+        window._unlockIdentityFields = unlockIdentityFields;
       }
 
       const resp = await fetch(`/api/forms/${formId}/retrait-items`);
@@ -1666,6 +1733,10 @@ function initRetraitsSection() {
     signatureBlock.classList.add("d-none");
     itemsList.innerHTML = "";
     searchInput.value = "";
+    // Déverrouiller les champs identité
+    if (window._unlockIdentityFields) {
+      window._unlockIdentityFields();
+    }
     searchInput.focus();
   });
 
