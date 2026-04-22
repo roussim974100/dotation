@@ -1,33 +1,67 @@
-// Suggestions autocomplete pour les champs dynamiques (marque, modèle, zones, UNC…).
-// Dépend de requestJson et escapeAttribute définis dans app.js.
-// Chargé après app.js — toutes les fonctions appelées sont disponibles au runtime.
+// Suggestions autocomplete pour les champs dynamiques (marque, modèle, etc.).
+// Utilise /api/catalog/suggestions/<resource_id> — valeurs triées par fréquence,
+// avec cascade liée (changer marque filtre les modèles disponibles).
+// Dépend de escapeAttribute défini dans app.js.
 
 const _fieldSuggestCache = new Map();
 
-async function loadFieldSuggestions() {
-  // Collecte tous les datalists fsugg-* présents dans le DOM (générés par buildDynamicFieldInput)
-  const datalists = document.querySelectorAll("datalist[id^='fsugg-']");
-  if (!datalists.length) return;
-  const keys = [...new Set([...datalists].map(dl => dl.id.replace("fsugg-", "")))];
-  await Promise.all(keys.map(async (key) => {
-    if (_fieldSuggestCache.has(key)) {
-      fillFieldDatalist(key, _fieldSuggestCache.get(key));
-      return;
-    }
-    try {
-      const values = await requestJson(`/api/forms/field-suggestions?field=${encodeURIComponent(key)}`);
-      _fieldSuggestCache.set(key, values);
-      fillFieldDatalist(key, values);
-    } catch {
-      // silencieux — l'autocomplete est optionnel
-    }
-  }));
+async function _fetchCatalogSuggestions(resourceId) {
+  if (_fieldSuggestCache.has(resourceId)) return _fieldSuggestCache.get(resourceId);
+  try {
+    const r = await fetch(`/api/catalog/suggestions/${encodeURIComponent(resourceId)}`, { credentials: "same-origin" });
+    if (!r.ok) return null;
+    const data = await r.json();
+    _fieldSuggestCache.set(resourceId, data);
+    return data;
+  } catch {
+    return null;
+  }
 }
 
-function fillFieldDatalist(key, values) {
-  document.querySelectorAll(`datalist#fsugg-${key}`).forEach((dl) => {
-    if (dl.dataset.filled === "1") return;
-    dl.innerHTML = values.map(v => `<option value="${escapeAttribute(v)}">`).join("");
-    dl.dataset.filled = "1";
+function fillFieldDatalist(datalistId, values) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
+  dl.innerHTML = (values || [])
+    .map((v) => `<option value="${escapeAttribute(String(v))}"></option>`)
+    .join("");
+}
+
+function _bindLinkedListeners(resourceId, suggestions) {
+  document.querySelectorAll(`[data-suggest-field][data-resource-id="${CSS.escape(resourceId)}"]`).forEach((input) => {
+    if (input.dataset.boundSuggest) return;
+    input.addEventListener("input", () => {
+      const val = input.value.trim();
+      const linkedForVal = suggestions.linked?.[input.dataset.suggestField]?.[val];
+      Object.keys(suggestions.values || {}).forEach((otherKey) => {
+        if (otherKey === input.dataset.suggestField) return;
+        fillFieldDatalist(
+          `fsugg-${resourceId}-${otherKey}`,
+          linkedForVal?.[otherKey] || suggestions.values[otherKey]
+        );
+      });
+    });
+    input.dataset.boundSuggest = "true";
   });
+}
+
+async function loadFieldSuggestions() {
+  // Collecte les resource_id depuis les datalists fsugg-<resourceId>-<fieldKey>
+  const datalists = document.querySelectorAll("datalist[id^='fsugg-']");
+  if (!datalists.length) return;
+
+  // Extrait les resource_id uniques (tout ce qui précède le dernier segment)
+  const resourceIds = new Set();
+  datalists.forEach((dl) => {
+    const parts = dl.id.replace("fsugg-", "").split("-");
+    if (parts.length >= 2) resourceIds.add(parts.slice(0, -1).join("-"));
+  });
+
+  await Promise.all([...resourceIds].map(async (resourceId) => {
+    const suggestions = await _fetchCatalogSuggestions(resourceId);
+    if (!suggestions?.values) return;
+    Object.entries(suggestions.values).forEach(([fieldKey, values]) => {
+      fillFieldDatalist(`fsugg-${resourceId}-${fieldKey}`, values);
+    });
+    _bindLinkedListeners(resourceId, suggestions);
+  }));
 }

@@ -403,64 +403,6 @@ function initDynamicListFields() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Suggestions de champs (marque → modèle, etc.)
-// Chargées une seule fois à l'ouverture, filtrées côté client ensuite.
-// ---------------------------------------------------------------------------
-const _fieldSuggestCache = {};
-
-async function _fetchResourceSuggestions(resourceId) {
-  if (_fieldSuggestCache[resourceId]) return _fieldSuggestCache[resourceId];
-  try {
-    const r = await fetch(`/api/catalog/suggestions/${encodeURIComponent(resourceId)}`, { credentials: "same-origin" });
-    if (!r.ok) return null;
-    const data = await r.json();
-    _fieldSuggestCache[resourceId] = data;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function _fillDatalist(datalistId, values) {
-  const dl = document.getElementById(datalistId);
-  if (!dl) return;
-  dl.innerHTML = (values || [])
-    .map((v) => `<option value="${escapeAttribute(String(v))}"></option>`)
-    .join("");
-}
-
-function _bindSuggestFieldListeners(resourceId, suggestions) {
-  document.querySelectorAll(`[data-suggest-field][data-resource-id="${CSS.escape(resourceId)}"]`).forEach((input) => {
-    if (input.dataset.boundSuggest) return;
-    input.addEventListener("input", () => {
-      const val = input.value.trim();
-      const linkedForVal = suggestions.linked?.[input.dataset.suggestField]?.[val];
-      Object.keys(suggestions.values || {}).forEach((otherKey) => {
-        if (otherKey === input.dataset.suggestField) return;
-        _fillDatalist(
-          `fsugg-${resourceId}-${otherKey}`,
-          linkedForVal?.[otherKey] || suggestions.values[otherKey]
-        );
-      });
-    });
-    input.dataset.boundSuggest = "true";
-  });
-}
-
-async function loadFieldSuggestions() {
-  const targets = (dynamicResourceReferences || []).filter(
-    (r) => Array.isArray(r.field_schema) && r.field_schema.some((f) => f.suggest)
-  );
-  await Promise.all(targets.map(async (resource) => {
-    const suggestions = await _fetchResourceSuggestions(resource.id);
-    if (!suggestions?.values) return;
-    Object.entries(suggestions.values).forEach(([fieldKey, values]) => {
-      _fillDatalist(`fsugg-${resource.id}-${fieldKey}`, values);
-    });
-    _bindSuggestFieldListeners(resource.id, suggestions);
-  }));
-}
 
 function initDynamicEmailDomainFields() {
   const domainSelects = document.querySelectorAll(".dynamic-resource-email-domain");
