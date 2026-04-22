@@ -126,7 +126,9 @@
       "Bash(PYTHONIOENCODING=utf-8 grep -n \"CREATE INDEX\\\\|INDEX.*dotation\" C:/www/dotation/backend/app.py C:/www/dotation/backend/database.py C:/www/dotation/backend/models/forms.py)",
       "Bash(PYTHONIOENCODING=utf-8 python:*)",
       "Bash(pkill -f \"python backend/app.py\")",
-      "Bash(cd C:\\\\\\\\www\\\\\\\\dotation)"
+      "Bash(cd C:\\\\\\\\www\\\\\\\\dotation)",
+      "Bash(pkill -f \"python.*backend/app.py\")",
+      "Bash(APP_SECRET_KEY=\"test-key\" SESSION_COOKIE_SECURE=\"0\" python3 backend/app.py)"
     ]
   }
 }

@@ -396,8 +396,9 @@ def persist_form(payload, allow_locked_update=False):
         )
         _upsert_field_suggestions(connection, payload)
 
-        # Apply retraits if this is a mise_a_jour form transitioning to active
-        if status == "active" and dossier.get("type") == "mise_a_jour":
+        # Apply retraits if this is a mise_a_jour form with retraits
+        # Check based on dossier type and presence of retraits, not computed status
+        if dossier.get("type") == "mise_a_jour":
             source_form_id = dossier.get("sourceFormId")
             retraits_items = (payload.get("retraits") or {}).get("items") or {}
             if source_form_id and retraits_items:
