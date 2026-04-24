@@ -9,7 +9,6 @@ from utils import utc_now
 from database import get_db
 from auth import (
     login_required, admin_required, has_permission,
-    load_auth_config, save_auth_config,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, extract_first_forwarded_ip, check_user,
     current_user,
@@ -98,7 +97,6 @@ def signup():
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         password_confirm = request.form.get("password_confirm") or ""
-        config = load_auth_config()
 
         if not username or not password or not password_confirm:
             return redirect("/signup?error=missing_fields")
@@ -112,15 +110,17 @@ def signup():
         if complexity_error:
             return redirect(f"/signup?error={complexity_error}")
 
-        config.setdefault("users", []).append({
-            "username": username,
-            "password_hash": bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
-            "groups": ["lecture"],
-            "is_active": True,
-            "status": "pending",
-        })
-        save_auth_config(config)
+        now = utc_now()
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         with get_db() as connection:
+            connection.execute(
+                "INSERT INTO users (username, password_hash, is_active, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+                (username, password_hash, 1, "pending", now, now)
+            )
+            connection.execute(
+                "INSERT INTO user_groups (username, group_key) VALUES (?,?)",
+                (username, "lecture")
+            )
             insert_app_log(
                 connection,
                 "security",
@@ -416,16 +416,16 @@ def change_own_password():
     complexity_error = password_complexity_error(new_pw)
     if complexity_error:
         return jsonify({"error": complexity_error}), 400
-    config = load_auth_config()
-    for u in config["users"]:
-        if u.get("username") == user["username"]:
-            u["password_hash"] = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
-            break
-    save_auth_config(config)
-    insert_app_log(get_db(), "security", "password_self_change", "Changement de mot de passe", details={
-        "username": user["username"],
-        "ip": get_request_client_ip(),
-    })
+    new_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash=?, updated_at=? WHERE username=?",
+            (new_hash, utc_now(), user["username"])
+        )
+        insert_app_log(conn, "security", "password_self_change", "Changement de mot de passe", details={
+            "username": user["username"],
+            "ip": get_request_client_ip(),
+        })
     return jsonify({"ok": True})
 
 
