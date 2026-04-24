@@ -121,8 +121,10 @@ def signup():
                 "INSERT INTO user_groups (username, group_key) VALUES (?,?)",
                 (username, "lecture")
             )
+            connection.commit()
+        with get_db() as db_connection:
             insert_app_log(
-                connection,
+                db_connection,
                 "security",
                 "signup_requested",
                 "Demande d'inscription",
@@ -131,7 +133,6 @@ def signup():
                 {"groups": ["lecture"], "status": "pending"},
                 actor=username,
             )
-            connection.commit()
         return redirect("/login?notice=signup_pending")
 
     return send_from_directory(FRONTEND_DIR, "signup.html")
@@ -423,11 +424,12 @@ def change_own_password():
             "UPDATE users SET password_hash=?, updated_at=? WHERE username=?",
             (new_hash, utc_now(), user["username"])
         )
-        insert_app_log(conn, "security", "password_self_change", "Changement de mot de passe", details={
+        conn.commit()
+    with get_db() as connection:
+        insert_app_log(connection, "security", "password_self_change", "Changement de mot de passe", details={
             "username": user["username"],
             "ip": get_request_client_ip(),
         })
-        conn.commit()
     return jsonify({"ok": True})
 
 
