@@ -22,7 +22,6 @@
     <div class="header-actions">
       <a class="btn btn-outline-light" href="index.html">Accueil</a>
       <a id="adminLink" class="btn btn-outline-light d-none" href="admin.html">Administration</a>
-      <a class="btn btn-outline-light" data-help-page="dashboard" href="help.html?page=dashboard">Aide</a>
       <details id="userMenu" class="user-menu">
         <summary class="btn btn-outline-light" id="userMenuBtn">Mon compte</summary>
         <div class="user-menu__panel">
@@ -32,7 +31,7 @@
           </div>
           <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
           <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
-          <a class="user-menu__item" href="about.html">À propos</a>
+          <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide</a>
           <div class="user-menu__sep"></div>
           <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
         </div>
