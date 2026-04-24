@@ -154,8 +154,13 @@ function describeBrandingChanges(previous, next) {
   const themeChange = describeValueChange("Thème", getThemeLabel(previous.theme_id), getThemeLabel(next.theme_id));
   const darkModeChange = describeValueChange("Mode sombre", BRANDING_DARK_MODE_LABELS[previous.dark_mode_policy], BRANDING_DARK_MODE_LABELS[next.dark_mode_policy]);
   const emailDomainsChange = describeValueChange("Domaines e-mail autorisés", previous.email_domains, next.email_domains);
+  const supportNameChange = describeValueChange("Nom du contact support", previous.support_name, next.support_name);
+  const supportEmailChange = describeValueChange("Email du contact support", previous.support_email, next.support_email);
+  const supportRoleChange = describeValueChange("Rôle du contact support", previous.support_role, next.support_role);
+  const orgContextChange = describeValueChange("Type d'organisation", previous.org_context, next.org_context);
+  const beneficiaryTypesChange = describeValueChange("Types de bénéficiaires", previous.beneficiary_types, next.beneficiary_types);
 
-  [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange].filter(Boolean).forEach((item) => {
+  [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange, supportNameChange, supportEmailChange, supportRoleChange, orgContextChange, beneficiaryTypesChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 
