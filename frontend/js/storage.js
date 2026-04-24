@@ -354,7 +354,65 @@ function getTimingOffsetLabel(startAt) {
   return `${Math.abs(dayDelta)} j de retard`;
 }
 
+function buildRestitutionsPendingRow(draft, permissions) {
+  const progress = getDraftProgressMetrics(draft);
+  const progressPercent = Math.max(0, Math.min(100, Math.round((progress.ratio || 0) * 100)));
+  const title = draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier");
+  const dossierTypeLabel = formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || "");
+
+  let recoveryBadge = "";
+  if (draft.returnedAt && draft.assignedAt) {
+    const returned = new Date(draft.returnedAt);
+    const assigned = new Date(draft.assignedAt);
+    if (returned < assigned) {
+      recoveryBadge = '<span class="timing-chip timing-chip--ok">Tôt</span>';
+    } else if (returned > assigned) {
+      recoveryBadge = '<span class="timing-chip timing-chip--warning">Tardif</span>';
+    } else {
+      recoveryBadge = '<span class="timing-chip timing-chip--neutral">Dans les temps</span>';
+    }
+  }
+
+  return `
+    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
+      <td data-label="Dossier">
+        <div class="draft-title-wrap">
+          <span class="draft-title">${escapeHtml(title)}</span>
+          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
+        </div>
+        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
+        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
+      </td>
+      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
+      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
+      <td data-label="Pilotage">
+        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
+      </td>
+      <td data-label="Progression">
+        <div class="resource-progress">
+          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
+          <div class="resource-progress__track">
+            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
+          </div>
+        </div>
+      </td>
+      <td data-label="Récupération">${recoveryBadge}</td>
+      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
+      <td data-label="Actions" class="draft-actions-cell">
+        <div class="draft-actions">
+          ${buildDraftActionButtons(draft, permissions)}
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
 function buildDashboardRow(draft, permissions) {
+  const viewMode = getDashboardViewMode();
+  if (viewMode === "restitutions_pending") {
+    return buildRestitutionsPendingRow(draft, permissions);
+  }
+
   const progress = getDraftProgressMetrics(draft);
   const progressPercent = Math.max(0, Math.min(100, Math.round((progress.ratio || 0) * 100)));
   const title = draft.title || (draft.data ? buildDraftTitle(draft.data) : "Dossier");
@@ -684,6 +742,10 @@ function filterDraftsForCurrentView(drafts) {
 
   if (viewMode === "history_restitutions") {
     return drafts.filter((draft) => isCompletedRestitutionDraft(draft));
+  }
+
+  if (viewMode === "restitutions_pending") {
+    return applyDashboardFilters(drafts.filter((draft) => isOperationalRestitutionDraft(draft)));
   }
 
   return drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));

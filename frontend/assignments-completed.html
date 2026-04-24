@@ -9,14 +9,14 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="app-shell" data-dashboard-view="history_restitutions">
+<body class="app-shell" data-dashboard-view="history_assignments">
 <header class="app-header">
   <div class="container app-header__inner">
     <div class="app-brand" data-home-link>
       <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo application">
       <div>
-        <h1 class="app-title">Suivi des restitutions</h1>
-        <p class="app-subtitle">Restitutions closes et archivées pour consultation.</p>
+        <h1 class="app-title">Dossiers finalisés</h1>
+        <p class="app-subtitle">Attributions finalisées, signées et consultables.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -43,23 +43,24 @@
 <main class="container py-4 py-lg-5">
   <section class="hero-panel mb-4">
     <div>
-      <h2 class="panel-title">Restitutions terminées</h2>
-      <p class="panel-text">Consultez l'historique des restitutions achevées, sans surcharger le tableau de bord opérationnel.</p>
+      <h2 class="panel-title">Dossiers terminés</h2>
+      <p class="panel-text">Retrouvez ici les attributions achevées pour consultation, export ou recherche ultérieure.</p>
     </div>
     <div class="hero-panel__meta">
       <div class="hero-panel__stats hero-panel__stats--single">
         <div class="stat-card">
-          <span class="stat-card__label">Restitutions terminées</span>
+          <span class="stat-card__label">Dossiers terminés</span>
           <strong class="stat-card__value" id="historyCountValue">0</strong>
         </div>
       </div>
     </div>
   </section>
 
-  <nav class="dashboard-nav mb-4" aria-label="Navigation historique">
+  <nav class="dashboard-nav mb-4" aria-label="Navigation dossiers">
     <a class="dashboard-nav__link" href="index.html">Dossiers en cours</a>
-    <a class="dashboard-nav__link" href="historique-dossiers.html">Suivi des dossiers</a>
-    <a class="dashboard-nav__link is-active" href="historique-restitutions.html">Suivi des restitutions</a>
+    <a class="dashboard-nav__link" href="restitutions-pending.html">Restitutions en cours</a>
+    <a class="dashboard-nav__link is-active" href="assignments-completed.html">Dossiers finalisés</a>
+    <a class="dashboard-nav__link" href="restitutions-completed.html">Restitutions finalisées</a>
     <a class="dashboard-nav__link" href="pools.html">Parc mutualisé</a>
   </nav>
 
@@ -77,7 +78,7 @@
             <label class="form-label" for="statusFilter">État</label>
             <select id="statusFilter" class="form-select">
               <option value="">Tous les états</option>
-              <option value="returned">Restitution terminée</option>
+              <option value="active">Attribution active</option>
             </select>
           </div>
           <div>
@@ -121,7 +122,7 @@
     <div class="dashboard-toolbar mb-3">
       <div>
         <p class="panel-eyebrow">Historique</p>
-        <h3 class="section-title">Restitutions finalisées</h3>
+        <h3 class="section-title">Attributions finalisées</h3>
         <p class="panel-text mb-0" id="dashboardRefreshInfo">Mise à jour automatique active.</p>
       </div>
       <div class="dashboard-toolbar__actions">
@@ -138,8 +139,8 @@
     <section class="dashboard-group">
       <div class="dashboard-group__header">
         <div>
-          <p class="panel-eyebrow">Restitutions</p>
-          <h3 class="section-title">Suivi des restitutions</h3>
+          <p class="panel-eyebrow">Dossiers</p>
+          <h3 class="section-title">Historique des attributions</h3>
         </div>
         <span id="historyCountBadge" class="dashboard-group__badge">0</span>
       </div>
@@ -161,7 +162,7 @@
       </div>
       <div id="historyLoadMoreWrap" class="dashboard-group__load-more"></div>
       <div id="historyEmptyState" class="dashboard-group__empty d-none">
-        <p class="mb-0">Aucune restitution terminée ne correspond aux filtres actuels.</p>
+        <p class="mb-0">Aucun dossier terminé ne correspond aux filtres actuels.</p>
       </div>
     </section>
   </section>

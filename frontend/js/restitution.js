@@ -1,5 +1,6 @@
 const restitutionLoader = document.getElementById("restitutionLoader");
 const restitutionDetailList = document.getElementById("restitutionDetailList");
+const restitutionImmaterielList = document.getElementById("restitutionImmaterielList");
 
 async function requestJson(url, options = {}) {
   const method = (options.method || "GET").toUpperCase();
@@ -337,6 +338,58 @@ function renderRestitutionItems(items, existingStates) {
   });
 }
 
+function renderImmaterielItems(items, existingActions) {
+  if (!restitutionImmaterielList) {
+    return;
+  }
+
+  const immaterielSection = document.getElementById("restitution-immateriel");
+  if (!items.length) {
+    immaterielSection?.classList.add("d-none");
+    return;
+  }
+
+  immaterielSection?.classList.remove("d-none");
+
+  restitutionImmaterielList.innerHTML = items.map((item) => {
+    const actions = existingActions[item.itemKey] || {};
+    const currentValue = item.label;
+
+    return `
+      <div class="restitution-row">
+        <div>
+          <div class="restitution-row__title">${escapeHtml(currentValue)}</div>
+          ${item.details ? `<div class="restitution-row__meta">${escapeHtml(selectedDetail(item.details))}</div>` : ""}
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="immateriel_action_to_do_${item.itemKey}">Action prévue</label>
+            <select class="form-select" id="immateriel_action_to_do_${item.itemKey}" data-immateriel-key="${item.itemKey}">
+              <option value="">À définir</option>
+              <option value="supprimer" ${actions.actionToDo === "supprimer" ? "selected" : ""}>Supprimer</option>
+              <option value="desactiver" ${actions.actionToDo === "desactiver" ? "selected" : ""}>Désactiver</option>
+              <option value="reaffecter" ${actions.actionToDo === "reaffecter" ? "selected" : ""}>Réaffecter</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="immateriel_action_done_${item.itemKey}">Action effectuée</label>
+            <select class="form-select" id="immateriel_action_done_${item.itemKey}" data-immateriel-key="${item.itemKey}">
+              <option value="">Non fait</option>
+              <option value="supprime" ${actions.actionDone === "supprime" ? "selected" : ""}>Supprimé</option>
+              <option value="desactive" ${actions.actionDone === "desactive" ? "selected" : ""}>Désactivé</option>
+              <option value="reaffecte" ${actions.actionDone === "reaffecte" ? "selected" : ""}>Réaffecté</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label" for="immateriel_notes_${item.itemKey}">Notes</label>
+          <textarea class="form-control" id="immateriel_notes_${item.itemKey}" rows="2" placeholder="Observations ou détails supplémentaires…">${escapeHtml(actions.notes || "")}</textarea>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function deriveWorkflowStatus(itemStates) {
   const states = Object.values(itemStates);
   if (!states.length) {
@@ -468,11 +521,30 @@ async function initRestitutionPage() {
     document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
 
     const materialItems = (result.items || []).filter((item) => isRestitutionEligibleItem(item));
+    const immaterielItems = (result.items || []).filter((item) => item.category === "immateriel");
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
+    renderImmaterielItems(immaterielItems, result.data.restitution?.immaterielActions || {});
     let currentRestitution = result.data.restitution || {};
     restoreRestitutionSignature(currentRestitution, signaturePad);
     if (readOnlyMode) {
       applyRestitutionReadOnlyMode();
+    }
+
+    function getImmaterielActions(items) {
+      const actions = {};
+      items.forEach((item) => {
+        const actionToDo = document.getElementById(`immateriel_action_to_do_${item.itemKey}`)?.value || "";
+        const actionDone = document.getElementById(`immateriel_action_done_${item.itemKey}`)?.value || "";
+        const notes = document.getElementById(`immateriel_notes_${item.itemKey}`)?.value.trim() || "";
+        if (actionToDo || actionDone || notes) {
+          actions[item.itemKey] = {
+            actionToDo,
+            actionDone,
+            notes
+          };
+        }
+      });
+      return actions;
     }
 
     function buildRestitutionPayload(forceDeferredSignature = false) {
@@ -483,6 +555,7 @@ async function initRestitutionPage() {
       }
 
       const itemStates = getItemStates(materialItems, returnedAt, currentRestitution?.items || {});
+      const immaterielActions = getImmaterielActions(immaterielItems);
       let signature = getRestitutionSignaturePayload(signaturePad, currentRestitution || {});
 
       if (forceDeferredSignature) {
@@ -507,6 +580,7 @@ async function initRestitutionPage() {
         reason: document.getElementById("global_return_reason").value,
         notes: document.getElementById("global_return_notes").value.trim(),
         items: itemStates,
+        immaterielActions,
         signatureStatus: signature.signatureStatus,
         signatureReason: signature.signatureReason,
         signatureDataUrl: signature.signatureDataUrl,
