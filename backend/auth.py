@@ -8,7 +8,7 @@ from functools import wraps
 from flask import has_request_context, jsonify, redirect, request, session
 
 from config import BASE_DIR
-from database import get_db
+from database import get_db, get_users_db
 
 # ---------------------------------------------------------------------------
 # Fichier de configuration des utilisateurs
@@ -127,7 +127,7 @@ def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
 
 def get_user_record(username):
     try:
-        with get_db() as conn:
+        with get_users_db() as conn:
             row = conn.execute(
                 "SELECT u.*, GROUP_CONCAT(ug.group_key, ',') as groups_str FROM users u "
                 "LEFT JOIN user_groups ug ON u.username = ug.username "
@@ -169,7 +169,7 @@ def build_user_context(username):
         return None
     groups = user.get("groups", [])
     try:
-        with get_db() as conn:
+        with get_users_db() as conn:
             group_rows = []
             if groups:
                 placeholders = ','.join('?' * len(groups))

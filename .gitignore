@@ -8,13 +8,16 @@ backend/venv/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 
 # OS
 .DS_Store
 Thumbs.db
 
-# users
+# users/auth
 backend/.app_secret_key
+backend/users.json*
 
 # Cache / logs
 backend/__pycache__/
