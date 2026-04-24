@@ -795,7 +795,8 @@ def restore_trash_item(trash_id):
             is_active = bool(payload.get("is_active", True))
             status = payload.get("status", "active")
             db_manage = bool(payload.get("db_manage", False))
-            create_user(username, password_hash, groups, service, is_active, status, db_manage)
+            if not create_user(username, password_hash, groups, service, is_active, status, db_manage):
+                return jsonify({"error": "failed_to_restore_user"}), 500
             form_data = {"restored": True}
         else:
             return jsonify({"error": "unsupported_item_type"}), 400
@@ -1292,7 +1293,8 @@ def create_admin_user():
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     db_manage = bool(payload.get("db_manage", False))
 
-    create_user(username, password_hash, valid_groups, service, is_active, status, db_manage)
+    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage):
+        return jsonify({"error": "failed_to_create_user"}), 500
 
     with get_db() as connection:
         insert_app_log(
@@ -1347,7 +1349,8 @@ def update_admin_user(username):
         password_changed = True
 
     if update_fields:
-        update_user(username, **update_fields)
+        if not update_user(username, **update_fields):
+            return jsonify({"error": "failed_to_update_user"}), 500
 
     with get_db() as connection:
         insert_app_log(
@@ -1380,7 +1383,8 @@ def delete_admin_user(username):
     if not deleted_user:
         return jsonify({"error": "not_found"}), 404
 
-    delete_user(username)
+    if not delete_user(username):
+        return jsonify({"error": "failed_to_delete_user"}), 500
 
     with get_db() as connection:
         insert_deleted_item(
