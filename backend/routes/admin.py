@@ -138,6 +138,9 @@ def dashboard_stats():
         for row in by_status_rows
     ]
 
+    # Calculer active_count pour utilisation dans KPI Timing 3
+    active_count = sum(s["count"] for s in by_status if s["status"] == "active")
+
     # KPI 2 : Dossiers par service (top 10)
     service_query = f"SELECT service, COUNT(*) as count FROM dotation_forms {where_clause}{type_where} GROUP BY service ORDER BY count DESC LIMIT 10"
     service_params = []
@@ -253,8 +256,6 @@ def dashboard_stats():
     if type_filter:
         total_params.append(type_filter)
     total = db.execute(total_query, total_params).fetchone()["count"]
-
-    active_count = sum(s["count"] for s in by_status if s["status"] == "active")
 
     return jsonify({
         "period": {"label": _get_period_label(period), "days": period_days or "all"},
