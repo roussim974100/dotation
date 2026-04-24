@@ -64,20 +64,22 @@ def merge_users_config():
     # 1. Charger les configurations
     print("[1] Chargement des configurations...")
 
-    # La config locale est celle déjà en place sur le serveur
-    # Après git reset, elle sera remplacée par celle du repo
-    # On doit la sauvegarder et fusionner avant git ne l'écrase
+    # La config locale est celle déjà en place sur le serveur AVANT git reset
+    # Chercher la sauvegarde la PLUS RÉCENTE (dernier timestamp)
 
-    # Vérifier si on a une sauvegarde locale
     local_config = None
-    for backup_file_path in sorted(local_users_path.parent.glob("users.json.backup.*"), reverse=True):
-        # Utiliser la sauvegarde la plus récente
-        local_config = load_json(backup_file_path)
-        if local_config:
-            print(f"    [OK] Config locale trouvée: {backup_file_path.name}")
-            break
+    backup_files = sorted(local_users_path.parent.glob("users.json.backup.*"), reverse=True)
 
-    # Si pas de sauvegarde, essayer de lire directement (ne devrait pas arriver ici après reset)
+    if backup_files:
+        # Utiliser la sauvegarde la plus récente
+        most_recent_backup = backup_files[0]
+        local_config = load_json(most_recent_backup)
+        if local_config:
+            print(f"    [OK] Config locale trouvée: {most_recent_backup.name}")
+        else:
+            print(f"    [WARN] Impossible de lire: {most_recent_backup.name}")
+
+    # Si pas de sauvegarde valide, essayer de lire directement
     if not local_config and local_users_path.exists():
         local_config = load_json(local_users_path)
         if local_config:
