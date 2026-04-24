@@ -226,6 +226,17 @@ def list_forms():
     conditions = []
     params = []
 
+    # Restriction de confidentialité : si l'utilisateur a un service assigné
+    # et n'a pas la permission admin/direction, il ne voit que les dossiers
+    # de son service (pour respecter la confidentialité entre services)
+    user = current_user()
+    user_service = (user or {}).get("service") or ""
+    can_view_all = has_permission("forms.view_all")
+
+    if user_service and not can_view_all:
+        conditions.append("service = ?")
+        params.append(user_service)
+
     if status:
         conditions.append("status = ?")
         params.append(status)
