@@ -505,57 +505,39 @@ Ces valeurs sont personnalisables. Pour un ministère avec personnel militaire, 
 
 ---
 
-## Fichier users.json
+## Authentification et base de données utilisateurs
 
-L'authentification repose sur `backend/users.json`. Ce fichier contient les groupes, permissions et comptes utilisateurs.
+L'authentification repose sur **`backend/users.db`** — une base SQLite dédiée qui stocke les utilisateurs, groupes et permissions. Cette séparation garantit que les credentials et les paramètres locaux survivent aux déploiements.
 
-### Générer un hash bcrypt pour le premier admin
+### Migration automatique depuis users.json
+
+À la première démarrage après la migration (v3.13.0+), l'application :
+1. Détecte si `backend/users.json` existe
+2. Importe automatiquement les utilisateurs et groupes dans `backend/users.db`
+3. Renomme `backend/users.json` en `backend/users.json.migrated` (sauvegarde sécurisée)
+
+Après migration, **`users.json` n'est plus utilisé** — tout est en SQLite.
+
+### Gestion des utilisateurs
+
+**En développement :** Utilisez l'interface d'administration (`/admin-comptes.html`) pour :
+- Créer, modifier, supprimer des comptes
+- Assigner des groupes et permissions
+- Réinitialiser les mots de passe
+
+**En production :** Mêmes fonctionnalités via l'interface d'admin (accessible uniquement aux comptes avec permission `users.manage`).
+
+### Déploiement sans perte de données
 
 ```bash
-python3 -c "import bcrypt; print(bcrypt.hashpw(b'MotDePasseForT!', bcrypt.gensalt()).decode())"
+# Avant (era fragile, users.json écrasé par git reset) :
+./deploy.sh  # Sauvegarde, merge, risque d'erreur, etc.
+
+# Après (robuste, users.db en dehors de git) :
+./deploy.sh  # git fetch + restart, c'est tout
 ```
 
-```powershell
-python -c "import bcrypt; print(bcrypt.hashpw(b'MotDePasseForT!', bcrypt.gensalt()).decode())"
-```
-
-### Modèle minimal
-
-```json
-{
-  "groups": {
-    "lecture": {
-      "label": "Lecture",
-      "permissions": ["forms.read_list", "forms.read_detail", "forms.export"],
-      "data_scope": "full"
-    },
-    "redaction": {
-      "label": "Rédaction",
-      "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.export"],
-      "data_scope": "full"
-    },
-    "gestion": {
-      "label": "Gestion",
-      "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"],
-      "data_scope": "full"
-    },
-    "admin": {
-      "label": "Administration",
-      "permissions": ["*"],
-      "data_scope": "full"
-    }
-  },
-  "users": [
-    {
-      "username": "admin",
-      "password_hash": "COLLER_ICI_LE_HASH_BCRYPT",
-      "groups": ["admin"],
-      "is_active": true,
-      "status": "active"
-    }
-  ]
-}
-```
+Aucune sauvegarde/fusion nécessaire — `users.db` persiste entre les déploiements.
 
 ### Tableau des permissions
 
@@ -569,6 +551,7 @@ python -c "import bcrypt; print(bcrypt.hashpw(b'MotDePasseForT!', bcrypt.gensalt
 | `forms.export` | Exporter PDF et Excel |
 | `forms.delete` | Supprimer des dossiers |
 | `users.manage` | Gérer les comptes utilisateurs |
+| `db.manage` | Accès aux outils d'export/import de base de données |
 | `*` | Toutes les permissions (admin) |
 
 > `data_scope: "masked"` : les noms des bénéficiaires sont masqués pour conformité RGPD.

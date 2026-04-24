@@ -19,40 +19,20 @@ echo "========================================="
 echo "Déploiement en production (version: $APP_VERSION)"
 echo "========================================="
 
-# 1. Sauvegarder la config locale AVANT git reset
+# 1. Récupérer les changements
 echo ""
-echo "[1] Sauvegarde de la configuration locale..."
-if [ -f "backend/users.json" ]; then
-    cp "backend/users.json" "backend/users.json.backup.$(date +%Y%m%d_%H%M%S).pre-reset"
-    echo "    [OK] Config locale sauvegardée (pre-reset)"
-else
-    echo "    [WARN] Aucune config locale trouvée"
-fi
-
-# 2. Récupérer les changements
-echo ""
-echo "[2] Mise à jour du code..."
+echo "[1] Mise à jour du code..."
 git fetch origin
 git reset --hard origin/main
 echo "    [OK] Code à jour"
 
-# 3. Fusionner les configurations users
+# 2. Redémarrer le service
 echo ""
-echo "[3] Fusion des configurations utilisateurs..."
-python3 scripts/merge-users-config.py
-if [ $? -ne 0 ]; then
-    echo "    [ERROR] Erreur lors de la fusion - abandon"
-    exit 1
-fi
-echo "    [OK] Fusion complète"
-
-# 4. Redémarrer le service
-echo ""
-echo "[4] Redémarrage du service..."
+echo "[2] Redémarrage du service..."
 systemctl restart dotation
 sleep 2
 
-# 5. Vérifier que le service tourne
+# 3. Vérifier que le service tourne
 if systemctl is-active --quiet dotation; then
     echo "    [OK] Service redémarré avec succès"
 else

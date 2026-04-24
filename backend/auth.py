@@ -11,10 +11,8 @@ from config import BASE_DIR
 from database import get_db, get_users_db
 
 # ---------------------------------------------------------------------------
-# Fichier de configuration des utilisateurs
+# Définition des groupes (permissions et rôles)
 # ---------------------------------------------------------------------------
-
-USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 DEFAULT_GROUPS = {
     "lecture": {
@@ -103,6 +101,63 @@ def update_group(key, permissions):
                 "UPDATE groups SET permissions_json = ?, updated_at = ? WHERE key = ?",
                 (json.dumps(permissions), utc_now(), key)
             )
+            return True
+    except Exception:
+        return False
+
+
+def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False):
+    """Crée un nouvel utilisateur."""
+    try:
+        from utils import utc_now
+        with get_users_db() as conn:
+            now = utc_now()
+            conn.execute(
+                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (username, password_hash, int(is_active), status, service, int(db_manage), now, now)
+            )
+            for group_key in groups:
+                conn.execute(
+                    "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
+                    (username, group_key)
+                )
+            return True
+    except Exception:
+        return False
+
+
+def update_user(username, **fields):
+    """Met à jour un utilisateur."""
+    try:
+        from utils import utc_now
+        with get_users_db() as conn:
+            # Mettre à jour les colonnes
+            update_fields = {k: v for k, v in fields.items() if k != "groups"}
+            if update_fields:
+                update_fields["updated_at"] = utc_now()
+                cols = ", ".join(f"{k}=?" for k in update_fields.keys())
+                vals = list(update_fields.values())
+                conn.execute(f"UPDATE users SET {cols} WHERE username=?", vals + [username])
+
+            # Mettre à jour les groupes
+            if "groups" in fields:
+                conn.execute("DELETE FROM user_groups WHERE username=?", (username,))
+                for group_key in fields["groups"]:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
+                        (username, group_key)
+                    )
+            return True
+    except Exception:
+        return False
+
+
+def delete_user(username):
+    """Supprime un utilisateur."""
+    try:
+        with get_users_db() as conn:
+            conn.execute("DELETE FROM user_groups WHERE username=?", (username,))
+            conn.execute("DELETE FROM users WHERE username=?", (username,))
             return True
     except Exception:
         return False
