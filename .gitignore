@@ -27,3 +27,4 @@ chrome-*.png
 debug-appjs-check*.png
 login-*.png
 chromedriver/
+backend/.prod/
