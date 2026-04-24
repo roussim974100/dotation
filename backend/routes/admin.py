@@ -20,6 +20,7 @@ from auth import (
     load_auth_config, save_auth_config,
     get_user_record, password_complexity_error, is_valid_username,
     current_user, rate_limit,
+    list_all_users, list_all_groups, update_group,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
@@ -645,17 +646,17 @@ def reference_services():
 @login_required
 @permission_required("users.manage")
 def admin_users():
-    config = load_auth_config()
+    users = list_all_users()
     return jsonify([
         {
             "username": user["username"],
             "groups": user.get("groups", []),
             "is_active": user.get("is_active", True),
-            "status": user.get("status", "active" if user.get("is_active", True) else "disabled"),
+            "status": user.get("status", "active"),
             "service": user.get("service") or "",
             "db_manage": bool(user.get("db_manage", False)),
         }
-        for user in config.get("users", [])
+        for user in users
     ])
 
 
