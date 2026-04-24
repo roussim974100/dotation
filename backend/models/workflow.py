@@ -140,7 +140,9 @@ def extract_items(payload):
         ("zoneAlarme", "immateriel", "Zone alarme", immateriel.get("zoneAlarme", {})),
     ]
 
-    for resource in payload.get("resources", {}).get("additional", []):
+    resources_obj = payload.get("resources", {})
+    additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+    for resource in additional:
         items.append((
             resource.get("code") or resource.get("id") or generate_id("resource"),
             resource.get("category") or "materiel",
@@ -472,7 +474,8 @@ def describe_assignment_condition(item):
 def collect_resource_entries(payload):
     materiel = payload.get("materiel", {})
     immateriel = payload.get("immateriel", {})
-    additional = payload.get("resources", {}).get("additional", [])
+    resources_obj = payload.get("resources", {})
+    additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
 
     entries = []
 
