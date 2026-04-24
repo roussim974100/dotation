@@ -180,8 +180,8 @@ def build_user_context(username):
     except Exception:
         group_rows = []
 
-    permissions = sorted({p for row in group_rows for p in json.loads(row.get("permissions_json") or "[]")})
-    data_scope = "masked" if group_rows and all(r.get("data_scope") == "masked" for r in group_rows) else "full"
+    permissions = sorted({p for row in group_rows for p in json.loads(row["permissions_json"] or "[]")})
+    data_scope = "masked" if group_rows and all(r["data_scope"] == "masked" for r in group_rows) else "full"
     return {
         "username": username,
         "groups": groups,
