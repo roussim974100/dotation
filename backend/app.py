@@ -4,7 +4,7 @@ import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
-from database import get_db, ensure_column
+from database import get_db, get_users_db, ensure_column
 from models.dossier import migrate_forms_to_dossiers
 from utils import utc_now
 import json
@@ -94,6 +94,43 @@ def disable_frontend_cache(response):
     elif response.status_code == 200 and request.path.startswith("/assets/"):
         response.headers["Cache-Control"] = "public, max-age=604800, immutable"
     return response
+
+def init_users_db():
+    with get_users_db() as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'active',
+                service TEXT,
+                db_manage INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS groups (
+                key TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                description TEXT,
+                permissions_json TEXT NOT NULL DEFAULT '[]',
+                data_scope TEXT NOT NULL DEFAULT 'full',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_groups (
+                username TEXT NOT NULL,
+                group_key TEXT NOT NULL,
+                PRIMARY KEY (username, group_key),
+                FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE,
+                FOREIGN KEY(group_key) REFERENCES groups(key) ON DELETE RESTRICT
+            );
+            """
+        )
+        migrate_users_from_json(connection)
+
 
 def migrate_users_from_json(connection):
     count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -332,35 +369,6 @@ def init_db():
                 FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
             );
-
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                status TEXT NOT NULL DEFAULT 'active',
-                service TEXT,
-                db_manage INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS groups (
-                key TEXT PRIMARY KEY,
-                label TEXT NOT NULL,
-                description TEXT,
-                permissions_json TEXT NOT NULL DEFAULT '[]',
-                data_scope TEXT NOT NULL DEFAULT 'full',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS user_groups (
-                username TEXT NOT NULL,
-                group_key TEXT NOT NULL,
-                PRIMARY KEY (username, group_key),
-                FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE,
-                FOREIGN KEY(group_key) REFERENCES groups(key) ON DELETE RESTRICT
-            );
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
@@ -404,9 +412,7 @@ def init_db():
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
-        migrate_users_from_json(connection)
-
-
+        # Migration auto depuis users.json vers users.db (voir init_users_db)
 
 
 
@@ -414,8 +420,10 @@ def init_db():
 
 
 init_db()
+init_users_db()
 
 
 if __name__ == "__main__":
     init_db()
+    init_users_db()
     app.run(host="0.0.0.0", port=5000, debug=True)

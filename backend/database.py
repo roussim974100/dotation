@@ -1,7 +1,7 @@
 import json
 import sqlite3
 
-from config import DB_PATH
+from config import DB_PATH, DB_USERS_PATH
 
 
 _KNOWN_TABLES = {
@@ -17,6 +17,15 @@ def get_db():
     # timeout=10 : attendre 10 secondes avant de lever une erreur de verrouillage
     # check_same_thread=False : permettre l'accès cross-thread (gunicorn workers)
     connection = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA journal_mode = WAL")
+    return connection
+
+
+def get_users_db():
+    # BDD séparée pour users/groupes (ignore par git)
+    connection = sqlite3.connect(DB_USERS_PATH, timeout=10, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA journal_mode = WAL")

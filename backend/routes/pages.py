@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, make_response, redirect, request, send_fro
 
 from config import FRONTEND_DIR, FRONTEND_ASSETS_DIR, CITY_LOGO_URL, CITY_LOGO_PATH
 from utils import utc_now
-from database import get_db
+from database import get_db, get_users_db
 from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
@@ -112,7 +112,7 @@ def signup():
 
         now = utc_now()
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-        with get_db() as connection:
+        with get_users_db() as connection:
             connection.execute(
                 "INSERT INTO users (username, password_hash, is_active, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
                 (username, password_hash, 1, "pending", now, now)
@@ -417,7 +417,7 @@ def change_own_password():
     if complexity_error:
         return jsonify({"error": complexity_error}), 400
     new_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
-    with get_db() as conn:
+    with get_users_db() as conn:
         conn.execute(
             "UPDATE users SET password_hash=?, updated_at=? WHERE username=?",
             (new_hash, utc_now(), user["username"])
