@@ -17,10 +17,10 @@ from utils import utc_now, generate_id, bool_to_int
 from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
-    load_auth_config, save_auth_config,
     get_user_record, password_complexity_error, is_valid_username,
     current_user, rate_limit,
     list_all_users, list_all_groups, update_group,
+    create_user, update_user, delete_user,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
@@ -785,11 +785,16 @@ def restore_trash_item(trash_id):
             )
             form_data = {"restored": True}
         elif item_type == "user":
-            config = load_auth_config()
             if get_user_record(payload.get("username")):
                 return jsonify({"error": "user_exists"}), 409
-            config.setdefault("users", []).append(payload)
-            save_auth_config(config)
+            username = payload.get("username")
+            password_hash = payload.get("password_hash")
+            groups = payload.get("groups", [])
+            service = payload.get("service", "")
+            is_active = bool(payload.get("is_active", True))
+            status = payload.get("status", "active")
+            db_manage = bool(payload.get("db_manage", False))
+            create_user(username, password_hash, groups, service, is_active, status, db_manage)
             form_data = {"restored": True}
         else:
             return jsonify({"error": "unsupported_item_type"}), 400
@@ -1266,7 +1271,6 @@ def create_admin_user():
     password = payload.get("password") or ""
     groups = payload.get("groups") or []
     is_active = bool(payload.get("is_active", True))
-    config = load_auth_config()
 
     if not username or not password:
         return jsonify({"error": "username_and_password_required"}), 400
@@ -1278,21 +1282,17 @@ def create_admin_user():
     if get_user_record(username):
         return jsonify({"error": "user_exists"}), 409
 
+    all_groups = list_all_groups()
+    valid_group_keys = {g["key"] for g in all_groups}
+    valid_groups = [group for group in groups if group in valid_group_keys]
+
     service = (payload.get("service") or "").strip()
     status = "active" if is_active else "disabled"
-    new_user = {
-        "username": username,
-        "password_hash": bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
-        "groups": [group for group in groups if group in config.get("groups", {})],
-        "is_active": is_active,
-        "status": status,
-    }
-    if service:
-        new_user["service"] = service
-    if bool(payload.get("db_manage", False)):
-        new_user["db_manage"] = True
-    config["users"].append(new_user)
-    save_auth_config(config)
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    db_manage = bool(payload.get("db_manage", False))
+
+    create_user(username, password_hash, valid_groups, service, is_active, status, db_manage)
+
     with get_db() as connection:
         insert_app_log(
             connection,
@@ -1301,7 +1301,7 @@ def create_admin_user():
             "Compte utilisateur cree",
             "user",
             username,
-            {"groups": [group for group in groups if group in config.get("groups", {})], "is_active": is_active, "status": status},
+            {"groups": valid_groups, "is_active": is_active, "status": status},
         )
     return jsonify({"created": True}), 201
 
@@ -1311,37 +1311,43 @@ def create_admin_user():
 @permission_required("users.manage")
 def update_admin_user(username):
     payload = request.get_json(silent=True) or {}
-    config = load_auth_config()
-    user = next((item for item in config.get("users", []) if item.get("username") == username), None)
+    user = get_user_record(username)
     if not user:
         return jsonify({"error": "not_found"}), 404
 
-    user["groups"] = [group for group in payload.get("groups", user.get("groups", [])) if group in config.get("groups", {})]
+    update_fields = {}
+
+    all_groups = list_all_groups()
+    valid_group_keys = {g["key"] for g in all_groups}
+    if "groups" in payload:
+        update_fields["groups"] = [group for group in payload.get("groups", []) if group in valid_group_keys]
+
     requested_status = payload.get("status")
     if requested_status in {"pending", "active", "disabled"}:
-        user["status"] = requested_status
-        user["is_active"] = requested_status != "disabled"
-    else:
-        user["is_active"] = bool(payload.get("is_active", user.get("is_active", True)))
-        user["status"] = "active" if user.get("is_active", True) else "disabled"
+        update_fields["status"] = requested_status
+        update_fields["is_active"] = int(requested_status != "disabled")
+    elif "is_active" in payload:
+        update_fields["is_active"] = int(bool(payload.get("is_active", True)))
+        update_fields["status"] = "active" if update_fields["is_active"] else "disabled"
+
     if "service" in payload:
         service = (payload["service"] or "").strip()
-        if service:
-            user["service"] = service
-        else:
-            user.pop("service", None)
+        update_fields["service"] = service if service else None
+
     if "db_manage" in payload:
-        if payload["db_manage"]:
-            user["db_manage"] = True
-        else:
-            user.pop("db_manage", None)
+        update_fields["db_manage"] = int(bool(payload["db_manage"]))
+
+    password_changed = False
     if payload.get("password"):
         complexity_error = password_complexity_error(payload["password"])
         if complexity_error:
             return jsonify({"error": complexity_error}), 400
-        user["password_hash"] = bcrypt.hashpw(payload["password"].encode(), bcrypt.gensalt()).decode()
+        update_fields["password_hash"] = bcrypt.hashpw(payload["password"].encode(), bcrypt.gensalt()).decode()
+        password_changed = True
 
-    save_auth_config(config)
+    if update_fields:
+        update_user(username, **update_fields)
+
     with get_db() as connection:
         insert_app_log(
             connection,
@@ -1351,10 +1357,10 @@ def update_admin_user(username):
             "user",
             username,
             {
-                "groups": user.get("groups", []),
-                "is_active": user.get("is_active", True),
-                "status": user.get("status", "active"),
-                "password_changed": bool(payload.get("password")),
+                "groups": update_fields.get("groups", user.get("groups", [])),
+                "is_active": bool(update_fields.get("is_active", user.get("is_active", True))),
+                "status": update_fields.get("status", user.get("status", "active")),
+                "password_changed": password_changed,
             },
         )
     return jsonify({"updated": True})
@@ -1368,24 +1374,21 @@ def delete_admin_user(username):
     if current_username == username:
         return jsonify({"error": "cannot_delete_current_user"}), 400
 
-    config = load_auth_config()
-    users = config.get("users", [])
-    deleted_user = next((user for user in users if user.get("username") == username), None)
-    kept_users = [user for user in users if user.get("username") != username]
-    if len(kept_users) == len(users):
+    all_users = list_all_users()
+    deleted_user = next((u for u in all_users if u.get("username") == username), None)
+    if not deleted_user:
         return jsonify({"error": "not_found"}), 404
 
-    config["users"] = kept_users
-    save_auth_config(config)
+    delete_user(username)
+
     with get_db() as connection:
-        if deleted_user:
-            insert_deleted_item(
-                connection,
-                "user",
-                username,
-                username,
-                deleted_user,
-            )
+        insert_deleted_item(
+            connection,
+            "user",
+            username,
+            username,
+            deleted_user,
+        )
         insert_app_log(
             connection,
             "admin",
