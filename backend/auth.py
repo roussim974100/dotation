@@ -65,6 +65,7 @@ def update_group(key, permissions):
                 "UPDATE groups SET permissions_json = ?, updated_at = ? WHERE key = ?",
                 (json.dumps(permissions), utc_now(), key)
             )
+            conn.commit()
             return True
     except Exception:
         return False
@@ -85,6 +86,7 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
                     "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
                     (username, group_key)
                 )
+            conn.commit()
             return True
     except Exception:
         return False
@@ -111,6 +113,7 @@ def update_user(username, **fields):
                         "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
                         (username, group_key)
                     )
+            conn.commit()
             return True
     except Exception:
         return False
@@ -122,6 +125,7 @@ def delete_user(username):
         with get_users_db() as conn:
             conn.execute("DELETE FROM user_groups WHERE username=?", (username,))
             conn.execute("DELETE FROM users WHERE username=?", (username,))
+            conn.commit()
             return True
     except Exception:
         return False
