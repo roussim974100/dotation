@@ -88,7 +88,12 @@ function bindFilterListeners() {
 async function loadStats() {
   try {
     const params = new URLSearchParams(filters);
-    const data = await fetch(`/api/admin/dashboard-stats?${params}`).then(r => r.json());
+    const response = await fetch(`/api/admin/dashboard-stats?${params}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+    const data = await response.json();
     allData = data;
 
     renderKpis(data.kpis);
@@ -97,7 +102,7 @@ async function loadStats() {
     renderServicesTable(data.by_service);
   } catch (error) {
     console.error("Erreur chargement stats:", error);
-    showError("Impossible de charger les données");
+    showError("Impossible de charger les données : " + error.message);
   }
 }
 
