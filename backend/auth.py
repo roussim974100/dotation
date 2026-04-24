@@ -58,6 +58,56 @@ def save_auth_config(config):
     raise NotImplementedError("save_auth_config() is deprecated. Users are now stored in SQLite.")
 
 
+# ---- Fonctions helper pour CRUD users/groups ----
+
+def list_all_users():
+    """Retourne tous les users avec leurs groupes."""
+    try:
+        with get_users_db() as conn:
+            users = conn.execute("SELECT * FROM users ORDER BY username").fetchall()
+            result = []
+            for u in users:
+                user_dict = dict(u)
+                groups = conn.execute(
+                    "SELECT group_key FROM user_groups WHERE username = ?",
+                    (u["username"],)
+                ).fetchall()
+                user_dict["groups"] = [g["group_key"] for g in groups]
+                result.append(user_dict)
+            return result
+    except Exception:
+        return []
+
+
+def list_all_groups():
+    """Retourne tous les groupes avec permissions."""
+    try:
+        with get_users_db() as conn:
+            groups = conn.execute("SELECT * FROM groups ORDER BY key").fetchall()
+            result = []
+            for g in groups:
+                g_dict = dict(g)
+                g_dict["permissions"] = json.loads(g["permissions_json"] or "[]")
+                result.append(g_dict)
+            return result
+    except Exception:
+        return []
+
+
+def update_group(key, permissions):
+    """Met à jour les permissions d'un groupe."""
+    try:
+        with get_users_db() as conn:
+            from utils import utc_now
+            conn.execute(
+                "UPDATE groups SET permissions_json = ?, updated_at = ? WHERE key = ?",
+                (json.dumps(permissions), utc_now(), key)
+            )
+            return True
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Rate limiting login : max 10 tentatives par IP sur une fenetre glissante de 10 minutes.
 # ---------------------------------------------------------------------------
