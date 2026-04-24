@@ -8,6 +8,7 @@ from functools import wraps
 from flask import has_request_context, jsonify, redirect, request, session
 
 from config import BASE_DIR
+from database import get_db
 
 # ---------------------------------------------------------------------------
 # Fichier de configuration des utilisateurs
@@ -50,48 +51,11 @@ DEFAULT_GROUPS = {
 
 
 def load_auth_config():
-    # Supporte deux formats:
-    # - ancien format {username: hash}
-    # - nouveau format {groups: ..., users: ...}
-    with open(USERS_FILE, encoding="utf-8") as file:
-        raw = json.load(file)
-
-    if "users" in raw and "groups" in raw:
-        changed = False
-        for user in raw.get("users", []):
-            status = user.get("status")
-            if not status:
-                user["status"] = "active" if user.get("is_active", True) else "disabled"
-                changed = True
-            if "is_active" not in user:
-                user["is_active"] = user.get("status") != "disabled"
-                changed = True
-        # Fusionner les groupes par défaut manquants (nouvelles versions)
-        for key, group in DEFAULT_GROUPS.items():
-            if key not in raw["groups"]:
-                raw["groups"][key] = group
-                changed = True
-        if changed:
-            save_auth_config(raw)
-        return raw
-
-    migrated_users = [
-        {
-            "username": username,
-            "password_hash": password_hash,
-            "groups": ["admin"],
-            "is_active": True,
-        }
-        for username, password_hash in raw.items()
-    ]
-    config = {"groups": DEFAULT_GROUPS, "users": migrated_users}
-    save_auth_config(config)
-    return config
+    raise NotImplementedError("load_auth_config() is deprecated. Users are now stored in SQLite.")
 
 
 def save_auth_config(config):
-    with open(USERS_FILE, "w", encoding="utf-8") as file:
-        json.dump(config, file, ensure_ascii=False, indent=2)
+    raise NotImplementedError("save_auth_config() is deprecated. Users are now stored in SQLite.")
 
 
 # ---------------------------------------------------------------------------
@@ -162,11 +126,20 @@ def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
 # ---------------------------------------------------------------------------
 
 def get_user_record(username):
-    config = load_auth_config()
-    for user in config.get("users", []):
-        if user.get("username") == username:
-            return user
-    return None
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT u.*, GROUP_CONCAT(ug.group_key, ',') as groups_str FROM users u "
+                "LEFT JOIN user_groups ug ON u.username = ug.username "
+                "WHERE u.username = ? GROUP BY u.username", (username,)
+            ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    d = dict(row)
+    d["groups"] = d["groups_str"].split(",") if d["groups_str"] else []
+    return d
 
 
 def password_complexity_error(password):
@@ -191,12 +164,24 @@ def is_valid_username(username):
 def build_user_context(username):
     # Les permissions sont calculees a partir des groupes.
     # data_scope pilote ensuite le masquage RGPD des reponses.
-    config = load_auth_config()
     user = get_user_record(username)
-    groups = user.get("groups", []) if user else []
-    group_objects = [config["groups"][group] for group in groups if group in config.get("groups", {})]
-    permissions = sorted({permission for group in group_objects for permission in group.get("permissions", [])})
-    data_scope = "masked" if group_objects and all(group.get("data_scope") == "masked" for group in group_objects) else "full"
+    if not user:
+        return None
+    groups = user.get("groups", [])
+    try:
+        with get_db() as conn:
+            group_rows = []
+            if groups:
+                placeholders = ','.join('?' * len(groups))
+                group_rows = conn.execute(
+                    f"SELECT key, permissions_json, data_scope FROM groups WHERE key IN ({placeholders})",
+                    groups
+                ).fetchall()
+    except Exception:
+        group_rows = []
+
+    permissions = sorted({p for row in group_rows for p in json.loads(row.get("permissions_json") or "[]")})
+    data_scope = "masked" if group_rows and all(r.get("data_scope") == "masked" for r in group_rows) else "full"
     return {
         "username": username,
         "groups": groups,
