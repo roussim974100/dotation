@@ -45,6 +45,13 @@
   color: var(--text);
   margin-bottom: 1rem;
 }
+.stat-card__sublabel {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  font-weight: normal;
+}
 </style>
 </head>
 <body class="app-shell">
@@ -103,6 +110,33 @@
       <div class="stat-card">
         <span class="stat-card__label">Alertes</span>
         <strong class="stat-card__value" id="kpiAlertes">0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- KPIs délais -->
+  <section class="content-card mb-4">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Délais</p>
+        <h2 class="section-title">Indicateurs de performance</h2>
+      </div>
+    </div>
+    <div class="hero-panel__stats">
+      <div class="stat-card">
+        <span class="stat-card__label">Délai moyen de traitement</span>
+        <strong class="stat-card__value" id="kpiAvgTreatment">—</strong>
+        <span class="stat-card__sublabel">jours</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Délai moyen de restitution</span>
+        <strong class="stat-card__value" id="kpiAvgRestitution">—</strong>
+        <span class="stat-card__sublabel">jours</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Complétés rapidement</span>
+        <strong class="stat-card__value" id="kpiPctFast">—</strong>
+        <span class="stat-card__sublabel">≤7 jours</span>
       </div>
     </div>
   </section>
@@ -184,6 +218,10 @@
     <div class="chart-container">
       <p class="chart-title">Ressources attribuées (top 10)</p>
       <canvas id="chartResources"></canvas>
+    </div>
+    <div class="chart-container">
+      <p class="chart-title">Distribution des délais</p>
+      <canvas id="chartTiming"></canvas>
     </div>
   </div>
 

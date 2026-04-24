@@ -173,6 +173,56 @@ def dashboard_stats():
             "jours_blocage": days_blocked
         })
 
+    # KPI Timing 1 : Durée moyenne de traitement (création → active)
+    avg_treatment_query = """
+    SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT)) as avg_days
+    FROM dotation_forms
+    WHERE status IN ('active', 'returned', 'partial_return')
+    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    avg_treatment_row = db.execute(avg_treatment_query).fetchone()
+    avg_treatment = round(avg_treatment_row["avg_days"], 1) if avg_treatment_row and avg_treatment_row["avg_days"] else 0
+
+    # KPI Timing 2 : Durée moyenne de restitution (active → returned)
+    avg_restitution_query = """
+    SELECT AVG(CAST((julianday(returned_at) - julianday(assigned_at)) AS FLOAT)) as avg_days
+    FROM dotation_forms
+    WHERE status IN ('returned', 'partial_return') AND returned_at IS NOT NULL AND assigned_at IS NOT NULL
+    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    avg_restitution_row = db.execute(avg_restitution_query).fetchone()
+    avg_restitution = round(avg_restitution_row["avg_days"], 1) if avg_restitution_row and avg_restitution_row["avg_days"] else 0
+
+    # KPI Timing 3 : % dossiers complétés en ≤ 7 jours
+    fast_query = """
+    SELECT COUNT(*) as count FROM dotation_forms
+    WHERE status IN ('active', 'returned', 'partial_return')
+    AND CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7
+    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    fast_count = db.execute(fast_query).fetchone()["count"]
+    pct_fast = (fast_count * 100.0 / active_count) if active_count > 0 else 0
+    pct_fast = round(pct_fast, 0)
+
+    # KPI Timing 4 : Distribution des délais
+    timing_distribution_query = """
+    SELECT
+      CASE
+        WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 3 THEN 'rapide'
+        WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7 THEN 'normal'
+        ELSE 'long'
+      END as categorie,
+      COUNT(*) as count
+    FROM dotation_forms
+    WHERE status IN ('active', 'returned', 'partial_return')
+    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "") + """
+    GROUP BY categorie
+    """
+    timing_dist_rows = db.execute(timing_distribution_query).fetchall()
+    timing_dist = {row["categorie"]: row["count"] for row in timing_dist_rows}
+    timing_distribution = [
+        {"categorie": "rapide", "label": "Rapide (≤3j)", "count": timing_dist.get("rapide", 0), "color": "#def7e7"},
+        {"categorie": "normal", "label": "Normal (3-7j)", "count": timing_dist.get("normal", 0), "color": "#fff4d6"},
+        {"categorie": "long", "label": "Long (>7j)", "count": timing_dist.get("long", 0), "color": "#fde2e2"}
+    ]
+
     # KPI globaux
     total_query = f"SELECT COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where}"
     total = db.execute(total_query, params).fetchone()["count"]
@@ -186,14 +236,18 @@ def dashboard_stats():
             "actifs": active_count,
             "taux_restitution": taux_restitution,
             "alertes_blocage": len(alertes),
-            "ressources_total": sum(r["count"] for r in by_resource)
+            "ressources_total": sum(r["count"] for r in by_resource),
+            "avg_treatment": avg_treatment,
+            "avg_restitution": avg_restitution,
+            "pct_fast": pct_fast
         },
         "by_status": by_status,
         "by_service": by_service,
         "by_type": by_type,
         "by_resource": by_resource,
         "tendance": tendance,
-        "alertes": alertes[:10]  # limiter à 10 alertes
+        "alertes": alertes[:10],
+        "timing_distribution": timing_distribution
     })
 
 

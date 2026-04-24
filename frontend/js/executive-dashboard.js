@@ -107,6 +107,20 @@ function renderKpis(kpis) {
   if (byId("kpiActifs")) byId("kpiActifs").textContent = kpis.actifs || 0;
   if (byId("kpiRestitution")) byId("kpiRestitution").textContent = `${kpis.taux_restitution || 0}%`;
   if (byId("kpiAlertes")) byId("kpiAlertes").textContent = kpis.alertes_blocage || 0;
+
+  // Timing KPIs
+  if (byId("kpiAvgTreatment")) {
+    const val = kpis.avg_treatment !== null && kpis.avg_treatment !== undefined ? parseFloat(kpis.avg_treatment).toFixed(1) : "—";
+    byId("kpiAvgTreatment").textContent = val;
+  }
+  if (byId("kpiAvgRestitution")) {
+    const val = kpis.avg_restitution !== null && kpis.avg_restitution !== undefined ? parseFloat(kpis.avg_restitution).toFixed(1) : "—";
+    byId("kpiAvgRestitution").textContent = val;
+  }
+  if (byId("kpiPctFast")) {
+    const val = kpis.pct_fast !== null && kpis.pct_fast !== undefined ? `${parseFloat(kpis.pct_fast).toFixed(0)}%` : "—";
+    byId("kpiPctFast").textContent = val;
+  }
 }
 
 function renderCharts(data) {
@@ -116,6 +130,9 @@ function renderCharts(data) {
   renderServicesChart(data.by_service);
   renderTendanceChart(data.tendance);
   renderResourcesChart(data.by_resource);
+  if (data.timing_distribution) {
+    renderTimingChart(data.timing_distribution);
+  }
 }
 
 function renderStatusChart(by_status) {
@@ -240,6 +257,37 @@ function renderResourcesChart(by_resource) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { x: { beginAtZero: true } }
+    }
+  });
+}
+
+function renderTimingChart(timing_distribution) {
+  const ctx = document.getElementById("chartTiming");
+  if (!ctx) return;
+
+  if (charts.timing) charts.timing.destroy();
+
+  const labels = timing_distribution.map(t => t.label);
+  const counts = timing_distribution.map(t => t.count);
+  const bgColors = timing_distribution.map(t => t.color);
+
+  charts.timing = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: bgColors,
+        borderColor: "#fff",
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" }
+      }
     }
   });
 }
