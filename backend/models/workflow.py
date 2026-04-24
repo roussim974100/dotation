@@ -258,7 +258,8 @@ def collect_resource_validation_errors(payload):
     errors = []
     materiel = payload.get("materiel", {})
     immateriel = payload.get("immateriel", {})
-    resources = payload.get("resources", {}).get("additional", [])
+    resources_obj = payload.get("resources", {})
+    resources = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
 
     fixed_rules = [
         ("ordinateur", materiel.get("ordinateur", {}), [
