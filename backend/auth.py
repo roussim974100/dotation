@@ -10,42 +10,6 @@ from flask import has_request_context, jsonify, redirect, request, session
 from config import BASE_DIR
 from database import get_db, get_users_db
 
-# ---------------------------------------------------------------------------
-# Définition des groupes (permissions et rôles)
-# ---------------------------------------------------------------------------
-
-DEFAULT_GROUPS = {
-    "lecture": {
-        "label": "Lecture",
-        "description": "Consultation seule, sans possibilite de saisie.",
-        "permissions": ["forms.read_list", "forms.read_detail", "forms.export"],
-        "data_scope": "full",
-    },
-    "redaction": {
-        "label": "Redaction",
-        "description": "Creation et modification des fiches en cours.",
-        "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.export"],
-        "data_scope": "full",
-    },
-    "gestion": {
-        "label": "Gestion",
-        "description": "Gestion avancee avec restitution et export.",
-        "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"],
-        "data_scope": "full",
-    },
-    "direction": {
-        "label": "Direction",
-        "description": "Acces complet aux dossiers avec visibilite sur les chemins reseau UNC. Ideal pour DGS, DRH et encadrement superieur.",
-        "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "unc.view_all"],
-        "data_scope": "full",
-    },
-    "admin": {
-        "label": "Administration",
-        "description": "Controle total et gestion des utilisateurs.",
-        "permissions": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "users.manage", "*"],
-        "data_scope": "full",
-    },
-}
 
 
 def load_auth_config():
