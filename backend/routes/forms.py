@@ -671,6 +671,7 @@ def update_restitution(form_id):
     payload["restitution"]["reason"] = patch.get("reason", payload["restitution"].get("reason"))
     payload["restitution"]["notes"] = patch.get("notes", payload["restitution"].get("notes"))
     payload["restitution"]["items"] = patch.get("items", payload["restitution"].get("items", {}))
+    payload["restitution"]["immaterielActions"] = patch.get("immaterielActions", payload["restitution"].get("immaterielActions", {}))
     payload["restitution"]["signatureStatus"] = patch.get("signatureStatus", payload["restitution"].get("signatureStatus"))
     payload["restitution"]["signatureReason"] = patch.get("signatureReason", payload["restitution"].get("signatureReason"))
     payload["restitution"]["signatureDataUrl"] = patch.get("signatureDataUrl", payload["restitution"].get("signatureDataUrl"))

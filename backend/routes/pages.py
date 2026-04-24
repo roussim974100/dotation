@@ -176,16 +176,34 @@ def index_page():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
+@bp.route("/assignments-completed.html")
+@login_required
+def assignments_completed_page():
+    return send_from_directory(FRONTEND_DIR, "assignments-completed.html")
+
+
+@bp.route("/restitutions-completed.html")
+@login_required
+def restitutions_completed_page():
+    return send_from_directory(FRONTEND_DIR, "restitutions-completed.html")
+
+
+@bp.route("/restitutions-pending.html")
+@login_required
+def restitutions_pending_page():
+    return send_from_directory(FRONTEND_DIR, "restitutions-pending.html")
+
+
 @bp.route("/historique-dossiers.html")
 @login_required
 def assignments_history_page():
-    return send_from_directory(FRONTEND_DIR, "historique-dossiers.html")
+    return redirect("/assignments-completed.html")
 
 
 @bp.route("/historique-restitutions.html")
 @login_required
 def restitutions_history_page():
-    return send_from_directory(FRONTEND_DIR, "historique-restitutions.html")
+    return redirect("/restitutions-completed.html")
 
 
 @bp.route("/form.html")
