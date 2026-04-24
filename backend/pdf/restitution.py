@@ -31,9 +31,11 @@ def build_restitution_pdf_bytes(title, payload):
     decision_label = format_restitution_decision_label(signature_status, restitution.get("signataireDecision"))
     signature_export_allowed = can_export_signature_assets()
     signature_present = bool(restitution.get("signatureDataUrl"))
+    resources_obj = payload.get("resources", {})
+    additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
     additional_resource_index = {
         resource.get("code") or resource.get("id"): resource
-        for resource in payload.get("resources", {}).get("additional", [])
+        for resource in additional
         if isinstance(resource, dict)
     }
     material_entries = {}

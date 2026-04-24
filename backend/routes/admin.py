@@ -584,7 +584,9 @@ def catalog_field_suggestions(resource_id):
             payload = json.loads(row["payload_json"])
         except (TypeError, json.JSONDecodeError):
             continue
-        for res in payload.get("resources", {}).get("additional", []):
+        resources_obj = payload.get("resources", {})
+        additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+        for res in additional:
             if not isinstance(res, dict) or res.get("id") != resource_id or not res.get("selected"):
                 continue
             fields = res.get("fields", {})

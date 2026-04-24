@@ -585,7 +585,9 @@ def create_form():
         return jsonify({"error": error.code}), error.status
     saved_id = form_data["summary"]["id"]
     with get_db() as conn:
-        sync_shared_pools_for_form(conn, saved_id, payload.get("resources", {}).get("additional", []))
+        resources_obj = payload.get("resources", {})
+        additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+        sync_shared_pools_for_form(conn, saved_id, additional)
     return jsonify(form_data), 201
 
 
@@ -601,7 +603,9 @@ def update_form(form_id):
     except AppError as error:
         return jsonify({"error": error.code}), error.status
     with get_db() as conn:
-        sync_shared_pools_for_form(conn, form_id, payload.get("resources", {}).get("additional", []))
+        resources_obj = payload.get("resources", {})
+        additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+        sync_shared_pools_for_form(conn, form_id, additional)
     return jsonify(form_data)
 
 
