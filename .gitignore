@@ -14,7 +14,6 @@ backend/venv/
 Thumbs.db
 
 # users
-backend/users.json
 backend/.app_secret_key
 
 # Cache / logs
