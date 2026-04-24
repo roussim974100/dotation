@@ -23,7 +23,7 @@ echo "========================================="
 echo ""
 echo "[1] Mise à jour du code..."
 git fetch origin
-git reset --hard origin/main
+git reset --hard origin/prod
 echo "    [OK] Code à jour"
 
 # 2. Redémarrer le service
