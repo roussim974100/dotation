@@ -75,6 +75,172 @@ def unc_stats():
     })
 
 
+@bp.route("/api/admin/dashboard-stats", methods=["GET"])
+@login_required
+@permission_required("forms.view_all")
+def dashboard_stats():
+    period = request.args.get("period", "30d")
+    service_filter = request.args.get("service", "")
+    type_filter = request.args.get("type", "")
+
+    # Calculer la date limite selon la période
+    period_days = 30
+    if period == "7d": period_days = 7
+    elif period == "90d": period_days = 90
+    elif period == "365d": period_days = 365
+    elif period == "all": period_days = None
+
+    where_clause = ""
+    params = []
+    if period_days:
+        where_clause = "WHERE created_at >= datetime('now', ? || ' days')"
+        params = [f"-{period_days}"]
+
+    service_where = ""
+    if service_filter:
+        service_where = f" AND service = ?" if where_clause else "WHERE service = ?"
+        params.append(service_filter)
+
+    type_where = ""
+    if type_filter:
+        type_where = f" AND dossier_type = ?" if (where_clause or service_where) else "WHERE dossier_type = ?"
+        params.append(type_filter)
+
+    db = get_db()
+
+    # KPI 1 : Dossiers par statut
+    status_query = f"SELECT status, COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where} GROUP BY status"
+    by_status_rows = db.execute(status_query, params).fetchall()
+    by_status = [
+        {"status": row["status"], "label": STATUS_LABELS.get(row["status"], row["status"]), "count": row["count"]}
+        for row in by_status_rows
+    ]
+
+    # KPI 2 : Dossiers par service (top 10)
+    service_query = f"SELECT service, COUNT(*) as count FROM dotation_forms {where_clause}{type_where} GROUP BY service ORDER BY count DESC LIMIT 10"
+    service_params = params[:1] if period_days else []
+    if type_filter:
+        service_params.append(type_filter)
+    by_service_rows = db.execute(service_query, service_params).fetchall()
+    by_service = [
+        {"service": row["service"] or "—", "count": row["count"]}
+        for row in by_service_rows
+    ]
+
+    # KPI 3 : Dossiers par type
+    type_query = f"SELECT dossier_type, COUNT(*) as count FROM dotation_forms {where_clause}{service_where} GROUP BY dossier_type"
+    type_params = params[:1] if period_days else []
+    if service_filter:
+        type_params.append(service_filter)
+    by_type_rows = db.execute(type_query, type_params).fetchall()
+    by_type = [
+        {"type": row["dossier_type"], "label": TYPE_LABELS.get(row["dossier_type"], row["dossier_type"]), "count": row["count"]}
+        for row in by_type_rows
+    ]
+
+    # KPI 4 : Ressources les plus attribuées (top 10)
+    resource_query = "SELECT label, COUNT(*) as count FROM dotation_items WHERE assigned=1 GROUP BY label ORDER BY count DESC LIMIT 10"
+    by_resource_rows = db.execute(resource_query).fetchall()
+    by_resource = [
+        {"label": row["label"], "count": row["count"]}
+        for row in by_resource_rows
+    ]
+
+    # KPI 5 : Taux de restitution (matériel)
+    restitution_query = "SELECT SUM(CASE WHEN returned=1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) as taux FROM dotation_items WHERE category='materiel' AND assigned=1"
+    restitution_row = db.execute(restitution_query).fetchone()
+    taux_restitution = round(restitution_row["taux"], 1) if restitution_row and restitution_row["taux"] else 0
+
+    # KPI 6 : Tendance mensuelle (12 derniers mois)
+    tendance_query = "SELECT strftime('%Y-%m', created_at) as mois, COUNT(*) as count FROM dotation_forms GROUP BY mois ORDER BY mois DESC LIMIT 12"
+    tendance_rows = list(reversed(db.execute(tendance_query).fetchall()))
+    tendance = [
+        {"mois": row["mois"], "label": _format_month_label(row["mois"]), "count": row["count"]}
+        for row in tendance_rows
+    ]
+
+    # KPI 7 : Alertes — dossiers bloqués depuis > 30j
+    alertes_query = "SELECT id, nom, prenom, service, updated_at FROM dotation_forms WHERE status='draft' AND updated_at < datetime('now', '-30 days') ORDER BY updated_at"
+    alertes_rows = db.execute(alertes_query).fetchall()
+    alertes = []
+    for row in alertes_rows:
+        days_blocked = _days_since(row["updated_at"])
+        alertes.append({
+            "id": row["id"],
+            "nom": row["nom"] or "",
+            "prenom": row["prenom"] or "",
+            "service": row["service"] or "—",
+            "jours_blocage": days_blocked
+        })
+
+    # KPI globaux
+    total_query = f"SELECT COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where}"
+    total = db.execute(total_query, params).fetchone()["count"]
+
+    active_count = sum(s["count"] for s in by_status if s["status"] == "active")
+
+    return jsonify({
+        "period": {"label": _get_period_label(period), "days": period_days or "all"},
+        "kpis": {
+            "total": total,
+            "actifs": active_count,
+            "taux_restitution": taux_restitution,
+            "alertes_blocage": len(alertes),
+            "ressources_total": sum(r["count"] for r in by_resource)
+        },
+        "by_status": by_status,
+        "by_service": by_service,
+        "by_type": by_type,
+        "by_resource": by_resource,
+        "tendance": tendance,
+        "alertes": alertes[:10]  # limiter à 10 alertes
+    })
+
+
+def _get_period_label(period):
+    labels = {"7d": "7 derniers jours", "30d": "30 derniers jours", "90d": "90 derniers jours", "365d": "Dernière année", "all": "Tous les temps"}
+    return labels.get(period, "30 derniers jours")
+
+
+def _format_month_label(mois_str):
+    months = {
+        "01": "Jan", "02": "Fév", "03": "Mar", "04": "Avr", "05": "Mai", "06": "Juin",
+        "07": "Juil", "08": "Août", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Déc"
+    }
+    if len(mois_str) >= 7:
+        return months.get(mois_str[5:7], mois_str)
+    return mois_str
+
+
+def _days_since(timestamp_str):
+    from datetime import datetime
+    try:
+        dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        delta = datetime.now(dt.tzinfo) - dt if dt.tzinfo else datetime.now() - dt.replace(tzinfo=None)
+        return delta.days
+    except:
+        return 0
+
+
+# Labels pour statuts et types
+STATUS_LABELS = {
+    "draft": "À compléter",
+    "active": "Actif",
+    "partial_assignment": "Attribution partielle",
+    "awaiting_signature": "En attente de signature",
+    "returned": "Restitué",
+    "partial_return": "Restitution partielle",
+    "cancelled": "Annulé"
+}
+
+TYPE_LABELS = {
+    "arrivee": "Arrivée",
+    "changement_service": "Changement de service",
+    "mise_a_jour": "Mise à jour",
+    "sortie": "Sortie"
+}
+
+
 @bp.route("/api/admin/settings", methods=["GET"])
 @login_required
 @permission_required("users.manage")

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<title>Tableau de bord exécutif</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+.chart-container {
+  position: relative;
+  height: 300px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+}
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+}
+.filter-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+.chart-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+</style>
+</head>
+<body class="app-shell">
+<!-- En-tête commun -->
+<header class="app-header">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
+      <div>
+        <p class="app-kicker">Exécutif</p>
+        <h1 class="app-title">Tableau de bord</h1>
+        <p class="app-subtitle">Indicateurs de performance et alertes pour direction et administration.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="index.html">Accueil</a>
+      <a class="btn btn-outline-light" href="admin.html">Portail admin</a>
+      <details id="userMenu" class="user-menu">
+        <summary class="btn btn-outline-light" id="userMenuBtn">Mon compte</summary>
+        <div class="user-menu__panel">
+          <div class="user-menu__header">
+            <span class="user-menu__name" id="userMenuName"></span>
+            <span class="user-menu__role" id="userMenuRole"></span>
+          </div>
+          <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+          <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+          <a class="user-menu__item" href="about.html">À propos</a>
+          <div class="user-menu__sep"></div>
+          <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <!-- KPIs hero panel -->
+  <section class="hero-panel mb-4">
+    <div>
+      <p class="panel-eyebrow">Indicateurs clés</p>
+      <h2 class="panel-title">Vue d'ensemble</h2>
+    </div>
+    <div class="hero-panel__stats">
+      <div class="stat-card">
+        <span class="stat-card__label">Total dossiers</span>
+        <strong class="stat-card__value" id="kpiTotal">0</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Actifs</span>
+        <strong class="stat-card__value" id="kpiActifs">0</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Taux restitution</span>
+        <strong class="stat-card__value" id="kpiRestitution">0%</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Alertes</span>
+        <strong class="stat-card__value" id="kpiAlertes">0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filtres segments -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Période</label>
+      <div class="choice-group">
+        <label class="choice-chip">
+          <input type="radio" name="filter-period" value="7d">
+          <span>7 jours</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-period" value="30d" checked>
+          <span>30 jours</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-period" value="90d">
+          <span>90 jours</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-period" value="365d">
+          <span>Année</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-period" value="all">
+          <span>Tout</span>
+        </label>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Service</label>
+      <select id="filterService" class="form-select" style="max-width:200px">
+        <option value="">— Tous les services —</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Type de dossier</label>
+      <div class="choice-group">
+        <label class="choice-chip">
+          <input type="radio" name="filter-type" value="" checked>
+          <span>Tous</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-type" value="arrivee">
+          <span>Arrivée</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-type" value="changement_service">
+          <span>Changement</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-type" value="mise_a_jour">
+          <span>Mise à jour</span>
+        </label>
+        <label class="choice-chip">
+          <input type="radio" name="filter-type" value="sortie">
+          <span>Sortie</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graphiques -->
+  <div class="dashboard-charts-grid">
+    <div class="chart-container">
+      <p class="chart-title">Répartition par statut</p>
+      <canvas id="chartStatus"></canvas>
+    </div>
+    <div class="chart-container">
+      <p class="chart-title">Top services</p>
+      <canvas id="chartServices"></canvas>
+    </div>
+    <div class="chart-container">
+      <p class="chart-title">Tendance mensuelle</p>
+      <canvas id="chartTendance"></canvas>
+    </div>
+    <div class="chart-container">
+      <p class="chart-title">Ressources attribuées (top 10)</p>
+      <canvas id="chartResources"></canvas>
+    </div>
+  </div>
+
+  <!-- Alertes -->
+  <section class="content-card mb-4">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Attention</p>
+        <h2 class="section-title">Dossiers bloqués (> 30 jours)</h2>
+      </div>
+    </div>
+    <div class="table-responsive" id="alertesContainer">
+      <p class="text-muted">Chargement...</p>
+    </div>
+  </section>
+
+  <!-- Tableau détail par service -->
+  <section class="content-card">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Détail</p>
+        <h2 class="section-title">Récapitulatif par service</h2>
+      </div>
+    </div>
+    <div class="table-responsive" id="servicesContainer">
+      <p class="text-muted">Chargement...</p>
+    </div>
+  </section>
+</main>
+
+<script src="js/branding.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/global-search.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="js/executive-dashboard.js"></script>
+</body>
+</html>

@@ -96,6 +96,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (canManageDb) {
       document.getElementById("adminDbCard")?.classList.remove("d-none");
     }
+    const canViewExecutiveDash = session?.permissions?.includes("forms.view_all") || session?.is_admin;
+    if (canViewExecutiveDash) {
+      document.getElementById("execDashCard")?.classList.remove("d-none");
+    }
   } catch (error) {
     console.error(error);
   }

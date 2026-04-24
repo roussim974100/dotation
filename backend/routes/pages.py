@@ -283,6 +283,14 @@ def admin_branding_page():
     return send_from_directory(FRONTEND_DIR, "admin-personnalisation.html")
 
 
+@bp.route("/executive-dashboard.html")
+@login_required
+def executive_dashboard_page():
+    if not has_permission("forms.view_all"):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "executive-dashboard.html")
+
+
 @bp.route("/pools.html")
 @login_required
 def pools_page():
