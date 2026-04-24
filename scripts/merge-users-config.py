@@ -13,6 +13,7 @@ from datetime import datetime
 def load_json(path):
     """Charge un fichier JSON."""
     try:
+        path = Path(path)
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
@@ -22,6 +23,9 @@ def load_json(path):
 def save_json(path, data):
     """Sauvegarde un fichier JSON."""
     try:
+        path = Path(path)
+        # Créer le répertoire s'il n'existe pas
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         return True
@@ -32,8 +36,9 @@ def save_json(path, data):
 def backup_file(path):
     """Crée une sauvegarde du fichier avec timestamp."""
     try:
+        path = Path(path)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"{path}.backup.{timestamp}"
+        backup_path = path.parent / f"{path.name}.backup.{timestamp}"
         with open(path, 'r', encoding='utf-8') as src:
             with open(backup_path, 'w', encoding='utf-8') as dst:
                 dst.write(src.read())
