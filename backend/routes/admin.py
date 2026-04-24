@@ -111,8 +111,7 @@ def dashboard_stats():
     where_clause = ""
     params = []
     if period_days:
-        where_clause = "WHERE created_at >= datetime('now', ? || ' days')"
-        params = [f"-{period_days}"]
+        where_clause = f"WHERE created_at >= datetime('now', '-{period_days} days')"
 
     service_where = ""
     if service_filter:
@@ -128,7 +127,12 @@ def dashboard_stats():
 
     # KPI 1 : Dossiers par statut
     status_query = f"SELECT status, COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where} GROUP BY status"
-    by_status_rows = db.execute(status_query, params).fetchall()
+    status_params = []
+    if service_filter:
+        status_params.append(service_filter)
+    if type_filter:
+        status_params.append(type_filter)
+    by_status_rows = db.execute(status_query, status_params).fetchall()
     by_status = [
         {"status": row["status"], "label": STATUS_LABELS.get(row["status"], row["status"]), "count": row["count"]}
         for row in by_status_rows
@@ -136,7 +140,7 @@ def dashboard_stats():
 
     # KPI 2 : Dossiers par service (top 10)
     service_query = f"SELECT service, COUNT(*) as count FROM dotation_forms {where_clause}{type_where} GROUP BY service ORDER BY count DESC LIMIT 10"
-    service_params = params[:1] if period_days else []
+    service_params = []
     if type_filter:
         service_params.append(type_filter)
     by_service_rows = db.execute(service_query, service_params).fetchall()
@@ -147,7 +151,7 @@ def dashboard_stats():
 
     # KPI 3 : Dossiers par type
     type_query = f"SELECT dossier_type, COUNT(*) as count FROM dotation_forms {where_clause}{service_where} GROUP BY dossier_type"
-    type_params = params[:1] if period_days else []
+    type_params = []
     if service_filter:
         type_params.append(service_filter)
     by_type_rows = db.execute(type_query, type_params).fetchall()
@@ -192,35 +196,35 @@ def dashboard_stats():
         })
 
     # KPI Timing 1 : Durée moyenne de traitement (création → active)
-    avg_treatment_query = """
+    avg_treatment_query = f"""
     SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT)) as avg_days
     FROM dotation_forms
     WHERE status IN ('active', 'returned', 'partial_return')
-    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
     avg_treatment_row = db.execute(avg_treatment_query).fetchone()
     avg_treatment = round(avg_treatment_row["avg_days"], 1) if avg_treatment_row and avg_treatment_row["avg_days"] else 0
 
     # KPI Timing 2 : Durée moyenne de restitution (active → returned)
-    avg_restitution_query = """
+    avg_restitution_query = f"""
     SELECT AVG(CAST((julianday(returned_at) - julianday(assigned_at)) AS FLOAT)) as avg_days
     FROM dotation_forms
     WHERE status IN ('returned', 'partial_return') AND returned_at IS NOT NULL AND assigned_at IS NOT NULL
-    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
     avg_restitution_row = db.execute(avg_restitution_query).fetchone()
     avg_restitution = round(avg_restitution_row["avg_days"], 1) if avg_restitution_row and avg_restitution_row["avg_days"] else 0
 
     # KPI Timing 3 : % dossiers complétés en ≤ 7 jours
-    fast_query = """
+    fast_query = f"""
     SELECT COUNT(*) as count FROM dotation_forms
     WHERE status IN ('active', 'returned', 'partial_return')
     AND CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7
-    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "")
+    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
     fast_count = db.execute(fast_query).fetchone()["count"]
     pct_fast = (fast_count * 100.0 / active_count) if active_count > 0 else 0
     pct_fast = round(pct_fast, 0)
 
     # KPI Timing 4 : Distribution des délais
-    timing_distribution_query = """
+    timing_distribution_query = f"""
     SELECT
       CASE
         WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 3 THEN 'rapide'
@@ -230,7 +234,7 @@ def dashboard_stats():
       COUNT(*) as count
     FROM dotation_forms
     WHERE status IN ('active', 'returned', 'partial_return')
-    """ + (f"AND created_at >= datetime('now', '{period_days} days')" if period_days else "") + """
+    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}
     GROUP BY categorie
     """
     timing_dist_rows = db.execute(timing_distribution_query).fetchall()
@@ -243,7 +247,12 @@ def dashboard_stats():
 
     # KPI globaux
     total_query = f"SELECT COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where}"
-    total = db.execute(total_query, params).fetchone()["count"]
+    total_params = []
+    if service_filter:
+        total_params.append(service_filter)
+    if type_filter:
+        total_params.append(type_filter)
+    total = db.execute(total_query, total_params).fetchone()["count"]
 
     active_count = sum(s["count"] for s in by_status if s["status"] == "active")
 
