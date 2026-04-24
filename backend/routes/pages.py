@@ -131,6 +131,7 @@ def signup():
                 {"groups": ["lecture"], "status": "pending"},
                 actor=username,
             )
+            connection.commit()
         return redirect("/login?notice=signup_pending")
 
     return send_from_directory(FRONTEND_DIR, "signup.html")
@@ -426,6 +427,7 @@ def change_own_password():
             "username": user["username"],
             "ip": get_request_client_ip(),
         })
+        conn.commit()
     return jsonify({"ok": True})
 
 
