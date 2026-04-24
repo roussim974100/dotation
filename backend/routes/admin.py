@@ -538,7 +538,8 @@ def update_group_permissions(key):
             "group", key, {"permissions": perms},
             actor=current_actor(),
         )
-    return jsonify(config.get("groups", {}))
+    updated_groups = list_all_groups()
+    return jsonify({g["key"]: g for g in updated_groups})
 
 
 @bp.route("/api/catalog/suggestions/<resource_id>", methods=["GET"])
