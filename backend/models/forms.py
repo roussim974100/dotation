@@ -493,7 +493,9 @@ def get_form(form_id):
     payload = json.loads(form_row["payload_json"])
 
     # Injecter l'état mutualisé depuis la DB (source de vérité) pour tous les membres
-    for resource in payload.get("resources", {}).get("additional", []):
+    resources_obj = payload.get("resources", {})
+    additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+    for resource in additional:
         rid = resource.get("id") or resource.get("code")
         if rid in pool_by_resource:
             pool_info = pool_by_resource[rid]
