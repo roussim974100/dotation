@@ -66,16 +66,24 @@ def merge_users_config():
 
     # La config locale est celle déjà en place sur le serveur AVANT git reset
     # Chercher la sauvegarde la PLUS RÉCENTE (dernier timestamp)
+    # Ignorer les backups .pre-reset (créés par deploy.sh automatiquement)
+    # Préférer les backups "réels" (manuels ou antérieurs)
 
     local_config = None
-    backup_files = sorted(local_users_path.parent.glob("users.json.backup.*"), reverse=True)
+    all_backups = list(local_users_path.parent.glob("users.json.backup.*"))
+
+    # Phase 1: chercher les backups RÉELS (sans .pre-reset)
+    real_backups = sorted([f for f in all_backups if not f.name.endswith(".pre-reset")], reverse=True)
+
+    backup_files = real_backups if real_backups else sorted(all_backups, reverse=True)
 
     if backup_files:
         # Utiliser la sauvegarde la plus récente
         most_recent_backup = backup_files[0]
         local_config = load_json(most_recent_backup)
         if local_config:
-            print(f"    [OK] Config locale trouvée: {most_recent_backup.name}")
+            backup_type = "(réel)" if most_recent_backup in real_backups else "(pre-reset, fallback)"
+            print(f"    [OK] Config locale trouvée: {most_recent_backup.name} {backup_type}")
         else:
             print(f"    [WARN] Impossible de lire: {most_recent_backup.name}")
 
