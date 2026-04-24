@@ -506,8 +506,8 @@ def upload_admin_logo_route():
 @login_required
 @permission_required("users.manage")
 def admin_groups():
-    config = load_auth_config()
-    return jsonify(config.get("groups", {}))
+    groups = list_all_groups()
+    return jsonify({g["key"]: g for g in groups})
 
 
 TOGGLEABLE_PERMISSIONS = {"unc.view_all"}
@@ -516,22 +516,21 @@ TOGGLEABLE_PERMISSIONS = {"unc.view_all"}
 @login_required
 @permission_required("users.manage")
 def update_group_permissions(key):
-    config = load_auth_config()
-    groups = config.get("groups", {})
-    if key not in groups:
+    groups = list_all_groups()
+    group = next((g for g in groups if g["key"] == key), None)
+    if not group:
         return jsonify({"error": "group_not_found"}), 404
-    if "*" in groups[key].get("permissions", []):
+    if "*" in group.get("permissions", []):
         return jsonify({"error": "cannot_edit_admin_group"}), 403
     payload = request.get_json(silent=True) or {}
-    perms = list(groups[key].get("permissions", []))
+    perms = list(group.get("permissions", []))
     for perm in TOGGLEABLE_PERMISSIONS:
         if perm in payload:
             if payload[perm] and perm not in perms:
                 perms.append(perm)
             elif not payload[perm] and perm in perms:
                 perms.remove(perm)
-    groups[key]["permissions"] = perms
-    save_auth_config(config)
+    update_group(key, perms)
     with get_db() as connection:
         insert_app_log(
             connection, "admin", "group_permissions_updated",
