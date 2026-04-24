@@ -140,17 +140,20 @@ def signup():
 def logout():
     username = session.get("user")
     if username:
-        with get_db() as connection:
-            insert_app_log(
-                connection,
-                "security",
-                "logout",
-                "Deconnexion",
-                "user",
-                username,
-                {"ip": get_request_client_ip()},
-                actor=username,
-            )
+        try:
+            with get_db() as connection:
+                insert_app_log(
+                    connection,
+                    "security",
+                    "logout",
+                    "Deconnexion",
+                    "user",
+                    username,
+                    {"ip": get_request_client_ip()},
+                    actor=username,
+                )
+        except Exception:
+            pass
     session.clear()
     return redirect("/login")
 
