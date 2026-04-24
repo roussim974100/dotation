@@ -1,11 +1,11 @@
 const HELP_CONTENT = {
   dashboard: {
-    title: "Aide du tableau de bord",
+    title: "Aide des dossiers en cours",
     subtitle: "Retrouvez vos dossiers, suivez leur avancement et lancez les actions utiles sans quitter la liste.",
-    hero: "Le tableau de bord centralise les dossiers d'attribution et de restitution, leur état et les actions disponibles.",
-    pill: "Tableau de bord",
+    hero: "Les dossiers en cours centralisent les dossiers d'attribution et de restitution, leur état et les actions disponibles.",
+    pill: "Dossiers en cours",
     returnHref: "index.html",
-    returnLabel: "Retour au tableau de bord",
+    returnLabel: "Retour aux dossiers en cours",
     quickLinkLabel: "",
     summary: [
       "Créer un nouveau dossier quand vous démarrez une arrivée, une mobilité interne ou une mise à jour.",
