@@ -195,12 +195,22 @@ function updateAdminMetrics() {
 
 function renderGroups() {
   const selector = byId("groupSelector");
+  const modalSelector = byId("modalGroupSelector");
   const cards = byId("groupCards");
 
   if (selector) {
     selector.innerHTML = Object.entries(groups).map(([key, group]) => `
       <label class="choice-chip">
-        <input type="checkbox" value="${escapeHtml(key)}" class="admin-group-option">
+        <input type="radio" name="admin_group" value="${escapeHtml(key)}" class="admin-group-option">
+        <span>${escapeHtml(group.label)}</span>
+      </label>
+    `).join("");
+  }
+
+  if (modalSelector) {
+    modalSelector.innerHTML = Object.entries(groups).map(([key, group]) => `
+      <label class="choice-chip">
+        <input type="radio" name="modal_group" value="${escapeHtml(key)}" class="modal-group-option">
         <span>${escapeHtml(group.label)}</span>
       </label>
     `).join("");
@@ -232,13 +242,24 @@ function renderGroups() {
 }
 
 function getSelectedGroups() {
-  return Array.from(document.querySelectorAll(".admin-group-option:checked")).map((input) => input.value);
+  const checked = document.querySelector(".admin-group-option:checked");
+  return checked ? [checked.value] : [];
 }
 
 function setSelectedGroups(selectedGroups) {
-  const selectedSet = new Set(selectedGroups || []);
   document.querySelectorAll(".admin-group-option").forEach((input) => {
-    input.checked = selectedSet.has(input.value);
+    input.checked = selectedGroups && selectedGroups[0] === input.value;
+  });
+}
+
+function getSelectedGroupsFromModal() {
+  const checked = document.querySelector(".modal-group-option:checked");
+  return checked ? [checked.value] : [];
+}
+
+function setSelectedGroupsInModal(selectedGroups) {
+  document.querySelectorAll(".modal-group-option").forEach((input) => {
+    input.checked = selectedGroups && selectedGroups[0] === input.value;
   });
 }
 
@@ -373,29 +394,73 @@ function resetUserForm() {
 
 function populateUserForm(username) {
   const user = currentUsers.find((item) => item.username === username);
-  if (!user || !byId("userFormTitle")) {
+  if (!user) {
     return;
   }
 
   editingUsername = user.username;
-  byId("userFormTitle").textContent = `Modifier le compte ${user.username}`;
-  byId("saveUserBtn").textContent = "Enregistrer les modifications";
-  byId("cancelUserEditBtn").classList.remove("d-none");
-  setNotice(
-    "userEditNotice",
-    user.status === "pending"
-      ? "Ce compte est en attente. Vous pouvez le valider ou ajuster ses groupes avant activation."
-      : "Laissez le mot de passe vide si vous ne souhaitez pas le modifier.",
-    true
-  );
-  byId("admin_username").value = user.username;
-  byId("admin_username").disabled = true;
-  byId("admin_password").value = "";
-  byId("admin_password").placeholder = "Nouveau mot de passe (optionnel)";
-  byId("admin_active").checked = user.status !== "disabled";
-  if (byId("admin_service")) byId("admin_service").value = user.service || "";
-  if (byId("admin_db_manage")) byId("admin_db_manage").checked = Boolean(user.db_manage);
-  setSelectedGroups(user.groups || []);
+  byId("modalAdminUsername").value = user.username;
+  byId("modalAdminPassword").value = "";
+  byId("modalAdminActive").checked = user.status !== "disabled";
+  if (byId("modalAdminService")) byId("modalAdminService").value = user.service || "";
+  if (byId("modalAdminDbManage")) byId("modalAdminDbManage").checked = Boolean(user.db_manage);
+  setSelectedGroupsInModal(user.groups || []);
+
+  openUserEditModal();
+}
+
+function openUserEditModal() {
+  const modal = byId("userEditModal");
+  if (modal) {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeUserEditModal() {
+  const modal = byId("userEditModal");
+  if (modal) {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingUsername = null;
+}
+
+async function saveUserFromModal() {
+  const username = byId("modalAdminUsername")?.value.trim() || "";
+  const password = byId("modalAdminPassword")?.value || "";
+  const isActive = Boolean(byId("modalAdminActive")?.checked);
+  const selectedGroups = getSelectedGroupsFromModal();
+  const passwordError = password ? validatePasswordComplexity(password) : null;
+
+  if (passwordError) {
+    showToast(passwordError, "error");
+    return;
+  }
+
+  if (!editingUsername) {
+    showToast("Erreur : aucun utilisateur en cours d'édition", "error");
+    return;
+  }
+
+  const service = byId("modalAdminService")?.value.trim() || "";
+  const dbManage = Boolean(byId("modalAdminDbManage")?.checked);
+
+  try {
+    await adminRequest(`/api/admin/users/${encodeURIComponent(editingUsername)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        groups: selectedGroups, is_active: isActive,
+        status: isActive ? "active" : "disabled",
+        password, service, db_manage: dbManage
+      })
+    });
+    showToast("Compte mis à jour.");
+    closeUserEditModal();
+    await loadUsers();
+  } catch (error) {
+    showToast(`Impossible d'enregistrer le compte : ${error.message}`, "error");
+  }
 }
 
 function createResourceFieldRow(field = {}) {
@@ -698,16 +763,33 @@ async function deleteUser(username) {
 
 function populateServiceSelect() {
   const sel = byId("admin_service");
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— Aucun service —</option>';
-  (currentServices || []).filter((s) => s.is_active).forEach((s) => {
-    const opt = document.createElement("option");
-    opt.value = s.label;
-    opt.textContent = s.label;
-    sel.appendChild(opt);
-  });
-  sel.value = current;
+  const modalSel = byId("modalAdminService");
+
+  if (!sel && !modalSel) return;
+
+  if (sel) {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Aucun service —</option>';
+    (currentServices || []).filter((s) => s.is_active).forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.label;
+      opt.textContent = s.label;
+      sel.appendChild(opt);
+    });
+    sel.value = current;
+  }
+
+  if (modalSel) {
+    const current = modalSel.value;
+    modalSel.innerHTML = '<option value="">— Aucun service —</option>';
+    (currentServices || []).filter((s) => s.is_active).forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.label;
+      opt.textContent = s.label;
+      modalSel.appendChild(opt);
+    });
+    modalSel.value = current;
+  }
 }
 
 async function loadServices() {
@@ -1002,6 +1084,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     byId("cancelUserEditBtn")?.addEventListener("click", () => {
       resetUserForm();
+    });
+
+    // Modal listeners
+    byId("modalSaveUserBtn")?.addEventListener("click", async () => {
+      await saveUserFromModal();
+    });
+
+    document.querySelectorAll("[data-user-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeUserEditModal();
+      });
     });
 
     byId("saveServiceBtn")?.addEventListener("click", async () => {

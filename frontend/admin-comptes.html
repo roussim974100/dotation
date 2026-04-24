@@ -123,7 +123,7 @@
             </div>
           </div>
           <div class="col-12">
-            <label class="form-label">Groupes</label>
+            <label class="form-label">Groupe</label>
             <div id="groupSelector" class="choice-group"></div>
           </div>
           <div class="col-12">
@@ -134,6 +134,57 @@
           </div>
         </div>
       </section>
+
+      <!-- Modal d'édition utilisateur -->
+      <div class="password-generator-modal d-none" id="userEditModal" aria-hidden="true">
+        <div class="password-generator-modal__backdrop" data-user-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="userEditModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Compte</p>
+              <h2 class="section-title" id="userEditModalTitle">Modifier l'utilisateur</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-user-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <div class="mb-3">
+              <label class="form-label" for="modalAdminUsername">Identifiant</label>
+              <input class="form-control" id="modalAdminUsername" type="text" disabled>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="modalAdminPassword">Mot de passe (laisser vide pour ne pas changer)</label>
+              <input class="form-control" id="modalAdminPassword" type="password" placeholder="Nouveau mot de passe">
+              <div class="form-text">Si renseigné: 12 caractères min, majuscule, minuscule, chiffre, caractère spécial.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="modalAdminService">Service (optionnel)</label>
+              <select class="form-select" id="modalAdminService">
+                <option value="">— Aucun service —</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-check">
+                <input class="form-check-input" type="checkbox" id="modalAdminActive">
+                <span class="form-check-label">Compte actif</span>
+              </label>
+            </div>
+            <div class="mb-3">
+              <label class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="modalAdminDbManage">
+                <span class="form-check-label">Gestion base de données</span>
+              </label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Groupe</label>
+              <div id="modalGroupSelector" class="choice-group"></div>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-user-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="modalSaveUserBtn" type="button">Enregistrer</button>
+          </div>
+        </div>
+      </div>
 
       <section class="content-card mb-4" id="admin-groups">
         <div class="section-heading">
