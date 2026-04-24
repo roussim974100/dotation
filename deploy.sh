@@ -22,8 +22,8 @@ echo "========================================="
 # 1. Récupérer les changements
 echo ""
 echo "[1] Mise à jour du code..."
-git fetch origin
-git reset --hard origin/prod
+git fetch origin prod
+git reset --hard FETCH_HEAD
 echo "    [OK] Code à jour"
 
 # 2. Redémarrer le service
