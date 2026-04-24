@@ -54,7 +54,7 @@ def merge_users_config():
     project_root = script_dir.parent
 
     # Chemins
-    prod_users_path = project_root / "backend" / ".prod" / "users.json"
+    local_users_path = project_root / "backend" / "users.json"
     repo_users_path = project_root / "backend" / "users.json"
 
     print("\n========================================")
@@ -64,13 +64,24 @@ def merge_users_config():
     # 1. Charger les configurations
     print("[1] Chargement des configurations...")
 
-    if not prod_users_path.exists():
-        print(f"    [WARN] Aucune config locale en {prod_users_path}")
-        prod_config = None
-    else:
-        prod_config = load_json(prod_users_path)
-        if not prod_config:
-            return False
+    # La config locale est celle déjà en place sur le serveur
+    # Après git reset, elle sera remplacée par celle du repo
+    # On doit la sauvegarder et fusionner avant git ne l'écrase
+
+    # Vérifier si on a une sauvegarde locale
+    local_config = None
+    for backup_file_path in sorted(local_users_path.parent.glob("users.json.backup.*"), reverse=True):
+        # Utiliser la sauvegarde la plus récente
+        local_config = load_json(backup_file_path)
+        if local_config:
+            print(f"    [OK] Config locale trouvée: {backup_file_path.name}")
+            break
+
+    # Si pas de sauvegarde, essayer de lire directement (ne devrait pas arriver ici après reset)
+    if not local_config and local_users_path.exists():
+        local_config = load_json(local_users_path)
+        if local_config:
+            print(f"    [OK] Config locale trouvée: {local_users_path}")
 
     repo_config = load_json(repo_users_path)
     if not repo_config:
@@ -79,20 +90,18 @@ def merge_users_config():
     print("    [OK] Configurations chargées")
 
     # 2. Si aucune config locale, utiliser repo
-    if not prod_config:
+    if not local_config:
         print("[2] Première installation - utiliser configuration du dépôt")
-        if save_json(prod_users_path, repo_config):
-            print("    [OK] Configuration initialisée")
-            return True
-        else:
-            return False
+        # Déjà en place depuis git reset
+        print("    [OK] Configuration du dépôt conservée")
+        return True
 
-    # 3. Fusionner: groupes depuis repo, utilisateurs depuis prod
+    # 3. Fusionner: groupes depuis repo, utilisateurs depuis local
     print("[2] Fusion intelligente...")
 
     merged_config = {
         "groups": repo_config.get("groups", {}),
-        "users": prod_config.get("users", [])
+        "users": local_config.get("users", [])
     }
 
     # 4. Vérifier que tous les utilisateurs locaux ont des groupes valides
@@ -106,8 +115,8 @@ def merge_users_config():
 
     # 5. Sauvegarder
     print("[3] Sauvegarde de la fusion...")
-    backup_file(prod_users_path)
-    if save_json(prod_users_path, merged_config):
+    backup_file(local_users_path)
+    if save_json(local_users_path, merged_config):
         print("    [OK] Fusion sauvegardée")
     else:
         return False
@@ -118,7 +127,7 @@ def merge_users_config():
     print("========================================")
     print(f"  • Groupes: {len(merged_config['groups'])} (depuis dépôt)")
     print(f"  • Utilisateurs: {len(merged_config['users'])} (locaux préservés)")
-    print(f"  • Config: {prod_users_path}")
+    print(f"  • Config: {local_users_path}")
     print()
 
     return True
