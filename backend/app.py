@@ -3,9 +3,12 @@ import os
 import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import get_app_secret_key
+from config import get_app_secret_key, AUTH_CONFIG_PATH
 from database import get_db, ensure_column
 from models.dossier import migrate_forms_to_dossiers
+from utils import utc_now
+import json
+from pathlib import Path
 from models.settings import seed_app_settings
 from models.catalog import seed_reference_catalogs, seed_service_catalog, migrate_suggest_flags, migrate_builtin_resource_schemas, migrate_builtin_resource_flags, migrate_missing_builtin_resources, migrate_cartes_visite_quantite, migrate_builtin_issuer_service, migrate_builtin_display_order, migrate_telephone_imei_field
 from models.forms import migrate_field_suggestions_from_history
@@ -91,6 +94,41 @@ def disable_frontend_cache(response):
     elif response.status_code == 200 and request.path.startswith("/assets/"):
         response.headers["Cache-Control"] = "public, max-age=604800, immutable"
     return response
+
+def migrate_users_from_json(connection):
+    count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if count > 0:
+        return
+    json_path = Path(AUTH_CONFIG_PATH)
+    if not json_path.exists():
+        return
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except Exception:
+        return
+    now = utc_now()
+    for key, group in config.get("groups", {}).items():
+        connection.execute(
+            "INSERT OR IGNORE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (key, group.get("label",""), group.get("description",""), json.dumps(group.get("permissions",[])), group.get("data_scope","full"), now, now)
+        )
+    for user in config.get("users", []):
+        connection.execute(
+            "INSERT OR IGNORE INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (user["username"], user["password_hash"], int(user.get("is_active", True)), user.get("status","active"), user.get("service"), int(user.get("db_manage", False)), now, now)
+        )
+        for group_key in user.get("groups", []):
+            connection.execute(
+                "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
+                (user["username"], group_key)
+            )
+    connection.commit()
+    try:
+        json_path.rename(json_path.parent / f"{json_path.name}.migrated")
+    except Exception:
+        pass
+
 
 def init_db():
     # Le schema reste volontairement compact:
@@ -294,6 +332,35 @@ def init_db():
                 FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'active',
+                service TEXT,
+                db_manage INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS groups (
+                key TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                description TEXT,
+                permissions_json TEXT NOT NULL DEFAULT '[]',
+                data_scope TEXT NOT NULL DEFAULT 'full',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_groups (
+                username TEXT NOT NULL,
+                group_key TEXT NOT NULL,
+                PRIMARY KEY (username, group_key),
+                FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE,
+                FOREIGN KEY(group_key) REFERENCES groups(key) ON DELETE RESTRICT
+            );
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
@@ -337,6 +404,7 @@ def init_db():
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
+        migrate_users_from_json(connection)
 
 
 
