@@ -34,6 +34,24 @@ from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR
 
 bp = Blueprint("admin", __name__)
 
+# Labels pour statuts et types
+STATUS_LABELS = {
+    "draft": "À compléter",
+    "active": "Actif",
+    "partial_assignment": "Attribution partielle",
+    "awaiting_signature": "En attente de signature",
+    "returned": "Restitué",
+    "partial_return": "Restitution partielle",
+    "cancelled": "Annulé"
+}
+
+TYPE_LABELS = {
+    "arrivee": "Arrivée",
+    "changement_service": "Changement de service",
+    "mise_a_jour": "Mise à jour",
+    "sortie": "Sortie"
+}
+
 
 @bp.route("/api/admin/unc-stats", methods=["GET"])
 @login_required
@@ -274,25 +292,6 @@ def _days_since(timestamp_str):
         return delta.days
     except:
         return 0
-
-
-# Labels pour statuts et types
-STATUS_LABELS = {
-    "draft": "À compléter",
-    "active": "Actif",
-    "partial_assignment": "Attribution partielle",
-    "awaiting_signature": "En attente de signature",
-    "returned": "Restitué",
-    "partial_return": "Restitution partielle",
-    "cancelled": "Annulé"
-}
-
-TYPE_LABELS = {
-    "arrivee": "Arrivée",
-    "changement_service": "Changement de service",
-    "mise_a_jour": "Mise à jour",
-    "sortie": "Sortie"
-}
 
 
 @bp.route("/api/admin/settings", methods=["GET"])
