@@ -2349,6 +2349,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (user && (user.permissions.includes("users.manage") || user.permissions.includes("*"))) {
       document.getElementById("adminLink").classList.remove("d-none");
     }
+    if (user && (user.groups?.includes("direction") || user.is_admin)) {
+      document.getElementById("execDashboardLink").classList.remove("d-none");
+    }
     if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
       document.getElementById("exportMenu")?.classList.remove("d-none");
     }
