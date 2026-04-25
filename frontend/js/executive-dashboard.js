@@ -23,7 +23,7 @@ const STATUS_TEXT_COLORS = {
   partial_return: "#7a4312", cancelled: "#7f1d1d"
 };
 
-let filters = { period: "30d", service: "", type: "" };
+let filters = { period: "30d", service: "", type: "", statut: "", qualite: "", date_from: "", date_to: "", alerte_seuil: "30" };
 let charts = {};
 let allData = null;
 
@@ -68,8 +68,24 @@ function bindFilterListeners() {
   document.querySelectorAll('[name="filter-period"]').forEach(radio => {
     radio.addEventListener("change", e => {
       filters.period = e.target.value;
+      const customWrap = document.getElementById("filterCustomDateWrap");
+      if (customWrap) customWrap.classList.toggle("d-none", filters.period !== "custom");
+      if (filters.period !== "custom") {
+        filters.date_from = "";
+        filters.date_to = "";
+      }
       loadStats();
     });
+  });
+
+  document.getElementById("filterDateFrom")?.addEventListener("change", e => {
+    filters.date_from = e.target.value;
+    loadStats();
+  });
+
+  document.getElementById("filterDateTo")?.addEventListener("change", e => {
+    filters.date_to = e.target.value;
+    loadStats();
   });
 
   document.getElementById("filterService")?.addEventListener("change", e => {
@@ -83,6 +99,30 @@ function bindFilterListeners() {
       loadStats();
     });
   });
+
+  document.getElementById("filterStatut")?.addEventListener("change", e => {
+    filters.statut = e.target.value;
+    loadStats();
+  });
+
+  document.querySelectorAll('[name="filter-qualite"]').forEach(radio => {
+    radio.addEventListener("change", e => {
+      filters.qualite = e.target.value;
+      loadStats();
+    });
+  });
+
+  const seuilInput = document.getElementById("filterAlerteSeuil");
+  const seuilLabel = document.getElementById("filterAlerteSeuilLabel");
+  if (seuilInput) {
+    seuilInput.addEventListener("input", () => {
+      if (seuilLabel) seuilLabel.textContent = `${seuilInput.value} j`;
+    });
+    seuilInput.addEventListener("change", () => {
+      filters.alerte_seuil = seuilInput.value;
+      loadStats();
+    });
+  }
 }
 
 async function loadStats() {
@@ -98,7 +138,7 @@ async function loadStats() {
 
     renderKpis(data.kpis);
     renderCharts(data);
-    renderAlertes(data.alertes);
+    renderAlertes(data.alertes, data.kpis.alerte_seuil);
     renderServicesTable(data.by_service);
   } catch (error) {
     console.error("Erreur chargement stats:", error);
@@ -297,8 +337,10 @@ function renderTimingChart(timing_distribution) {
   });
 }
 
-function renderAlertes(alertes) {
+function renderAlertes(alertes, seuil) {
   const container = document.getElementById("alertesContainer");
+  const title = document.getElementById("alertesSectionTitle");
+  if (title) title.textContent = `Dossiers bloqués (> ${seuil || 30} jours)`;
   if (!container) return;
 
   if (!alertes || alertes.length === 0) {
@@ -310,11 +352,10 @@ function renderAlertes(alertes) {
     <tr>
       <td><strong>${a.nom} ${a.prenom}</strong></td>
       <td>${a.service}</td>
-      <td>${a.jours_blocage} jours</td>
+      <td><span class="badge bg-danger">${a.jours_blocage} j</span></td>
+      <td>${STATUS_LABELS[a.status] || a.status}</td>
       <td class="text-end">
-        <a href="form.html?id=${encodeURIComponent(a.id)}" class="btn btn-sm btn-primary">
-          Ouvrir
-        </a>
+        <a href="form.html?id=${encodeURIComponent(a.id)}" class="btn btn-sm btn-primary">Ouvrir</a>
       </td>
     </tr>
   `).join("");
@@ -326,6 +367,7 @@ function renderAlertes(alertes) {
           <th>Nom</th>
           <th>Service</th>
           <th>Jours bloqués</th>
+          <th>Statut</th>
           <th class="text-end">Actions</th>
         </tr>
       </thead>
