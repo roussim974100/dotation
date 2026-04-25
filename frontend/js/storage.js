@@ -615,31 +615,45 @@ function renderActionGroup(shortLabel, tone, items) {
 
 function buildDraftActionButtons(draft, options) {
   const id = draft.id;
+  const status = draft.status || "draft";
+  const inRestitutionPhase = ["returned", "partial_return"].includes(status);
+  const hasRestitution = hasRestitutionData(draft);
+  const restitutionEmailEligible = hasRestitution || ["active", "partial_return", "awaiting_signature", "returned"].includes(status);
 
+  // PDF — l'action principale reflète la phase du dossier
   const pdfItems = [];
   if (options.canExport) {
-    pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
-  }
-  if (options.canExport && hasRestitutionData(draft)) {
-    pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
+    if (inRestitutionPhase && hasRestitution) {
+      pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+    } else {
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+      if (hasRestitution) {
+        pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
+      }
+    }
   }
 
-  const emailItems = [];
-  emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
-  if (hasRestitutionData(draft) || ["active", "partial_return", "awaiting_signature", "returned"].includes(draft.status || "draft")) {
-    emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
-  }
+  // E-mail dossier — actions liées à l'attribution
+  const emailDossierItems = [];
+  emailDossierItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
   if (options.canExport) {
-    emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
-  }
-  if (options.canExport && hasRestitutionData(draft)) {
-    emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
+    emailDossierItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
   }
   if (canRequestAssignmentSignature(draft, options)) {
-    emailItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
+    emailDossierItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
+  }
+
+  // E-mail restitution — actions liées à la restitution, groupe séparé
+  const emailRestitutionItems = [];
+  if (restitutionEmailEligible) {
+    emailRestitutionItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
+  }
+  if (options.canExport && hasRestitution) {
+    emailRestitutionItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
   }
   if (canRequestRestitutionSignature(draft, options)) {
-    emailItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
+    emailRestitutionItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
   }
 
   const managementItems = [];
@@ -652,7 +666,8 @@ function buildDraftActionButtons(draft, options) {
       <button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir</button>
       ${canOpenRestitution(draft, options) ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
       ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
-      ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
+      ${renderActionGroup("E-mail", "btn-outline-primary", emailDossierItems)}
+      ${renderActionGroup("E-mail restitution", "btn-outline-secondary", emailRestitutionItems)}
       ${renderActionGroup("Supprimer", "btn-outline-danger", managementItems)}
     </div>
   `;
