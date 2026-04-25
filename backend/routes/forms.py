@@ -606,6 +606,12 @@ def update_form(form_id):
         resources_obj = payload.get("resources", {})
         additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
         sync_shared_pools_for_form(conn, form_id, additional)
+
+        # Sauvegarder les sélections multiples d'items (multi-ordinateurs, multi-téléphones, etc.)
+        from models.forms import save_item_selections
+        selected_items = payload.get("selectedItems", {})
+        if selected_items:
+            save_item_selections(conn, form_id, selected_items)
     return jsonify(form_data)
 
 
