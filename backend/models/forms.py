@@ -583,8 +583,14 @@ def get_form(form_id):
     payload["meta"]["assignedAt"] = form_row["assigned_at"]
     payload["dossier"]["type"] = normalize_dossier_type(payload.get("dossier", {}).get("type") or form_row["dossier_type"] or "arrivee")
     payload.setdefault("workflow", {})["status"] = compute_effective_workflow_status(payload)
-    if payload["workflow"]["status"] != "active":
-        payload["meta"]["lockedAt"] = ""
+
+    # Ne pas vider lockedAt si le dossier a déjà été verrouillé (même si le statut recalculé change)
+    # lockedAt est la source de vérité pour savoir si un dossier est verrouillé/finalisé
+    # Le statut peut être recalculé dynamiquement, mais une fois verrouillé, reste verrouillé
+    if not payload.get("meta", {}).get("lockedAt"):
+        # Seulement mettre lockedAt vide si c'était déjà vide (dossier non finalisé)
+        if payload["workflow"]["status"] != "active":
+            payload["meta"]["lockedAt"] = ""
     user = current_user()
     if user and user.get("data_scope") == "masked":
         payload = mask_payload(payload)
