@@ -11,7 +11,7 @@ services:
       # - APP_SECRET_KEY=
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dotation.rule=Host(`ton-domaine.fr`)"
+      - "traefik.http.routers.dotation.rule=Host(`aquai.intra.ville-publier.fr`)"
       - "traefik.http.routers.dotation.entrypoints=websecure"
       - "traefik.http.routers.dotation.tls.certresolver=letsencrypt"
       - "traefik.http.services.dotation.loadbalancer.server.port=5000"
