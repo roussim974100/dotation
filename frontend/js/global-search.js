@@ -22,6 +22,36 @@
     cancelled: "Annulé",
   };
 
+  const FILTER_CONFIG = {
+    active: { status: true, timing: true, qualite: true, service: true, sort: true },
+    history_assignments: { status: true, timing: true, qualite: true, service: true, sort: true },
+    restitutions_pending: { status: true, timing: true, qualite: true, service: true, sort: true },
+    history_restitutions: { status: true, timing: true, qualite: true, service: true, sort: true },
+    pools: { search: true },
+  };
+
+  const FILTER_OPTIONS = {
+    status: [
+      { label: "À compléter", value: "draft" },
+      { label: "Attribution partielle", value: "partial_assignment" },
+      { label: "En attente de signature", value: "awaiting_signature" },
+      { label: "Attribution active", value: "active" },
+      { label: "Restitution partielle", value: "partial_return" },
+      { label: "Restitué", value: "returned" },
+      { label: "Annulé", value: "cancelled" },
+    ],
+    timing: [
+      { label: "Prêt / Dans les temps", value: "ok" },
+      { label: "En danger", value: "warning" },
+      { label: "En retard", value: "late" },
+      { label: "À planifier", value: "neutral" },
+    ],
+    qualite: [
+      { label: "Agent", value: "agent" },
+      { label: "Élu(e)", value: "elu" },
+    ],
+  };
+
   let debounceTimer = null;
   let currentResults = [];
   let activeIndex = -1;
@@ -40,7 +70,7 @@
     modal.className = "global-search d-none";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", "Recherche globale");
+    modal.setAttribute("aria-label", "Recherche et filtres");
     modal.innerHTML = `
       <div class="global-search__backdrop" data-gs-close></div>
       <div class="global-search__panel" role="document">
@@ -52,6 +82,7 @@
                  aria-controls="${RESULTS_ID}" aria-autocomplete="list">
           <kbd class="global-search__esc">Esc</kbd>
         </div>
+        <div id="globalSearchFilters" class="global-search__filters"></div>
         <ul id="${RESULTS_ID}" class="global-search__results" role="listbox"></ul>
         <div class="global-search__footer">
           <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
@@ -92,6 +123,95 @@
     actions.insertBefore(btn, actions.firstChild);
   }
 
+  function getCurrentView() {
+    const body = document.querySelector("body[data-dashboard-view]");
+    return body ? body.dataset.dashboardView : null;
+  }
+
+  function getActiveFilters() {
+    const filters = {};
+    const statusFilter = document.getElementById("statusFilter");
+    const timingFilter = document.getElementById("timingFilter");
+    const qualiteFilter = document.getElementById("qualiteFilter");
+    const serviceFilter = document.getElementById("serviceFilter");
+    const sortFilter = document.getElementById("sortFilter");
+
+    if (statusFilter && statusFilter.value) filters.status = statusFilter.value;
+    if (timingFilter && timingFilter.value) filters.timing = timingFilter.value;
+    if (qualiteFilter && qualiteFilter.value) filters.qualite = qualiteFilter.value;
+    if (serviceFilter && serviceFilter.value) filters.service = serviceFilter.value;
+    if (sortFilter && sortFilter.value) filters.sort = sortFilter.value;
+
+    return filters;
+  }
+
+  function renderQuickFilters() {
+    const view = getCurrentView();
+    const config = FILTER_CONFIG[view];
+    if (!config) return;
+
+    const filtersDiv = document.getElementById("globalSearchFilters");
+    if (!filtersDiv) return;
+
+    const activeFilters = getActiveFilters();
+    let html = "";
+
+    if (config.status) {
+      html += '<div class="global-search__filter-group">';
+      html += '<span class="global-search__filter-label">Avancement</span>';
+      html += '<div class="global-search__filter-chips">';
+      FILTER_OPTIONS.status.forEach((opt) => {
+        const isActive = activeFilters.status === opt.value;
+        const cls = isActive ? "is-active" : "";
+        html += `<button type="button" class="global-search__filter-chip ${cls}" data-filter-type="status" data-filter-value="${escapeHtml(opt.value)}" title="${escapeHtml(opt.label)}">${escapeHtml(opt.label)}</button>`;
+      });
+      html += "</div></div>";
+    }
+
+    if (config.timing) {
+      html += '<div class="global-search__filter-group">';
+      html += '<span class="global-search__filter-label">Pilotage</span>';
+      html += '<div class="global-search__filter-chips">';
+      FILTER_OPTIONS.timing.forEach((opt) => {
+        const isActive = activeFilters.timing === opt.value;
+        const cls = isActive ? "is-active" : "";
+        html += `<button type="button" class="global-search__filter-chip ${cls}" data-filter-type="timing" data-filter-value="${escapeHtml(opt.value)}" title="${escapeHtml(opt.label)}">${escapeHtml(opt.label)}</button>`;
+      });
+      html += "</div></div>";
+    }
+
+    if (config.qualite) {
+      html += '<div class="global-search__filter-group">';
+      html += '<span class="global-search__filter-label">Qualité</span>';
+      html += '<div class="global-search__filter-chips">';
+      FILTER_OPTIONS.qualite.forEach((opt) => {
+        const isActive = activeFilters.qualite === opt.value;
+        const cls = isActive ? "is-active" : "";
+        html += `<button type="button" class="global-search__filter-chip ${cls}" data-filter-type="qualite" data-filter-value="${escapeHtml(opt.value)}" title="${escapeHtml(opt.label)}">${escapeHtml(opt.label)}</button>`;
+      });
+      html += "</div></div>";
+    }
+
+    filtersDiv.innerHTML = html;
+    filtersDiv.querySelectorAll(".global-search__filter-chip").forEach((btn) => {
+      btn.addEventListener("click", onFilterChipClick);
+    });
+  }
+
+  function onFilterChipClick(event) {
+    const filterType = event.target.dataset.filterType;
+    const filterValue = event.target.dataset.filterValue;
+    const selectId = filterType.charAt(0).toUpperCase() + filterType.slice(1) + "Filter";
+    const select = document.getElementById(selectId);
+
+    if (select) {
+      const isActive = event.target.classList.contains("is-active");
+      select.value = isActive ? "" : filterValue;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      renderQuickFilters();
+    }
+  }
+
   function openModal() {
     buildModal();
     const modal = document.getElementById(MODAL_ID);
@@ -107,6 +227,7 @@
     currentResults = [];
     activeIndex = -1;
     renderResults();
+    renderQuickFilters();
   }
 
   function closeModal() {
