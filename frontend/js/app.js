@@ -1031,6 +1031,8 @@ function getAdditionalResourcesData() {
 
 function populateAdditionalResources(data = {}) {
   const resources = data.resources?.additional || [];
+  const isLocked = Boolean(data.meta?.lockedAt);
+
   resources.forEach((resource) => {
     // Pour les ressources mutualisées avec items disponibles
     if (resource.shared && Array.isArray(resource.availableItems)) {
@@ -1047,6 +1049,10 @@ function populateAdditionalResources(data = {}) {
             label.innerHTML = `<input type="checkbox" id="${itemCheckboxId}" data-pool-item-id="${item.id}" data-resource-id="${resource.id}"><span>${escapeHtml(item.label)}</span>`;
             container.prepend(label);
             itemCheckbox = document.getElementById(itemCheckboxId);
+            // Appliquer le verrou immédiatement si le dossier est finalisé
+            if (itemCheckbox && isLocked) {
+              itemCheckbox.disabled = true;
+            }
           }
         }
         // Cocher si l'item était précédemment sélectionné
