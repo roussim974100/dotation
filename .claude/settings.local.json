@@ -38,7 +38,9 @@
       "Bash(pkill -9 -f \"python.*flask\")",
       "Bash(curl -s http://localhost:5000/api/health)",
       "Bash(curl -s http://localhost:5000/api/forms -H \"Authorization: Bearer test\")",
-      "Bash(node -c frontend/js/storage.js)"
+      "Bash(node -c frontend/js/storage.js)",
+      "Bash(cd C:\\\\\\\\www\\\\\\\\dotation)",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\" -H \"Accept: application/json\")"
     ]
   }
 }
