@@ -157,6 +157,10 @@ function addProgressIndicator(fieldId) {
   if (!fieldId) {
     return;
   }
+  // Don't add badges if form is locked
+  if (currentLockState) {
+    return;
+  }
   const field = document.getElementById(fieldId);
   if (field) {
     if (fieldId === "signature") {
@@ -263,6 +267,42 @@ function bindProgressIndicatorRefresh() {
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.dataset.boundProgressIndicators = "true";
+}
+
+function bindSignatureProtectionHandlers() {
+  const showSignatureBtn = document.getElementById("showSignatureBtn");
+  const verificationBtn = document.getElementById("signatureVerificationBtn");
+  const verificationModal = document.getElementById("signatureVerificationModal");
+  const passwordInput = document.getElementById("signatureVerificationPassword");
+
+  console.log("[SIGNATURE] Binding handlers - btn:" + (showSignatureBtn ? "found" : "NOT FOUND"));
+
+  if (showSignatureBtn) {
+    showSignatureBtn.addEventListener("click", () => {
+      console.log("[SIGNATURE] Show signature button clicked");
+      const modal = new bootstrap.Modal(verificationModal);
+      modal.show();
+      // Clear previous error and password
+      const errorEl = document.getElementById("signatureVerificationError");
+      if (errorEl) errorEl.classList.add("d-none");
+      if (passwordInput) passwordInput.value = "";
+    });
+  }
+
+  if (verificationBtn) {
+    verificationBtn.addEventListener("click", () => {
+      console.log("[SIGNATURE] Verification button clicked");
+      verifyPasswordAndShowSignature();
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        verifyPasswordAndShowSignature();
+      }
+    });
+  }
 }
 
 function buildDynamicFieldInput(resource, field) {
@@ -1246,6 +1286,111 @@ function syncDossierTypeUi() {
 }
 
 
+function applySignatureProtection(locked) {
+  const signatureSection = document.getElementById("signatureSection");
+  const signatureLockedSection = document.getElementById("signatureLockedSection");
+
+  if (locked) {
+    if (signatureSection) signatureSection.classList.add("d-none");
+    if (signatureLockedSection) signatureLockedSection.classList.remove("d-none");
+  } else {
+    if (signatureSection) signatureSection.classList.remove("d-none");
+    if (signatureLockedSection) signatureLockedSection.classList.add("d-none");
+  }
+}
+
+async function verifyPasswordAndShowSignature() {
+  const password = document.getElementById("signatureVerificationPassword").value;
+  if (!password) {
+    alert("Veuillez entrer votre mot de passe");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/auth/verify-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ password })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      const errorEl = document.getElementById("signatureVerificationError");
+      if (errorEl) {
+        let errorMsg = "Mot de passe incorrect";
+        if (data.error === "user_pending") {
+          errorMsg = "Votre compte est en attente d'activation";
+        } else if (data.error === "user_disabled") {
+          errorMsg = "Votre compte est désactivé";
+        } else if (data.error === "authentication_required") {
+          errorMsg = "Vous devez être connecté";
+        } else if (data.error === "invalid_password") {
+          errorMsg = "Mot de passe incorrect";
+        }
+        errorEl.textContent = errorMsg;
+        errorEl.classList.remove("d-none");
+      }
+      return;
+    }
+
+    // Password verified, close verification modal and show signature
+    const verificationModalEl = document.getElementById("signatureVerificationModal");
+    const verificationModal = bootstrap.Modal.getInstance(verificationModalEl);
+    if (verificationModal) verificationModal.hide();
+
+    // Fetch and display signature
+    const params = new URLSearchParams(window.location.search);
+    const formId = params.get("id");
+    if (!formId) {
+      console.error("No form ID found in URL");
+      return;
+    }
+
+    console.log("[SIGNATURE] Fetching signature for form: " + formId);
+    const sigResponse = await fetch(`/api/forms/${formId}/signature/view`, {
+      credentials: "same-origin"
+    });
+    if (!sigResponse.ok) {
+      const errData = await sigResponse.json();
+      alert("Erreur: " + (errData.error || "Impossible de récupérer la signature"));
+      return;
+    }
+
+    const sigData = await sigResponse.json();
+    displaySignatureModal(sigData.signature, sigData.signedAt);
+  } catch (e) {
+    console.error("Error:", e);
+    alert("Erreur lors de la vérification");
+  }
+}
+
+function displaySignatureModal(signatureDataUrl, signedAt) {
+  const canvas = document.getElementById("signatureDisplayCanvas");
+  const timeEl = document.getElementById("signatureDisplayTime");
+
+  if (timeEl && signedAt) {
+    const date = new Date(signedAt);
+    timeEl.textContent = `Signée le ${date.toLocaleDateString("fr-FR")} à ${date.toLocaleTimeString("fr-FR")}`;
+  }
+
+  if (canvas && signatureDataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+      }
+    };
+    img.src = signatureDataUrl;
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById("signatureDisplayModal"));
+  modal.show();
+}
+
 function applyLockState(locked) {
   // Une fiche signée complète passe en lecture seule.
   // L'utilisateur peut encore consulter / imprimer, mais plus modifier.
@@ -1262,12 +1407,19 @@ function applyLockState(locked) {
     console.log("[LOCK] Verrouillage du formulaire - lockedAt présent");
   }
 
-  const allElements = form.querySelectorAll("input, select, textarea, button");
+  // Sélectionner TOUS les éléments éditables du formulaire
+  // Important: inclure les champs dynamiques de ressources avec la classe dynamic-resource-field
+  const allElements = form.querySelectorAll("input, select, textarea, button, .dynamic-resource-field");
   console.log("[LOCK] Total elements found: " + allElements.length);
 
   let actuallyDisabled = 0;
 
   allElements.forEach((element) => {
+    // Ignorer les éléments qui n'ont pas la propriété disabled (par exemple les divs)
+    if (element.disabled === undefined) {
+      return;
+    }
+
     const wasDisabled = element.disabled;
 
     if (element.id === "exportPdfBtn") {
@@ -1278,16 +1430,40 @@ function applyLockState(locked) {
       element.disabled = false;
       return;
     }
+    // Boutons qui doivent rester accessibles sur dossier verrouillé
+    if (element.hasAttribute("data-back-to-index") || element.id === "showSignatureBtn") {
+      element.disabled = false;
+      return;
+    }
     // Ne pas réactiver un toggle mutualisé bloqué par la présence de membres
     if (!locked && element.dataset.membersLocked === "true") {
       return;
     }
+
+    // Désactiver l'élément de formulaire
     element.disabled = locked;
     if (locked && !wasDisabled) actuallyDisabled++;
   });
 
   if (locked) {
     console.log("[LOCK] " + actuallyDisabled + " champs newly disabled");
+    // Supprimer tous les indicateurs de progression (badges et classes) quand le formulaire est verrouillé
+    clearProgressIndicators();
+    // Cacher le bouton Enregistrer pour les dossiers finalisés
+    const saveDraftBtn = document.getElementById("saveDraftBtn");
+    if (saveDraftBtn) {
+      saveDraftBtn.style.display = "none";
+    }
+    // Cacher la signature et afficher le bouton pour la consulter
+    applySignatureProtection(true);
+  } else {
+    // Afficher le bouton Enregistrer si le formulaire est déverrouillé
+    const saveDraftBtn = document.getElementById("saveDraftBtn");
+    if (saveDraftBtn) {
+      saveDraftBtn.style.display = "";
+    }
+    // Afficher la signature normalement
+    applySignatureProtection(false);
   }
 
   if (resumeHint && locked) {
@@ -2978,6 +3154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initConditionalBlocks();
     initQualite();
     bindProgressIndicatorRefresh();
+    bindSignatureProtectionHandlers();
     syncDossierTypeUi();
 
     setFormBootstrapStage("ouverture de la fiche", "Chargement de la fiche...");
