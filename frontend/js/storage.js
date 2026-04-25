@@ -616,14 +616,12 @@ function renderActionGroup(shortLabel, tone, items) {
 function buildDraftActionButtons(draft, options) {
   const id = draft.id;
   const status = draft.status || "draft";
-  const inRestitutionPhase = ["returned", "partial_return"].includes(status);
   const hasRestitution = hasRestitutionData(draft);
-  const restitutionEmailEligible = hasRestitution || ["active", "partial_return", "awaiting_signature", "returned"].includes(status);
 
-  // PDF — l'action principale reflète la phase du dossier
+  // PDF — action principale selon la phase
   const pdfItems = [];
   if (options.canExport) {
-    if (inRestitutionPhase && hasRestitution) {
+    if (["returned", "partial_return"].includes(status) && hasRestitution) {
       pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
       pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
     } else {
@@ -634,26 +632,32 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
-  // E-mail dossier — actions liées à l'attribution
-  const emailDossierItems = [];
-  emailDossierItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
-  if (options.canExport) {
-    emailDossierItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
-  }
-  if (canRequestAssignmentSignature(draft, options)) {
-    emailDossierItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
-  }
-
-  // E-mail restitution — actions liées à la restitution, groupe séparé
-  const emailRestitutionItems = [];
-  if (restitutionEmailEligible) {
-    emailRestitutionItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
-  }
-  if (options.canExport && hasRestitution) {
-    emailRestitutionItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
-  }
-  if (canRequestRestitutionSignature(draft, options)) {
-    emailRestitutionItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
+  // E-mail — un seul groupe, actions adaptées au workflow courant
+  const emailItems = [];
+  if (["returned", "partial_return"].includes(status)) {
+    // Phase restitution : actions restitution uniquement
+    emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
+    if (options.canExport && hasRestitution) {
+      emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
+    }
+    if (canRequestRestitutionSignature(draft, options)) {
+      emailItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
+    }
+  } else if (status === "active") {
+    // Attribution finalisée : pas encore de restitution
+    emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
+    if (options.canExport) {
+      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
+    }
+  } else {
+    // En cours / en attente de signature
+    emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
+    if (options.canExport) {
+      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
+    }
+    if (canRequestAssignmentSignature(draft, options)) {
+      emailItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
+    }
   }
 
   const managementItems = [];
@@ -661,13 +665,15 @@ function buildDraftActionButtons(draft, options) {
     managementItems.push({ action: "removeDraft", id, label: "Supprimer le dossier" });
   }
 
+  // Bouton "Restitution" : uniquement sur attribution finalisée (active), pas sur les phases restitution
+  const showRestitutionBtn = options.canRestitution && status === "active";
+
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir</button>
-      ${canOpenRestitution(draft, options) ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
+      ${showRestitutionBtn ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
       ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
-      ${renderActionGroup("E-mail", "btn-outline-primary", emailDossierItems)}
-      ${renderActionGroup("E-mail restitution", "btn-outline-secondary", emailRestitutionItems)}
+      ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
       ${renderActionGroup("Supprimer", "btn-outline-danger", managementItems)}
     </div>
   `;
