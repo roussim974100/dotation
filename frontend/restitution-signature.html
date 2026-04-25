@@ -43,14 +43,30 @@
     <p id="restitutionSignatureErrorText" class="panel-text mb-0">Le lien de signature de restitution est invalide, expiré, déjà utilisé ou révoqué.</p>
   </section>
 
-  <section id="restitutionSignatureSuccessCard" class="content-card d-none">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Validation</p>
-        <h2 class="section-title">La restitution a bien été signée</h2>
+  <section id="restitutionSignatureSuccessCard" class="content-card d-none sig-success">
+    <div class="sig-success__icon-wrap">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <polyline class="sig-success__check" points="8,21 17,30 33,12"
+          stroke="#0a4d28" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <h2 class="sig-success__title">Restitution signée</h2>
+    <p class="sig-success__subtitle">Votre signature a bien été enregistrée.</p>
+    <div class="sig-success__summary">
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Signataire</span>
+        <span class="sig-success__summary-value" id="restitutionSuccessName">—</span>
+      </div>
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Date de signature</span>
+        <span class="sig-success__summary-value" id="restitutionSuccessDate">—</span>
+      </div>
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Décision</span>
+        <span class="sig-success__summary-value" id="restitutionSuccessDecision">—</span>
       </div>
     </div>
-    <p class="panel-text mb-0">Merci. La signature de restitution a bien été enregistrée.</p>
+    <p class="sig-success__close">Vous pouvez fermer cet onglet.</p>
   </section>
 
   <form id="publicRestitutionSignatureForm" class="d-none" novalidate>
