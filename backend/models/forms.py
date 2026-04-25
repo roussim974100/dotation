@@ -503,9 +503,42 @@ def get_form(form_id):
     # Injecter l'état mutualisé depuis la DB (source de vérité) pour tous les membres
     resources_obj = payload.get("resources", {})
     additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
+
+    # Ajouter les ressources mutualisées qui n'existent pas encore dans additional
+    existing_ids = {r.get("id") or r.get("code") for r in additional}
+    for resource_catalog_id, pool_info in pool_by_resource.items():
+        if resource_catalog_id not in existing_ids:
+            # Récupérer les infos du catalogue pour cette ressource
+            catalog_res = connection.execute(
+                "SELECT id, code, label, category, issuer_service, field_schema FROM resource_catalog WHERE id = ?",
+                (resource_catalog_id,)
+            ).fetchone()
+
+            if catalog_res:
+                # Créer une entrée pour cette ressource mutualisée
+                additional.append({
+                    "id": catalog_res["id"],
+                    "code": catalog_res["code"],
+                    "label": catalog_res["label"],
+                    "category": catalog_res["category"],
+                    "issuerService": catalog_res["issuer_service"],
+                    "selected": True,  # Les ressources mutualisées sont toujours sélectionnées
+                    "shared": True,
+                    "poolId": pool_info["poolId"],
+                    "sharedWith": pool_info["members"],
+                    "fieldSchema": catalog_res["field_schema"] or [],
+                    "fields": {},
+                    "details": "",
+                })
+
+    # Mettre à jour le payload avec les ressources complètes
+    if additional or payload.get("resources"):
+        payload.setdefault("resources", {})["additional"] = additional
+
+    # Injector l'état mutualisé pour les ressources existantes
     for resource in additional:
         rid = resource.get("id") or resource.get("code")
-        if rid in pool_by_resource:
+        if rid in pool_by_resource and not resource.get("shared"):
             pool_info = pool_by_resource[rid]
             resource["shared"] = True
             resource["poolId"] = pool_info["poolId"]
