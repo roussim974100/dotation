@@ -98,168 +98,174 @@ def unc_stats():
 @login_required
 @permission_required("forms.view_all")
 def dashboard_stats():
-    period = request.args.get("period", "30d")
+    period       = request.args.get("period", "30d")
     service_filter = request.args.get("service", "")
-    type_filter = request.args.get("type", "")
+    type_filter  = request.args.get("type", "")
+    status_filter  = request.args.get("statut", "")
+    qualite_filter = request.args.get("qualite", "")
+    date_from    = request.args.get("date_from", "")
+    date_to      = request.args.get("date_to", "")
+    try:
+        alerte_seuil = max(1, min(365, int(request.args.get("alerte_seuil", "30"))))
+    except (ValueError, TypeError):
+        alerte_seuil = 30
 
-    # Calculer la date limite selon la période
-    period_days = 30
-    if period == "7d": period_days = 7
-    elif period == "90d": period_days = 90
-    elif period == "365d": period_days = 365
-    elif period == "all": period_days = None
+    # Construire la clause WHERE commune à toutes les requêtes
+    conditions = []
+    base_params = []
 
-    where_clause = ""
-    params = []
-    if period_days:
-        where_clause = f"WHERE created_at >= datetime('now', '-{period_days} days')"
+    if date_from:
+        conditions.append("created_at >= ?")
+        base_params.append(date_from)
+    elif period != "all":
+        period_days = {"7d": 7, "30d": 30, "90d": 90, "365d": 365}.get(period, 30)
+        conditions.append(f"created_at >= datetime('now', '-{period_days} days')")
 
-    service_where = ""
+    if date_to:
+        conditions.append("created_at <= ?")
+        base_params.append(date_to + " 23:59:59")
+
     if service_filter:
-        service_where = f" AND service = ?" if where_clause else "WHERE service = ?"
-        params.append(service_filter)
+        conditions.append("service = ?")
+        base_params.append(service_filter)
 
-    type_where = ""
     if type_filter:
-        type_where = f" AND dossier_type = ?" if (where_clause or service_where) else "WHERE dossier_type = ?"
-        params.append(type_filter)
+        conditions.append("dossier_type = ?")
+        base_params.append(type_filter)
+
+    if status_filter:
+        conditions.append("status = ?")
+        base_params.append(status_filter)
+
+    if qualite_filter:
+        conditions.append("beneficiary_type = ?")
+        base_params.append(qualite_filter)
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     db = get_db()
 
     # KPI 1 : Dossiers par statut
-    status_query = f"SELECT status, COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where} GROUP BY status"
-    status_params = []
-    if service_filter:
-        status_params.append(service_filter)
-    if type_filter:
-        status_params.append(type_filter)
-    by_status_rows = db.execute(status_query, status_params).fetchall()
+    by_status_rows = db.execute(
+        f"SELECT status, COUNT(*) as count FROM dotation_forms {where_clause} GROUP BY status",
+        base_params,
+    ).fetchall()
     by_status = [
         {"status": row["status"], "label": STATUS_LABELS.get(row["status"], row["status"]), "count": row["count"]}
         for row in by_status_rows
     ]
-
-    # Calculer active_count pour utilisation dans KPI Timing 3
     active_count = sum(s["count"] for s in by_status if s["status"] == "active")
 
-    # KPI 2 : Dossiers par service (top 10)
-    service_query = f"SELECT service, COUNT(*) as count FROM dotation_forms {where_clause}{type_where} GROUP BY service ORDER BY count DESC LIMIT 10"
-    service_params = []
-    if type_filter:
-        service_params.append(type_filter)
-    by_service_rows = db.execute(service_query, service_params).fetchall()
-    by_service = [
-        {"service": row["service"] or "—", "count": row["count"]}
-        for row in by_service_rows
-    ]
+    # KPI 2 : Dossiers par service (top 10) — sans filtre service pour garder la vue globale
+    svc_conds = [c for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else conditions
+    svc_params = [p for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else base_params
+    svc_where = ("WHERE " + " AND ".join(svc_conds)) if svc_conds else ""
+    by_service_rows = db.execute(
+        f"SELECT service, COUNT(*) as count FROM dotation_forms {svc_where} GROUP BY service ORDER BY count DESC LIMIT 10",
+        svc_params,
+    ).fetchall()
+    by_service = [{"service": row["service"] or "—", "count": row["count"]} for row in by_service_rows]
 
     # KPI 3 : Dossiers par type
-    type_query = f"SELECT dossier_type, COUNT(*) as count FROM dotation_forms {where_clause}{service_where} GROUP BY dossier_type"
-    type_params = []
-    if service_filter:
-        type_params.append(service_filter)
-    by_type_rows = db.execute(type_query, type_params).fetchall()
+    by_type_rows = db.execute(
+        f"SELECT dossier_type, COUNT(*) as count FROM dotation_forms {where_clause} GROUP BY dossier_type",
+        base_params,
+    ).fetchall()
     by_type = [
         {"type": row["dossier_type"], "label": TYPE_LABELS.get(row["dossier_type"], row["dossier_type"]), "count": row["count"]}
         for row in by_type_rows
     ]
 
     # KPI 4 : Ressources les plus attribuées (top 10)
-    resource_query = "SELECT label, COUNT(*) as count FROM dotation_items WHERE assigned=1 GROUP BY label ORDER BY count DESC LIMIT 10"
-    by_resource_rows = db.execute(resource_query).fetchall()
-    by_resource = [
-        {"label": row["label"], "count": row["count"]}
-        for row in by_resource_rows
-    ]
+    by_resource_rows = db.execute(
+        "SELECT label, COUNT(*) as count FROM dotation_items WHERE assigned=1 GROUP BY label ORDER BY count DESC LIMIT 10"
+    ).fetchall()
+    by_resource = [{"label": row["label"], "count": row["count"]} for row in by_resource_rows]
 
     # KPI 5 : Taux de restitution (matériel)
-    restitution_query = "SELECT SUM(CASE WHEN returned=1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) as taux FROM dotation_items WHERE category='materiel' AND assigned=1"
-    restitution_row = db.execute(restitution_query).fetchone()
+    restitution_row = db.execute(
+        "SELECT SUM(CASE WHEN returned=1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) as taux FROM dotation_items WHERE category='materiel' AND assigned=1"
+    ).fetchone()
     taux_restitution = round(restitution_row["taux"], 1) if restitution_row and restitution_row["taux"] else 0
 
     # KPI 6 : Tendance mensuelle (12 derniers mois)
-    tendance_query = "SELECT strftime('%Y-%m', created_at) as mois, COUNT(*) as count FROM dotation_forms GROUP BY mois ORDER BY mois DESC LIMIT 12"
-    tendance_rows = list(reversed(db.execute(tendance_query).fetchall()))
+    tendance_rows = list(reversed(db.execute(
+        "SELECT strftime('%Y-%m', created_at) as mois, COUNT(*) as count FROM dotation_forms GROUP BY mois ORDER BY mois DESC LIMIT 12"
+    ).fetchall()))
     tendance = [
         {"mois": row["mois"], "label": _format_month_label(row["mois"]), "count": row["count"]}
         for row in tendance_rows
     ]
 
-    # KPI 7 : Alertes — dossiers bloqués depuis > 30j
-    alertes_query = "SELECT id, nom, prenom, service, updated_at FROM dotation_forms WHERE status='draft' AND updated_at < datetime('now', '-30 days') ORDER BY updated_at"
-    alertes_rows = db.execute(alertes_query).fetchall()
-    alertes = []
-    for row in alertes_rows:
-        days_blocked = _days_since(row["updated_at"])
-        alertes.append({
-            "id": row["id"],
-            "nom": row["nom"] or "",
-            "prenom": row["prenom"] or "",
-            "service": row["service"] or "—",
-            "jours_blocage": days_blocked
-        })
+    # KPI 7 : Alertes — dossiers bloqués (seuil configurable)
+    alerte_conds = [c for i, (c, p) in enumerate(zip(conditions, base_params)) if "created_at" not in c]
+    alerte_params = [p for c, p in zip(conditions, base_params) if "created_at" not in c]
+    alerte_where = "WHERE status='draft' AND updated_at < datetime('now', ?)"
+    alerte_params_full = [f"-{alerte_seuil} days"] + alerte_params
+    if alerte_conds:
+        alerte_where += " AND " + " AND ".join(alerte_conds)
+    alertes_rows = db.execute(
+        f"SELECT id, nom, prenom, service, status, updated_at FROM dotation_forms {alerte_where} ORDER BY updated_at",
+        alerte_params_full,
+    ).fetchall()
+    alertes = [
+        {"id": row["id"], "nom": row["nom"] or "", "prenom": row["prenom"] or "",
+         "service": row["service"] or "—", "jours_blocage": _days_since(row["updated_at"]),
+         "status": row["status"]}
+        for row in alertes_rows
+    ]
 
-    # KPI Timing 1 : Durée moyenne de traitement (création → active)
-    avg_treatment_query = f"""
-    SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT)) as avg_days
-    FROM dotation_forms
-    WHERE status IN ('active', 'returned', 'partial_return')
-    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
-    avg_treatment_row = db.execute(avg_treatment_query).fetchone()
+    # KPI Timing 1 : Durée moyenne de traitement
+    timing_conds = ["status IN ('active', 'returned', 'partial_return')"] + conditions
+    avg_treatment_row = db.execute(
+        "SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT)) as avg_days "
+        f"FROM dotation_forms WHERE " + " AND ".join(timing_conds),
+        base_params,
+    ).fetchone()
     avg_treatment = round(avg_treatment_row["avg_days"], 1) if avg_treatment_row and avg_treatment_row["avg_days"] else 0
 
-    # KPI Timing 2 : Durée moyenne de restitution (active → returned)
-    avg_restitution_query = f"""
-    SELECT AVG(CAST((julianday(returned_at) - julianday(assigned_at)) AS FLOAT)) as avg_days
-    FROM dotation_forms
-    WHERE status IN ('returned', 'partial_return') AND returned_at IS NOT NULL AND assigned_at IS NOT NULL
-    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
-    avg_restitution_row = db.execute(avg_restitution_query).fetchone()
+    # KPI Timing 2 : Durée moyenne de restitution
+    restitution_conds = ["status IN ('returned', 'partial_return')", "returned_at IS NOT NULL", "assigned_at IS NOT NULL"] + conditions
+    avg_restitution_row = db.execute(
+        "SELECT AVG(CAST((julianday(returned_at) - julianday(assigned_at)) AS FLOAT)) as avg_days "
+        f"FROM dotation_forms WHERE " + " AND ".join(restitution_conds),
+        base_params,
+    ).fetchone()
     avg_restitution = round(avg_restitution_row["avg_days"], 1) if avg_restitution_row and avg_restitution_row["avg_days"] else 0
 
     # KPI Timing 3 : % dossiers complétés en ≤ 7 jours
-    fast_query = f"""
-    SELECT COUNT(*) as count FROM dotation_forms
-    WHERE status IN ('active', 'returned', 'partial_return')
-    AND CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7
-    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}"""
-    fast_count = db.execute(fast_query).fetchone()["count"]
-    pct_fast = (fast_count * 100.0 / active_count) if active_count > 0 else 0
-    pct_fast = round(pct_fast, 0)
+    fast_conds = ["status IN ('active', 'returned', 'partial_return')",
+                  "CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7"] + conditions
+    fast_count = db.execute(
+        "SELECT COUNT(*) as count FROM dotation_forms WHERE " + " AND ".join(fast_conds),
+        base_params,
+    ).fetchone()["count"]
+    pct_fast = round((fast_count * 100.0 / active_count) if active_count > 0 else 0, 0)
 
     # KPI Timing 4 : Distribution des délais
-    timing_distribution_query = f"""
-    SELECT
-      CASE
-        WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 3 THEN 'rapide'
-        WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7 THEN 'normal'
-        ELSE 'long'
-      END as categorie,
-      COUNT(*) as count
-    FROM dotation_forms
-    WHERE status IN ('active', 'returned', 'partial_return')
-    {f"AND created_at >= datetime('now', '-{period_days} days')" if period_days else ""}
-    GROUP BY categorie
-    """
-    timing_dist_rows = db.execute(timing_distribution_query).fetchall()
+    timing_dist_conds = ["status IN ('active', 'returned', 'partial_return')"] + conditions
+    timing_dist_rows = db.execute(
+        "SELECT CASE "
+        "  WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 3 THEN 'rapide' "
+        "  WHEN CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7 THEN 'normal' "
+        "  ELSE 'long' END as categorie, COUNT(*) as count "
+        f"FROM dotation_forms WHERE " + " AND ".join(timing_dist_conds) + " GROUP BY categorie",
+        base_params,
+    ).fetchall()
     timing_dist = {row["categorie"]: row["count"] for row in timing_dist_rows}
     timing_distribution = [
         {"categorie": "rapide", "label": "Rapide (≤3j)", "count": timing_dist.get("rapide", 0), "color": "#def7e7"},
         {"categorie": "normal", "label": "Normal (3-7j)", "count": timing_dist.get("normal", 0), "color": "#fff4d6"},
-        {"categorie": "long", "label": "Long (>7j)", "count": timing_dist.get("long", 0), "color": "#fde2e2"}
+        {"categorie": "long", "label": "Long (>7j)", "count": timing_dist.get("long", 0), "color": "#fde2e2"},
     ]
 
-    # KPI globaux
-    total_query = f"SELECT COUNT(*) as count FROM dotation_forms {where_clause}{service_where}{type_where}"
-    total_params = []
-    if service_filter:
-        total_params.append(service_filter)
-    if type_filter:
-        total_params.append(type_filter)
-    total = db.execute(total_query, total_params).fetchone()["count"]
+    # Total global
+    total = db.execute(
+        f"SELECT COUNT(*) as count FROM dotation_forms {where_clause}", base_params
+    ).fetchone()["count"]
 
     return jsonify({
-        "period": {"label": _get_period_label(period), "days": period_days or "all"},
+        "period": {"label": _get_period_label(period), "days": period},
         "kpis": {
             "total": total,
             "actifs": active_count,
@@ -268,15 +274,16 @@ def dashboard_stats():
             "ressources_total": sum(r["count"] for r in by_resource),
             "avg_treatment": avg_treatment,
             "avg_restitution": avg_restitution,
-            "pct_fast": pct_fast
+            "pct_fast": pct_fast,
+            "alerte_seuil": alerte_seuil,
         },
         "by_status": by_status,
         "by_service": by_service,
         "by_type": by_type,
         "by_resource": by_resource,
         "tendance": tendance,
-        "alertes": alertes[:10],
-        "timing_distribution": timing_distribution
+        "alertes": alertes[:20],
+        "timing_distribution": timing_distribution,
     })
 
 
