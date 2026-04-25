@@ -1850,7 +1850,9 @@ function initRetraitsSection() {
       return;
     }
     try {
-      const resp = await fetch(`/api/forms?search=${encodeURIComponent(query)}&status=active`);
+      const resp = await fetch(`/api/forms?search=${encodeURIComponent(query)}&status=active`, {
+        credentials: "same-origin"
+      });
       const forms = resp.ok ? await resp.json() : [];
       resultsDiv.innerHTML = forms
         .map(
@@ -1877,7 +1879,9 @@ function initRetraitsSection() {
 
     try {
       // Pré-remplir l'identité du bénéficiaire depuis le dossier source
-      const formResp = await fetch(`/api/forms/${formId}`);
+      const formResp = await fetch(`/api/forms/${formId}`, {
+        credentials: "same-origin"
+      });
       if (formResp.ok) {
         const formData = await formResp.json();
         const bene = formData.data?.beneficiaire || {};
@@ -1967,7 +1971,9 @@ function initRetraitsSection() {
         window._unlockIdentityFields = unlockIdentityFields;
       }
 
-      const resp = await fetch(`/api/forms/${formId}/retrait-items`);
+      const resp = await fetch(`/api/forms/${formId}/retrait-items`, {
+        credentials: "same-origin"
+      });
       const items = resp.ok ? await resp.json() : [];
       itemsList.innerHTML = items
         .map(
@@ -2035,7 +2041,9 @@ function initRetraitsSection() {
     const formId = document.querySelector("[data-form-id]")?.dataset.formId;
     if (!formId) return;
     try {
-      const resp = await fetch(`/api/forms/${formId}/pdf/retraits`);
+      const resp = await fetch(`/api/forms/${formId}/pdf/retraits`, {
+        credentials: "same-origin"
+      });
       if (resp.ok) {
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
@@ -2205,7 +2213,9 @@ function bindUncCopyFrom() {
     const q = searchInput.value.trim();
     if (q.length < 2) { resultsBox.classList.add("d-none"); resultsBox.innerHTML = ""; return; }
     debounceTimer = setTimeout(async () => {
-      const res = await fetch(`/api/forms?search=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/forms?search=${encodeURIComponent(q)}`, {
+        credentials: "same-origin"
+      });
       if (!res.ok) return;
       const forms = await res.json();
       const withUnc = forms.filter(f => f.id !== (document.getElementById("form")?.dataset?.draftId || ""));
@@ -2221,7 +2231,9 @@ function bindUncCopyFrom() {
           btn.addEventListener("click", async () => {
             resultsBox.classList.add("d-none");
             searchInput.value = "";
-            const detail = await fetch(`/api/forms/${f.id}`);
+            const detail = await fetch(`/api/forms/${f.id}`, {
+              credentials: "same-origin"
+            });
             if (!detail.ok) return;
             const data = await detail.json();
             const entries = data.data?.unc_acces || [];
@@ -2423,7 +2435,9 @@ function populateForm(data, signaturePad) {
     // Need to load retraits items to restore state
     (async () => {
       try {
-        const resp = await fetch(`/api/forms/${sourceFormId}/retrait-items`);
+        const resp = await fetch(`/api/forms/${sourceFormId}/retrait-items`, {
+          credentials: "same-origin"
+        });
         const items = resp.ok ? await resp.json() : [];
         const itemsList = document.getElementById("retraitsItemsList");
         if (itemsList) {
