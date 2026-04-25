@@ -46,6 +46,9 @@ def validate_csrf():
     # Les endpoints publics de signature ne nécessitent pas d'auth ni de CSRF
     if request.path.startswith("/api/signature/") or request.path.startswith("/api/restitution-signature/"):
         return
+    # Les endpoints d'authentification (vérification de session) ne nécessitent pas de CSRF
+    if request.path.startswith("/api/auth/"):
+        return
     # Si pas de session utilisateur, l'endpoint sera rejeté par @login_required — pas besoin de CSRF
     if not session.get("user"):
         return
