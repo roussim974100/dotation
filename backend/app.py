@@ -18,6 +18,7 @@ from routes.forms import bp as forms_bp
 from routes.signature import bp as signature_bp
 from routes.pools import bp as pools_bp
 from routes.debug import bp as debug_bp
+from routes.auth import bp as auth_bp
 
 
 app = Flask(__name__, static_folder=None)
@@ -29,6 +30,7 @@ app.register_blueprint(forms_bp)
 app.register_blueprint(signature_bp)
 app.register_blueprint(pools_bp)
 app.register_blueprint(debug_bp)
+app.register_blueprint(auth_bp)
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
