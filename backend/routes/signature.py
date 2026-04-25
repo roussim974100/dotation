@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session as flask_session
 
 from utils import utc_now, AppError
 from database import get_db
@@ -145,6 +145,9 @@ def get_signature_token_route(token):
     return jsonify(build_signature_public_payload(form_data, link_row))
 
 
+_MAX_SIGNATURE_BYTES = 1_048_576  # 1 Mo
+
+
 @bp.route("/api/signature/<token>/submit", methods=["POST"])
 def submit_signature_token_route(token):
     payload = request.get_json(silent=True) or {}
@@ -152,6 +155,8 @@ def submit_signature_token_route(token):
     rgpd_accepted = bool(payload.get("rgpdAccepted"))
     if not signature_data or not rgpd_accepted:
         return jsonify({"error": "signature_and_rgpd_required"}), 400
+    if len(signature_data) > _MAX_SIGNATURE_BYTES:
+        return jsonify({"error": "signature_too_large"}), 413
 
     with get_db() as connection:
         link_row = get_signature_link_by_token(connection, token)
@@ -258,6 +263,8 @@ def submit_restitution_signature_token_route(token):
     signature_data = payload.get("signatureDataUrl") or ""
     signataire_decision = payload.get("signataireDecision") or "confirmed"
     signataire_comment = str(payload.get("signataireComment") or "").strip()
+    if len(signature_data) > _MAX_SIGNATURE_BYTES:
+        return jsonify({"error": "signature_too_large"}), 413
     if not signature_data:
         return jsonify({"error": "signature_required"}), 400
     if signataire_decision not in {"confirmed", "with_reservation"}:
@@ -324,17 +331,16 @@ def submit_restitution_signature_token_route(token):
     return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})
 
 
+def _check_signature_verification():
+    from routes.auth import _verification_still_valid
+    token = flask_session.get("signature_verification_token")
+    return bool(token) and _verification_still_valid()
+
+
 @bp.route("/api/forms/<form_id>/signature/view", methods=["GET"])
 @login_required
 def view_form_signature(form_id):
-    """View signature of a finalized form (requires password verification)"""
-    from flask import session
-
-    # Check if user has verified their password
-    verification_token = session.get("signature_verification_token")
-    print(f"[SIGNATURE_VIEW] User: {session.get('user')}, has_token: {bool(verification_token)}")
-    if not verification_token:
-        print(f"[SIGNATURE_VIEW] ERROR: No verification token for user: {session.get('user')}")
+    if not _check_signature_verification():
         return jsonify({"error": "verification_required"}), 401
 
     form_data = get_form(form_id)
@@ -370,12 +376,7 @@ def view_form_signature(form_id):
 @bp.route("/api/forms/<form_id>/restitution-signature/view", methods=["GET"])
 @login_required
 def view_form_restitution_signature(form_id):
-    """View restitution signature of a finalized form (requires password verification)"""
-    from flask import session
-
-    # Check if user has verified their password
-    verification_token = session.get("signature_verification_token")
-    if not verification_token:
+    if not _check_signature_verification():
         return jsonify({"error": "verification_required"}), 401
 
     form_data = get_form(form_id)
