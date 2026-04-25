@@ -370,6 +370,16 @@ def init_db():
                 FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS signature_views (
+                id TEXT PRIMARY KEY,
+                form_id TEXT NOT NULL,
+                username TEXT,
+                viewed_at TEXT NOT NULL,
+                ip_address TEXT,
+                user_agent TEXT,
+                FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE CASCADE
+            );
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
@@ -427,4 +437,5 @@ init_users_db()
 if __name__ == "__main__":
     init_db()
     init_users_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
