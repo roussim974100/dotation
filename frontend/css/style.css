@@ -4069,6 +4069,7 @@ button.export-menu__item {
 .global-search__backdrop {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: rgba(15, 55, 84, 0.45);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -4076,6 +4077,7 @@ button.export-menu__item {
 
 .global-search__panel {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 620px;
   background: var(--surface);
