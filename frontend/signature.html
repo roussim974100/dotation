@@ -43,14 +43,30 @@
     <p id="signatureErrorText" class="panel-text mb-0">Le lien de signature est invalide, expiré, déjà utilisé ou révoqué.</p>
   </section>
 
-  <section id="signatureSuccessCard" class="content-card d-none">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Validation</p>
-        <h2 class="section-title">Le dossier a bien été signé</h2>
+  <section id="signatureSuccessCard" class="content-card d-none sig-success">
+    <div class="sig-success__icon-wrap">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <polyline class="sig-success__check" points="8,21 17,30 33,12"
+          stroke="#0a4d28" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <h2 class="sig-success__title">Signature enregistrée</h2>
+    <p class="sig-success__subtitle">Votre signature et votre accord RGPD ont bien été pris en compte.</p>
+    <div class="sig-success__summary">
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Signataire</span>
+        <span class="sig-success__summary-value" id="successName">—</span>
+      </div>
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Date de signature</span>
+        <span class="sig-success__summary-value" id="successDate">—</span>
+      </div>
+      <div class="sig-success__summary-row">
+        <span class="sig-success__summary-label">Dossier</span>
+        <span class="sig-success__summary-value" id="successTitle">—</span>
       </div>
     </div>
-    <p class="panel-text mb-0">Merci. La prise de connaissance du dossier et la validation RGPD ont bien été enregistrées.</p>
+    <p class="sig-success__close">Vous pouvez fermer cet onglet.</p>
   </section>
 
   <form id="publicSignatureForm" class="d-none" novalidate>
