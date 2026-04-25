@@ -120,7 +120,11 @@ def build_title(payload):
     prenom = beneficiaire.get("prenom") or ""
     dossier_type = normalize_dossier_type(dossier.get("type"))
     type_label = DOSSIER_TYPE_LABELS.get(dossier_type, "Dossier")
-    return f"{type_label} - {nom} {prenom}".strip()
+    if beneficiaire.get("qualite") == "elu":
+        prefix = beneficiaire.get("mandat") or type_label
+    else:
+        prefix = beneficiaire.get("service") or type_label
+    return f"{prefix.upper()} - {nom} {prenom}".strip()
 
 
 def normalize_dossier_type(value):

@@ -446,7 +446,11 @@ def row_to_summary(row):
         summary["nom"] = mask_text(summary["nom"])
         summary["prenom"] = mask_text(summary["prenom"])
         type_label = DOSSIER_TYPE_LABELS.get(summary["dossierType"], "Dossier")
-        summary["title"] = f"{type_label} - {summary['nom']} {summary['prenom']}".strip()
+        if summary["beneficiaryType"] == "elu":
+            prefix = summary["mandat"] or type_label
+        else:
+            prefix = summary["service"] or type_label
+        summary["title"] = f"{str(prefix).upper()} - {summary['nom']} {summary['prenom']}".strip()
     return summary
 
 
