@@ -297,12 +297,18 @@ def has_permission(permission):
 def check_user(username, password):
     user = get_user_record(username)
     if not user:
+        print(f"[CHECK_USER] User not found: {username}")
         return "invalid"
+    print(f"[CHECK_USER] User found: {username}, status={user.get('status')}, is_active={user.get('is_active')}")
     if user.get("status") == "pending":
+        print(f"[CHECK_USER] User is pending: {username}")
         return "pending"
     if user.get("status") == "disabled" or not user.get("is_active", True):
+        print(f"[CHECK_USER] User is disabled/inactive: {username}")
         return "disabled"
-    if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+    password_match = bcrypt.checkpw(password.encode(), user["password_hash"].encode())
+    print(f"[CHECK_USER] Password match for {username}: {password_match}")
+    if not password_match:
         return "invalid"
     return "ok"
 
