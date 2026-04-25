@@ -40,7 +40,15 @@
       "Bash(curl -s http://localhost:5000/api/forms -H \"Authorization: Bearer test\")",
       "Bash(node -c frontend/js/storage.js)",
       "Bash(cd C:\\\\\\\\www\\\\\\\\dotation)",
-      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\" -H \"Accept: application/json\")"
+      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\" -H \"Accept: application/json\")",
+      "Bash(pkill -f \"python.*app.py\")",
+      "Bash(python app.py)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill -9)",
+      "PowerShell(Stop-Process *)",
+      "Bash(python *)",
+      "Bash(curl -s http://127.0.0.1:5000/api/health)",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\")"
     ]
   }
 }

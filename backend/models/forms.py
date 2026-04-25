@@ -473,30 +473,47 @@ def get_form(form_id):
         ).fetchall()
         selected_item_ids = {r["item_id"] for r in selections}
 
-        # Charger tous les pools dont ce dossier est membre (propriétaire ou co-utilisateur)
-        # Modèle symétrique : tous les membres voient le même état
-        pool_by_resource = {}  # resource_catalog_id -> {pool_id, other_members[]}
-        for pool in connection.execute(
-            """SELECT p.id, p.resource_catalog_id
-               FROM shared_pools p
-               JOIN shared_pool_members m ON m.pool_id = p.id
+        # Charger tous les items de pools dont ce dossier est membre
+        # Grouper par resource_catalog_id pour supporter multiple pools par resource type
+        items_by_resource = {}  # resource_catalog_id -> [item1, item2, ...]
+        members_by_resource = {}  # resource_catalog_id -> [members...]
+
+        for pool_item in connection.execute(
+            """SELECT spi.id, spi.label, sp.resource_catalog_id, sp.id as pool_id
+               FROM shared_pool_items spi
+               JOIN shared_pools sp ON spi.pool_id = sp.id
+               JOIN shared_pool_members m ON m.pool_id = sp.id
                WHERE m.form_id = ?""",
             (form_id,),
         ).fetchall():
+            res_id = pool_item["resource_catalog_id"]
+            if res_id not in items_by_resource:
+                items_by_resource[res_id] = []
+                members_by_resource[res_id] = []
+
+            # Ajouter l'item (éviter les doublons)
+            item_exists = any(item["id"] == pool_item["id"] for item in items_by_resource[res_id])
+            if not item_exists:
+                items_by_resource[res_id].append({
+                    "id": pool_item["id"],
+                    "label": pool_item["label"],
+                    "poolId": pool_item["pool_id"]
+                })
+
+        # Récupérer les autres membres par resource_catalog_id
+        for res_id in items_by_resource.keys():
             other_members = connection.execute(
-                """SELECT m.form_id, f.nom, f.prenom, f.service
+                """SELECT DISTINCT m.form_id, f.nom, f.prenom, f.service
                    FROM shared_pool_members m
                    LEFT JOIN dotation_forms f ON f.id = m.form_id
-                   WHERE m.pool_id = ? AND m.form_id != ?""",
-                (pool["id"], form_id),
+                   JOIN shared_pools sp ON m.pool_id = sp.id
+                   WHERE sp.resource_catalog_id = ? AND m.form_id != ?""",
+                (res_id, form_id),
             ).fetchall()
-            pool_by_resource[pool["resource_catalog_id"]] = {
-                "poolId": pool["id"],
-                "members": [
-                    {"formId": m["form_id"], "nom": m["nom"], "prenom": m["prenom"], "service": m["service"]}
-                    for m in other_members if m["form_id"]
-                ],
-            }
+            members_by_resource[res_id] = [
+                {"formId": m["form_id"], "nom": m["nom"], "prenom": m["prenom"], "service": m["service"]}
+                for m in other_members if m["form_id"]
+            ]
 
     payload = json.loads(form_row["payload_json"])
 
@@ -506,16 +523,30 @@ def get_form(form_id):
 
     # Ajouter les ressources mutualisées qui n'existent pas encore dans additional
     existing_ids = {r.get("id") or r.get("code") for r in additional}
-    for resource_catalog_id, pool_info in pool_by_resource.items():
-        if resource_catalog_id not in existing_ids:
+    for resource_catalog_id, items_list in items_by_resource.items():
+        if resource_catalog_id not in existing_ids and items_list:
             # Récupérer les infos du catalogue pour cette ressource
             catalog_res = connection.execute(
-                "SELECT id, code, label, category, issuer_service, field_schema FROM resource_catalog WHERE id = ?",
+                "SELECT id, code, label, category, issuer_service, field_schema_json FROM resource_catalog WHERE id = ?",
                 (resource_catalog_id,)
             ).fetchone()
 
             if catalog_res:
-                # Créer une entrée pour cette ressource mutualisée
+                # Marquer les items déjà sélectionnés
+                items_with_selection = []
+                for item in items_list:
+                    items_with_selection.append({
+                        **item,
+                        "selected": item["id"] in selected_item_ids
+                    })
+
+                # Créer une entrée pour cette ressource mutualisée avec tous les items disponibles
+                field_schema_str = catalog_res["field_schema_json"] or "[]"
+                try:
+                    field_schema = json.loads(field_schema_str) if isinstance(field_schema_str, str) else field_schema_str
+                except (json.JSONDecodeError, TypeError):
+                    field_schema = []
+
                 additional.append({
                     "id": catalog_res["id"],
                     "code": catalog_res["code"],
@@ -524,9 +555,9 @@ def get_form(form_id):
                     "issuerService": catalog_res["issuer_service"],
                     "selected": True,  # Les ressources mutualisées sont toujours sélectionnées
                     "shared": True,
-                    "poolId": pool_info["poolId"],
-                    "sharedWith": pool_info["members"],
-                    "fieldSchema": catalog_res["field_schema"] or [],
+                    "availableItems": items_with_selection,  # Tous les items disponibles pour multi-sélection
+                    "sharedWith": members_by_resource.get(resource_catalog_id, []),
+                    "fieldSchema": field_schema,
                     "fields": {},
                     "details": "",
                 })
@@ -538,11 +569,10 @@ def get_form(form_id):
     # Injector l'état mutualisé pour les ressources existantes
     for resource in additional:
         rid = resource.get("id") or resource.get("code")
-        if rid in pool_by_resource and not resource.get("shared"):
-            pool_info = pool_by_resource[rid]
+        if rid in items_by_resource and not resource.get("shared"):
             resource["shared"] = True
-            resource["poolId"] = pool_info["poolId"]
-            resource["sharedWith"] = pool_info["members"]
+            resource["availableItems"] = items_by_resource[rid]
+            resource["sharedWith"] = members_by_resource.get(rid, [])
 
     payload.setdefault("meta", {})
     payload.setdefault("dossier", {})

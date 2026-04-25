@@ -1032,9 +1032,38 @@ function getAdditionalResourcesData() {
 function populateAdditionalResources(data = {}) {
   const resources = data.resources?.additional || [];
   resources.forEach((resource) => {
+    // Pour les ressources mutualisées avec items disponibles
+    if (resource.shared && Array.isArray(resource.availableItems)) {
+      // Créer des cases à cocher pour chaque item disponible
+      resource.availableItems.forEach((item) => {
+        const itemCheckboxId = `pool_item_${item.id}`;
+        let itemCheckbox = document.getElementById(itemCheckboxId);
+        if (!itemCheckbox) {
+          // Créer le checkbox s'il n'existe pas
+          const container = document.getElementById(`dynamic_resource_fields_wrap_${resource.id}`);
+          if (container) {
+            const label = document.createElement("label");
+            label.className = "equipment-toggle pool-item-toggle";
+            label.innerHTML = `<input type="checkbox" id="${itemCheckboxId}" data-pool-item-id="${item.id}" data-resource-id="${resource.id}"><span>${escapeHtml(item.label)}</span>`;
+            container.prepend(label);
+            itemCheckbox = document.getElementById(itemCheckboxId);
+          }
+        }
+        // Cocher si l'item était précédemment sélectionné
+        if (itemCheckbox) {
+          itemCheckbox.checked = Boolean(item.selected);
+        }
+      });
+      // Marquer le resource comme sélectionné si des items sont disponibles
+      const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+      if (checkbox && resource.availableItems.length > 0) {
+        checkbox.checked = true;
+      }
+    }
+
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     const details = document.getElementById(`dynamic_resource_details_${resource.id}`);
-    if (checkbox) {
+    if (checkbox && !resource.shared) {
       checkbox.checked = Boolean(resource.selected);
     }
     if (details) {
@@ -2000,11 +2029,23 @@ function populateUncAcces(entries = []) {
 
 function buildSelectedItems() {
   // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
-  const additionalResources = getAdditionalResourcesData();
   const selectedItems = {};
 
+  // Collecter les items de pool sélectionnés
+  document.querySelectorAll('input[data-pool-item-id]:checked').forEach((checkbox) => {
+    const itemId = checkbox.dataset.poolItemId;
+    if (itemId) {
+      if (!selectedItems.poolItems) {
+        selectedItems.poolItems = [];
+      }
+      selectedItems.poolItems.push(itemId);
+    }
+  });
+
+  // Collecter les ressources dynamiques sélectionnées
+  const additionalResources = getAdditionalResourcesData();
   additionalResources.forEach((resource) => {
-    if (resource.selected) {
+    if (resource.selected && !resource.shared) {
       const key = resource.triggerKey || String(resource.id);
       if (!selectedItems[key]) {
         selectedItems[key] = [];
