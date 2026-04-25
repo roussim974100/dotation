@@ -146,57 +146,61 @@
     <div class="filter-group">
       <label>Période</label>
       <div class="choice-group">
-        <label class="choice-chip">
-          <input type="radio" name="filter-period" value="7d">
-          <span>7 jours</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-period" value="30d" checked>
-          <span>30 jours</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-period" value="90d">
-          <span>90 jours</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-period" value="365d">
-          <span>Année</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-period" value="all">
-          <span>Tout</span>
-        </label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="7d"><span>7 jours</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="30d" checked><span>30 jours</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="90d"><span>90 jours</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="365d"><span>Année</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="all"><span>Tout</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-period" value="custom"><span>Personnalisé</span></label>
+      </div>
+      <div id="filterCustomDateWrap" class="d-none mt-2 d-flex gap-2 align-items-center">
+        <input type="date" id="filterDateFrom" class="form-control form-control-sm" style="max-width:150px">
+        <span class="text-muted small">→</span>
+        <input type="date" id="filterDateTo" class="form-control form-control-sm" style="max-width:150px">
       </div>
     </div>
     <div class="filter-group">
       <label>Service</label>
       <select id="filterService" class="form-select" style="max-width:200px">
-        <option value="">— Tous les services —</option>
+        <option value="">— Tous —</option>
       </select>
     </div>
     <div class="filter-group">
       <label>Type de dossier</label>
       <div class="choice-group">
-        <label class="choice-chip">
-          <input type="radio" name="filter-type" value="" checked>
-          <span>Tous</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-type" value="arrivee">
-          <span>Arrivée</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-type" value="changement_service">
-          <span>Changement</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-type" value="mise_a_jour">
-          <span>Mise à jour</span>
-        </label>
-        <label class="choice-chip">
-          <input type="radio" name="filter-type" value="sortie">
-          <span>Sortie</span>
-        </label>
+        <label class="choice-chip"><input type="radio" name="filter-type" value="" checked><span>Tous</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-type" value="arrivee"><span>Arrivée</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-type" value="changement_service"><span>Changement</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-type" value="mise_a_jour"><span>Mise à jour</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-type" value="sortie"><span>Sortie</span></label>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Statut</label>
+      <select id="filterStatut" class="form-select" style="max-width:220px">
+        <option value="">— Tous —</option>
+        <option value="draft">À compléter</option>
+        <option value="partial_assignment">Attribution partielle</option>
+        <option value="awaiting_signature">En attente de signature</option>
+        <option value="active">Actif</option>
+        <option value="partial_return">Restitution partielle</option>
+        <option value="returned">Restitué</option>
+        <option value="cancelled">Annulé</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Qualité</label>
+      <div class="choice-group">
+        <label class="choice-chip"><input type="radio" name="filter-qualite" value="" checked><span>Tous</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-qualite" value="agent"><span>Agent</span></label>
+        <label class="choice-chip"><input type="radio" name="filter-qualite" value="elu"><span>Élu(e)</span></label>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Seuil alerte <span class="text-muted small">(jours bloqués)</span></label>
+      <div class="d-flex align-items-center gap-2">
+        <input type="range" id="filterAlerteSeuil" min="7" max="90" value="30" step="1" style="width:120px">
+        <span id="filterAlerteSeuilLabel" class="text-muted small fw-semibold">30 j</span>
       </div>
     </div>
   </div>
@@ -230,7 +234,7 @@
     <div class="section-heading">
       <div>
         <p class="panel-eyebrow">Attention</p>
-        <h2 class="section-title">Dossiers bloqués (> 30 jours)</h2>
+        <h2 class="section-title" id="alertesSectionTitle">Dossiers bloqués (> 30 jours)</h2>
       </div>
     </div>
     <div class="table-responsive" id="alertesContainer">
