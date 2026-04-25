@@ -6,7 +6,7 @@ from utils import (
     utc_now, bool_to_int, normalize_dossier_type,
     build_title, format_export_datetime, get_signature_datetime,
     format_beneficiary_label, format_status_label, format_restitution_state_label,
-    dossier_type_label, mask_text, mask_payload, AppError,
+    dossier_type_label, mask_text, mask_payload, AppError, DOSSIER_TYPE_LABELS,
 )
 from database import get_db
 from auth import current_user
@@ -445,10 +445,8 @@ def row_to_summary(row):
     if user and user.get("data_scope") == "masked":
         summary["nom"] = mask_text(summary["nom"])
         summary["prenom"] = mask_text(summary["prenom"])
-        prefix = (summary["mandat"] if summary["beneficiaryType"] == "elu" else summary["service"]) or (
-            "MANDAT" if summary["beneficiaryType"] == "elu" else "SERVICE"
-        )
-        summary["title"] = f"{str(prefix).upper()} - {summary['nom']} {summary['prenom']}".strip()
+        type_label = DOSSIER_TYPE_LABELS.get(summary["dossierType"], "Dossier")
+        summary["title"] = f"{type_label} - {summary['nom']} {summary['prenom']}".strip()
     return summary
 
 
