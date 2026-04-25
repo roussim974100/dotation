@@ -64,61 +64,46 @@
     <a class="dashboard-nav__link" href="pools.html">Parc mutualisé</a>
   </nav>
 
-  <details id="filterMenu" class="filter-menu mb-4">
-    <summary class="btn btn-outline-secondary" aria-label="Ouvrir les filtres">
-      Filtres
-      <span id="filterActiveBadge" class="filter-menu__badge d-none">0</span>
-    </summary>
-    <div class="filter-menu__panel">
-      <div class="filter-menu__search">
-        <input id="searchInput" class="form-control form-control-sm" type="search"
-               placeholder="Nom, prénom, service, titre…" autocomplete="off">
-      </div>
-      <div class="filter-menu__grid">
-        <div>
-          <label class="filter-menu__label" for="statusFilter">État</label>
-          <select id="statusFilter" class="form-select form-select-sm">
-            <option value="">Tous les états</option>
-            <option value="active">Attribution active</option>
-          </select>
-        </div>
-        <div>
-          <label class="filter-menu__label" for="timingFilter">Pilotage</label>
-          <select id="timingFilter" class="form-select form-select-sm">
-            <option value="">Tous les pilotages</option>
-            <option value="ok">Prêt / Dans les temps</option>
-            <option value="warning">En danger</option>
-            <option value="late">En retard</option>
-            <option value="neutral">À planifier</option>
-          </select>
-        </div>
-        <div>
-          <label class="filter-menu__label" for="qualiteFilter">Qualité</label>
-          <select id="qualiteFilter" class="form-select form-select-sm" data-dynamic-qualite-filter>
-            <option value="">Toutes</option>
-            <option value="agent">Agent</option>
-            <option value="elu">Élu(e)</option>
-          </select>
-        </div>
-        <div>
-          <label class="filter-menu__label" for="serviceFilter">Service</label>
-          <select id="serviceFilter" class="form-select form-select-sm">
-            <option value="">Tous les services</option>
-          </select>
-        </div>
-        <div>
-          <label class="filter-menu__label" for="sortFilter">Ancienneté</label>
-          <select id="sortFilter" class="form-select form-select-sm">
-            <option value="recent">Plus récents d'abord</option>
-            <option value="oldest">Plus anciens d'abord</option>
-          </select>
-        </div>
-      </div>
-      <div class="filter-menu__footer">
-        <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary" type="button">Réinitialiser</button>
-      </div>
-    </div>
-  </details>
+  <div class="mb-4" style="display: flex; gap: 12px; align-items: center;">
+    <input id="searchInput" class="form-control form-control-sm" type="search"
+           placeholder="Rechercher par nom, prénom, service, titre…" autocomplete="off"
+           style="max-width: 300px;">
+  </div>
+
+  <!-- Filtres cachés (contrôlés via Ctrl+K et utilisés par storage.js) -->
+  <div style="display: none;">
+    <select id="statusFilter">
+      <option value="">Tous les avancements</option>
+      <option value="draft">À compléter</option>
+      <option value="partial_assignment">Attribution partielle</option>
+      <option value="awaiting_signature">En attente de signature</option>
+      <option value="active">Attribution active</option>
+      <option value="returned">Restitution terminée</option>
+      <option value="partial_return">Restitution partielle</option>
+      <option value="cancelled">Dossier annulé</option>
+    </select>
+    <select id="timingFilter">
+      <option value="">Tous les pilotages</option>
+      <option value="ok">Prêt / Dans les temps</option>
+      <option value="warning">En danger</option>
+      <option value="late">En retard</option>
+      <option value="neutral">À planifier</option>
+    </select>
+    <select id="qualiteFilter">
+      <option value="">Tous</option>
+      <option value="agent">Agent</option>
+      <option value="elu">Élu(e)</option>
+    </select>
+    <select id="serviceFilter">
+      <option value="">Tous les services</option>
+    </select>
+    <select id="sortFilter">
+      <option value="recent">Plus récents d'abord</option>
+      <option value="oldest">Plus anciens d'abord</option>
+    </select>
+    <button id="resetFiltersBtn">Réinitialiser</button>
+    <span id="filterActiveBadge" class="d-none">0</span>
+  </div>
 
   <section class="content-card">
 
