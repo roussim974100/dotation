@@ -439,6 +439,7 @@ def row_to_summary(row):
         "resourceProgressRatio": progress["ratio"],
         "timingStatus": progress["timingStatus"],
         "timingLabel": progress["timingLabel"],
+        "data": payload,
     }
     user = current_user()
     if user and user.get("data_scope") == "masked":

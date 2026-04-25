@@ -152,7 +152,7 @@ def extract_items(payload):
 
     extracted = []
     for item_key, category, label, details in items:
-        if not details.get("selected"):
+        if not isinstance(details, dict) or not details.get("selected"):
             continue
 
         state = item_states.get(item_key, {})
@@ -301,7 +301,7 @@ def collect_resource_validation_errors(payload):
     ]
 
     for _, resource, rules in fixed_rules:
-        if not resource.get("selected"):
+        if not isinstance(resource, dict) or not resource.get("selected"):
             continue
         for label, key in rules:
             value = str(resource.get(key) or "").strip()
@@ -316,7 +316,7 @@ def collect_resource_validation_errors(payload):
         errors.append("Au moins une zone alarme doit être renseignée")
 
     for resource in resources:
-        if not resource.get("selected"):
+        if not isinstance(resource, dict) or not resource.get("selected"):
             continue
         field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
         field_values = resource.get("fields") or {}
