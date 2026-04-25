@@ -201,7 +201,7 @@
   function onFilterChipClick(event) {
     const filterType = event.target.dataset.filterType;
     const filterValue = event.target.dataset.filterValue;
-    const selectId = filterType.charAt(0).toUpperCase() + filterType.slice(1) + "Filter";
+    const selectId = filterType + "Filter";
     const select = document.getElementById(selectId);
 
     if (select) {
