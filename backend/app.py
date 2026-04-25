@@ -28,7 +28,7 @@ for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") != "0"
 
 
 @app.before_request
