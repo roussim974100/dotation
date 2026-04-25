@@ -322,3 +322,46 @@ def submit_restitution_signature_token_route(token):
             )
 
     return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})
+
+
+@bp.route("/api/forms/<form_id>/signature/view", methods=["GET"])
+@login_required
+def view_form_signature(form_id):
+    """View signature of a finalized form (requires password verification)"""
+    from flask import session
+
+    # Check if user has verified their password
+    verification_token = session.get("signature_verification_token")
+    print(f"[SIGNATURE_VIEW] User: {session.get('user')}, has_token: {bool(verification_token)}")
+    if not verification_token:
+        print(f"[SIGNATURE_VIEW] ERROR: No verification token for user: {session.get('user')}")
+        return jsonify({"error": "verification_required"}), 401
+
+    form_data = get_form(form_id)
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+
+    signature_data = form_data.get("data", {}).get("validation", {}).get("signatureDataUrl")
+    if not signature_data:
+        return jsonify({"error": "no_signature"}), 404
+
+    # Log the view
+    with get_db() as connection:
+        import uuid
+        log_id = str(uuid.uuid4())
+        connection.execute(
+            "INSERT INTO signature_views (id, form_id, username, viewed_at, ip_address, user_agent) VALUES (?,?,?,?,?,?)",
+            (
+                log_id,
+                form_id,
+                current_actor(),
+                utc_now(),
+                get_request_client_ip(),
+                request.headers.get("User-Agent", "")
+            )
+        )
+
+    return jsonify({
+        "signature": signature_data,
+        "signedAt": form_data.get("data", {}).get("validation", {}).get("signedAt")
+    }), 200
