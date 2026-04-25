@@ -105,16 +105,22 @@ def extract_signature_image(signature_data_url):
         return None
 
 
+DOSSIER_TYPE_LABELS = {
+    "arrivee": "Nouvelle arrivée",
+    "changement_service": "Changement de service",
+    "mise_a_jour": "Mise à jour",
+    "sortie": "Sortie",
+}
+
+
 def build_title(payload):
     beneficiaire = payload.get("beneficiaire", {})
-    prefix = (
-        beneficiaire.get("mandat")
-        if beneficiaire.get("qualite") == "elu"
-        else beneficiaire.get("service")
-    ) or ("MANDAT" if beneficiaire.get("qualite") == "elu" else "SERVICE")
+    dossier = payload.get("dossier", {})
     nom = (beneficiaire.get("nom") or "SANS NOM").upper()
     prenom = beneficiaire.get("prenom") or ""
-    return f"{prefix.upper()} - {nom} {prenom}".strip()
+    dossier_type = normalize_dossier_type(dossier.get("type"))
+    type_label = DOSSIER_TYPE_LABELS.get(dossier_type, "Dossier")
+    return f"{type_label} - {nom} {prenom}".strip()
 
 
 def normalize_dossier_type(value):
@@ -131,13 +137,7 @@ def normalize_dossier_type(value):
 
 
 def dossier_type_label(value):
-    labels = {
-        "arrivee": "Nouvelle arrivée",
-        "changement_service": "Changement de service",
-        "mise_a_jour": "Mise à jour de ressources",
-        "sortie": "Sortie / restitution",
-    }
-    return labels.get(normalize_dossier_type(value), "Nouvelle arrivée")
+    return DOSSIER_TYPE_LABELS.get(normalize_dossier_type(value), "Nouvelle arrivée")
 
 
 def format_export_datetime(value):
