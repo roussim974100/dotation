@@ -45,11 +45,7 @@ def build_restitution_pdf_bytes(title, payload):
         details = json.loads(item.get("details_json") or "{}") if item.get("details_json") else {}
         if not is_restitution_eligible_material_details(details):
             continue
-        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
-            str(value).strip()
-            for key, value in details.items()
-            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
-        )
+        detail_text = summarize_dynamic_resource(details) or "-"
         material_entries[item["item_key"]] = {
             "itemKey": item["item_key"],
             "label": item["label"],

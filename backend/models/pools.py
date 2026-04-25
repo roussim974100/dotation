@@ -7,17 +7,21 @@ from utils import generate_id, utc_now
 # Injection de la ressource partagée dans le dossier co-utilisateur
 # ---------------------------------------------------------------------------
 
-def _inject_resource_into_form(conn, target_form_id, source_resource):
-    """Copie les champs matériels (marque, modèle, SN…) de la ressource partagée
-    dans le dossier cible, sans écraser les données propres au co-utilisateur
-    (date d'attribution, condition, notes, signature…).
+# Attributs top-level de la ressource à propager en plus de fields{}
+_TOP_LEVEL_PROPAGATE = frozenset({"conditionAttribution", "conditionNotes", "assignedAt"})
 
-    - Si la ressource est absente du dossier cible : on l'ajoute sélectionnée.
-    - Si elle est déjà présente mais sans détails : on complète les champs.
-    - Si elle est déjà remplie : on ne touche à rien.
+
+def _inject_resource_into_form(conn, target_form_id, source_resource):
+    """Copie tous les champs de la ressource partagée dans le dossier cible.
+
+    Règle : remplir uniquement les champs vides — ne jamais écraser ce que
+    le co-utilisateur a déjà saisi. Recalcule le statut workflow après injection.
+
+    - Si la ressource est absente du dossier cible : on l'ajoute complète.
+    - Si elle est déjà présente : on complète uniquement les attributs vides.
     """
     row = conn.execute(
-        "SELECT payload_json, updated_at FROM dotation_forms WHERE id = ?",
+        "SELECT payload_json FROM dotation_forms WHERE id = ?",
         (target_form_id,),
     ).fetchone()
     if not row:
@@ -30,50 +34,62 @@ def _inject_resource_into_form(conn, target_form_id, source_resource):
 
     additional = (payload.get("resources") or {}).get("additional") or []
     resource_id = source_resource.get("id") or source_resource.get("code")
+    if not resource_id:
+        return
+
     source_fields = source_resource.get("fields") or {}
-
-    # Champs à propager (identification matérielle uniquement, pas les champs usage)
-    SHARED_FIELD_KEYS = {
-        "marque", "modele", "numeroSerie", "imei", "nomPoste",
-        "nomTelephone", "nomTablette",
-    }
-    propagated_fields = {k: v for k, v in source_fields.items() if k in SHARED_FIELD_KEYS and v}
-
-    if not propagated_fields:
-        return  # Rien à propager
-
     existing = next((r for r in additional if (r.get("id") or r.get("code")) == resource_id), None)
 
+    changed = False
+
     if existing is None:
-        # Ajouter la ressource en copiant les métadonnées du catalogue (sans données usage)
+        # Nouvelle ressource : copie complète (identification + condition + date + schéma)
         new_resource = {k: v for k, v in source_resource.items()
-                        if k not in ("sharedWith", "shared", "assignedAt",
-                                     "conditionAttribution", "conditionNotes")}
+                        if k not in ("sharedWith", "shared")}
         new_resource["selected"] = True
-        new_resource["fields"] = propagated_fields
+        new_resource["fields"] = dict(source_fields)
         new_resource["sharedWith"] = []
-        new_resource["shared"] = False  # le co-user n'est pas lui-même l'owner de la mutualisation
+        new_resource["shared"] = False  # le co-user n'est pas owner du pool
         additional.append(new_resource)
         changed = True
     else:
-        # Compléter les champs vides seulement (ne pas écraser ce que l'utilisateur a saisi)
+        # Ressource existante : compléter uniquement les attributs encore vides
         existing_fields = existing.get("fields") or {}
-        changed = False
-        for key, val in propagated_fields.items():
-            if not existing_fields.get(key):
+        for key, val in source_fields.items():
+            if val and not existing_fields.get(key):
                 existing_fields[key] = val
                 changed = True
         if changed:
             existing["fields"] = existing_fields
             existing["selected"] = True
 
+        for key in _TOP_LEVEL_PROPAGATE:
+            src_val = source_resource.get(key)
+            if src_val and not existing.get(key):
+                existing[key] = src_val
+                changed = True
+
     if not changed:
         return
 
     payload.setdefault("resources", {})["additional"] = additional
+
+    # Recalculer le statut workflow pour que le dossier reflète les champs maintenant remplis
+    try:
+        from models.workflow import compute_effective_workflow_status
+        new_status = compute_effective_workflow_status(payload)
+        payload.setdefault("workflow", {})["status"] = new_status
+    except Exception:
+        pass
+
     conn.execute(
-        "UPDATE dotation_forms SET payload_json = ?, updated_at = ? WHERE id = ?",
-        (_json.dumps(payload, ensure_ascii=False), utc_now(), target_form_id),
+        "UPDATE dotation_forms SET payload_json = ?, status = ?, updated_at = ? WHERE id = ?",
+        (
+            _json.dumps(payload, ensure_ascii=False),
+            payload.get("workflow", {}).get("status", "en_cours"),
+            utc_now(),
+            target_form_id,
+        ),
     )
 
 
