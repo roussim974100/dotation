@@ -1,0 +1,26 @@
+services:
+  dotation:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - dotation_data:/data       # clé secrète + bases SQLite persistées ici
+    environment:
+      - SESSION_COOKIE_SECURE=1
+      - DATA_DIR=/data
+      # APP_SECRET_KEY est optionnel : si absent, généré et persisté dans /data/.app_secret_key
+      # - APP_SECRET_KEY=
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dotation.rule=Host(`ton-domaine.fr`)"
+      - "traefik.http.routers.dotation.entrypoints=websecure"
+      - "traefik.http.routers.dotation.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dotation.loadbalancer.server.port=5000"
+    networks:
+      - traefik_network
+
+volumes:
+  dotation_data:
+
+networks:
+  traefik_network:
+    external: true   # réseau Traefik existant — adapter le nom si besoin
