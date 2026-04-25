@@ -94,8 +94,8 @@
     document.body.appendChild(modal);
 
     modal.addEventListener("mousedown", (event) => {
-      const target = event.target;
-      if (target && target.dataset && "gsClose" in target.dataset) {
+      const panel = modal.querySelector(".global-search__panel");
+      if (panel && !panel.contains(event.target)) {
         closeModal();
       }
     });
