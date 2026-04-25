@@ -4511,3 +4511,133 @@ main {
     display: none;
   }
 }
+
+/* ── Écran de confirmation de signature ───────────────────────────────────── */
+
+.sig-success {
+  text-align: center;
+  padding: 3rem 2rem 2.5rem;
+}
+
+.sig-success__icon-wrap {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 1.75rem;
+  background: #def7e7;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: sig-pop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes sig-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.sig-success__check {
+  stroke-dasharray: 52;
+  stroke-dashoffset: 52;
+  animation: sig-draw 0.4s 0.35s ease forwards;
+}
+
+@keyframes sig-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.sig-success__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.sig-success__subtitle {
+  color: var(--muted);
+  margin-bottom: 2rem;
+}
+
+.sig-success__summary {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 2rem;
+  margin-bottom: 2rem;
+  text-align: left;
+  min-width: 260px;
+}
+
+.sig-success__summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sig-success__summary-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sig-success__summary-value {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.sig-success__decision-confirmed {
+  color: #0a4d28;
+  background: #def7e7;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sig-success__decision-reservation {
+  color: #8a4b12;
+  background: #ffe7d1;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sig-success__close {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: 0;
+}
+
+/* Bouton en état chargement */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.btn-loading::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 0.5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: loader-spin 0.7s linear infinite;
+}
+
+[data-color-mode="dark"] .sig-success__icon-wrap {
+  background: #0a4d2840;
+}
+
+[data-color-mode="dark"] .sig-success__summary {
+  background: var(--surface-alt);
+}
