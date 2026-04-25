@@ -287,7 +287,6 @@
       if (lastQuery !== query) return;
       let results = Array.isArray(data) ? data : [];
       // Filtres client-side (timing et qualite non supportés par le backend)
-      const activeFilters = getActiveFilters();
       if (activeFilters.timing) {
         results = results.filter((r) => r.timingStatus === activeFilters.timing);
       }
