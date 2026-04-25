@@ -462,6 +462,19 @@ function getRestitutionLinkValidityDays() {
   return sanitized;
 }
 
+function applyRestitutionSignatureProtection(locked) {
+  const signatureSection = document.getElementById("restitutionSignatureSection");
+  const lockedSection = document.getElementById("restitutionSignatureLockedSection");
+
+  if (locked) {
+    if (signatureSection) signatureSection.classList.add("d-none");
+    if (lockedSection) lockedSection.classList.remove("d-none");
+  } else {
+    if (signatureSection) signatureSection.classList.remove("d-none");
+    if (lockedSection) lockedSection.classList.add("d-none");
+  }
+}
+
 function applyRestitutionReadOnlyMode() {
   document.getElementById("restitutionSubtitle").textContent = "Consultation de la restitution finalisée. Les informations restent visibles, sans modification possible.";
   document.getElementById("restitutionStatus").textContent = "Restitution terminée";
@@ -471,11 +484,8 @@ function applyRestitutionReadOnlyMode() {
   document.getElementById("saveRestitutionBtn")?.classList.add("d-none");
   document.getElementById("clearRestitutionSignatureBtn")?.classList.add("d-none");
 
-  // Hide the entire signature section for completed restitutions
-  const signatureSection = document.getElementById("restitution-signature");
-  if (signatureSection) {
-    signatureSection.classList.add("d-none");
-  }
+  // Hide the signature section and show the locked section for completed restitutions
+  applyRestitutionSignatureProtection(true);
 
   document.getElementById("restitution_signature")?.classList.add("signature-box--readonly");
 
@@ -485,6 +495,131 @@ function applyRestitutionReadOnlyMode() {
   ).forEach((field) => {
     field.disabled = true;
   });
+}
+
+function bindRestitutionSignatureProtectionHandlers() {
+  const showSignatureBtn = document.getElementById("showRestitutionSignatureBtn");
+  const verificationBtn = document.getElementById("restitutionSignatureVerificationBtn");
+  const verificationModal = document.getElementById("restitutionSignatureVerificationModal");
+  const passwordInput = document.getElementById("restitutionSignatureVerificationPassword");
+
+  console.log("[RESTITUTION_SIGNATURE] Binding handlers - btn:" + (showSignatureBtn ? "found" : "NOT FOUND"));
+
+  if (showSignatureBtn) {
+    showSignatureBtn.addEventListener("click", () => {
+      console.log("[RESTITUTION_SIGNATURE] Show signature button clicked");
+      const modal = new bootstrap.Modal(verificationModal);
+      modal.show();
+      const errorEl = document.getElementById("restitutionSignatureVerificationError");
+      if (errorEl) errorEl.classList.add("d-none");
+      if (passwordInput) passwordInput.value = "";
+    });
+  }
+
+  if (verificationBtn) {
+    verificationBtn.addEventListener("click", () => {
+      console.log("[RESTITUTION_SIGNATURE] Verification button clicked");
+      verifyRestitutionPasswordAndShowSignature();
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        verifyRestitutionPasswordAndShowSignature();
+      }
+    });
+  }
+}
+
+async function verifyRestitutionPasswordAndShowSignature() {
+  const password = document.getElementById("restitutionSignatureVerificationPassword").value;
+  if (!password) {
+    alert("Veuillez entrer votre mot de passe");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/auth/verify-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ password })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      const errorEl = document.getElementById("restitutionSignatureVerificationError");
+      if (errorEl) {
+        let errorMsg = "Mot de passe incorrect";
+        if (data.error === "user_pending") {
+          errorMsg = "Votre compte est en attente d'activation";
+        } else if (data.error === "user_disabled") {
+          errorMsg = "Votre compte est désactivé";
+        } else if (data.error === "authentication_required") {
+          errorMsg = "Vous devez être connecté";
+        } else if (data.error === "invalid_password") {
+          errorMsg = "Mot de passe incorrect";
+        }
+        errorEl.textContent = errorMsg;
+        errorEl.classList.remove("d-none");
+      }
+      return;
+    }
+
+    const verificationModalEl = document.getElementById("restitutionSignatureVerificationModal");
+    const verificationModal = bootstrap.Modal.getInstance(verificationModalEl);
+    if (verificationModal) verificationModal.hide();
+
+    const params = new URLSearchParams(window.location.search);
+    const formId = params.get("id");
+    if (!formId) {
+      console.error("No form ID found in URL");
+      return;
+    }
+
+    console.log("[RESTITUTION_SIGNATURE] Fetching signature for form: " + formId);
+    const sigResponse = await fetch(`/api/forms/${formId}/restitution-signature/view`, {
+      credentials: "same-origin"
+    });
+    if (!sigResponse.ok) {
+      const errData = await sigResponse.json();
+      alert("Erreur: " + (errData.error || "Impossible de récupérer la signature"));
+      return;
+    }
+
+    const sigData = await sigResponse.json();
+    displayRestitutionSignatureModal(sigData.signature, sigData.signedAt);
+  } catch (e) {
+    console.error("Error:", e);
+    alert("Erreur lors de la vérification");
+  }
+}
+
+function displayRestitutionSignatureModal(signatureDataUrl, signedAt) {
+  const canvas = document.getElementById("restitutionSignatureDisplayCanvas");
+  const timeEl = document.getElementById("restitutionSignatureDisplayTime");
+
+  if (timeEl && signedAt) {
+    const date = new Date(signedAt);
+    timeEl.textContent = `Signée le ${date.toLocaleDateString("fr-FR")} à ${date.toLocaleTimeString("fr-FR")}`;
+  }
+
+  if (canvas && signatureDataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+      }
+    };
+    img.src = signatureDataUrl;
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById("restitutionSignatureDisplayModal"));
+  modal.show();
 }
 
 async function initRestitutionPage() {
@@ -536,6 +671,7 @@ async function initRestitutionPage() {
     if (readOnlyMode) {
       applyRestitutionReadOnlyMode();
     }
+    bindRestitutionSignatureProtectionHandlers();
 
     function getImmaterielActions(items) {
       const actions = {};
