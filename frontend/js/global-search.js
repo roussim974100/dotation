@@ -194,6 +194,7 @@
 
     filtersDiv.innerHTML = html;
     filtersDiv.querySelectorAll(".global-search__filter-chip").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
       btn.addEventListener("click", onFilterChipClick);
     });
   }
