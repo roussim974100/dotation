@@ -16,11 +16,15 @@
     <div class="app-brand" data-home-link>
       <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
       <div>
-        <h1 class="app-title">Dossiers en cours</h1>
+        <h1 class="app-title">Attributions en cours</h1>
         <p class="app-subtitle">Arrivées, mobilités internes, ressources attribuées et restitutions.</p>
       </div>
     </div>
     <div class="header-actions">
+      <button id="newFormBtn" class="btn btn-primary d-none header-action-btn" type="button">
+        <span class="header-action-btn__icon">+</span>
+        <span class="header-action-btn__text">Nouvelle attribution</span>
+      </button>
       <a id="execDashboardLink" class="btn btn-outline-light d-none" href="executive-dashboard.html">Synthèse</a>
       <a id="adminLink" class="btn btn-outline-light d-none" href="admin.html">Administration</a>
       <details id="userMenu" class="user-menu">
@@ -41,36 +45,29 @@
   </div>
 </header>
 
-<!-- Dossiers en cours : recherche, suivi des dossiers et actions de gestion. -->
+<!-- Attributions en cours : recherche, suivi des dossiers et actions de gestion. -->
 <main class="container py-4 py-lg-5">
   <section class="hero-panel mb-4">
     <div>
       <div class="panel-title-wrap">
-        <h2 class="panel-title">Dossiers en cours</h2>
+        <h2 class="panel-title">Attributions en cours</h2>
         <span id="dashboardPendingBadge" class="dashboard-pending-badge d-none" aria-live="polite"></span>
       </div>
       <p class="panel-text">Concentrez-vous sur les dossiers et restitutions qui demandent encore une action, puis basculez vers les historiques dédiés quand tout est terminé.</p>
     </div>
     <div class="hero-panel__meta">
-      <div class="hero-panel__actions">
-        <button id="newFormBtn" class="btn btn-primary btn-lg d-none" type="button">Nouveau dossier</button>
-      </div>
       <div class="hero-panel__stats">
         <div class="stat-card">
           <span class="stat-card__label">Dossiers à compléter</span>
           <strong class="stat-card__value" id="assignmentDraftCount">0</strong>
-        </div>
-        <div class="stat-card">
-          <span class="stat-card__label">Restitutions à compléter</span>
-          <strong class="stat-card__value" id="restitutionDraftCount">0</strong>
         </div>
       </div>
     </div>
   </section>
 
   <nav class="dashboard-nav mb-4" aria-label="Navigation dossiers">
-    <a class="dashboard-nav__link is-active" href="index.html">Dossiers en cours</a>
-    <a class="dashboard-nav__link" href="assignments-completed.html">Dossiers finalisés</a>
+    <a class="dashboard-nav__link is-active" href="index.html">Attributions en cours</a>
+    <a class="dashboard-nav__link" href="assignments-completed.html">Attributions finalisées</a>
     <a class="dashboard-nav__link" href="restitutions-pending.html">Restitutions en cours</a>
     <a class="dashboard-nav__link" href="restitutions-completed.html">Restitutions finalisées</a>
     <a class="dashboard-nav__link" href="pools.html">Parc mutualisé</a>
@@ -168,7 +165,7 @@
         <div class="dashboard-group__header">
           <div>
             <p class="panel-eyebrow">Attributions</p>
-            <h3 class="section-title">Dossiers en cours</h3>
+            <h3 class="section-title">Attributions en cours</h3>
           </div>
           <span id="assignmentCountBadge" class="dashboard-group__badge">0</span>
         </div>
@@ -198,37 +195,6 @@
         </div>
       </section>
 
-      <section class="dashboard-group">
-        <div class="dashboard-group__header">
-          <div>
-            <p class="panel-eyebrow">Restitutions</p>
-            <h3 class="section-title">Dossiers avec restitution</h3>
-          </div>
-          <span id="restitutionCountBadge" class="dashboard-group__badge">0</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table align-middle draft-table">
-            <thead>
-              <tr>
-                <th class="draft-check-col"></th>
-                <th>Dossier</th>
-                <th>État</th>
-                <th>Avancement</th>
-                <th>Pilotage</th>
-                <th>Progression</th>
-
-                <th>Dernière modification</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="restitutionList"></tbody>
-          </table>
-        </div>
-        <div id="restitutionLoadMoreWrap" class="dashboard-group__load-more"></div>
-        <div id="restitutionEmptyState" class="dashboard-group__empty d-none">
-          <p class="mb-0">Aucun dossier en restitution ne correspond aux filtres actuels.</p>
-        </div>
-      </section>
     </div>
 
     <div id="emptyState" class="empty-state d-none">
