@@ -1307,9 +1307,16 @@ async function verifyPasswordAndShowSignature() {
   }
 
   try {
+    const csrfHeaders = {};
+    if (typeof getCsrfToken === "function") {
+      csrfHeaders["X-CSRF-Token"] = await getCsrfToken();
+    }
     const response = await fetch("/api/auth/verify-session", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...csrfHeaders
+      },
       credentials: "same-origin",
       body: JSON.stringify({ password })
     });

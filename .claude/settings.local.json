@@ -12,7 +12,9 @@
       "Bash(timeout 5 python -m flask run --debug)",
       "Bash(curl -s http://127.0.0.1:5000/)",
       "Bash(python3 -m py_compile \"C:\\\\www\\\\dotation\\\\backend\\\\routes\\\\signature.py\")",
-      "Bash(node -c \"C:\\\\www\\\\dotation\\\\frontend\\\\js\\\\restitution.js\")"
+      "Bash(node -c \"C:\\\\www\\\\dotation\\\\frontend\\\\js\\\\restitution.js\")",
+      "Bash(git commit -m ' *)",
+      "Bash(python3)"
     ]
   }
 }
