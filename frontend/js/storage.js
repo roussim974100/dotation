@@ -748,7 +748,8 @@ function filterDraftsForCurrentView(drafts) {
     return applyDashboardFilters(drafts.filter((draft) => isOperationalRestitutionDraft(draft)));
   }
 
-  return drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));
+  const operational = drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));
+  return applyDashboardFilters(operational);
 }
 
 function hydrateServiceFilterOptions(drafts) {
@@ -1040,7 +1041,7 @@ async function renderDraftList() {
     persistPendingDashboardUpdates();
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
-    const filteredDrafts = filterDraftsForCurrentView(applyDashboardFilters(sortedDrafts));
+    const filteredDrafts = filterDraftsForCurrentView(sortedDrafts);
     const assignmentDrafts = filteredDrafts.filter((draft) => isOperationalAssignmentDraft(draft));
     const restitutionDrafts = filteredDrafts.filter((draft) => isOperationalRestitutionDraft(draft));
     const historyDrafts = filteredDrafts;

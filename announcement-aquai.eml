@@ -1,0 +1,132 @@
+From: Direction IT <computing.bs@gmail.com>
+To: Chefs de services
+Subject: =?UTF-8?B?QW5ub25jZTogTGFuY2VtZW50IGRlIGxhIHBsYXRlZm9ybWUgIkEgUXVhaSI=?=
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Date: Thu, 24 Apr 2026 12:00:00 +0200
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }
+        .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 0; }
+        .header { background: linear-gradient(135deg, #0f5b8d 0%, #0a4267 100%); padding: 40px 20px; text-align: center; }
+        .logo { max-width: 280px; margin: 0 auto 20px; }
+        .logo img { width: 100%; height: auto; }
+        .content { padding: 40px 30px; }
+        h1 { color: #0f5b8d; font-size: 28px; margin-bottom: 10px; }
+        .tagline { color: #d9a441; font-size: 16px; font-weight: 600; margin-bottom: 30px; }
+        p { margin-bottom: 16px; color: #555; }
+        .section-title { color: #0f5b8d; font-size: 18px; font-weight: 600; margin-top: 30px; margin-bottom: 12px; border-left: 4px solid #d9a441; padding-left: 12px; }
+        ul { margin-left: 20px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; color: #555; }
+        .cta-box { background: #dbeaf3; border-left: 4px solid #0f5b8d; padding: 20px; margin: 30px 0; border-radius: 4px; }
+        .cta-box h3 { color: #0f5b8d; margin-bottom: 10px; font-size: 16px; }
+        .cta-link { display: inline-block; background: #0f5b8d; color: white; text-decoration: none; padding: 12px 24px; border-radius: 4px; font-weight: 600; margin-top: 10px; }
+        .cta-link:hover { background: #0a4267; }
+        .url-box { background: #f0f0f0; padding: 12px 16px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 14px; color: #0f5b8d; margin: 15px 0; word-break: break-all; }
+        .footer { background: #f9f9f9; border-top: 1px solid #eee; padding: 20px 30px; text-align: center; font-size: 12px; color: #999; }
+        .highlight { background: #fffacd; padding: 2px 4px; border-radius: 2px; }
+        strong { color: #0f5b8d; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <img src="https://aquai.intra.ville-publier.fr/assets/a-quai-email-logo.png" alt="À Quai" />
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <h1>🚀 À Quai — Votre nouveau gestionnaire de dotations</h1>
+            <p class="tagline">Prêts pour le voyage professionnel et toute la logistique que cela implique ?</p>
+
+            <p>Chères Collègues, Chers Collègues,</p>
+            <p>Après plusieurs années de réflexion sur les besoins logistiques de notre collectivité, nous sommes heureux de vous présenter <strong>À Quai</strong>, notre nouvelle plateforme de gestion des dotations matérielles.</p>
+
+            <p>Développée en <span class="highlight">vibecoding</span> <em>(itération agile, feedback utilisateurs, amélioration continue)</em>, cette application est née <strong>from scratch</strong> à partir d'une véritable compréhension des défis terrain : attribution de ressources, suivi du matériel, restitution en fin de mission, et collaboration entre services.</p>
+
+            <!-- Objectif -->
+            <div class="section-title">📌 Objectif</div>
+            <p>Centraliser et simplifier la gestion des dotations matérielles de la commune — de l'attribution initiale jusqu'à la restitution — en un seul endroit collaboratif, sécurisé et intuitif.</p>
+
+            <!-- Fonctionnalités -->
+            <div class="section-title">✨ Fonctionnalités principales</div>
+            <ul>
+                <li><strong>Dossiers d'attribution</strong> — Créer, modifier et verrouiller des dossiers pour nouvelle arrivée, changement de service, mise à jour ou sortie</li>
+                <li><strong>Ressources configurables</strong> — Catalogue adapté à vos services avec champs métier, suivi à l'attribution et à la restitution</li>
+                <li><strong>Signature sécurisée</strong> — Signature directe en ligne ou via lien à usage unique envoyé aux bénéficiaires</li>
+                <li><strong>Restitution intégrée</strong> — État par ressource (conforme, dégradé, manquant…), commentaires et suivi des dates</li>
+                <li><strong>Exports flexibles</strong> — PDF dossier, PDF restitution, Excel multi-dossiers en un clic</li>
+                <li><strong>Administration centralisée</strong> — Gestion des comptes, groupes, permissions, catalogue services/ressources</li>
+                <li><strong>Personnalisation</strong> — Logo, couleurs, nom d'organisation, email DPO et contact support configurables</li>
+                <li><strong>Journal d'audit</strong> — Traçabilité complète de toutes les actions pour conformité et transparence</li>
+                <li><strong>Mode sombre intégré</strong> — Interface adaptée à vos préférences de confort visuel</li>
+                <li><strong>Travail collaboratif</strong> — Services partageant ressources et informations via une interface commune</li>
+            </ul>
+
+            <!-- Call to Action -->
+            <div class="cta-box">
+                <h3>🔐 Accès et création de compte</h3>
+                <p>Tous les chefs de services sont invités à <strong>créer leur compte en 3 étapes simples</strong> :</p>
+
+                <ol style="margin-left: 20px; margin-top: 16px; margin-bottom: 16px;">
+                    <li><strong>Se rendre sur :</strong> <div class="url-box" style="margin-top: 8px;">https://aquai.intra.ville-publier.fr/</div></li>
+                    <li><strong>Cliquer sur « S'inscrire »</strong> et remplir le formulaire avec :<br>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li>Votre identifiant (3-64 caractères)</li>
+                            <li>Un mot de passe robuste (12+ caractères, majuscule, minuscule, chiffre, caractère spécial)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Demander l'activation de votre compte</strong> en envoyant un email à :<br>
+                        <div class="url-box" style="margin-top: 8px; font-size: 13px;">aquai@ville-publier.fr</div>
+                        <p style="margin-top: 8px; font-size: 13px;"><em>Indiquez simplement votre identifiant créé à l'étape 2. Nous activerons votre compte rapidement.</em></p>
+                    </li>
+                </ol>
+
+                <p style="margin-top: 16px; padding: 12px; background: #fff9e6; border-left: 4px solid #d9a441; border-radius: 2px; font-size: 13px;">
+                    <strong>💡 Conseil :</strong> Gardez votre identifiant et mot de passe en sécurité — vous en aurez besoin pour vous connecter une fois votre compte activé.
+                </p>
+            </div>
+
+            <!-- Diffusion -->
+            <div class="section-title">📢 Diffusion de l'information</div>
+            <p>Nous vous demandons de <strong>relayer cette annonce à toutes les personnes concernées</strong> par votre secteur :</p>
+            <ul>
+                <li>Vos collaborateurs directs qui gèrent les ressources</li>
+                <li>Les responsables administratifs de votre service</li>
+                <li>Tout agent amenés à utiliser le dossier de dotation</li>
+            </ul>
+            <p>L'application fonctionne mieux quand <strong>tout le monde est dedans</strong> — c'est un outil collaboratif par essence.</p>
+
+            <!-- Prochaines étapes -->
+            <div class="section-title">📅 Pour vous</div>
+            <ul>
+                <li><strong>Aujourd'hui :</strong> Créez votre compte sur À Quai</li>
+                <li><strong>Dès demain :</strong> Envoyez un email à <strong>aquai@ville-publier.fr</strong> pour demander l'activation</li>
+                <li><strong>Sous 24h :</strong> Votre compte sera activé et vous pourrez vous connecter</li>
+                <li><strong>Mois à venir :</strong> Sessions de formation et support progressif</li>
+            </ul>
+
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;"><strong>Demandes d'amélioration & feedback ?</strong> Écrivez à : <a href="mailto:aquai@ville-publier.fr" style="color: #0f5b8d;"><strong>aquai@ville-publier.fr</strong></a></p>
+
+            <p style="margin-top: 20px;"><strong>Bon voyage à bord ! ⚓</strong></p>
+            <p><strong>Samir BASSIM</strong></p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>À Quai</strong> v3.12.3 — Plateforme de gestion des dotations matérielles</p>
+            <p>© 2026 Collectivité. Tous droits réservés.</p>
+        </div>
+    </div>
+</body>
+</html>

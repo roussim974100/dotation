@@ -76,18 +76,44 @@ async function loadPools() {
   _pools = await apiJson("/api/pools");
   renderPools();
   document.getElementById("poolsCountValue").textContent = _pools.length;
+  bindFilterInput();
+}
+
+function bindFilterInput() {
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      renderPools();
+      updateFilterBadge();
+    });
+  }
+}
+
+function getFilteredPools() {
+  const search = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
+  if (!search) return _pools;
+  return _pools.filter((p) => p.label.toLowerCase().includes(search));
+}
+
+function updateFilterBadge() {
+  const search = (document.getElementById("searchInput")?.value || "").trim();
+  const badge = document.getElementById("filterActiveBadge");
+  if (badge) {
+    badge.classList.toggle("d-none", !search);
+  }
 }
 
 function renderPools() {
   const container = document.getElementById("poolsList");
   const empty = document.getElementById("poolsEmptyState");
-  if (!_pools.length) {
+  const filtered = getFilteredPools();
+  if (!filtered.length) {
     container.innerHTML = "";
     empty.classList.remove("d-none");
     return;
   }
   empty.classList.add("d-none");
-  container.innerHTML = _pools.map(renderPoolCard).join("");
+  container.innerHTML = filtered.map(renderPoolCard).join("");
   container.querySelectorAll("[data-pool-edit]").forEach((btn) =>
     btn.addEventListener("click", () => openPoolModal(_pools.find((p) => p.id === btn.dataset.poolEdit)))
   );

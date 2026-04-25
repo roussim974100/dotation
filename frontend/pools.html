@@ -20,6 +20,10 @@
       </div>
     </div>
     <div class="header-actions">
+      <button id="newPoolBtn" class="btn btn-primary d-none header-action-btn" type="button">
+        <span class="header-action-btn__icon">+</span>
+        <span class="header-action-btn__text">Nouveau parc</span>
+      </button>
       <a class="btn btn-outline-light" href="index.html">Accueil</a>
       <a id="adminLink" class="btn btn-outline-light d-none" href="admin.html">Administration</a>
       <details id="userMenu" class="user-menu">
@@ -56,14 +60,32 @@
     </div>
   </section>
 
+  <nav class="dashboard-nav mb-4" aria-label="Navigation dossiers">
+    <a class="dashboard-nav__link" href="index.html">Attributions en cours</a>
+    <a class="dashboard-nav__link" href="assignments-completed.html">Attributions finalisées</a>
+    <a class="dashboard-nav__link" href="restitutions-pending.html">Restitutions en cours</a>
+    <a class="dashboard-nav__link" href="restitutions-completed.html">Restitutions finalisées</a>
+    <a class="dashboard-nav__link is-active" href="pools.html">Parc mutualisé</a>
+  </nav>
+
+  <details id="filterMenu" class="filter-menu mb-4">
+    <summary class="btn btn-outline-secondary" aria-label="Ouvrir les filtres">
+      Filtres
+      <span id="filterActiveBadge" class="filter-menu__badge d-none">0</span>
+    </summary>
+    <div class="filter-menu__panel">
+      <div class="filter-menu__search">
+        <input id="searchInput" class="form-control form-control-sm" type="search"
+               placeholder="Nom du parc…" autocomplete="off">
+      </div>
+    </div>
+  </details>
+
   <section class="content-card">
     <div class="dashboard-toolbar mb-3">
       <div>
         <p class="panel-eyebrow">Parc mutualisé</p>
         <h3 class="section-title">Liste des parcs</h3>
-      </div>
-      <div class="dashboard-toolbar__actions">
-        <button id="newPoolBtn" class="btn btn-primary d-none" type="button">Nouveau parc</button>
       </div>
     </div>
 
