@@ -472,8 +472,10 @@ def describe_assignment_condition(item):
 
 
 def collect_resource_entries(payload):
-    materiel = payload.get("materiel", {})
-    immateriel = payload.get("immateriel", {})
+    _raw_mat = payload.get("materiel") or {}
+    _raw_imm = payload.get("immateriel") or {}
+    materiel = {k: v for k, v in _raw_mat.items() if isinstance(v, dict)}
+    immateriel = {k: v for k, v in _raw_imm.items() if isinstance(v, dict)}
     resources_obj = payload.get("resources", {})
     additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
 
