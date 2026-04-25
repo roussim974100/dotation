@@ -470,6 +470,13 @@ function applyRestitutionReadOnlyMode() {
   );
   document.getElementById("saveRestitutionBtn")?.classList.add("d-none");
   document.getElementById("clearRestitutionSignatureBtn")?.classList.add("d-none");
+
+  // Hide the entire signature section for completed restitutions
+  const signatureSection = document.getElementById("restitution-signature");
+  if (signatureSection) {
+    signatureSection.classList.add("d-none");
+  }
+
   document.getElementById("restitution_signature")?.classList.add("signature-box--readonly");
 
   document.querySelectorAll(
