@@ -68,18 +68,11 @@
     <a class="dashboard-nav__link is-active" href="pools.html">Parc mutualisé</a>
   </nav>
 
-  <details id="filterMenu" class="filter-menu mb-4">
-    <summary class="btn btn-outline-secondary" aria-label="Ouvrir les filtres">
-      Filtres
-      <span id="filterActiveBadge" class="filter-menu__badge d-none">0</span>
-    </summary>
-    <div class="filter-menu__panel">
-      <div class="filter-menu__search">
-        <input id="searchInput" class="form-control form-control-sm" type="search"
-               placeholder="Nom du parc…" autocomplete="off">
-      </div>
-    </div>
-  </details>
+  <div class="mb-4" style="display: flex; gap: 12px; align-items: center;">
+    <input id="searchInput" class="form-control form-control-sm" type="search"
+           placeholder="Rechercher un parc…" autocomplete="off"
+           style="max-width: 300px;">
+  </div>
 
   <section class="content-card">
     <div class="dashboard-toolbar mb-3">
