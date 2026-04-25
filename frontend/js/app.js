@@ -2543,8 +2543,8 @@ function populateForm(data, signaturePad) {
   renderReopenInfo(data.meta || {});
   signaturePad.restore(data.validation?.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
-  const isLocked = Boolean(data.meta.lockedAt);
-  console.log("[FORM] meta.lockedAt = '" + data.meta.lockedAt + "' -> locked = " + isLocked);
+  const workflowStatus = data.workflow?.status || "draft";
+  const isLocked = Boolean(data.meta.lockedAt) || ["returned", "partial_return"].includes(workflowStatus);
   applyLockState(isLocked);
 
   // Signaler le résultat du verrou au serveur
