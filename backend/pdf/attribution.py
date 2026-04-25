@@ -169,7 +169,13 @@ class _AQuaiDoc(FPDF):
 
         if sig_bytes and sig_w and sig_h:
             img_y = y_top + section_h - 18 - sig_h
-            self.image(io.BytesIO(sig_bytes), x=self._MARGIN + 14, y=img_y, w=sig_w, h=sig_h)
+            try:
+                self.image(io.BytesIO(sig_bytes), x=self._MARGIN + 14, y=img_y, w=sig_w, h=sig_h)
+            except Exception:
+                self.set_text_color(160, 160, 160)
+                self.set_font("Helvetica", "I", 9)
+                self.text(self._MARGIN + 14, img_y + sig_h / 2, normalize_pdf_text("[Image de signature non lisible]"))
+                self.set_text_color(0, 0, 0)
 
         return y_top + section_h + 16
 
