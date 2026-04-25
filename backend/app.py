@@ -12,25 +12,19 @@ from pathlib import Path
 from models.settings import seed_app_settings
 from models.catalog import seed_reference_catalogs, seed_service_catalog, migrate_suggest_flags, migrate_builtin_resource_schemas, migrate_builtin_resource_flags, migrate_missing_builtin_resources, migrate_cartes_visite_quantite, migrate_builtin_issuer_service, migrate_builtin_display_order, migrate_telephone_imei_field
 from models.forms import migrate_field_suggestions_from_history
-from routes.admin import bp as admin_bp
-from routes.pages import bp as pages_bp
-from routes.forms import bp as forms_bp
-from routes.signature import bp as signature_bp
-from routes.pools import bp as pools_bp
-from routes.debug import bp as debug_bp
-from routes.auth import bp as auth_bp
+import importlib
+import pkgutil
+import routes as _routes_pkg
 
 
 app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-app.register_blueprint(admin_bp)
-app.register_blueprint(pages_bp)
-app.register_blueprint(forms_bp)
-app.register_blueprint(signature_bp)
-app.register_blueprint(pools_bp)
-app.register_blueprint(debug_bp)
-app.register_blueprint(auth_bp)
+
+for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
+    _mod = importlib.import_module(f"routes.{_modname}")
+    if hasattr(_mod, "bp"):
+        app.register_blueprint(_mod.bp)
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
