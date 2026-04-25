@@ -211,6 +211,10 @@
       select.dispatchEvent(new Event("change", { bubbles: true }));
       renderQuickFilters();
     }
+
+    const input = document.getElementById(INPUT_ID);
+    const currentQuery = input ? input.value.trim() : "";
+    void runSearch(currentQuery);
   }
 
   function openModal() {
@@ -249,7 +253,8 @@
   function onInput(event) {
     const query = event.target.value.trim();
     clearTimeout(debounceTimer);
-    if (query.length < MIN_QUERY_LENGTH) {
+    const hasActiveFilters = Object.values(getActiveFilters()).some(Boolean);
+    if (query.length < MIN_QUERY_LENGTH && !hasActiveFilters) {
       lastQuery = query;
       currentResults = [];
       activeIndex = -1;
@@ -262,7 +267,11 @@
   async function runSearch(query) {
     lastQuery = query;
     try {
-      const res = await fetch(`/api/forms?search=${encodeURIComponent(query)}`, {
+      const params = new URLSearchParams();
+      if (query) params.set("search", query);
+      const activeFilters = getActiveFilters();
+      if (activeFilters.status) params.set("status", activeFilters.status);
+      const res = await fetch(`/api/forms?${params.toString()}`, {
         credentials: "same-origin",
       });
       if (res.status === 401) {
