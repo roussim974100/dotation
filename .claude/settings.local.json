@@ -48,7 +48,14 @@
       "PowerShell(Stop-Process *)",
       "Bash(python *)",
       "Bash(curl -s http://127.0.0.1:5000/api/health)",
-      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\")"
+      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\")",
+      "Bash(tee /tmp/flask_verbose.log)",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/debug/check-lock/f34eea78-272d-47fd-b944-487e79bb9941\")",
+      "Bash(tee /tmp/server2.log)",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/debug/test\")",
+      "Bash(curl -v \"http://127.0.0.1:5000/api/debug/check-lock/f34eea78-272d-47fd-b944-487e79bb9941\")",
+      "Bash(tee /tmp/server_debug.log)",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/forms/f34eea78-272d-47fd-b944-487e79bb9941\" -H \"Cookie: publier_session=test\")"
     ]
   }
 }

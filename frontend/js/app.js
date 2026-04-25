@@ -3,6 +3,54 @@ const draftStatus = document.getElementById("draftStatus");
 const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 let formDirty = false;
+
+// Capture des logs pour debug
+let consoleLogs = [];
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+console.log = function(...args) {
+  originalLog.apply(console, args);
+  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+  consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
+};
+
+console.error = function(...args) {
+  originalError.apply(console, args);
+  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+  consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
+};
+
+console.warn = function(...args) {
+  originalWarn.apply(console, args);
+  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+  consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
+};
+
+async function sendConsoleLogs() {
+  if (!consoleLogs.length) return;
+  try {
+    originalLog("[DEBUG] Sending " + consoleLogs.length + " logs to server");
+    const response = await fetch('/api/debug/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logs: consoleLogs })
+    });
+    const data = await response.json();
+    originalLog("[DEBUG] Logs sent successfully: " + data.file);
+    consoleLogs = [];
+  } catch (e) {
+    originalError('Failed to send logs:', e);
+  }
+}
+
+// Envoyer les logs quand on quitte la page
+window.addEventListener('beforeunload', () => {
+  if (consoleLogs.length) {
+    navigator.sendBeacon('/api/debug/logs', JSON.stringify({ logs: consoleLogs }));
+  }
+});
 const DOSSIER_TYPE_LABELS = {
   arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
@@ -1202,9 +1250,26 @@ function applyLockState(locked) {
   // Une fiche signée complète passe en lecture seule.
   // L'utilisateur peut encore consulter / imprimer, mais plus modifier.
   currentLockState = locked;
+
+  if (!form) {
+    console.error("[LOCK] form element not found!");
+    return;
+  }
+
   form.classList.toggle("form-locked", locked);
 
-  form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+  if (locked) {
+    console.log("[LOCK] Verrouillage du formulaire - lockedAt présent");
+  }
+
+  const allElements = form.querySelectorAll("input, select, textarea, button");
+  console.log("[LOCK] Total elements found: " + allElements.length);
+
+  let actuallyDisabled = 0;
+
+  allElements.forEach((element) => {
+    const wasDisabled = element.disabled;
+
     if (element.id === "exportPdfBtn") {
       element.disabled = false;
       return;
@@ -1218,7 +1283,12 @@ function applyLockState(locked) {
       return;
     }
     element.disabled = locked;
+    if (locked && !wasDisabled) actuallyDisabled++;
   });
+
+  if (locked) {
+    console.log("[LOCK] " + actuallyDisabled + " champs newly disabled");
+  }
 
   if (resumeHint && locked) {
     resumeHint.textContent = "Fiche signée : elle est maintenant verrouillée et disponible uniquement en consultation et impression.";
@@ -2276,7 +2346,29 @@ function populateForm(data, signaturePad) {
   renderReopenInfo(data.meta || {});
   signaturePad.restore(data.validation?.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
-  applyLockState(Boolean(data.meta.lockedAt));
+  const isLocked = Boolean(data.meta.lockedAt);
+  console.log("[FORM] meta.lockedAt = '" + data.meta.lockedAt + "' -> locked = " + isLocked);
+  applyLockState(isLocked);
+
+  // Signaler le résultat du verrou au serveur
+  if (isLocked) {
+    const allInputs = form ? form.querySelectorAll("input, select, textarea") : [];
+    const disabledCount = Array.from(allInputs).filter(e => e.disabled).length;
+    fetch('/api/debug/report-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        formId: data.meta.id,
+        isLocked: isLocked,
+        totalElements: allInputs.length,
+        disabledElements: disabledCount,
+        timestamp: new Date().toISOString()
+      })
+    }).catch(() => {});
+  }
+
+  // Envoyer les logs au serveur après un délai
+  setTimeout(sendConsoleLogs, 500);
 }
 
 function formatStatusLabel(status) {
