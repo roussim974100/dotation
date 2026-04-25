@@ -285,7 +285,16 @@
       const data = await res.json();
       // Ignore les résultats obsolètes si une nouvelle saisie est intervenue.
       if (lastQuery !== query) return;
-      currentResults = Array.isArray(data) ? data.slice(0, MAX_RESULTS) : [];
+      let results = Array.isArray(data) ? data : [];
+      // Filtres client-side (timing et qualite non supportés par le backend)
+      const activeFilters = getActiveFilters();
+      if (activeFilters.timing) {
+        results = results.filter((r) => r.timingStatus === activeFilters.timing);
+      }
+      if (activeFilters.qualite) {
+        results = results.filter((r) => r.beneficiaryType === activeFilters.qualite);
+      }
+      currentResults = results.slice(0, MAX_RESULTS);
       activeIndex = currentResults.length ? 0 : -1;
       renderResults();
     } catch (_error) {
