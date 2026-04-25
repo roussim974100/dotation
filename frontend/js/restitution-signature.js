@@ -229,6 +229,25 @@ function syncReservationVisibility() {
   document.getElementById("publicRestitutionReservationWrap")?.classList.toggle("d-none", selectedDecision !== "with_reservation");
 }
 
+function showRestitutionSuccess(result, decision) {
+  const summary = result?.summary || {};
+  const nom = [summary.prenom, summary.nom].filter(Boolean).join(" ") || "—";
+  const now = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(new Date());
+  const decisionEl = document.getElementById("restitutionSuccessDecision");
+  document.getElementById("restitutionSuccessName").textContent = nom;
+  document.getElementById("restitutionSuccessDate").textContent = now;
+  if (decisionEl) {
+    if (decision === "with_reservation") {
+      decisionEl.innerHTML = '<span class="sig-success__decision-reservation">Signé avec réserve</span>';
+    } else {
+      decisionEl.innerHTML = '<span class="sig-success__decision-confirmed">Restitution confirmée</span>';
+    }
+  }
+  publicRestitutionSignatureForm.classList.add("d-none");
+  restitutionSignatureSuccessCard.classList.remove("d-none");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 async function submitPublicRestitutionSignature(signaturePad) {
   const token = getRestitutionTokenFromUrl();
   const signatureDataUrl = signaturePad.toDataUrl();
@@ -243,20 +262,26 @@ async function submitPublicRestitutionSignature(signaturePad) {
     return;
   }
 
+  const btn = document.getElementById("submitPublicRestitutionSignatureBtn");
+  const originalLabel = btn.textContent;
+  btn.classList.add("btn-loading");
+  btn.textContent = "Envoi en cours…";
+
   try {
-    await requestRestitutionSignatureJson(`/api/restitution-signature/${encodeURIComponent(token)}/submit`, {
+    const result = await requestRestitutionSignatureJson(`/api/restitution-signature/${encodeURIComponent(token)}/submit`, {
       method: "POST",
       body: JSON.stringify({ signatureDataUrl, signataireDecision, signataireComment })
     });
-    publicRestitutionSignatureForm.classList.add("d-none");
-    restitutionSignatureSuccessCard.classList.remove("d-none");
+    showRestitutionSuccess(result, signataireDecision);
   } catch (error) {
+    btn.classList.remove("btn-loading");
+    btn.textContent = originalLabel;
     const messages = {
       invalid_link: "Ce lien de signature n'est plus valide.",
-      expired: "Ce lien de signature a expire.",
-      used: "Cette restitution a deja ete signee.",
-      revoked: "Ce lien de signature a ete revoque.",
-      reservation_comment_required: "Merci de renseigner votre reclamation avant validation."
+      expired: "Ce lien de signature a expiré.",
+      used: "Cette restitution a déjà été signée.",
+      revoked: "Ce lien de signature a été révoqué.",
+      reservation_comment_required: "Merci de renseigner votre réclamation avant validation."
     };
     showRestitutionSignatureError(messages[error.message] || "Impossible de valider la signature de restitution.");
   }

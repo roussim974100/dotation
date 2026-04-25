@@ -203,6 +203,18 @@ function populatePublicForm(payload) {
   });
 }
 
+function showSignatureSuccess(result) {
+  const summary = result?.summary || {};
+  const nom = [summary.prenom, summary.nom].filter(Boolean).join(" ") || "—";
+  const now = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(new Date());
+  document.getElementById("successName").textContent = nom;
+  document.getElementById("successDate").textContent = now;
+  document.getElementById("successTitle").textContent = summary.title || "—";
+  publicSignatureForm.classList.add("d-none");
+  signatureSuccessCard.classList.remove("d-none");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 async function submitPublicSignature(signaturePad) {
   const token = getTokenFromUrl();
   const rgpdAccepted = document.getElementById("publicRgpdCheck").checked;
@@ -216,14 +228,20 @@ async function submitPublicSignature(signaturePad) {
     return;
   }
 
+  const btn = document.getElementById("submitPublicSignatureBtn");
+  const originalLabel = btn.textContent;
+  btn.classList.add("btn-loading");
+  btn.textContent = "Envoi en cours…";
+
   try {
-    await requestPublicJson(`/api/signature/${encodeURIComponent(token)}/submit`, {
+    const result = await requestPublicJson(`/api/signature/${encodeURIComponent(token)}/submit`, {
       method: "POST",
       body: JSON.stringify({ rgpdAccepted, signatureDataUrl })
     });
-    publicSignatureForm.classList.add("d-none");
-    signatureSuccessCard.classList.remove("d-none");
+    showSignatureSuccess(result);
   } catch (error) {
+    btn.classList.remove("btn-loading");
+    btn.textContent = originalLabel;
     const messages = {
       invalid_link: "Ce lien n'est plus valide.",
       expired: "Ce lien de signature a expiré.",
