@@ -1846,13 +1846,16 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // Les ressources matérielles sont désormais collectées via getAdditionalResourcesData().
-  return {};
+  // Préserver les données existantes du formulaire pour backward compatibility
+  // (les ressources anciennes ne sont pas dans le nouveau système resources.additional)
+  const savedData = JSON.parse(JSON.stringify(window._savedMaterielData || {}));
+  return savedData;
 }
 
 function buildIntangibleSelectionMap() {
-  // Les ressources immatérielles sont désormais collectées via getAdditionalResourcesData().
-  return {};
+  // Préserver les données existantes du formulaire pour backward compatibility
+  const savedData = JSON.parse(JSON.stringify(window._savedImmaterielData || {}));
+  return savedData;
 }
 
 function collectRequestedResourcesFromFormData(formData) {
@@ -2191,12 +2194,26 @@ function populateForm(data, signaturePad) {
     })();
   }
 
+  // Sauvegarder les données legacy pour les préserver lors de la sauvegarde
+  window._savedMaterielData = JSON.parse(JSON.stringify(data.materiel || {}));
+  window._savedImmaterielData = JSON.parse(JSON.stringify(data.immateriel || {}));
+
   // Migration : convertir les anciennes données materiel/immateriel en resources.additional
   // pour les dossiers sauvegardés avant le rendu dynamique.
   migrateLegacyResourcesToAdditional(data);
 
   document.getElementById("rgpdCheck").checked = Boolean(data.validation?.rgpdAccepted);
   populateAdditionalResources(data);
+
+  // Afficher un avertissement si des ressources legacy n'ont pas été migrées
+  const legacyMateriel = data.materiel || {};
+  const legacyImmateriel = data.immateriel || {};
+  const hasLegacy = Object.keys(legacyMateriel).some(k => legacyMateriel[k]?.selected)
+                  || Object.keys(legacyImmateriel).some(k => legacyImmateriel[k]?.selected);
+  if (hasLegacy && (!data.resources?.additional || !data.resources.additional.length)) {
+    console.warn("⚠️ Ressources anciennes détectées et non migrées. Migration en cours...");
+    // Les ressources legacy seront conservées dans window._savedMaterielData et window._savedImmaterielData
+  }
 
   initQualite();
   initConditionalBlocks();
