@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request, session
+from flask.sessions import SecureCookieSessionInterface
 import os
 import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -17,8 +18,19 @@ import pkgutil
 import routes as _routes_pkg
 
 
+class _AutoSecureSessionInterface(SecureCookieSessionInterface):
+    """Cookie Secure = True si la requête arrive en HTTPS, False sinon.
+    Fonctionne automatiquement en dev (HTTP) et en prod (HTTPS via proxy)."""
+    def get_cookie_secure(self, app):
+        try:
+            return request.is_secure
+        except RuntimeError:
+            return False
+
+
 app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
+app.session_interface = _AutoSecureSessionInterface()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
@@ -28,7 +40,6 @@ for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") != "0"
 
 
 @app.before_request
