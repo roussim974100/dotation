@@ -2194,6 +2194,12 @@ function populateForm(data, signaturePad) {
     })();
   }
 
+  // DEBUG: Log les ressources chargées
+  console.log("📋 Données du formulaire chargées:");
+  console.log("   resources.additional:", data.resources?.additional?.length || 0);
+  console.log("   materiel keys:", Object.keys(data.materiel || {}).filter(k => data.materiel[k]?.selected));
+  console.log("   immateriel keys:", Object.keys(data.immateriel || {}).filter(k => data.immateriel[k]?.selected));
+
   // Sauvegarder les données legacy pour les préserver lors de la sauvegarde
   window._savedMaterielData = JSON.parse(JSON.stringify(data.materiel || {}));
   window._savedImmaterielData = JSON.parse(JSON.stringify(data.immateriel || {}));
