@@ -1,0 +1,239 @@
+{
+  "_comment": "Configuration locale des groupes et comptes applicatifs. Les mots de passe sont stockes haches avec bcrypt.",
+  "groups": {
+    "lecture": {
+      "label": "Lecture",
+      "description": "Consultation seule, sans possibilite de saisie.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "redaction": {
+      "label": "Redaction",
+      "description": "Creation et modification des fiches en cours.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.export"
+      ],
+      "data_scope": "full"
+    },
+    "gestion": {
+      "label": "Gestion",
+      "description": "Gestion avancee avec restitution et export.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete",
+        "forms.view_all",
+        "pools.manage"
+      ],
+      "data_scope": "full"
+    },
+    "direction": {
+      "label": "Direction",
+      "description": "Acces complet aux dossiers avec visibilite sur les chemins reseau UNC. Ideal pour DGS, DRH et encadrement superieur.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete",
+        "forms.view_all",
+        "pools.manage",
+        "unc.view_all"
+      ],
+      "data_scope": "full"
+    },
+    "admin": {
+      "label": "Administration",
+      "description": "Controle total et gestion des utilisateurs.",
+      "permissions": [
+        "forms.read_list",
+        "forms.read_detail",
+        "forms.create",
+        "forms.edit",
+        "forms.restitution",
+        "forms.export",
+        "forms.delete",
+        "pools.manage",
+        "users.manage",
+        "*"
+      ],
+      "data_scope": "full"
+    }
+  },
+  "users": [
+    {
+      "username": "admin",
+      "password_hash": "$2b$12$BgokKgQjVAIc90jozM2T7OSf16Ih2gy0is2JFLFkbwd6AqXI/Bycq",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "samir",
+      "password_hash": "$2b$12$.6bMyjOghJ5fhPjHf29KoOEKqMKzolD2YDvXSNYwr9DALEs5TPYd2",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active",
+      "service": "DSI",
+      "unc_view_all": true
+    },
+    {
+      "username": "drh",
+      "password_hash": "$2b$12$bmOVVsCJZ/ZxqbxeFKSBz./0O6aEw8OmRPiqpZZnt57GbCg/BO/SK",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active",
+      "service": "DRH"
+    },
+    {
+      "username": "slc",
+      "password_hash": "$2b$12$3Fprf0nob5eygT81VvV1T.Q2w1pBgdN362UzPHA2isV.ss92oSWIm",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "fabien.beley",
+      "password_hash": "$2b$12$bs2E9FBcjWdrQ/OFPAapw.CcYvpBjrE8q58fbmST1TnCIj1aXovp6",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "Testlecture",
+      "password_hash": "$2b$12$BXcWpv0NvHi5yvxuXpGou.MefrbfJ/kjARIJ0bgGuZ0ts9W9VA/DO",
+      "groups": [
+        "lecture"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "tatiana",
+      "password_hash": "$2b$12$EVcRelwFtzOTiHEEifr0A.0iSQM12TpsP5099UtOBlF8miabq7x1m",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "naim",
+      "password_hash": "$2b$12$QQdyFd2q4ochty21VRTyNOA4hFBcKhQ8vcnSZUkEDnUODM6HKaCvS",
+      "groups": [
+        "lecture"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "DaynaB",
+      "password_hash": "$2b$12$gOoWvp9RYOXG5tpmy9VxeOOm5Uv9DyV.nyCAB65DyTfWaSPlevjji",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "codex.test",
+      "password_hash": "$2b$12$6bi3uLnzH/IUzHwOxFfnCuqpA9JIcWAJnlq1g6X.NOY2e3soUO72u",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "claude.test",
+      "password_hash": "$2b$12$PKFxnAoGvu.PC4pJbUhAtOSJupyfAbRhANwlX1FiXVuRGDiPU5Vt.",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "Jordan",
+      "password_hash": "$2b$12$CM0OTdTiTMrmAtnlUN3XyO0AZZaLeC9L6iswCwEhl2LxmQuaZ/Hwi",
+      "groups": [
+        "lecture"
+      ],
+      "is_active": true,
+      "status": "pending"
+    },
+    {
+      "username": "test.dsi",
+      "password_hash": "$2b$12$yB7yb0QQ484Fv.DjGvEGNOM42oB5TQWy7oSc6ZexJg03Zu7oKocpi",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active",
+      "service": "DSI",
+      "unc_view_all": true
+    },
+    {
+      "username": "test.direction",
+      "password_hash": "$2b$12$DiG13QJBbR042g1Pyu4gUep3AAVKlzESbv/5e9N1K5fNQF6lyfXBC",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active",
+      "service": "Direction generale"
+    },
+    {
+      "username": "test.noservice",
+      "password_hash": "$2b$12$Ul8324OoJmRA2czCNRaYx.0zm4srxN9KuneKc3Df/P90/B7Fb21R6",
+      "groups": [
+        "lecture"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "e2e.test",
+      "password_hash": "$2b$10$7AWTXgjKuZRuDxEIcichsOJBdLY8FnsvCWDBklwkym4/dKjAir2wK",
+      "groups": [
+        "admin"
+      ],
+      "is_active": true,
+      "status": "active"
+    },
+    {
+      "username": "ccas",
+      "password_hash": "$2b$12$L8V0UXj2Sw.7ozVtrzr0Keo4kb14p/NGlj5qZhZXfkcEjMpiPPz8i",
+      "groups": [
+        "gestion"
+      ],
+      "is_active": true,
+      "status": "active",
+      "service": "CCAS"
+    }
+  ]
+}
