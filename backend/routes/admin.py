@@ -243,10 +243,17 @@ def dashboard_stats():
     ).fetchone()
     avg_treatment = round(avg_treatment_row["avg_days"], 1) if avg_treatment_row and avg_treatment_row["avg_days"] else 0
 
-    # KPI Timing 2 : Durée moyenne de restitution
-    restitution_conds = ["status IN ('returned', 'partial_return')", "returned_at IS NOT NULL", "assigned_at IS NOT NULL"] + conditions
+    # KPI Timing 2 : Délai moyen de restitution
+    # Priorité : returned_at - missionEndAt (date fin de mission saisie dans la restitution)
+    # Fallback : returned_at - created_at (ouverture du dossier de sortie)
+    restitution_conds = ["status IN ('returned', 'partial_return')", "returned_at IS NOT NULL"] + conditions
     avg_restitution_row = db.execute(
-        "SELECT AVG(CAST((julianday(returned_at) - julianday(assigned_at)) AS FLOAT)) as avg_days "
+        "SELECT AVG(CAST((julianday(returned_at) - julianday("
+        "  CASE WHEN NULLIF(TRIM(json_extract(payload_json, '$.restitution.missionEndAt')), '') IS NOT NULL"
+        "       THEN json_extract(payload_json, '$.restitution.missionEndAt')"
+        "       ELSE created_at"
+        "  END"
+        ")) AS FLOAT)) as avg_days "
         f"FROM dotation_forms WHERE " + " AND ".join(restitution_conds),
         base_params,
     ).fetchone()
