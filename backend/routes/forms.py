@@ -677,6 +677,7 @@ def update_restitution(form_id):
     payload = existing["data"]
     payload.setdefault("workflow", {})
     payload.setdefault("restitution", {})
+    payload["restitution"]["missionEndAt"] = patch.get("missionEndAt", payload["restitution"].get("missionEndAt"))
     payload["restitution"]["returnedAt"] = patch.get("returnedAt", payload["restitution"].get("returnedAt"))
     payload["restitution"]["reason"] = patch.get("reason", payload["restitution"].get("reason"))
     payload["restitution"]["notes"] = patch.get("notes", payload["restitution"].get("notes"))
