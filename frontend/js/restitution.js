@@ -665,6 +665,7 @@ async function initRestitutionPage() {
     document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return"
       ? "Restitution partielle"
       : (currentStatus === "awaiting_signature" ? "En attente de signature" : (currentStatus === "returned" ? "Restitution terminée" : "Attribution active"));
+    document.getElementById("global_mission_end_at").value = result.data.restitution?.missionEndAt || "";
     document.getElementById("global_returned_at").value = result.data.restitution?.returnedAt || todayDateInputValue();
     document.getElementById("global_return_reason").value = result.data.restitution?.reason || "";
     document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
@@ -726,6 +727,7 @@ async function initRestitutionPage() {
 
       return {
         status: deriveWorkflowStatus(itemStates),
+        missionEndAt: document.getElementById("global_mission_end_at").value || "",
         returnedAt,
         reason: document.getElementById("global_return_reason").value,
         notes: document.getElementById("global_return_notes").value.trim(),
