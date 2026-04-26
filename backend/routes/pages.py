@@ -12,7 +12,7 @@ from auth import (
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, extract_first_forwarded_ip, check_user,
     current_user,
-    _is_login_rate_limited,
+    _is_login_rate_limited, rate_limit,
 )
 from models.audit import insert_app_log, read_login_attempt_context
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings, build_public_settings_payload
@@ -89,6 +89,7 @@ def login():
 
 
 @bp.route("/signup", methods=["GET", "POST"])
+@rate_limit(max_requests=5, window_seconds=600, scope="signup")
 def signup():
     if request.method == "POST":
         submitted_token = request.form.get("csrf_token") or ""
@@ -103,7 +104,7 @@ def signup():
         if not is_valid_username(username):
             return redirect("/signup?error=invalid_username")
         if get_user_record(username):
-            return redirect("/signup?error=user_exists")
+            return redirect("/signup?error=invalid_username")
         if password != password_confirm:
             return redirect("/signup?error=password_mismatch")
         complexity_error = password_complexity_error(password)

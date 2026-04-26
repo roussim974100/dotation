@@ -37,7 +37,8 @@ for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
     _mod = importlib.import_module(f"routes.{_modname}")
     if hasattr(_mod, "bp"):
         app.register_blueprint(_mod.bp)
-app.config["SESSION_COOKIE_NAME"] = "publier_session"
+_is_prod = os.environ.get("FLASK_DEBUG", "0") != "1"
+app.config["SESSION_COOKIE_NAME"] = "__Secure-publier_session" if _is_prod else "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
@@ -70,6 +71,8 @@ def disable_frontend_cache(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
     # CSP : self uniquement + CDN Bootstrap/CookieConsent autorisés explicitement
     # unsafe-inline nécessaire pour les styles Bootstrap injectés dynamiquement
     response.headers.setdefault(
