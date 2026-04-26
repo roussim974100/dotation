@@ -253,13 +253,18 @@ def dashboard_stats():
     avg_restitution = round(avg_restitution_row["avg_days"], 1) if avg_restitution_row and avg_restitution_row["avg_days"] else 0
 
     # KPI Timing 3 : % dossiers complétés en ≤ 7 jours
+    completed_conds = ["status IN ('active', 'returned', 'partial_return')"] + conditions
+    completed_count = db.execute(
+        "SELECT COUNT(*) as count FROM dotation_forms WHERE " + " AND ".join(completed_conds),
+        base_params,
+    ).fetchone()["count"]
     fast_conds = ["status IN ('active', 'returned', 'partial_return')",
                   "CAST((julianday(updated_at) - julianday(created_at)) AS FLOAT) <= 7"] + conditions
     fast_count = db.execute(
         "SELECT COUNT(*) as count FROM dotation_forms WHERE " + " AND ".join(fast_conds),
         base_params,
     ).fetchone()["count"]
-    pct_fast = round((fast_count * 100.0 / active_count) if active_count > 0 else 0, 0)
+    pct_fast = round((fast_count * 100.0 / completed_count) if completed_count > 0 else 0, 0)
 
     # KPI Timing 4 : Distribution des délais
     timing_dist_conds = ["status IN ('active', 'returned', 'partial_return')"] + conditions
