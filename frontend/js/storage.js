@@ -617,6 +617,13 @@ function buildDraftActionButtons(draft, options) {
   const id = draft.id;
   const status = draft.status || "draft";
   const hasRestitution = hasRestitutionData(draft);
+  const viewMode = getDashboardViewMode();
+
+  // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html
+  const inRestitutionsPendingView = viewMode === "restitutions_pending";
+  const openAction = (inRestitutionsPendingView && canOpenRestitution(draft, options))
+    ? "openRestitution"
+    : "editDraft";
 
   // PDF — action principale selon la phase
   const pdfItems = [];
@@ -665,12 +672,13 @@ function buildDraftActionButtons(draft, options) {
     managementItems.push({ action: "removeDraft", id, label: "Supprimer le dossier" });
   }
 
-  // Bouton "Restitution" : uniquement sur attribution finalisée (active), pas sur les phases restitution
-  const showRestitutionBtn = options.canRestitution && status === "active";
+  // Bouton "Restitution" : uniquement sur attribution finalisée (active) hors vue restitutions en cours
+  // (dans restitutions_pending, "Ouvrir" pointe déjà directement sur restitution.html)
+  const showRestitutionBtn = options.canRestitution && status === "active" && !inRestitutionsPendingView;
 
   return `
     <div class="draft-actions__primary">
-      <button class="btn btn-sm btn-primary" type="button" data-action="editDraft" data-id="${id}">Ouvrir</button>
+      <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
       ${showRestitutionBtn ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
       ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
       ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
