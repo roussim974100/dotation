@@ -184,10 +184,19 @@ def dashboard_stats():
     ]
 
     # KPI 4 : Ressources les plus attribuées (top 10)
+    # Pour "Autre matériel", on remplace le label générique par la description saisie.
+    # Pour les ressources dynamiques additionnelles sans description, on concatène les champs.
     by_resource_rows = db.execute(
-        """SELECT TRIM(label) as label, COUNT(*) as count
+        """SELECT
+             CASE
+               WHEN LOWER(TRIM(label)) = 'autre matériel'
+                    AND TRIM(COALESCE(json_extract(details_json, '$.description'), '')) != ''
+               THEN TRIM(json_extract(details_json, '$.description'))
+               ELSE TRIM(label)
+             END AS label,
+             COUNT(*) AS count
            FROM dotation_items WHERE assigned=1
-           GROUP BY LOWER(TRIM(label))
+           GROUP BY 1
            ORDER BY count DESC LIMIT 10"""
     ).fetchall()
     by_resource = [{"label": row["label"], "count": row["count"]} for row in by_resource_rows]
