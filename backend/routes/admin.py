@@ -161,10 +161,17 @@ def dashboard_stats():
     svc_params = [p for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else base_params
     svc_where = ("WHERE " + " AND ".join(svc_conds)) if svc_conds else ""
     by_service_rows = db.execute(
-        f"SELECT service, COUNT(*) as count FROM dotation_forms {svc_where} GROUP BY service ORDER BY count DESC LIMIT 10",
+        f"""SELECT
+            CASE WHEN beneficiary_type = 'elu'
+                 THEN COALESCE(NULLIF(mandat,''), service, '—')
+                 ELSE COALESCE(NULLIF(service,''), '—')
+            END as service,
+            COUNT(*) as count
+            FROM dotation_forms {svc_where}
+            GROUP BY 1 ORDER BY count DESC LIMIT 10""",
         svc_params,
     ).fetchall()
-    by_service = [{"service": row["service"] or "—", "count": row["count"]} for row in by_service_rows]
+    by_service = [{"service": row["service"], "count": row["count"]} for row in by_service_rows]
 
     # KPI 3 : Dossiers par type
     by_type_rows = db.execute(
