@@ -74,7 +74,8 @@ function normalizeBrandingSettings(raw = {}) {
     beneficiary_types: raw.beneficiary_types || "agent:Agent,elu:Élu(e)",
     support_name: raw.support_name || "",
     support_role: raw.support_role || "",
-    support_email: raw.support_email || ""
+    support_email: raw.support_email || "",
+    restitution_phase1_unlock_days: raw.restitution_phase1_unlock_days ?? "1"
   };
 }
 
@@ -91,7 +92,8 @@ function collectBrandingPayload() {
     beneficiary_types: brandingById("brandingBeneficiaryTypes")?.value.trim(),
     support_name: brandingById("brandingSupportName")?.value.trim(),
     support_role: brandingById("brandingSupportRole")?.value.trim(),
-    support_email: brandingById("brandingSupportEmail")?.value.trim()
+    support_email: brandingById("brandingSupportEmail")?.value.trim(),
+    restitution_phase1_unlock_days: parseInt(brandingById("brandingPhase1UnlockDays")?.value || "1", 10)
   });
 }
 
@@ -281,6 +283,7 @@ async function loadBrandingSettings() {
   if (brandingById("brandingSupportName")) brandingById("brandingSupportName").value = raw.support_name || "";
   if (brandingById("brandingSupportRole")) brandingById("brandingSupportRole").value = raw.support_role || "";
   if (brandingById("brandingSupportEmail")) brandingById("brandingSupportEmail").value = raw.support_email || "";
+  if (brandingById("brandingPhase1UnlockDays")) brandingById("brandingPhase1UnlockDays").value = raw.restitution_phase1_unlock_days ?? "1";
 
   toggleLogoFields(raw.brand_logo_mode);
   updateBrandingPreview(payload.logoUrl, raw.org_name || payload.orgName);
