@@ -9,6 +9,8 @@ _KNOWN_TABLES = {
     "resource_catalog", "service_catalog", "signature_links",
     "app_settings", "app_logs", "deleted_items",
     "shared_pools", "shared_pool_members", "shared_pool_items",
+    "persons", "audit_events", "field_suggestions",
+    "signature_views", "dotation_item_selections",
     "users", "groups", "user_groups",
 }
 
