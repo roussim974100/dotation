@@ -98,6 +98,13 @@ async function initPhase1Page() {
       return;
     }
 
+    // Si Phase 1 déjà validée et dossier non terminé → aller directement à Phase 2
+    const currentRestitutionCheck = result.data.restitution || {};
+    if (currentRestitutionCheck.phase1ValidatedAt && status !== "returned") {
+      window.location.href = `restitution.html?id=${encodeURIComponent(id)}`;
+      return;
+    }
+
     // Hydrater l'en-tête
     const b = result.data.beneficiaire || {};
     if (getEl("phase1Title")) getEl("phase1Title").textContent = `${b.nom || ""} ${b.prenom || ""}`.trim() || "Dossier";
@@ -106,7 +113,7 @@ async function initPhase1Page() {
     if (getEl("phase1StatusPill")) getEl("phase1StatusPill").textContent = statusLabels[status] || status;
 
     // Hydrater les champs
-    let currentRestitution = result.data.restitution || {};
+    let currentRestitution = currentRestitutionCheck;
     if (getEl("p1_mission_end_at")) getEl("p1_mission_end_at").value = currentRestitution.missionEndAt || "";
     if (getEl("p1_returned_at")) getEl("p1_returned_at").value = currentRestitution.returnedAt || "";
     if (getEl("p1_return_reason")) getEl("p1_return_reason").value = currentRestitution.reason || "";
