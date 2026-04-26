@@ -654,6 +654,13 @@ async function initRestitutionPage() {
       return;
     }
     const readOnlyMode = currentStatus === "returned";
+    let currentRestitution = result.data.restitution || {};
+
+    // Redirection vers Phase 1 si non validée (avant tout rendu)
+    if (!currentRestitution?.phase1ValidatedAt && !readOnlyMode) {
+      window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
+      return;
+    }
 
     const signaturePad = initSignaturePad("restitution_signature", "clearRestitutionSignatureBtn");
     document.querySelectorAll('input[name="restitution_signature_status"]').forEach((input) => {
@@ -669,18 +676,11 @@ async function initRestitutionPage() {
     const immaterielItems = (result.items || []).filter((item) => item.category === "immateriel");
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
     renderImmaterielItems(immaterielItems, result.data.restitution?.immaterielActions || {});
-    let currentRestitution = result.data.restitution || {};
     restoreRestitutionSignature(currentRestitution, signaturePad);
     if (readOnlyMode) {
       applyRestitutionReadOnlyMode();
     }
     bindRestitutionSignatureProtectionHandlers();
-
-    // Redirection vers Phase 1 si non validée
-    if (!currentRestitution?.phase1ValidatedAt && !readOnlyMode) {
-      window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
-      return;
-    }
 
     // Hydratation du résumé Phase 1
     const phase1EditLink = document.getElementById("phase1EditLink");
