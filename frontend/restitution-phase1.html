@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<title>Restitution — Phase 1</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
+      <div>
+        <h1 class="app-title">Restitution — Phase 1</h1>
+        <p class="app-subtitle">Saisissez les dates de restitution pour permettre aux services de traiter le dossier.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="index.html">Retour à l'accueil</a>
+      <details id="userMenu" class="user-menu">
+        <summary class="btn btn-outline-light" id="userMenuBtn">Mon compte</summary>
+        <div class="user-menu__panel">
+          <div class="user-menu__header">
+            <span class="user-menu__name" id="userMenuName"></span>
+            <span class="user-menu__role" id="userMenuRole"></span>
+          </div>
+          <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+          <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+          <div class="user-menu__sep"></div>
+          <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <div id="phase1Loader" class="page-loader">
+    <div class="page-loader__panel">
+      <div class="page-loader__spinner"></div>
+      <strong>Chargement</strong>
+      <p>Préparation de la Phase 1.</p>
+    </div>
+  </div>
+
+  <section class="hero-panel mb-4">
+    <div>
+      <p class="panel-eyebrow">Phase 1 — RH</p>
+      <h2 class="panel-title" id="phase1Title">Dossier en cours</h2>
+      <p class="panel-text" id="phase1Subtitle">Renseignez les dates clés pour déclencher le traitement par les services.</p>
+    </div>
+    <div class="hero-panel__meta">
+      <div class="status-pill" id="phase1StatusPill">Attribution active</div>
+    </div>
+  </section>
+
+  <section class="content-card" id="phase1Form">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Dates de restitution</p>
+        <h3 class="section-title">Contexte de départ</h3>
+        <p class="panel-text">Renseignez les informations disponibles. Vous pouvez enregistrer sans valider si les dates ne sont pas encore connues.</p>
+      </div>
+      <div id="phase1ValidatedBadge" class="d-none">
+        <span class="badge bg-success fs-6 px-3 py-2">Phase 1 validée</span>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label" for="p1_mission_end_at">Date de fin de mission</label>
+        <input class="form-control" type="date" id="p1_mission_end_at">
+        <div class="form-text">Dernier jour effectif de l'agent (retraite, départ…)</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="p1_returned_at">Date de restitution du matériel</label>
+        <input class="form-control" type="date" id="p1_returned_at">
+      </div>
+      <div class="col-12 d-none" id="p1DateOrderWarning">
+        <div class="alert alert-warning py-2 mb-0">La date de restitution est antérieure à la date de fin de mission — c'est possible si le matériel a été rendu avant le départ effectif de l'agent.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="p1_return_reason">Motif</label>
+        <select class="form-select" id="p1_return_reason">
+          <option value="">Sélectionner</option>
+          <option value="fin_de_fonction">Fin de fonction</option>
+          <option value="demission">Démission</option>
+          <option value="mutation">Mutation</option>
+          <option value="fin_de_mandat">Fin de mandat</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="p1_return_notes">Observations générales</label>
+        <textarea class="form-control" id="p1_return_notes" rows="3" placeholder="Précisez le contexte général de la restitution."></textarea>
+      </div>
+    </div>
+
+    <!-- Barre Phase 1 validée : info + bouton modifier -->
+    <div class="mt-4 pt-3 border-top d-none" id="phase1ModifyBar">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="text-muted small" id="phase1ValidatedMeta"></span>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="unlockPhase1Btn">Modifier les dates</button>
+        <a class="btn btn-outline-primary btn-sm" id="goToPhase2Btn" href="#">Accéder à l'état du matériel →</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <div class="action-bar__hint" id="phase1ActionHint">Les dates peuvent être enregistrées sans valider si elles ne sont pas encore connues.</div>
+    <div class="action-bar__buttons">
+      <a class="btn btn-outline-secondary" id="cancelBtn" href="index.html">Annuler</a>
+      <button class="btn btn-outline-primary" id="savePhase1Btn" type="button">Enregistrer</button>
+      <button class="btn btn-primary" id="validatePhase1Btn" type="button">Valider Phase 1</button>
+    </div>
+  </div>
+</main>
+
+<!-- Modal déverrouillage Phase 1 -->
+<div class="modal fade" id="unlockPhase1Modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Modifier les dates — Phase 1</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <p class="panel-text" id="unlockPhase1ModalText"></p>
+        <div id="unlockPhase1MotifWrap" class="d-none">
+          <label class="form-label" for="unlockPhase1Motif">Motif de correction <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="unlockPhase1Motif" rows="3" placeholder="Expliquez pourquoi les dates doivent être corrigées."></textarea>
+        </div>
+        <div id="unlockPhase1Error" class="alert alert-danger py-2 mt-2 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-warning" id="unlockPhase1ConfirmBtn">Déverrouiller et modifier</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/branding.js"></script>
+<script src="js/ui.js?v=20260330a"></script>
+<script src="js/global-search.js?v=20260330a"></script>
+<script src="js/restitution-phase1.js?v=20260501a"></script>
+</body>
+</html>
