@@ -12,15 +12,23 @@ const TYPE_LABELS = {
 };
 
 const STATUS_COLORS = {
-  draft: "#fff4d6", active: "#def7e7", partial_assignment: "#ffe7d1",
-  awaiting_signature: "#ddefff", returned: "#ddefff",
-  partial_return: "#ffe7d1", cancelled: "#fde2e2"
+  draft:               "#FBBF24",
+  active:              "#22C55E",
+  partial_assignment:  "#F97316",
+  awaiting_signature:  "#3B82F6",
+  returned:            "#6366F1",
+  partial_return:      "#A855F7",
+  cancelled:           "#EF4444"
 };
 
 const STATUS_TEXT_COLORS = {
-  draft: "#694b00", active: "#0a4d28", partial_assignment: "#8a4b12",
-  awaiting_signature: "#18436d", returned: "#18436d",
-  partial_return: "#7a4312", cancelled: "#7f1d1d"
+  draft:               "#92400E",
+  active:              "#14532D",
+  partial_assignment:  "#7C2D12",
+  awaiting_signature:  "#1E3A5F",
+  returned:            "#312E81",
+  partial_return:      "#581C87",
+  cancelled:           "#7F1D1D"
 };
 
 let filters = { period: "30d", service: "", type: "", statut: "", qualite: "", date_from: "", date_to: "", alerte_seuil: "30" };
@@ -198,15 +206,28 @@ function renderStatusChart(by_status) {
       datasets: [{
         data: counts,
         backgroundColor: bgColors,
-        borderColor: textColors,
-        borderWidth: 1
+        borderColor: "#ffffff",
+        borderWidth: 3,
+        hoverOffset: 8
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "bottom" }
+        legend: {
+          position: "bottom",
+          labels: {
+            padding: 16,
+            boxWidth: 14,
+            font: { size: 12 }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.label} : ${ctx.parsed}`
+          }
+        }
       }
     }
   });
