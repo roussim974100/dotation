@@ -185,7 +185,10 @@ def dashboard_stats():
 
     # KPI 4 : Ressources les plus attribuées (top 10)
     by_resource_rows = db.execute(
-        "SELECT label, COUNT(*) as count FROM dotation_items WHERE assigned=1 GROUP BY label ORDER BY count DESC LIMIT 10"
+        """SELECT TRIM(label) as label, COUNT(*) as count
+           FROM dotation_items WHERE assigned=1
+           GROUP BY LOWER(TRIM(label))
+           ORDER BY count DESC LIMIT 10"""
     ).fetchall()
     by_resource = [{"label": row["label"], "count": row["count"]} for row in by_resource_rows]
 
