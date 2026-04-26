@@ -79,6 +79,9 @@
         <label class="form-label" for="global_returned_at">Date de restitution du matériel</label>
         <input class="form-control" type="date" id="global_returned_at">
       </div>
+      <div class="col-12 d-none" id="dateOrderWarning">
+        <div class="alert alert-warning py-2 mb-0">La date de restitution est antérieure à la date de fin de mission — c'est possible si le matériel a été rendu avant le départ effectif de l'agent.</div>
+      </div>
       <div class="col-md-6">
         <label class="form-label" for="global_return_reason">Motif</label>
         <select class="form-select" id="global_return_reason">

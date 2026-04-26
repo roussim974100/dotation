@@ -670,6 +670,18 @@ async function initRestitutionPage() {
     document.getElementById("global_return_reason").value = result.data.restitution?.reason || "";
     document.getElementById("global_return_notes").value = result.data.restitution?.notes || "";
 
+    function updateDateOrderWarning() {
+      const missionEnd = document.getElementById("global_mission_end_at").value;
+      const returnedAt = document.getElementById("global_returned_at").value;
+      const warn = document.getElementById("dateOrderWarning");
+      if (warn) {
+        warn.classList.toggle("d-none", !(missionEnd && returnedAt && returnedAt < missionEnd));
+      }
+    }
+    document.getElementById("global_mission_end_at").addEventListener("change", updateDateOrderWarning);
+    document.getElementById("global_returned_at").addEventListener("change", updateDateOrderWarning);
+    updateDateOrderWarning();
+
     const materialItems = (result.items || []).filter((item) => isRestitutionEligibleItem(item));
     const immaterielItems = (result.items || []).filter((item) => item.category === "immateriel");
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
