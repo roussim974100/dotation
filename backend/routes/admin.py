@@ -163,7 +163,7 @@ def dashboard_stats():
     by_service_rows = db.execute(
         f"""SELECT
             CASE WHEN beneficiary_type = 'elu'
-                 THEN 'Élu'
+                 THEN 'Élu(e)'
                  ELSE COALESCE(NULLIF(service,''), '—')
             END as service,
             COUNT(*) as count
