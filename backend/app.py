@@ -435,6 +435,8 @@ def init_db():
         ensure_column(connection, "shared_pools", "resource_catalog_id", "resource_catalog_id TEXT")
         ensure_column(connection, "shared_pool_members", "removed_at", "removed_at TEXT")
         ensure_column(connection, "dotation_forms", "source_form_id", "source_form_id TEXT")
+        ensure_column(connection, "dotation_items", "resource_type", "resource_type TEXT")
+        ensure_column(connection, "dotation_items", "serial_number", "serial_number TEXT")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)
