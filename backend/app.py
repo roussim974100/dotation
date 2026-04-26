@@ -391,6 +391,20 @@ def init_db():
                 user_agent TEXT,
                 FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS dotation_item_selections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                form_id TEXT NOT NULL,
+                item_id INTEGER NOT NULL,
+                assigned_at TEXT,
+                returned_at TEXT,
+                returned_status TEXT,
+                notes TEXT,
+                FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_dotation_item_selections_form
+                ON dotation_item_selections(form_id, returned_at);
             """
         )
         ensure_column(connection, "dotation_forms", "dossier_id", "dossier_id TEXT")
