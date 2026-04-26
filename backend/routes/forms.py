@@ -20,6 +20,7 @@ from models.workflow import (
     derive_restitution_workflow_status, collect_resource_validation_errors,
 )
 from models.forms import persist_form, row_to_summary, get_form
+from models.settings import get_app_settings, DEFAULT_APP_SETTINGS
 from models.pools import sync_shared_pools_for_form
 from pdf.attribution import build_pdf_bytes
 from pdf.restitution import build_restitution_pdf_bytes
@@ -677,6 +678,12 @@ def update_restitution(form_id):
     payload = existing["data"]
     payload.setdefault("workflow", {})
     payload.setdefault("restitution", {})
+
+    # Garde Phase 1 : si la Phase 1 n'est pas validée, refuser la saisie de l'état du matériel
+    phase1_validated_at = payload["restitution"].get("phase1ValidatedAt")
+    if "items" in patch and patch["items"] and not phase1_validated_at:
+        return jsonify({"error": "phase1_required", "message": "La Phase 1 (dates) doit être validée avant de saisir l'état du matériel."}), 400
+
     payload["restitution"]["missionEndAt"] = patch.get("missionEndAt", payload["restitution"].get("missionEndAt"))
     payload["restitution"]["returnedAt"] = patch.get("returnedAt", payload["restitution"].get("returnedAt"))
     payload["restitution"]["reason"] = patch.get("reason", payload["restitution"].get("reason"))
@@ -709,6 +716,86 @@ def update_restitution(form_id):
             {
                 "status": payload.get("workflow", {}).get("status"),
                 "returned_at": payload.get("restitution", {}).get("returnedAt"),
+            },
+            target_label=form_data.get("summary", {}).get("title"),
+        )
+    return jsonify(form_data)
+
+
+@bp.route("/api/forms/<form_id>/restitution-phase1-validate", methods=["POST"])
+@login_required
+def validate_restitution_phase1(form_id):
+    if not has_permission("forms.restitution"):
+        return jsonify({"error": "forbidden"}), 403
+    existing = get_form(form_id)
+    if not existing:
+        return jsonify({"error": "not_found"}), 404
+
+    payload = existing["data"]
+    payload.setdefault("restitution", {})
+
+    if not payload["restitution"].get("returnedAt"):
+        return jsonify({"error": "missing_dates", "message": "La date de remise du matériel est obligatoire avant de valider la Phase 1."}), 400
+
+    user = session.get("user") or "inconnu"
+    payload["restitution"]["phase1ValidatedAt"] = utc_now()
+    payload["restitution"]["phase1ValidatedBy"] = user
+
+    form_data = persist_form(payload, allow_locked_update=True)
+    with get_db() as connection:
+        insert_app_log(
+            connection, "restitution", "phase1_validated",
+            "Phase 1 restitution validée (dates)",
+            "form", form_id,
+            {"validated_by": user, "returned_at": payload["restitution"].get("returnedAt"), "mission_end_at": payload["restitution"].get("missionEndAt")},
+            target_label=form_data.get("summary", {}).get("title"),
+        )
+    return jsonify(form_data)
+
+
+@bp.route("/api/forms/<form_id>/restitution-phase1-unlock", methods=["POST"])
+@login_required
+def unlock_restitution_phase1(form_id):
+    if not has_permission("forms.restitution"):
+        return jsonify({"error": "forbidden"}), 403
+    existing = get_form(form_id)
+    if not existing:
+        return jsonify({"error": "not_found"}), 404
+
+    patch = request.get_json(silent=True) or {}
+    payload = existing["data"]
+    payload.setdefault("restitution", {})
+
+    phase1_validated_at = payload["restitution"].get("phase1ValidatedAt")
+    if not phase1_validated_at:
+        return jsonify({"error": "not_validated", "message": "La Phase 1 n'est pas encore validée."}), 400
+
+    settings = get_app_settings()
+    unlock_days = int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"])
+    validated_dt = datetime.fromisoformat(phase1_validated_at.replace("Z", "+00:00"))
+    now_dt = datetime.now(timezone.utc)
+    elapsed_days = (now_dt - validated_dt).total_seconds() / 86400
+
+    motif = (patch.get("motif") or "").strip()
+    if elapsed_days > unlock_days and not motif:
+        return jsonify({"error": "motif_required", "message": f"La fenêtre de modification libre est dépassée ({unlock_days} j). Veuillez préciser le motif de correction."}), 400
+
+    user = session.get("user") or "inconnu"
+    previous_validated_at = payload["restitution"].pop("phase1ValidatedAt", None)
+    previous_validated_by = payload["restitution"].pop("phase1ValidatedBy", None)
+
+    form_data = persist_form(payload, allow_locked_update=True)
+    with get_db() as connection:
+        insert_app_log(
+            connection, "restitution", "phase1_unlocked",
+            "Phase 1 restitution déverrouillée pour correction",
+            "form", form_id,
+            {
+                "unlocked_by": user,
+                "previously_validated_by": previous_validated_by,
+                "previously_validated_at": previous_validated_at,
+                "elapsed_days": round(elapsed_days, 2),
+                "motif": motif or None,
             },
             target_label=form_data.get("summary", {}).get("title"),
         )

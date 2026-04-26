@@ -363,6 +363,7 @@ def admin_settings_route():
         "support_name": settings.get("support_name") or "",
         "support_email": settings.get("support_email") or "",
         "support_role": settings.get("support_role") or "",
+        "restitution_phase1_unlock_days": settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"],
     }
     payload["themeOptions"] = [
         {"id": key, "label": value["label"]}
@@ -391,6 +392,7 @@ def update_admin_settings_route():
             "support_name": payload.get("support_name"),
             "support_email": payload.get("support_email"),
             "support_role": payload.get("support_role"),
+            "restitution_phase1_unlock_days": str(int(payload.get("restitution_phase1_unlock_days") or 1)),
         })
         insert_app_log(
             connection,
