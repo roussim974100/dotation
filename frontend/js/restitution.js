@@ -693,6 +693,123 @@ async function initRestitutionPage() {
     }
     bindRestitutionSignatureProtectionHandlers();
 
+    // --- Phase 1 : gestion validation / déverrouillage ---
+
+    const phase1UnlockDays = (await fetch("/api/settings/public").then(r => r.ok ? r.json() : null))?.restitutionPhase1UnlockDays ?? 1;
+
+    function applyPhase1State(restitution) {
+      const validatedAt = restitution?.phase1ValidatedAt;
+      const validatedBy = restitution?.phase1ValidatedBy;
+      const pendingBar = document.getElementById("phase1PendingBar");
+      const validatedBar = document.getElementById("phase1ValidatedBar");
+      const phase1ActionBar = document.getElementById("phase1ActionBar");
+      const phase2BlockedMsg = document.getElementById("phase2BlockedMsg");
+      const phase2Content = document.getElementById("phase2Content");
+      const phase1Meta = document.getElementById("phase1ValidatedMeta");
+
+      if (readOnlyMode) {
+        phase1ActionBar?.classList.add("d-none");
+        phase2BlockedMsg?.classList.add("d-none");
+        return;
+      }
+
+      if (validatedAt) {
+        pendingBar?.classList.add("d-none");
+        validatedBar?.classList.remove("d-none");
+        const validatedDate = new Date(validatedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        if (phase1Meta) phase1Meta.textContent = `Validée le ${validatedDate} par ${validatedBy || "inconnu"}`;
+        // Verrouiller les champs de dates Phase 1
+        ["global_mission_end_at", "global_returned_at", "global_return_reason", "global_return_notes"].forEach(fieldId => {
+          const el = document.getElementById(fieldId);
+          if (el) el.disabled = true;
+        });
+        // Débloquer Phase 2
+        phase2BlockedMsg?.classList.add("d-none");
+        phase2Content?.classList.remove("d-none");
+        document.getElementById("saveRestitutionBtn")?.classList.remove("d-none");
+        document.getElementById("saveRestitutionPendingBtn")?.classList.remove("d-none");
+      } else {
+        pendingBar?.classList.remove("d-none");
+        validatedBar?.classList.add("d-none");
+        // Phase 1 non validée : Phase 2 bloquée
+        phase2BlockedMsg?.classList.remove("d-none");
+        phase2Content?.classList.add("d-none");
+        // Masquer les boutons de sauvegarde finale (seulement Phase 1 save possible)
+        document.getElementById("saveRestitutionBtn")?.classList.add("d-none");
+        document.getElementById("saveRestitutionPendingBtn")?.classList.add("d-none");
+      }
+    }
+
+    applyPhase1State(currentRestitution);
+
+    // Bouton "Valider Phase 1"
+    document.getElementById("validatePhase1Btn")?.addEventListener("click", async () => {
+      try {
+        // Sauvegarder les données contextuelles d'abord
+        const contextPatch = {
+          missionEndAt: document.getElementById("global_mission_end_at").value || "",
+          returnedAt: document.getElementById("global_returned_at").value || todayDateInputValue(),
+          reason: document.getElementById("global_return_reason").value,
+          notes: document.getElementById("global_return_notes").value.trim(),
+          keepPending: true,
+        };
+        if (!contextPatch.returnedAt) {
+          alert("La date de remise du matériel est obligatoire.");
+          return;
+        }
+        await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution`, { method: "PATCH", body: JSON.stringify(contextPatch) });
+        const resp = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-phase1-validate`, { method: "POST" });
+        currentRestitution = resp?.data?.restitution || currentRestitution;
+        applyPhase1State(currentRestitution);
+      } catch (e) {
+        alert(e.message || "Erreur lors de la validation de la Phase 1.");
+      }
+    });
+
+    // Bouton "Modifier les dates" → modal déverrouillage
+    document.getElementById("unlockPhase1Btn")?.addEventListener("click", () => {
+      const validatedAt = currentRestitution?.phase1ValidatedAt;
+      const elapsedDays = validatedAt ? (Date.now() - new Date(validatedAt).getTime()) / 86400000 : 0;
+      const needsMotif = elapsedDays > phase1UnlockDays;
+      const modalText = document.getElementById("unlockPhase1ModalText");
+      const motifWrap = document.getElementById("unlockPhase1MotifWrap");
+      const motifInput = document.getElementById("unlockPhase1Motif");
+      const errorEl = document.getElementById("unlockPhase1Error");
+      if (modalText) modalText.textContent = needsMotif
+        ? `La fenêtre de modification libre (${phase1UnlockDays} j) est dépassée. Un motif est requis.`
+        : "Vous pouvez déverrouiller les dates et les corriger librement.";
+      motifWrap?.classList.toggle("d-none", !needsMotif);
+      if (motifInput) motifInput.value = "";
+      errorEl?.classList.add("d-none");
+      new bootstrap.Modal(document.getElementById("unlockPhase1Modal")).show();
+    });
+
+    // Confirmation déverrouillage Phase 1
+    document.getElementById("unlockPhase1ConfirmBtn")?.addEventListener("click", async () => {
+      const validatedAt = currentRestitution?.phase1ValidatedAt;
+      const elapsedDays = validatedAt ? (Date.now() - new Date(validatedAt).getTime()) / 86400000 : 0;
+      const needsMotif = elapsedDays > phase1UnlockDays;
+      const motif = document.getElementById("unlockPhase1Motif")?.value.trim() || "";
+      const errorEl = document.getElementById("unlockPhase1Error");
+      if (needsMotif && !motif) {
+        if (errorEl) { errorEl.textContent = "Le motif est obligatoire."; errorEl.classList.remove("d-none"); }
+        return;
+      }
+      try {
+        const resp = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-phase1-unlock`, { method: "POST", body: JSON.stringify({ motif }) });
+        currentRestitution = resp?.data?.restitution || currentRestitution;
+        bootstrap.Modal.getInstance(document.getElementById("unlockPhase1Modal"))?.hide();
+        // Réactiver les champs de dates
+        ["global_mission_end_at", "global_returned_at", "global_return_reason", "global_return_notes"].forEach(fieldId => {
+          const el = document.getElementById(fieldId);
+          if (el) el.disabled = false;
+        });
+        applyPhase1State(currentRestitution);
+      } catch (e) {
+        if (errorEl) { errorEl.textContent = e.message || "Erreur lors du déverrouillage."; errorEl.classList.remove("d-none"); }
+      }
+    });
+
     function getImmaterielActions(items) {
       const actions = {};
       items.forEach((item) => {
