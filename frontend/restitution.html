@@ -62,96 +62,27 @@
     </div>
   </section>
 
-  <section class="content-card" id="restitution-context">
-    <div class="section-heading">
-      <div>
-        <p class="panel-eyebrow">Étape 1</p>
-        <h3 class="section-title">Contexte de restitution</h3>
+  <!-- Résumé Phase 1 (affiché une fois validée) -->
+  <section class="content-card mb-4 d-none" id="phase1Summary">
+    <div class="d-flex align-items-center gap-3 flex-wrap justify-content-between">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="badge bg-success px-3 py-2">Phase 1 validée</span>
+        <span class="text-muted small" id="phase1SummaryMeta"></span>
+        <span class="text-muted small" id="phase1SummaryDates"></span>
       </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label" for="global_mission_end_at">Date de fin de mission</label>
-        <input class="form-control" type="date" id="global_mission_end_at">
-        <div class="form-text">Dernier jour effectif de l'agent (retraite, départ…)</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label" for="global_returned_at">Date de restitution du matériel</label>
-        <input class="form-control" type="date" id="global_returned_at">
-      </div>
-      <div class="col-12 d-none" id="dateOrderWarning">
-        <div class="alert alert-warning py-2 mb-0">La date de restitution est antérieure à la date de fin de mission — c'est possible si le matériel a été rendu avant le départ effectif de l'agent.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label" for="global_return_reason">Motif</label>
-        <select class="form-select" id="global_return_reason">
-          <option value="">Sélectionner</option>
-          <option value="fin_de_fonction">Fin de fonction</option>
-          <option value="demission">Démission</option>
-          <option value="mutation">Mutation</option>
-          <option value="fin_de_mandat">Fin de mandat</option>
-          <option value="autre">Autre</option>
-        </select>
-      </div>
-      <div class="col-12">
-        <label class="form-label" for="global_return_notes">Observations générales</label>
-        <textarea class="form-control" id="global_return_notes" rows="3" placeholder="Précisez le contexte général de la restitution."></textarea>
-      </div>
-    </div>
-
-    <!-- Barre de validation Phase 1 -->
-    <div class="mt-4 pt-3 border-top" id="phase1ActionBar">
-      <div id="phase1PendingBar">
-        <p class="panel-text mb-2">Une fois les dates confirmées, validez la Phase 1 pour permettre aux services de saisir l’état du matériel.</p>
-        <button class="btn btn-primary" type="button" id="validatePhase1Btn">Valider Phase 1 — dates confirmées</button>
-      </div>
-      <div class="d-none" id="phase1ValidatedBar">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-          <span class="badge bg-success fs-6 px-3 py-2" id="phase1Badge">Phase 1 validée</span>
-          <span class="text-muted small" id="phase1ValidatedMeta"></span>
-          <button class="btn btn-outline-secondary btn-sm" type="button" id="unlockPhase1Btn">Modifier les dates</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal déverrouillage Phase 1 (motif requis hors fenêtre) -->
-    <div class="modal fade" id="unlockPhase1Modal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Modifier les dates — Phase 1</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-          </div>
-          <div class="modal-body">
-            <p class="panel-text" id="unlockPhase1ModalText"></p>
-            <div id="unlockPhase1MotifWrap" class="d-none">
-              <label class="form-label" for="unlockPhase1Motif">Motif de correction <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="unlockPhase1Motif" rows="3" placeholder="Expliquez pourquoi les dates doivent être corrigées."></textarea>
-            </div>
-            <div id="unlockPhase1Error" class="alert alert-danger py-2 mt-2 d-none"></div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-            <button type="button" class="btn btn-warning" id="unlockPhase1ConfirmBtn">Déverrouiller et modifier</button>
-          </div>
-        </div>
-      </div>
+      <a class="btn btn-outline-secondary btn-sm" id="phase1EditLink" href="#">Modifier les dates</a>
     </div>
   </section>
 
   <section class="content-card mt-4" id="restitution-items">
     <div class="section-heading">
       <div>
-        <p class="panel-eyebrow">Étape 2</p>
+        <p class="panel-eyebrow">Étape 1</p>
         <h3 class="section-title">État du matériel</h3>
         <p class="panel-text">Choisissez un état visible immédiatement. Le commentaire n’apparaît qu’en cas d’écart.</p>
       </div>
     </div>
-    <!-- Message de blocage Phase 2 tant que Phase 1 non validée -->
-    <div id="phase2BlockedMsg" class="d-none">
-      <div class="alert alert-info mb-3">Validez d’abord la Phase 1 (dates) pour pouvoir saisir l’état du matériel.</div>
-    </div>
-    <div id="phase2Content">
+    <div>
       <label class="form-label">État de restitution par ressource matérielle</label>
       <div id="restitutionDetailList" class="restitution-list"></div>
     </div>
