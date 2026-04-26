@@ -1005,7 +1005,7 @@ function editDraft(id) {
 }
 
 function openRestitution(id) {
-  window.location.href = `restitution.html?id=${encodeURIComponent(id)}`;
+  window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
 }
 
 function renderLoadMoreButton(group, total, displayed, permissions) {
