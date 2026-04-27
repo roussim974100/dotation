@@ -626,12 +626,10 @@ async function populateUserMenuIdentity() {
     const user = await response.json();
     const nameEl = document.getElementById("userMenuName");
     const roleEl = document.getElementById("userMenuRole");
-    if (nameEl) {
-      nameEl.textContent = user.username || "";
-    }
-    if (roleEl) {
-      roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
-    }
+    const btnEl = document.getElementById("userMenuBtn");
+    if (nameEl) nameEl.textContent = user.username || "";
+    if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
+    if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
   } catch (_) {
     // silently ignore
   }
