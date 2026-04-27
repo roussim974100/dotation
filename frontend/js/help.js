@@ -59,29 +59,59 @@ const HELP_CONTENT = {
       }
     ]
   },
-  restitution: {
-    title: "Aide de la restitution",
-    subtitle: "Préparez la restitution, qualifiez l'état du matériel et choisissez le bon mode de signature.",
-    hero: "La restitution sert à tracer le retour des ressources matérielles et à finaliser leur validation par signature sur place ou à distance.",
-    pill: "Restitution",
-    returnHref: "restitution.html",
-    returnLabel: "Retour à la restitution",
-    quickLinkLabel: "Ouvrir la restitution",
+  "restitution-phase1": {
+    title: "Aide de la Phase 1 — Dates de restitution",
+    subtitle: "Renseignez les dates et le contexte pour démarrer le traitement par les services RH.",
+    hero: "La Phase 1 est l'étape de documentation initiale : elle recueille la date de fin de mission, la date de restitution du matériel, le motif et les observations pour cadrer le processus.",
+    pill: "Phase 1 — Restitution",
+    returnHref: "restitution-phase1.html",
+    returnLabel: "Retour à la Phase 1",
+    quickLinkLabel: "Ouvrir la Phase 1",
     summary: [
-      "Renseigner le contexte général de restitution avant de passer au matériel.",
-      "Choisir un état clair pour chaque ressource matérielle restituée.",
+      "Renseigner la date de fin de mission (dernier jour effectif de l'agent) et la date de restitution du matériel.",
+      "Choisir un motif dans la liste proposée pour qualifier la raison du départ ou de la mutation.",
+      "Ajouter des observations générales si des éléments contextuels doivent être documentés.",
+      "Enregistrer sans valider si toutes les dates ne sont pas encore connues.",
+      "Confirmer et transmettre pour déclencher le traitement par les services RH et passer à l'état du matériel."
+    ],
+    sections: [
+      {
+        title: "Dater le départ",
+        text: "La date de fin de mission et la date de restitution du matériel cadrent l'opération. Le matériel peut être rendu avant le départ effectif, ce qui est normal."
+      },
+      {
+        title: "Qualifier le contexte",
+        text: "Le motif et les observations générales documentent la situation. Elles servent au suivi RH et au dossier administratif de la restitution."
+      },
+      {
+        title: "Enregistrement progressif",
+        text: "Vous pouvez enregistrer sans valider si les dates ne sont pas finales. Une fois validée, la Phase 1 se verrouille et demande un motif de correction pour être modifiée."
+      }
+    ]
+  },
+  restitution: {
+    title: "Aide de la Phase 2 — État du matériel",
+    subtitle: "Évaluez l'état des ressources restituées et choisissez le mode de signature.",
+    hero: "La Phase 2 est l'étape opérationnelle : elle qualifie l'état de chaque ressource matérielle et finalisé la restitution par signature sur place ou à distance.",
+    pill: "Phase 2 — Restitution",
+    returnHref: "restitution.html",
+    returnLabel: "Retour à la Phase 2",
+    quickLinkLabel: "Ouvrir la Phase 2",
+    summary: [
+      "Consulter le résumé de la Phase 1 (dates et motif) pour rappel du contexte.",
+      "Choisir un état clair pour chaque ressource matérielle : présenté, cassé, perdu, etc.",
       "Ajouter un commentaire seulement lorsqu'un écart ou une anomalie doit être expliqué.",
       "Utiliser la signature sur place, impossible ou à distance selon la situation rencontrée.",
       "Enregistrer la restitution une fois toutes les lignes matérielles renseignées."
     ],
     sections: [
       {
-        title: "Contexte de restitution",
-        text: "Commencez par la date, le motif et les observations générales pour cadrer le retour du matériel."
+        title: "Récapitulatif de la Phase 1",
+        text: "La section supérieure affiche les dates et le motif de restitution saisis en Phase 1. Un lien permet de les modifier si nécessaire."
       },
       {
         title: "État du matériel",
-        text: "Chaque ligne de matériel doit recevoir un état visible. Cette étape sert au suivi des écarts et à la traçabilité du retour."
+        text: "Chaque ligne de matériel doit recevoir un état visible. Cette étape sert au suivi des écarts et à la traçabilité du retour physique."
       },
       {
         title: "Signature de restitution",
