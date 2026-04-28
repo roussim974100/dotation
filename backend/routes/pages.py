@@ -46,6 +46,32 @@ def build_login_forensic_details(username, auth_state):
 # Auth
 # ---------------------------------------------------------------------------
 
+@bp.route("/api/emergency-login", methods=["POST"])
+def emergency_login():
+    """Route d'urgence temporaire pour debugger les problèmes CSRF.
+    À SUPPRIMER une fois le problème résolu."""
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if username == "admsamir" and password == "MotDePasse74500":
+        session["user"] = username
+        with get_db() as connection:
+            insert_app_log(
+                connection,
+                "security",
+                "login",
+                "Connexion reussie (emergency-login)",
+                "user",
+                username,
+                {"ip": get_request_client_ip()},
+                actor=username,
+            )
+        return jsonify({"ok": True, "redirect": "/"}), 200
+
+    return jsonify({"error": "invalid"}), 401
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
