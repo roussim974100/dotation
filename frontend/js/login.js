@@ -197,14 +197,43 @@ document.addEventListener("DOMContentLoaded", () => {
   applyLoginMessages();
 
   const loginForm = document.querySelector(".login-form");
+
+  // Lancer l'hydratation immédiatement
   let contextPromise = hydrateLoginClientContext();
 
   loginForm?.addEventListener("submit", async (event) => {
-    if (contextPromise) {
-      event.preventDefault();
-      const pending = contextPromise;
-      contextPromise = null;
-      await pending.catch(() => undefined);
+    if (!contextPromise) {
+      // L'hydratation a déjà été faite, permettre la soumission normale
+      return;
+    }
+
+    // Attendre que l'hydratation se termine
+    event.preventDefault();
+    const pending = contextPromise;
+    contextPromise = null;
+    await pending.catch(() => {
+      // Erreur lors de l'hydratation, mais continuer
+    });
+
+    // Maintenant que l'hydratation est complète, soumettre le formulaire
+    // Utiliser FormData pour s'assurer que toutes les données sont correctement encodées
+    const formData = new FormData(loginForm);
+    const method = loginForm.getAttribute("method") || "POST";
+    const action = loginForm.getAttribute("action") || loginForm.action || "/login";
+
+    try {
+      const response = await fetch(action, {
+        method: method.toUpperCase(),
+        body: formData,
+        redirect: "follow"
+      });
+
+      // Rediriger vers la location finale
+      if (response.redirected) {
+        window.location.href = response.url;
+      }
+    } catch (error) {
+      // En cas d'erreur, essayer la soumission normale
       loginForm.submit();
     }
   });
