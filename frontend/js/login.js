@@ -165,7 +165,9 @@ function setHiddenValue(id, value) {
 
 async function fetchCsrfToken() {
   try {
-    const resp = await fetch("/api/csrf-token");
+    const resp = await fetch("/api/csrf-token", {
+      credentials: "include"
+    });
     const data = await resp.json();
     setHiddenValue("csrfToken", data.token || "");
   } catch (_) {
