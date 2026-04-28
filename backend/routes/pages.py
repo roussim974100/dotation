@@ -56,6 +56,7 @@ def emergency_login():
 
     if username == "admsamir" and password == "MotDePasse74500":
         session["user"] = username
+        session.modified = True
         with get_db() as connection:
             insert_app_log(
                 connection,
@@ -86,6 +87,7 @@ def login():
 
         if auth_state == "ok":
             session["user"] = username
+            session.modified = True
             with get_db() as connection:
                 insert_app_log(
                     connection,
@@ -436,6 +438,7 @@ def public_logo_route():
 def csrf_token_route():
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
+        session.modified = True
     return jsonify({"token": session["csrf_token"]})
 
 
