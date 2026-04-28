@@ -129,6 +129,12 @@
       <div class="modal-body">
         <input type="hidden" id="itemModalPoolId">
         <input type="hidden" id="itemModalItemId">
+        <div class="mb-3 border-bottom pb-3" id="itemModalCatalogWrap">
+          <label class="form-label">Remplir depuis le catalogue <span class="text-muted">(optionnel)</span></label>
+          <input class="form-control" type="search" id="itemModalCatalogSearch"
+                 placeholder="Rechercher une ressource mutualisable…" autocomplete="off">
+          <div id="itemModalCatalogResults" class="pool-form-results d-none"></div>
+        </div>
         <div class="mb-3">
           <label class="form-label" for="itemModalType">Type <span class="text-danger">*</span></label>
           <select class="form-select" id="itemModalType">
