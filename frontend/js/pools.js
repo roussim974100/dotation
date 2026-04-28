@@ -3,6 +3,7 @@
 let _pools = [];
 let _canManage = false;
 let _csrfToken = "";
+let _filterBound = false;
 
 const ITEM_TYPE_LABELS = {
   ordinateur: "PC portable",
@@ -80,6 +81,8 @@ async function loadPools() {
 }
 
 function bindFilterInput() {
+  if (_filterBound) return;
+  _filterBound = true;
   const searchInput = document.getElementById("searchInput");
   if (searchInput) {
     searchInput.addEventListener("input", () => {
@@ -249,7 +252,12 @@ async function savePool() {
     } else {
       await apiJson("/api/pools", "POST", { label, notes });
     }
-    bootstrap.Modal.getInstance(document.getElementById("poolModal"))?.hide();
+    const modalEl = document.getElementById("poolModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    await new Promise(resolve => {
+      modalEl.addEventListener("hidden.bs.modal", resolve, { once: true });
+      modal?.hide();
+    });
     await loadPools();
   } catch (e) {
     alert(`Erreur : ${e.message}`);
@@ -274,6 +282,7 @@ async function deletePool(poolId) {
 
 function bindItemModal() {
   document.getElementById("itemModalSaveBtn")?.addEventListener("click", saveItem);
+  bindItemCatalogSearch();
 }
 
 function openItemModal(poolId, item) {
@@ -284,6 +293,8 @@ function openItemModal(poolId, item) {
   document.getElementById("itemModalSerial").value = item?.serial_number || "";
   document.getElementById("itemModalNotes").value = item?.notes || "";
   document.getElementById("itemModalLabel").textContent = item ? "Modifier l'équipement" : "Ajouter un équipement";
+  document.getElementById("itemModalCatalogSearch").value = "";
+  document.getElementById("itemModalCatalogResults").classList.add("d-none");
   bootstrap.Modal.getOrCreateInstance(document.getElementById("itemModal")).show();
 }
 
@@ -441,4 +452,51 @@ async function searchForms(q, resultsEl, hiddenEl, chosenEl, inputEl, clearInput
   } catch (e) {
     console.error(e);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Recherche catalogue pour l'ajout d'item
+// ---------------------------------------------------------------------------
+
+function bindItemCatalogSearch() {
+  const input = document.getElementById("itemModalCatalogSearch");
+  if (!input) return;
+  let debounce = null;
+  input.addEventListener("input", () => {
+    clearTimeout(debounce);
+    const q = input.value.trim();
+    if (q.length < 2) {
+      document.getElementById("itemModalCatalogResults").classList.add("d-none");
+      return;
+    }
+    debounce = setTimeout(() => searchCatalog(q), 280);
+  });
+}
+
+async function searchCatalog(q) {
+  const resultsEl = document.getElementById("itemModalCatalogResults");
+  try {
+    const resources = await apiJson(`/api/resources/pool-catalog?search=${encodeURIComponent(q)}`);
+    if (!resources.length) {
+      resultsEl.innerHTML = '<div class="pool-form-result pool-form-result--empty">Aucune ressource trouvée</div>';
+      resultsEl.classList.remove("d-none");
+      return;
+    }
+    resultsEl.innerHTML = resources.map(r =>
+      `<div class="pool-form-result" data-code="${escHtml(r.code)}"
+            data-label="${escHtml(r.label)}" data-category="${escHtml(r.category)}">
+        <strong>${escHtml(r.label)}</strong>
+        ${r.issuer_service ? `<span class="text-muted"> — ${escHtml(r.issuer_service)}</span>` : ""}
+      </div>`
+    ).join("");
+    resultsEl.classList.remove("d-none");
+    resultsEl.querySelectorAll(".pool-form-result[data-code]").forEach(row => {
+      row.addEventListener("click", () => {
+        document.getElementById("itemModalType").value = row.dataset.category || "autre";
+        document.getElementById("itemModalLabel2").value = row.dataset.label;
+        document.getElementById("itemModalCatalogSearch").value = "";
+        resultsEl.classList.add("d-none");
+      });
+    });
+  } catch(e) { console.error(e); }
 }
