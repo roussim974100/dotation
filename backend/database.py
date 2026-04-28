@@ -62,6 +62,7 @@ def normalize_reference_row(row):
     data["has_assignment_notes"] = bool(data.get("has_assignment_notes", True))
     data["is_active"] = bool(data.get("is_active", True))
     data["is_builtin"] = bool(data.get("is_builtin", False))
+    data["is_pool_resource"] = bool(data.get("is_pool_resource", False))
     data["display_order"] = int(data.get("display_order") or 100)
     return data
 
