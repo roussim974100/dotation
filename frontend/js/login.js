@@ -225,7 +225,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch(action, {
         method: method.toUpperCase(),
         body: formData,
-        redirect: "follow"
+        redirect: "follow",
+        credentials: "include"  // IMPORTANT: Incluire les cookies (sessions)
       });
 
       // Rediriger vers la location finale
