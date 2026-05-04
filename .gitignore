@@ -35,3 +35,5 @@ backend/.backups/
 *.bkp
 backend/.backups/
 *.bkp
+backend/.backups/
+*.bkp
