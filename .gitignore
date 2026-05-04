@@ -33,3 +33,5 @@ chromedriver/
 backend/.prod/
 backend/.backups/
 *.bkp
+backend/.backups/
+*.bkp
