@@ -99,7 +99,9 @@ def login():
                     {"ip": get_request_client_ip()},
                     actor=username,
                 )
-            return redirect("/")
+            settings = get_app_settings()
+            setup_completed = settings.get("setup_completed", "0") == "1"
+            return redirect("/setup.html" if not setup_completed else "/")
         with get_db() as connection:
             insert_app_log(
                 connection,
