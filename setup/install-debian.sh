@@ -36,9 +36,19 @@ echo -e "${YELLOW}📋 Vérification des prérequis...${NC}"
 if ! command -v python3.11 &> /dev/null; then
     echo "  📦 Installation de Python 3.11..."
     apt-get update
-    apt-get install -y python3.11 python3.11-venv python3.11-dev
+    apt-get install -y python3.11 python3.11-venv python3.11-dev || {
+        echo "  ⚠️  Python 3.11 non disponible, utilisation de Python 3.10..."
+        apt-get install -y python3.10 python3.10-venv python3.10-dev
+    }
 fi
-echo -e "  ${GREEN}✓${NC} Python 3.11"
+
+# Vérifier que python3 -m venv est disponible
+if ! python3.11 -m venv --help &>/dev/null && ! python3.10 -m venv --help &>/dev/null; then
+    echo "  📦 Installation de python3-venv..."
+    apt-get install -y python3-venv
+fi
+
+echo -e "  ${GREEN}✓${NC} Python installé"
 
 # Vérifier/installer git
 if ! command -v git &> /dev/null; then
@@ -81,16 +91,43 @@ echo -e "  ${GREEN}✓${NC} Code téléchargé"
 echo ""
 echo -e "${YELLOW}🐍 Configuration Python...${NC}"
 
-# Créer venv
+# Créer venv avec fallback
 if [ ! -d "venv" ]; then
     echo "  🔧 Création de l'environnement virtuel..."
-    python3.11 -m venv venv
+    if python3.11 -m venv venv 2>/dev/null; then
+        echo "  ✓ venv créé avec Python 3.11"
+    elif python3.10 -m venv venv 2>/dev/null; then
+        echo "  ✓ venv créé avec Python 3.10"
+    elif python3 -m venv venv 2>/dev/null; then
+        echo "  ✓ venv créé avec Python 3"
+    else
+        echo -e "  ${RED}❌ Impossible de créer l'environnement virtuel${NC}"
+        exit 1
+    fi
+fi
+
+# Vérifier que pip existe
+if [ ! -f "venv/bin/pip" ]; then
+    echo -e "  ${RED}❌ pip n'a pas pu être créé dans venv${NC}"
+    exit 1
 fi
 
 # Activer venv et installer dépendances
 source venv/bin/activate
-pip install --upgrade pip setuptools wheel
-pip install -r backend/requirements.txt
+
+echo "  📦 Mise à jour de pip..."
+pip install --upgrade pip setuptools wheel 2>&1 | grep -i "successfully\|require" || true
+
+echo "  📦 Installation des dépendances d'À Quai..."
+if [ -f "backend/requirements.txt" ]; then
+    pip install -r backend/requirements.txt || {
+        echo -e "  ${RED}⚠️  Erreur lors de l'installation des dépendances${NC}"
+        exit 1
+    }
+else
+    echo -e "  ${RED}❌ backend/requirements.txt not found${NC}"
+    exit 1
+fi
 
 echo -e "  ${GREEN}✓${NC} Dépendances installées"
 
@@ -157,8 +194,22 @@ systemctl restart nginx
 
 echo -e "  ${GREEN}✓${NC} nginx configuré"
 
+# Initialiser la base de données
+echo "  🗄️  Initialisation de la base de données..."
+cd "$INSTALL_DIR"
+source venv/bin/activate
+python backend/app.py &
+APP_PID=$!
+sleep 3
+kill $APP_PID 2>/dev/null || true
+sleep 1
+
+echo -e "  ${GREEN}✓${NC} Base de données initialisée"
+
 # Créer service systemd
 echo "  ⚙️  Création du service systemd..."
+
+# Créer le fichier service
 cat > /etc/systemd/system/dotation.service <<'SYSTEMD_CONF'
 [Unit]
 Description=À Quai - Gestion des dotations matérielles
@@ -169,22 +220,82 @@ Type=simple
 User=www-data
 WorkingDirectory=/opt/dotation
 Environment="FLASK_ENV=production"
+Environment="PYTHONUNBUFFERED=1"
 ExecStart=/opt/dotation/venv/bin/python /opt/dotation/backend/app.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 SYSTEMD_CONF
 
-systemctl daemon-reload
-systemctl enable dotation
-systemctl restart dotation
+# Vérifier que le fichier a été créé
+if [ ! -f /etc/systemd/system/dotation.service ]; then
+    echo -e "  ${RED}❌ Impossible de créer le service systemd${NC}"
+    exit 1
+fi
 
-echo -e "  ${GREEN}✓${NC} Service systemd créé et activé"
+echo -e "  ${GREEN}✓${NC} Service systemd créé"
+
+# Recharger systemd et activer le service
+systemctl daemon-reload
+if ! systemctl enable dotation; then
+    echo -e "  ${RED}⚠️  Erreur lors de l'activation du service${NC}"
+fi
+
+echo -e "  ${GREEN}✓${NC} Service activé et prêt au démarrage"
+
+# Démarrer le service
+echo "  🚀 Démarrage du service..."
+if systemctl start dotation; then
+    sleep 2
+    if systemctl is-active --quiet dotation; then
+        echo -e "  ${GREEN}✓${NC} Service en cours d'exécution"
+    else
+        echo -e "  ${RED}⚠️  Service n'a pas pu démarrer${NC}"
+        echo "  Vérifiez les logs: journalctl -u dotation -n 20"
+    fi
+else
+    echo -e "  ${RED}⚠️  Erreur au démarrage du service${NC}"
+fi
 
 echo ""
-echo -e "${GREEN}✅ Installation complétée avec succès !${NC}"
+echo -e "${GREEN}✅ Installation complétée !${NC}"
+echo ""
+echo "=================================================="
+echo -e "${YELLOW}🔍 Vérification du statut...${NC}"
+echo "=================================================="
+
+# Vérifier le service
+echo -n "  Service À Quai : "
+if systemctl is-active --quiet dotation; then
+    echo -e "${GREEN}✓ En cours d'exécution${NC}"
+else
+    echo -e "${RED}❌ Arrêté${NC}"
+    echo "    Redémarrer avec: systemctl restart dotation"
+fi
+
+# Vérifier nginx
+echo -n "  Reverse proxy nginx : "
+if systemctl is-active --quiet nginx; then
+    echo -e "${GREEN}✓ En cours d'exécution${NC}"
+else
+    echo -e "${RED}❌ Arrêté${NC}"
+fi
+
+# Vérifier le port 5000
+echo -n "  Port 5000 (Flask) : "
+if netstat -tlnp 2>/dev/null | grep -q ":5000 "; then
+    echo -e "${GREEN}✓ Écoute active${NC}"
+else
+    echo -e "${YELLOW}⚠️  Pas de réponse (l'app peut démarrer en retard)${NC}"
+fi
+
+# Attendre un peu que l'app démarre
+sleep 3
+
 echo ""
 echo "=================================================="
 echo -e "${GREEN}🌊 À Quai est prêt !${NC}"
@@ -192,6 +303,8 @@ echo "=================================================="
 echo ""
 echo "📍 Accès à l'application :"
 echo -e "   ${YELLOW}http://localhost${NC}"
+echo "   ou"
+echo -e "   ${YELLOW}http://$(hostname -I | awk '{print $1}')${NC}"
 echo ""
 echo "🔐 Identifiants par défaut :"
 echo "   Utilisateur : ${YELLOW}admin${NC}"
