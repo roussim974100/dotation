@@ -76,16 +76,32 @@ Write-Host "🐍 Configuration Python..." -ForegroundColor $Yellow
 if (-not (Test-Path "venv")) {
     Write-Host "  🔧 Création de l'environnement virtuel..."
     & python -m venv venv
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Erreur lors de la création du venv" -ForegroundColor $Red
+        exit 1
+    }
 }
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Erreur lors de la création du venv" -ForegroundColor $Red
+# Vérifier que pip existe
+if (-not (Test-Path "venv\Scripts\pip.exe")) {
+    Write-Host "❌ pip n'a pas pu être créé dans venv" -ForegroundColor $Red
     exit 1
 }
 
-# Activer venv et installer dépendances
-Write-Host "  🔧 Installation des dépendances..."
+# Vérifier que requirements.txt existe
+if (-not (Test-Path "backend\requirements.txt")) {
+    Write-Host "❌ backend\requirements.txt n'existe pas" -ForegroundColor $Red
+    exit 1
+}
+
+Write-Host "  📦 Installation des dépendances..."
 & ".\venv\Scripts\pip.exe" install --upgrade pip setuptools wheel
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Erreur lors de la mise à jour de pip" -ForegroundColor $Red
+    exit 1
+}
+
 & ".\venv\Scripts\pip.exe" install -r backend\requirements.txt
 
 if ($LASTEXITCODE -ne 0) {
@@ -150,10 +166,34 @@ Write-Host "  ✓ Tâche planifiée créée" -ForegroundColor $Green
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor $Green
-Write-Host "✅ Installation complétée avec succès !" -ForegroundColor $Green
+Write-Host "✅ Installation complétée !" -ForegroundColor $Green
 Write-Host "==================================================" -ForegroundColor $Green
 Write-Host ""
 
+Write-Host "🔍 Vérifications finales..." -ForegroundColor $Yellow
+
+# Vérifier que le script de lancement existe
+if (Test-Path "$InstallDir\start-app.bat") {
+    Write-Host "  ✓ Script de lancement : OK" -ForegroundColor $Green
+} else {
+    Write-Host "  ❌ Script de lancement : MANQUANT" -ForegroundColor $Red
+}
+
+# Vérifier que les dépendances sont installées
+if (Test-Path "$InstallDir\venv\Scripts\pip.exe") {
+    Write-Host "  ✓ Environnement virtuel : OK" -ForegroundColor $Green
+} else {
+    Write-Host "  ❌ Environnement virtuel : PROBLÈME" -ForegroundColor $Red
+}
+
+# Vérifier que le répertoire data existe
+if (Test-Path "$InstallDir\backend\data") {
+    Write-Host "  ✓ Répertoire data : OK" -ForegroundColor $Green
+} else {
+    Write-Host "  ⚠️  Répertoire data : sera créé au premier démarrage" -ForegroundColor $Yellow
+}
+
+Write-Host ""
 Write-Host "📍 Accès à l'application :" -ForegroundColor $Yellow
 Write-Host "   http://localhost" -ForegroundColor $Green
 Write-Host ""
@@ -176,7 +216,12 @@ Write-Host ""
 
 Write-Host "🔄 Démarrage automatique :" -ForegroundColor $Yellow
 Write-Host "   La tâche planifiée 'À Quai' a été créée" -ForegroundColor $Green
-Write-Host "   Elle démarre automatiquement au redémarrage" -ForegroundColor $Green
+Write-Host "   Elle démarre automatiquement au redémarrage de Windows" -ForegroundColor $Green
+Write-Host ""
+
+Write-Host "💡 Conseil :" -ForegroundColor $Yellow
+Write-Host "   Pour arrêter l'application : fermez la fenêtre ou Ctrl+C" -ForegroundColor $Green
+Write-Host "   Pour voir les logs : consultez la fenêtre PowerShell" -ForegroundColor $Green
 Write-Host ""
 
 Write-Host "==================================================" -ForegroundColor $Green
