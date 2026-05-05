@@ -1,8 +1,37 @@
-# 📦 Guide de Déploiement - À Quai v3.17.1
+# 🌊 À Quai - Guide de Déploiement v3.17.1
 
-**Application de gestion des dotations matérielles**  
-Version : **3.17.1-prod** | Branche : **main**  
-Dernière mise à jour : 5 mai 2026
+## 🎯 Qu'est-ce qu'À Quai ?
+
+**À Quai**, c'est bien plus qu'une application de gestion matérielle. C'est **l'endroit mutualisé** où vous organisez le voyage professionnel de vos collaborateurs.
+
+### La métaphore du voyage
+
+Comme tout voyage, le parcours professionnel dans votre organisation comporte plusieurs étapes :
+- 🚀 **L'embarquement** (onboarding) : arrivée d'un nouvel agent, dotation en ressources
+- ✈️ **Le voyage** (vie professionnelle) : changement de service, mise à jour des dotations
+- 🏝️ **Les escales** (gestion continue) : suivi des ressources, inventaire
+- 🏠 **Le retour** (offboarding) : départ de l'agent, restitution des ressources
+
+### Gestion des richesses humaines
+
+À Quai vous aide à :
+- ✅ **Accueillir efficacement** vos nouvelles recrues en leur fournissant les ressources adaptées
+- ✅ **Suivre les dotations** matérielles tout au long du parcours professionnel
+- ✅ **Organiser les restitutions** de manière structurée et traçable
+- ✅ **Adapter les ressources** à chaque changement (changement de service, promotion, départ)
+- ✅ **Garantir la traçabilité** avec signatures numériques et audit complet
+
+### Pour quels types d'organisations ?
+
+À Quai s'adapte à votre contexte :
+- 🏛️ **Collectivités** (mairies, intercommunalités, administrations locales)
+- 🏢 **Administrations** (ministères, préfectures, services déconcentrés)
+- 🏭 **Entreprises privées** (PME, grandes entreprises)
+- 🤝 **Associations** (ONG, structures solidaires)
+
+---
+
+**Version :** 3.17.1-prod | **Branche :** main | **Dernière mise à jour :** 5 mai 2026
 
 ---
 
@@ -19,9 +48,33 @@ Dernière mise à jour : 5 mai 2026
 
 ---
 
-## 🎯 Vue d'ensemble
+## 🎯 Vue d'ensemble technique
 
-À Quai est une application Flask + SQLite pour la gestion des attributions et restitutions de ressources matérielles au sein d'organisations.
+À Quai est une application web modulaire (Flask + SQLite) qui digitalise le parcours des dotations matérielles, du onboarding à l'offboarding.
+
+### Cas d'usage concrets
+
+**Scénario 1 : Nouvelle arrivée (Onboarding)**
+1. Un nouvel agent arrive dans votre organisation
+2. L'admin crée un dossier "Nouvelle arrivée" dans À Quai
+3. Les ressources (ordinateur, téléphone, clés, etc.) sont dotées
+4. Un lien de signature est envoyé à l'agent (par email ou SMS)
+5. L'agent signe numériquement et reçoit une confirmation
+6. Tous les documents sont archivés automatiquement
+
+**Scénario 2 : Changement de service**
+1. Un agent change de service au sein de l'organisation
+2. Un dossier "Mise à jour" est créé
+3. Certaines ressources sont reprises, d'autres nouvelles sont dotées
+4. Même processus de signature sécurisée
+5. Historique complet du parcours de l'agent
+
+**Scénario 3 : Départ de l'agent (Offboarding)**
+1. Création d'un dossier "Sortie" pour l'agent
+2. Inventaire des ressources à restituer
+3. Enregistrement de l'état (bon état, endommagé, manquant)
+4. Signature numérique de restitution
+5. Clôture du dossier avec rapport d'audit
 
 ### Nouvelles fonctionnalités v3.17.1
 
