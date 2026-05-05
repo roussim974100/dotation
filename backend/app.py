@@ -160,90 +160,6 @@ def init_users_db():
         seed_default_groups(connection)
 
 
-def seed_default_groups_obsolete(connection):
-    """Crée les groupes par défaut si aucun groupe n'existe."""
-    count = connection.execute("SELECT COUNT(*) FROM groups").fetchone()[0]
-    if count > 0:
-        return
-    now = utc_now()
-    default_groups = [
-        ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.view_all", "db.manage", "unc.view_all"], "full"),
-        ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.view_all"], "full"),
-    ]
-    for key, label, description, permissions, data_scope in default_groups:
-        connection.execute(
-            "INSERT OR IGNORE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (key, label, description, json.dumps(permissions), data_scope, now, now)
-        )
-    connection.commit()
-    # Créer l'utilisateur admin par défaut s'il n'existe pas
-    seed_default_admin(connection)
-
-
-def seed_default_admin_obsolete(connection):
-    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas."""
-    import bcrypt
-    user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if user_count > 0:
-        return
-    now = utc_now()
-    # Hash du mot de passe "admin"
-    password_hash = bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode()
-    connection.execute(
-        "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-        ("admin", password_hash, 1, "active", "", 0, now, now)
-    )
-    connection.execute(
-        "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
-        ("admin", "admin")
-    )
-    connection.commit()
-
-
-def seed_default_groups(connection):
-    """Crée les groupes par défaut si aucun groupe n'existe."""
-    count = connection.execute("SELECT COUNT(*) FROM groups").fetchone()[0]
-    if count > 0:
-        return
-    now = utc_now()
-    default_groups = [
-        ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.view_all", "db.manage", "unc.view_all"], "full"),
-        ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.view_all"], "full"),
-    ]
-    for key, label, description, permissions, data_scope in default_groups:
-        connection.execute(
-            "INSERT OR IGNORE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (key, label, description, json.dumps(permissions), data_scope, now, now)
-        )
-    connection.commit()
-    # Créer l'utilisateur admin par défaut s'il n'existe pas
-    seed_default_admin(connection)
-
-
-def seed_default_admin(connection):
-    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas."""
-    import bcrypt
-    user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if user_count > 0:
-        return
-    now = utc_now()
-    # Hash du mot de passe "admin"
-    password_hash = bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode()
-    connection.execute(
-        "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-        ("admin", password_hash, 1, "active", "", 0, now, now)
-    )
-    connection.execute(
-        "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
-        ("admin", "admin")
-    )
-    connection.commit()
-
-
 def migrate_users_from_json(connection):
     count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count > 0:
@@ -282,28 +198,21 @@ def migrate_users_from_json(connection):
 
 
 def seed_default_groups(connection):
-    """Cree ou repare les groupes par defaut.
-
-    Cette definition volontairement placee apres la migration remplace l'ancien
-    seed qui sortait trop tot quand la table contenait deja des groupes.
-    """
+    """Cree les groupes par defaut manquants sans ecraser les droits existants."""
     now = utc_now()
     for key, label, description, permissions, data_scope in DEFAULT_GROUPS:
         existing = connection.execute(
-            "SELECT permissions_json FROM groups WHERE key = ?",
+            "SELECT 1 FROM groups WHERE key = ?",
             (key,),
         ).fetchone()
         if existing:
-            current = set(json.loads(existing["permissions_json"] or "[]"))
-            merged = sorted(current | set(permissions))
             connection.execute(
                 """
                 UPDATE groups
-                SET label = ?, description = ?, permissions_json = ?,
-                    data_scope = ?, updated_at = ?
+                SET label = ?, description = ?, updated_at = ?
                 WHERE key = ?
                 """,
-                (label, description, json.dumps(merged), data_scope, now, key),
+                (label, description, now, key),
             )
         else:
             connection.execute(
@@ -320,7 +229,7 @@ def seed_default_groups(connection):
 
 
 def seed_default_admin(connection):
-    """Cree l'utilisateur admin/admin par defaut et garantit son groupe."""
+    """Cree admin/admin uniquement lors de la premiere initialisation."""
     import bcrypt
     admin = connection.execute("SELECT username FROM users WHERE username = 'admin'").fetchone()
     if admin:
@@ -329,6 +238,9 @@ def seed_default_admin(connection):
             ("admin", "admin"),
         )
         connection.commit()
+        return
+    user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count > 0:
         return
     now = utc_now()
     password_hash = bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode()
