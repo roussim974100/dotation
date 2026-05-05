@@ -18,7 +18,7 @@ if (-not $isAdmin) {
 
 $InstallDir = "C:\dotation"
 $GitRepo = "https://github.com/roussim974100/dotation.git"
-$GitBranch = "main"
+$GitBranch = if ($env:GIT_BRANCH) { $env:GIT_BRANCH } else { "dev" }
 
 # Configuration
 Write-Host ""
@@ -53,8 +53,7 @@ if (Test-Path $InstallDir) {
     Write-Host "  📁 Répertoire existant trouvé, mise à jour..."
     Set-Location $InstallDir
     & git fetch origin
-    & git checkout $GitBranch
-    & git pull origin $GitBranch
+    & git checkout -B $GitBranch "origin/$GitBranch"
 } else {
     Write-Host "  📁 Création du répertoire $InstallDir..."
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
@@ -78,8 +77,8 @@ if (-not (Test-Path "venv")) {
     & python -m venv venv
 }
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Erreur lors de la création du venv" -ForegroundColor $Red
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path ".\venv\Scripts\pip.exe")) {
+    Write-Host "❌ Erreur lors de la création du venv ou pip absent" -ForegroundColor $Red
     exit 1
 }
 
