@@ -2,7 +2,8 @@
 
 Application interne de gestion des dotations matérielles — attribution et restitution de ressources pour les agents, collaborateurs ou élus d'une organisation.
 
-**Version :** `3.0.4` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne
+**Version :** `3.17.1-prod` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Statut :** Production ✅ | **Dernière MAJ :** Mai 2026 | **[Guide de déploiement](DEPLOYMENT_GUIDE.md)** ← À utiliser pour installer
 
 ---
 
