@@ -72,7 +72,7 @@ def update_group(key, permissions):
 
 
 def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False):
-    """Crée un nouvel utilisateur."""
+    """Crée un nouvel utilisateur. Affecte le premier utilisateur au groupe admin automatiquement."""
     try:
         from utils import utc_now
         with get_users_db() as conn:
@@ -81,6 +81,10 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
                 "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
                 (username, password_hash, int(is_active), status, service, int(db_manage), now, now)
             )
+            # Si c'est le premier utilisateur ET qu'il n'a pas de groupe, l'affecter au groupe admin
+            user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            if user_count == 1 and not groups:
+                groups = ["admin"]
             for group_key in groups:
                 conn.execute(
                     "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
