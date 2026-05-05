@@ -1,229 +1,150 @@
 #!/bin/bash
-# Installation automatique d'À Quai sur Debian/Ubuntu
-# Usage: sudo bash install-debian.sh
+# Installation automatique d'A Quai sur Debian/Ubuntu
+# Usage:
+#   sudo bash setup/install-debian.sh
+#   sudo GIT_BRANCH=main bash setup/install-debian.sh
 
-set -e
+set -Eeuo pipefail
 
-# Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Configuration
-INSTALL_DIR="/opt/dotation"
-GIT_REPO="https://github.com/roussim974100/dotation.git"
-GIT_BRANCH="main"
+INSTALL_DIR="${INSTALL_DIR:-/opt/dotation}"
+GIT_REPO="${GIT_REPO:-https://github.com/roussim974100/dotation.git}"
+GIT_BRANCH="${GIT_BRANCH:-dev}"
+APP_USER="${APP_USER:-www-data}"
+APP_HOST="${APP_HOST:-127.0.0.1}"
+APP_PORT="${APP_PORT:-5000}"
 
-echo -e "${GREEN}🌊 Installation d'À Quai${NC}"
+log() { echo -e "${YELLOW}$*${NC}"; }
+ok() { echo -e "  ${GREEN}✓${NC} $*"; }
+fail() { echo -e "  ${RED}❌ $*${NC}" >&2; exit 1; }
+
+run_apt_update_once() {
+    if [ "${APT_UPDATED:-0}" != "1" ]; then
+        apt-get update
+        APT_UPDATED=1
+    fi
+}
+
+install_packages() {
+    run_apt_update_once
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+
+choose_python() {
+    for candidate in python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+create_verified_venv() {
+    local python_bin="$1"
+    local venv_dir="$2"
+
+    rm -rf "$venv_dir"
+    "$python_bin" -m venv "$venv_dir"
+    "$venv_dir/bin/python" -m ensurepip --upgrade >/dev/null 2>&1 || true
+    "$venv_dir/bin/python" -m pip --version >/dev/null 2>&1
+}
+
+echo -e "${GREEN}Installation d'A Quai${NC}"
 echo "=================================================="
 
-# Vérifier root
 if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}❌ Ce script doit être exécuté en tant que root${NC}"
-   exit 1
+    fail "Ce script doit etre execute en tant que root"
 fi
 
-# Vérifier l'OS
-if ! grep -q "Debian\|Ubuntu" /etc/os-release; then
-    echo -e "${RED}❌ Ce script ne supporte que Debian/Ubuntu${NC}"
-    exit 1
+if ! grep -qiE "Debian|Ubuntu" /etc/os-release; then
+    fail "Ce script ne supporte que Debian/Ubuntu"
 fi
 
-echo -e "${YELLOW}📋 Vérification des prérequis...${NC}"
+log "Verification des prerequis..."
+install_packages git curl ca-certificates nginx net-tools python3 python3-venv python3-pip python3-dev
 
-# Vérifier/installer Python 3.11
-if ! command -v python3.11 &> /dev/null; then
-    echo "  📦 Installation de Python 3.11..."
-    apt-get update
-    apt-get install -y python3.11 python3.11-venv python3.11-dev || {
-        echo "  ⚠️  Python 3.11 non disponible, utilisation de Python 3.10..."
-        apt-get install -y python3.10 python3.10-venv python3.10-dev
-    }
+if command -v python3.11 >/dev/null 2>&1; then
+    install_packages python3.11-venv python3.11-dev || true
 fi
 
-# Vérifier que python3 -m venv est disponible
-if ! python3.11 -m venv --help &>/dev/null && ! python3.10 -m venv --help &>/dev/null; then
-    echo "  📦 Installation de python3-venv..."
-    apt-get install -y python3-venv
+if command -v python3.10 >/dev/null 2>&1; then
+    install_packages python3.10-venv python3.10-dev || true
 fi
 
-echo -e "  ${GREEN}✓${NC} Python installé"
+PYTHON_BIN="$(choose_python)" || fail "Python 3 est introuvable apres installation des paquets"
+ok "Python detecte: $($PYTHON_BIN --version 2>&1)"
+ok "git: $(git --version)"
+ok "nginx: $(nginx -v 2>&1)"
 
-# Vérifier/installer git
-if ! command -v git &> /dev/null; then
-    echo "  📦 Installation de git..."
-    apt-get install -y git
-fi
-echo -e "  ${GREEN}✓${NC} git"
-
-# Vérifier/installer nginx
-if ! command -v nginx &> /dev/null; then
-    echo "  📦 Installation de nginx..."
-    apt-get install -y nginx
-fi
-echo -e "  ${GREEN}✓${NC} nginx"
-
-# Vérifier/installer curl
-if ! command -v curl &> /dev/null; then
-    apt-get install -y curl
-fi
-
-echo ""
-echo -e "${YELLOW}📥 Préparation du répertoire d'installation...${NC}"
-
-# Créer/nettoyer le répertoire
-if [ -d "$INSTALL_DIR" ]; then
-    echo "  📁 Répertoire existant trouvé, mise à jour..."
+log "Preparation du repertoire d'installation..."
+if [ -d "$INSTALL_DIR/.git" ]; then
     cd "$INSTALL_DIR"
-    git fetch origin
-    git checkout $GIT_BRANCH
-    git pull origin $GIT_BRANCH
+    git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
+    git remote set-url origin "$GIT_REPO"
+    git fetch origin "$GIT_BRANCH"
+    git checkout -B "$GIT_BRANCH" "origin/$GIT_BRANCH"
 else
-    echo "  📁 Création du répertoire $INSTALL_DIR..."
+    rm -rf "$INSTALL_DIR"
     mkdir -p "$INSTALL_DIR"
+    git clone --branch "$GIT_BRANCH" "$GIT_REPO" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
-    git clone --branch $GIT_BRANCH $GIT_REPO .
 fi
+git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
+DEPLOY_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+DEPLOY_COMMIT="$(git rev-parse --short HEAD)"
+ok "Code deploye: branche $DEPLOY_BRANCH, commit $DEPLOY_COMMIT"
 
-echo -e "  ${GREEN}✓${NC} Code téléchargé"
-
-echo ""
-echo -e "${YELLOW}🐍 Configuration Python...${NC}"
-
-# Créer venv avec fallback
-if [ ! -d "venv" ]; then
-    echo "  🔧 Création de l'environnement virtuel..."
-    if python3.11 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3.11"
-    elif python3.10 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3.10"
-    elif python3 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3"
-    else
-        echo -e "  ${RED}❌ Impossible de créer l'environnement virtuel${NC}"
-        exit 1
+log "Configuration Python..."
+if [ ! -x "venv/bin/python" ] || ! venv/bin/python -m pip --version >/dev/null 2>&1; then
+    echo "  Creation de l'environnement virtuel..."
+    if ! create_verified_venv "$PYTHON_BIN" "venv"; then
+        echo "  Le venv a echoue avec $PYTHON_BIN, reinstallation de python3-venv..."
+        install_packages python3-venv python3-pip python3-dev
+        create_verified_venv python3 "venv" || fail "Impossible de creer un venv Python fonctionnel"
     fi
 fi
 
-# Vérifier que pip existe
-if [ ! -f "venv/bin/pip" ]; then
-    echo -e "  ${RED}❌ pip n'a pas pu être créé dans venv${NC}"
-    exit 1
-fi
+venv/bin/python -m pip install --upgrade pip setuptools wheel
+[ -f "backend/requirements.txt" ] || fail "backend/requirements.txt introuvable"
+venv/bin/python -m pip install -r backend/requirements.txt
+venv/bin/python -m pip install gunicorn
+ok "Dependances installees"
 
-# Activer venv et installer dépendances
-source venv/bin/activate
+log "Preparation des donnees et permissions..."
+mkdir -p "$INSTALL_DIR/backend/data"
+chown -R "$APP_USER:$APP_USER" "$INSTALL_DIR"
+chmod -R u+rwX,g+rwX,o-rwx "$INSTALL_DIR/backend"
+chmod -R a+rX "$INSTALL_DIR/frontend"
+ok "Permissions configurees"
 
-echo "  📦 Mise à jour de pip..."
-pip install --upgrade pip setuptools wheel 2>&1 | grep -i "successfully\|require" || true
+log "Initialisation de la base de donnees..."
+cd "$INSTALL_DIR/backend"
+sudo -u "$APP_USER" "$INSTALL_DIR/venv/bin/python" -c "import app; app.init_db(); app.init_users_db()"
+ok "Base de donnees initialisee"
 
-echo "  📦 Installation des dépendances d'À Quai..."
-if [ -f "backend/requirements.txt" ]; then
-    pip install -r backend/requirements.txt || {
-        echo -e "  ${RED}⚠️  Erreur lors de l'installation des dépendances${NC}"
-        exit 1
-    }
-else
-    echo -e "  ${RED}❌ backend/requirements.txt not found${NC}"
-    exit 1
-fi
-
-echo -e "  ${GREEN}✓${NC} Dépendances installées"
-
-echo ""
-echo -e "${YELLOW}🔧 Configuration du serveur...${NC}"
-
-# Configurer permissions
-echo "  ⚙️  Configuration des permissions..."
-chown -R www-data:www-data "$INSTALL_DIR"
-chmod -R 755 "$INSTALL_DIR"
-chmod -R 775 "$INSTALL_DIR/backend/data" 2>/dev/null || mkdir -p "$INSTALL_DIR/backend/data"
-chmod -R 775 "$INSTALL_DIR/backend/data"
-
-# Configurer nginx
-echo "  ⚙️  Configuration de nginx..."
-cat > /etc/nginx/sites-available/dotation <<'NGINX_CONF'
-upstream dotation_app {
-    server 127.0.0.1:5000;
-}
-
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-
-    location / {
-        proxy_pass http://dotation_app;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-    }
-
-    location /assets/ {
-        alias /opt/dotation/frontend/assets/;
-        expires 7d;
-    }
-
-    location /css/ {
-        alias /opt/dotation/frontend/css/;
-        expires 1h;
-    }
-
-    location /js/ {
-        alias /opt/dotation/frontend/js/;
-        expires 1h;
-    }
-}
-NGINX_CONF
-
-# Activer la configuration nginx
-if [ -L /etc/nginx/sites-enabled/dotation ]; then
-    rm /etc/nginx/sites-enabled/dotation
-fi
-ln -s /etc/nginx/sites-available/dotation /etc/nginx/sites-enabled/dotation
-
-# Supprimer la config par défaut
-rm -f /etc/nginx/sites-enabled/default
-
-# Tester nginx
-nginx -t || exit 1
-systemctl restart nginx
-
-echo -e "  ${GREEN}✓${NC} nginx configuré"
-
-# Initialiser la base de données
-echo "  🗄️  Initialisation de la base de données..."
-cd "$INSTALL_DIR"
-source venv/bin/activate
-python backend/app.py &
-APP_PID=$!
-sleep 3
-kill $APP_PID 2>/dev/null || true
-sleep 1
-
-echo -e "  ${GREEN}✓${NC} Base de données initialisée"
-
-# Créer service systemd
-echo "  ⚙️  Création du service systemd..."
-
-# Créer le fichier service
-cat > /etc/systemd/system/dotation.service <<'SYSTEMD_CONF'
+log "Creation du service systemd..."
+cat > /etc/systemd/system/dotation.service <<SYSTEMD_CONF
 [Unit]
-Description=À Quai - Gestion des dotations matérielles
-After=network.target
+Description=A Quai - Gestion des dotations materielles
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=www-data
-WorkingDirectory=/opt/dotation
-Environment="FLASK_ENV=production"
-Environment="PYTHONUNBUFFERED=1"
-ExecStart=/opt/dotation/venv/bin/python /opt/dotation/backend/app.py
+User=$APP_USER
+Group=$APP_USER
+WorkingDirectory=$INSTALL_DIR/backend
+Environment=FLASK_ENV=production
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=$INSTALL_DIR/backend/data
+ExecStart=$INSTALL_DIR/venv/bin/gunicorn --workers 2 --bind $APP_HOST:$APP_PORT --access-logfile - --error-logfile - app:app
 Restart=always
-RestartSec=10
+RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
@@ -231,94 +152,90 @@ StandardError=journal
 WantedBy=multi-user.target
 SYSTEMD_CONF
 
-# Vérifier que le fichier a été créé
-if [ ! -f /etc/systemd/system/dotation.service ]; then
-    echo -e "  ${RED}❌ Impossible de créer le service systemd${NC}"
-    exit 1
-fi
-
-echo -e "  ${GREEN}✓${NC} Service systemd créé"
-
-# Recharger systemd et activer le service
 systemctl daemon-reload
-if ! systemctl enable dotation; then
-    echo -e "  ${RED}⚠️  Erreur lors de l'activation du service${NC}"
-fi
+systemctl enable dotation >/dev/null
+ok "Service systemd cree"
 
-echo -e "  ${GREEN}✓${NC} Service activé et prêt au démarrage"
+log "Configuration nginx..."
+cat > /etc/nginx/sites-available/dotation <<NGINX_CONF
+upstream dotation_app {
+    server $APP_HOST:$APP_PORT;
+}
 
-# Démarrer le service
-echo "  🚀 Démarrage du service..."
-if systemctl start dotation; then
-    sleep 2
-    if systemctl is-active --quiet dotation; then
-        echo -e "  ${GREEN}✓${NC} Service en cours d'exécution"
-    else
-        echo -e "  ${RED}⚠️  Service n'a pas pu démarrer${NC}"
-        echo "  Vérifiez les logs: journalctl -u dotation -n 20"
-    fi
-else
-    echo -e "  ${RED}⚠️  Erreur au démarrage du service${NC}"
-fi
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
 
-echo ""
-echo -e "${GREEN}✅ Installation complétée !${NC}"
-echo ""
-echo "=================================================="
-echo -e "${YELLOW}🔍 Vérification du statut...${NC}"
-echo "=================================================="
+    client_max_body_size 20m;
 
-# Vérifier le service
-echo -n "  Service À Quai : "
-if systemctl is-active --quiet dotation; then
-    echo -e "${GREEN}✓ En cours d'exécution${NC}"
-else
-    echo -e "${RED}❌ Arrêté${NC}"
-    echo "    Redémarrer avec: systemctl restart dotation"
-fi
+    location / {
+        proxy_pass http://dotation_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+    }
 
-# Vérifier nginx
-echo -n "  Reverse proxy nginx : "
-if systemctl is-active --quiet nginx; then
-    echo -e "${GREEN}✓ En cours d'exécution${NC}"
-else
-    echo -e "${RED}❌ Arrêté${NC}"
-fi
+    location /assets/ {
+        alias $INSTALL_DIR/frontend/assets/;
+        expires 7d;
+    }
 
-# Vérifier le port 5000
-echo -n "  Port 5000 (Flask) : "
-if netstat -tlnp 2>/dev/null | grep -q ":5000 "; then
-    echo -e "${GREEN}✓ Écoute active${NC}"
-else
-    echo -e "${YELLOW}⚠️  Pas de réponse (l'app peut démarrer en retard)${NC}"
-fi
+    location /css/ {
+        alias $INSTALL_DIR/frontend/css/;
+        expires 1h;
+    }
 
-# Attendre un peu que l'app démarre
+    location /js/ {
+        alias $INSTALL_DIR/frontend/js/;
+        expires 1h;
+    }
+}
+NGINX_CONF
+
+ln -sfn /etc/nginx/sites-available/dotation /etc/nginx/sites-enabled/dotation
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl restart nginx
+ok "nginx configure"
+
+log "Demarrage de l'application..."
+systemctl restart dotation
 sleep 3
 
+log "Verification finale..."
+systemctl is-active --quiet dotation || {
+    journalctl -u dotation -n 80 --no-pager >&2 || true
+    fail "Le service dotation n'est pas actif"
+}
+
+netstat -tlnp 2>/dev/null | grep -q ":$APP_PORT " || fail "Le port $APP_PORT n'ecoute pas"
+curl -fsS "http://$APP_HOST:$APP_PORT/login" >/dev/null || fail "L'application ne repond pas directement sur le port $APP_PORT"
+curl -fsS "http://127.0.0.1/login" >/dev/null || fail "nginx ne relaie pas correctement vers l'application"
+
+APP_IP="$(hostname -I | awk '{print $1}')"
+
 echo ""
+echo -e "${GREEN}Installation completee avec succes.${NC}"
 echo "=================================================="
-echo -e "${GREEN}🌊 À Quai est prêt !${NC}"
-echo "=================================================="
+echo "Branche: $DEPLOY_BRANCH"
+echo "Commit: $DEPLOY_COMMIT"
+echo "Python: $("$INSTALL_DIR/venv/bin/python" --version 2>&1)"
+echo "Service: active"
+echo "Ports: $APP_PORT et 80 actifs"
 echo ""
-echo "📍 Accès à l'application :"
-echo -e "   ${YELLOW}http://localhost${NC}"
-echo "   ou"
-echo -e "   ${YELLOW}http://$(hostname -I | awk '{print $1}')${NC}"
+echo "Acces application:"
+echo "  http://localhost"
+echo "  http://$APP_IP"
 echo ""
-echo "🔐 Identifiants par défaut :"
-echo "   Utilisateur : ${YELLOW}admin${NC}"
-echo "   Mot de passe : ${YELLOW}admin${NC}"
+echo "Identifiants par defaut:"
+echo "  Utilisateur: admin"
+echo "  Mot de passe: admin"
 echo ""
-echo "📖 Première utilisation :"
-echo "   1. Accédez à http://localhost/login"
-echo "   2. Connectez-vous avec admin/admin"
-echo "   3. Suivez le wizard de configuration"
-echo ""
-echo "📊 Vérifier le statut :"
-echo "   systemctl status dotation"
-echo ""
-echo "📝 Voir les logs :"
-echo "   journalctl -u dotation -f"
-echo ""
+echo "Commandes utiles:"
+echo "  systemctl status dotation"
+echo "  journalctl -u dotation -f"
 echo "=================================================="
