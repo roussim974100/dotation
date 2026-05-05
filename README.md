@@ -7,6 +7,25 @@ Application interne de gestion des dotations matérielles — attribution et res
 
 ---
 
+## 🌊 La vision d'À Quai
+
+> **À Quai, c'est l'application pour organiser son voyage professionnel.**
+>
+> Comme pour un voyage, il y a le **onboarding** et l'**offboarding**. À Quai vous aide dans la **gestion des richesses humaines** dans votre organisation.
+>
+> **À Quai, c'est l'endroit mutualisé qui nous plaît.**
+
+### Pourquoi cette métaphore ?
+
+Tout comme un voyage, le parcours professionnel d'un collaborateur comporte des étapes clés :
+- **L'embarquement** : accueil et dotation initiale (onboarding)
+- **Le voyage** : vie professionnelle avec changements et évolutions
+- **Le retour** : départ et restitution des ressources (offboarding)
+
+À Quai accompagne votre organisation à chaque étape, en centralisant la gestion des dotations matérielles et en garantissant une traçabilité complète du parcours.
+
+---
+
 ## Sommaire
 
 - [Fonctionnalités](#fonctionnalités)
