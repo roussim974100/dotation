@@ -45,14 +45,12 @@ if ! command -v python3 &> /dev/null; then
     }
 fi
 
-# Vérifier que python3 -m venv est disponible
-if ! python3 -m venv --help &>/dev/null; then
-    echo "  📦 Installation de python3-venv..."
-    apt-get install -y python3-venv || {
-        echo -e "  ${RED}❌ Impossible d'installer python3-venv${NC}"
-        exit 1
-    }
-fi
+# Installer python3-venv (requis pour créer les environnements virtuels)
+echo "  📦 Installation de python3-venv..."
+apt-get install -y python3-venv || {
+    echo -e "  ${RED}❌ Impossible d'installer python3-venv${NC}"
+    exit 1
+}
 
 PYTHON_VERSION=$(python3 --version 2>&1)
 echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION installé"
