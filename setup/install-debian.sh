@@ -45,11 +45,15 @@ if ! command -v python3 &> /dev/null; then
     }
 fi
 
-# Installer python3-venv (requis pour créer les environnements virtuels)
+# Installer python3-venv et venv spécifique à la version
 echo "  📦 Installation de python3-venv..."
-apt-get install -y python3-venv || {
-    echo -e "  ${RED}❌ Impossible d'installer python3-venv${NC}"
-    exit 1
+PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+apt-get install -y python3-venv python3.${PYTHON_VERSION}-venv || {
+    # Essayer sans la version spécifique
+    apt-get install -y python3-venv || {
+        echo -e "  ${RED}❌ Impossible d'installer python3-venv${NC}"
+        exit 1
+    }
 }
 
 PYTHON_VERSION=$(python3 --version 2>&1)
@@ -96,9 +100,11 @@ echo -e "  ${GREEN}✓${NC} Code téléchargé"
 echo ""
 echo -e "${YELLOW}🐍 Configuration Python...${NC}"
 
-# Créer venv
+# Créer venv avec gestion d'erreurs robuste
 if [ ! -d "venv" ]; then
     echo "  🔧 Création de l'environnement virtuel..."
+
+    # Essayer de créer le venv
     if python3 -m venv venv 2>/dev/null; then
         PYTHON_USED=$(./venv/bin/python --version 2>&1)
         echo "  ✓ venv créé avec $PYTHON_USED"
@@ -108,34 +114,74 @@ if [ ! -d "venv" ]; then
     fi
 fi
 
-# Vérifier que pip existe
-if [ ! -f "venv/bin/pip" ]; then
-    echo -e "  ${RED}❌ pip n'a pas pu être créé dans venv${NC}"
+# Vérifier et fixer pip s'il manque
+if [ ! -f "venv/bin/pip" ] || [ ! -f "venv/bin/pip3" ]; then
+    echo "  ⚠️  pip manquant, tentative de correction..."
+
+    # Essayer d'installer python3-pip
+    apt-get install -y python3-pip || {
+        echo -e "  ${YELLOW}⚠️  python3-pip non disponible${NC}"
+    }
+
+    # Réessayer de créer le venv avec upgrade
+    rm -rf venv
+    if ! python3 -m venv --upgrade venv 2>/dev/null; then
+        python3 -m venv venv
+    fi
+
+    # Dernier recours : installer pip manuellement
+    if [ ! -f "venv/bin/pip" ]; then
+        echo "  🔧 Installation manuelle de pip..."
+        ./venv/bin/python -m ensurepip --upgrade 2>/dev/null || {
+            ./venv/bin/python -m ensurepip 2>/dev/null || {
+                echo -e "  ${RED}❌ Impossible d'installer pip${NC}"
+                exit 1
+            }
+        }
+    fi
+fi
+
+# Vérification finale
+if [ ! -f "venv/bin/pip" ] && [ ! -f "venv/bin/pip3" ]; then
+    echo -e "  ${RED}❌ Impossible de créer pip dans venv${NC}"
+    echo "  Essayez : sudo apt-get install -y python3.${PYTHON_VERSION}-venv python3-pip"
     exit 1
 fi
 
 # Activer venv et installer dépendances
-source venv/bin/activate
+PIP_CMD="venv/bin/pip"
+if [ ! -f "$PIP_CMD" ]; then
+    PIP_CMD="venv/bin/pip3"
+fi
 
 echo "  📦 Mise à jour de pip..."
-pip install --upgrade pip setuptools wheel 2>&1 | grep -i "successfully\|require" || true
+$PIP_CMD install --upgrade pip setuptools wheel 2>&1 | grep -i "successfully\|require" || true
 
-echo "  📦 Installation des dépendances d'À Quai..."
-if [ -f "backend/requirements.txt" ]; then
-    pip install -r backend/requirements.txt || {
-        echo -e "  ${RED}⚠️  Erreur lors de l'installation des dépendances${NC}"
-        exit 1
-    }
-else
-    echo -e "  ${RED}❌ backend/requirements.txt not found${NC}"
+# Vérifier que requirements.txt existe
+if [ ! -f "backend/requirements.txt" ]; then
+    echo -e "  ${RED}❌ backend/requirements.txt introuvable${NC}"
     exit 1
 fi
 
+echo "  📦 Installation des dépendances d'À Quai..."
+if ! $PIP_CMD install -r backend/requirements.txt; then
+    echo -e "  ${YELLOW}⚠️  Première tentative d'installation échouée, nouvelle tentative...${NC}"
+    sleep 2
+    if ! $PIP_CMD install -r backend/requirements.txt; then
+        echo -e "  ${RED}❌ Impossible d'installer les dépendances${NC}"
+        exit 1
+    fi
+fi
+
 echo "  📦 Installation de Gunicorn..."
-pip install gunicorn || {
-    echo -e "  ${RED}⚠️  Erreur lors de l'installation de Gunicorn${NC}"
-    exit 1
-}
+if ! $PIP_CMD install gunicorn; then
+    echo -e "  ${YELLOW}⚠️  Première tentative échouée, nouvelle tentative...${NC}"
+    sleep 2
+    if ! $PIP_CMD install gunicorn; then
+        echo -e "  ${RED}❌ Impossible d'installer Gunicorn${NC}"
+        exit 1
+    fi
+fi
 
 echo -e "  ${GREEN}✓${NC} Dépendances installées"
 
