@@ -147,10 +147,7 @@ def init_users_db():
 
 
 def seed_default_groups(connection):
-    """Crée les groupes par défaut si aucun groupe n'existe."""
-    count = connection.execute("SELECT COUNT(*) FROM groups").fetchone()[0]
-    if count > 0:
-        return
+    """Crée les groupes par défaut. Crée les groupes manquants, met à jour les existants."""
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
@@ -159,10 +156,19 @@ def seed_default_groups(connection):
          ["forms.view_all"], "full"),
     ]
     for key, label, description, permissions, data_scope in default_groups:
-        connection.execute(
-            "INSERT OR IGNORE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (key, label, description, json.dumps(permissions), data_scope, now, now)
-        )
+        existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
+        if existing:
+            # Groupe existe déjà : mettre à jour label/description seulement, pas les permissions
+            connection.execute(
+                "UPDATE groups SET label = ?, description = ?, data_scope = ?, updated_at = ? WHERE key = ?",
+                (label, description, data_scope, now, key)
+            )
+        else:
+            # Groupe n'existe pas : créer avec les permissions par défaut
+            connection.execute(
+                "INSERT INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+                (key, label, description, json.dumps(permissions), data_scope, now, now)
+            )
     connection.commit()
     # Créer l'utilisateur admin par défaut s'il n'existe pas
     seed_default_admin(connection)
