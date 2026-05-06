@@ -151,9 +151,9 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.create", "forms.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
@@ -209,9 +209,9 @@ def migrate_missing_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.create", "forms.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
