@@ -5,7 +5,61 @@
 
 ---
 
-## 🌊 La vision d'À Quai
+## 🚀 Installation rapide (5 minutes)
+
+### Déploiement automatisé — Debian 12 / LXC
+
+**Une seule commande pour une installation complète :**
+
+```bash
+sudo bash setup/install-debian.sh
+```
+
+C'est tout ! Le script :
+- ✅ Installe Python, nginx, Gunicorn
+- ✅ Crée la base de données
+- ✅ Configure le service systemd
+- ✅ Lance l'application
+
+**Puis accédez à :** `http://<IP_DE_VOTRE_SERVEUR>`
+
+### 🔓 Identifiants par défaut
+
+L'application est prête immédiatement. Connectez-vous avec :
+
+| Champ | Valeur |
+|---|---|
+| **Utilisateur** | `admin` |
+| **Mot de passe** | `admin` |
+
+### 🔒 ⚠️ SÉCURITÉ — À FAIRE EN PREMIER
+
+**Vous DEVEZ changer le mot de passe admin immédiatement :**
+
+1. Allez dans **Administration → Utilisateurs**
+2. Cliquez sur `admin`
+3. Définissez un mot de passe fort (minimum 12 caractères)
+4. Enregistrez
+
+> Cet identifiant par défaut n'existe que pour l'initialisation et doit être sécurisé avant toute autre action.
+
+### Configurer votre organisation
+
+1. Connecté en `admin`, allez dans **Paramètres**
+2. Remplissez :
+   - Nom de l'organisation
+   - Contexte (collectivité, entreprise, etc.)
+   - Contacts (support, DPO)
+   - Logo et personnalisation
+3. Créez vos utilisateurs métier et assignez les groupes
+
+**[Guide complet de configuration →](DEPLOYMENT_GUIDE.md)**
+
+---
+
+## 🌊 À propos d'À Quai
+
+### La vision
 
 > **À Quai, c'est l'application pour organiser son voyage professionnel.**
 >
@@ -19,51 +73,6 @@ Tout comme un voyage, le parcours professionnel d'un collaborateur comporte des 
 - **Le retour** : départ et restitution des ressources (offboarding)
 
 À Quai accompagne votre organisation à chaque étape, en centralisant la gestion des dotations matérielles et en garantissant une traçabilité complète du parcours.
-
----
-
-## 🚀 Démarrage rapide (5 minutes)
-
-### Installation automatisée
-
-Pour une installation complète sur Debian 12 ou LXC vierge, le script automatisé fait tout :
-
-```bash
-sudo bash setup/install-debian.sh
-```
-
-**Après l'installation**, accédez à l'application :
-
-```
-http://<IP_DE_VOTRE_SERVEUR>
-```
-
-Le setup wizard guidé s'affichera automatiquement au premier lancement.
-
-### ⚠️ Identifiants par défaut — IMPORTANT
-
-Une fois l'application en cours d'exécution, connectez-vous avec :
-
-| Champ | Valeur |
-|---|---|
-| **Utilisateur** | `admin` |
-| **Mot de passe** | `admin` |
-
-> 🔒 **SÉCURITÉ CRITIQUE** — Vous DEVEZ changer ce mot de passe immédiatement après votre première connexion.
-> 
-> **Comment :** Allez dans **Administration → Utilisateurs** et modifiez le compte `admin` pour définir un mot de passe sécurisé. Cet identifiant par défaut n'existe que pour le bootstrap initial et doit être sécurisé immédiatement.
-
-### Configuration initiale
-
-1. Connectez-vous en `admin/admin`
-2. Allez dans **Paramètres** et remplissez :
-   - Nom de l'organisation
-   - Contexte organisationnel (collectivité, entreprise, etc.)
-   - Contacts (support, DPO)
-   - Personnalisation (couleur, logo, thème)
-3. Créez vos utilisateurs métier et assignez-les aux groupes appropriés
-
-**[Plus de détails dans le guide de configuration →](DEPLOYMENT_GUIDE.md)**
 
 ---
 
