@@ -40,6 +40,8 @@ def build_restitution_pdf_bytes(title, payload):
     }
     material_entries = {}
     for item in extract_items(payload):
+        if not item.get("assigned"):
+            continue
         if item.get("category") != "materiel":
             continue
         details = json.loads(item.get("details_json") or "{}") if item.get("details_json") else {}
