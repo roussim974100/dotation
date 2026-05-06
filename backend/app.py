@@ -151,17 +151,17 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.view_all", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.view_all"], "full"),
+         ["forms.create", "forms.view_all"], "full"),
     ]
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe déjà : mettre à jour label/description seulement, pas les permissions
+            # Groupe existe déjà : mettre à jour label/description et permissions
             connection.execute(
-                "UPDATE groups SET label = ?, description = ?, data_scope = ?, updated_at = ? WHERE key = ?",
-                (label, description, data_scope, now, key)
+                "UPDATE groups SET label = ?, description = ?, permissions_json = ?, data_scope = ?, updated_at = ? WHERE key = ?",
+                (label, description, json.dumps(permissions), data_scope, now, key)
             )
         else:
             # Groupe n'existe pas : créer avec les permissions par défaut
