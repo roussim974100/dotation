@@ -205,9 +205,9 @@ echo -e "  ${GREEN}✓${NC} nginx configuré"
 
 # Initialiser la base de données
 echo "  🗄️  Initialisation de la base de données..."
-cd "$INSTALL_DIR"
-source venv/bin/activate
-python -c "from backend.app import init_db, init_users_db; init_db(); init_users_db()" || {
+cd "$INSTALL_DIR/backend"
+source "$INSTALL_DIR/venv/bin/activate"
+"$INSTALL_DIR/venv/bin/python" -c "from app import init_db, init_users_db; init_db(); init_users_db()" || {
     echo -e "  ${RED}❌ Erreur lors de l'initialisation de la base${NC}"
     exit 1
 }
