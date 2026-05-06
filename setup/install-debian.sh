@@ -1,6 +1,9 @@
 #!/bin/bash
 # Installation automatique d'À Quai sur Debian/Ubuntu
 # Usage: sudo bash install-debian.sh
+# Ou directement en root : bash install-debian.sh
+# Note: Ce script n'utilise pas 'sudo -u' ; il fonctionne directement en root
+# et ne dépend pas de sudo étant installé dans le conteneur.
 
 set -Eeuo pipefail
 
