@@ -1,5 +1,28 @@
 # Historique des versions — À Quai
 
+## [3.18.2] - 2026-05-06
+
+### 🐛 Bugfixes
+
+#### Installation script — Permissions post-initialisation
+- **Problème** : Le service ne démarrait pas avec l'erreur "Worker failed to boot"
+- **Cause** : Les fichiers créés par `init_db()` (dotation.db, users.db, .app_secret_key) avaient les permissions root, empêchant www-data de les lire
+- **Solution** : Ajouter une étape de correction des permissions immédiatement après l'initialisation de la base de données
+- **Commit** : `e06b0cf`
+
+### 📝 Modifications techniques
+
+**Fichiers modifiés :**
+- `setup/install-debian.sh` — Correction des permissions post-initialisation
+
+### ✅ Validations
+
+- ✅ Service démarre correctement après installation
+- ✅ www-data a les permissions nécessaires pour lire/écrire les bases de données
+- ✅ L'application Flask démarre sans erreur
+
+---
+
 ## [3.18.1] - 2026-05-06
 
 ### 🐛 Bugfixes
