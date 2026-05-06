@@ -5,6 +5,17 @@
 
 ---
 
+## 🔐 Credentials par défaut (après installation)
+
+```
+Utilisateur : admin
+Mot de passe : admin
+```
+
+⚠️ **À changer immédiatement après la première connexion**
+
+---
+
 ## 🚀 Installation rapide (5 minutes)
 
 ### Déploiement automatisé — Debian 12 / LXC
