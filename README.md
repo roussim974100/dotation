@@ -1,6 +1,6 @@
 # À Quai — Gestion des dotations matérielles
 
-**Version :** `3.18.1-prod` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Version :** `3.18.2-prod` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
 **Statut :** Production ✅ | **Dernière MAJ :** 06 mai 2026
 
 ---
