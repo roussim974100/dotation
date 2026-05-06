@@ -21,37 +21,55 @@ C'est tout ! Le script :
 - ✅ Configure le service systemd
 - ✅ Lance l'application
 
-**Puis accédez à :** `http://<IP_DE_VOTRE_SERVEUR>`
+---
 
-### 🔓 Identifiants par défaut
+## ✅ Première connexion
 
-L'application est prête immédiatement. Connectez-vous avec :
+**L'application est accessible immédiatement après l'installation.**
 
-| Champ | Valeur |
-|---|---|
-| **Utilisateur** | `admin` |
-| **Mot de passe** | `admin` |
+### Accès
 
-### 🔒 ⚠️ SÉCURITÉ — À FAIRE EN PREMIER
+```
+http://<IP_DE_VOTRE_SERVEUR>
+```
 
-**Vous DEVEZ changer le mot de passe admin immédiatement :**
+Remplacez `<IP_DE_VOTRE_SERVEUR>` par l'IP de votre machine (ex: `http://192.168.1.50`).
 
-1. Allez dans **Administration → Utilisateurs**
-2. Cliquez sur `admin`
-3. Définissez un mot de passe fort (minimum 12 caractères)
-4. Enregistrez
+### Identifiants de connexion
 
-> Cet identifiant par défaut n'existe que pour l'initialisation et doit être sécurisé avant toute autre action.
+Utilisez ces identifiants pour votre première connexion :
 
-### Configurer votre organisation
+```
+Utilisateur : admin
+Mot de passe : admin
+```
 
-1. Connecté en `admin`, allez dans **Paramètres**
-2. Remplissez :
-   - Nom de l'organisation
-   - Contexte (collectivité, entreprise, etc.)
-   - Contacts (support, DPO)
-   - Logo et personnalisation
-3. Créez vos utilisateurs métier et assignez les groupes
+---
+
+## 🔒 Sécurité : Changement du mot de passe (OBLIGATOIRE)
+
+**Vous DEVEZ changer le mot de passe `admin` immédiatement après votre première connexion.**
+
+1. Connectez-vous avec `admin` / `admin`
+2. Allez dans **Administration → Utilisateurs**
+3. Cliquez sur le compte `admin`
+4. Changez le mot de passe vers quelque chose de sécurisé (minimum 12 caractères, majuscules, minuscules, chiffres)
+5. Enregistrez
+
+> ⚠️ Ne pas sécuriser ce compte immédiatement est un risque de sécurité critique. Cet identifiant par défaut n'existe que pour l'initialisation.
+
+---
+
+## ⚙️ Configuration de l'organisation
+
+Une fois connecté en `admin` avec le nouveau mot de passe, allez dans **Paramètres** pour configurer :
+
+1. **Nom de l'organisation** — Comment s'appelle votre structure
+2. **Contexte organisationnel** — Collectivité, entreprise, administration, association
+3. **Contacts** — Email support et DPO
+4. **Personnalisation** — Couleur thème, logo, nom d'application
+
+Après cela, créez vos utilisateurs métier et assignez-les aux groupes appropriés.
 
 **[Guide complet de configuration →](DEPLOYMENT_GUIDE.md)**
 
