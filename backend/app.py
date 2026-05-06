@@ -163,7 +163,7 @@ def seed_default_groups(connection):
         ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
          ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
         ("redaction", "Rédaction", "Création et modification des fiches en cours",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"], "full"),
     ]
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
@@ -221,7 +221,7 @@ def migrate_missing_groups(connection):
         ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
          ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
         ("redaction", "Rédaction", "Création et modification des fiches en cours",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"], "full"),
     ]
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
