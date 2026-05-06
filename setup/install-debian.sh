@@ -299,6 +299,15 @@ source "$INSTALL_DIR/venv/bin/activate"
 
 echo -e "  ${GREEN}✓${NC} Base de données initialisée"
 
+# Fixer les permissions sur les fichiers créés par init_db
+echo "  ⚙️  Correction des permissions post-initialisation..."
+chown -R www-data:www-data "$INSTALL_DIR/backend" || true
+chmod 755 "$INSTALL_DIR/backend"
+chmod 644 "$INSTALL_DIR/backend/.app_secret_key" 2>/dev/null || true
+chmod 666 "$INSTALL_DIR/backend/dotation.db" 2>/dev/null || true
+chmod 666 "$INSTALL_DIR/backend/users.db" 2>/dev/null || true
+chmod -R 755 "$INSTALL_DIR/backend/venv" || true
+
 # Créer service systemd
 echo "  ⚙️  Création du service systemd..."
 
