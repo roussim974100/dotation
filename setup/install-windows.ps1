@@ -18,7 +18,7 @@ if (-not $isAdmin) {
 
 $InstallDir = "C:\dotation"
 $GitRepo = "https://github.com/roussim974100/dotation.git"
-$GitBranch = "main"
+$GitBranch = if ($env:GIT_BRANCH) { $env:GIT_BRANCH } else { "dev" }
 
 # Configuration
 Write-Host ""
@@ -53,7 +53,11 @@ if (Test-Path $InstallDir) {
     Write-Host "  📁 Répertoire existant trouvé, mise à jour..."
     Set-Location $InstallDir
     & git fetch origin
-    & git checkout $GitBranch
+    & git checkout -B $GitBranch origin/$GitBranch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "⚠️  Impossible de checkout vers origin/$GitBranch" -ForegroundColor $Yellow
+        & git checkout $GitBranch
+    }
     & git pull origin $GitBranch
 } else {
     Write-Host "  📁 Création du répertoire $InstallDir..."
@@ -110,6 +114,18 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "  ✓ Dépendances installées" -ForegroundColor $Green
+
+# Initialiser la base de données
+Write-Host ""
+Write-Host "🗄️  Initialisation de la base de données..." -ForegroundColor $Yellow
+
+& ".\venv\Scripts\python.exe" -c "from backend.app import init_db, init_users_db; init_db(); init_users_db()"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "⚠️  Erreur lors de l'initialisation de la base (elle sera créée au premier démarrage)" -ForegroundColor $Yellow
+} else {
+    Write-Host "  ✓ Base de données initialisée" -ForegroundColor $Green
+}
 
 Write-Host ""
 Write-Host "🔧 Configuration du serveur..." -ForegroundColor $Yellow
