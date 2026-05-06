@@ -190,10 +190,30 @@ echo -e "${YELLOW}🔧 Configuration du serveur...${NC}"
 
 # Configurer permissions
 echo "  ⚙️  Configuration des permissions..."
-chown -R www-data:www-data "$INSTALL_DIR"
+
+# Créer et préparer le répertoire data
+mkdir -p "$INSTALL_DIR/backend/data"
+mkdir -p "$INSTALL_DIR/backend/logs"
+
+# Fixer les permissions de manière robuste
+chown -R www-data:www-data "$INSTALL_DIR" || {
+    echo -e "  ${YELLOW}⚠️  Impossible de changer le propriétaire, essai avec sudo...${NC}"
+    sudo chown -R www-data:www-data "$INSTALL_DIR"
+}
+
+# Permissions pour que www-data puisse écrire
 chmod -R 755 "$INSTALL_DIR"
-chmod -R 775 "$INSTALL_DIR/backend/data" 2>/dev/null || mkdir -p "$INSTALL_DIR/backend/data"
 chmod -R 775 "$INSTALL_DIR/backend/data"
+chmod -R 775 "$INSTALL_DIR/backend/logs"
+chmod -R 755 "$INSTALL_DIR/venv"
+chmod -R 755 "$INSTALL_DIR/backend"
+
+# Vérifier que les permissions sont correctes
+if ! su - www-data -s /bin/bash -c "test -w $INSTALL_DIR/backend/data" 2>/dev/null; then
+    echo -e "  ${YELLOW}⚠️  Permissions insuffisantes, correction...${NC}"
+    chmod 777 "$INSTALL_DIR/backend/data"
+    chmod 777 "$INSTALL_DIR/backend/logs"
+fi
 
 # Configurer nginx
 echo "  ⚙️  Configuration de nginx..."
@@ -301,26 +321,54 @@ fi
 
 echo -e "  ${GREEN}✓${NC} Service activé et prêt au démarrage"
 
-# Démarrer le service
+# Démarrer le service avec vérification robuste
 echo "  🚀 Démarrage du service..."
-if systemctl start dotation; then
-    sleep 2
+systemctl start dotation
+
+# Attendre que le service démarre et réponde
+echo "  ⏳ Attente du démarrage de l'application..."
+MAX_ATTEMPTS=30
+ATTEMPT=0
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     if systemctl is-active --quiet dotation; then
-        echo -e "  ${GREEN}✓${NC} Service en cours d'exécution"
-    else
-        echo -e "  ${RED}⚠️  Service n'a pas pu démarrer${NC}"
-        echo "  Vérifiez les logs: journalctl -u dotation -n 20"
+        # Vérifier que l'app répond réellement
+        if curl -s http://localhost:5000/ > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✓${NC} Service en cours d'exécution et répond"
+            break
+        fi
     fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+        sleep 1
+    fi
+done
+
+# Vérifier le résultat final
+if ! systemctl is-active --quiet dotation; then
+    echo -e "  ${RED}❌ Le service n'a pas pu démarrer${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Logs d'erreur:${NC}"
+    journalctl -u dotation -n 20 --no-pager
+    exit 1
+elif ! curl -s http://localhost:5000/ > /dev/null 2>&1; then
+    echo -e "  ${YELLOW}⚠️  Le service est actif mais ne répond pas${NC}"
+    echo "  Attendez quelques secondes et vérifiez les logs:"
+    echo "  journalctl -u dotation -f"
 else
-    echo -e "  ${RED}⚠️  Erreur au démarrage du service${NC}"
+    echo -e "  ${GREEN}✓${NC} L'application est prête"
 fi
 
 echo ""
-echo -e "${GREEN}✅ Installation complétée !${NC}"
+echo "=================================================="
+echo -e "${GREEN}✅ Installation complétée avec succès !${NC}"
+echo "=================================================="
 echo ""
-echo "=================================================="
-echo -e "${YELLOW}🔍 Vérification du statut...${NC}"
-echo "=================================================="
+
+# Vérification finale
+echo -e "${YELLOW}🔍 Vérifications finales...${NC}"
+
+FINAL_CHECK=true
 
 # Vérifier le service
 echo -n "  Service À Quai : "
@@ -328,7 +376,7 @@ if systemctl is-active --quiet dotation; then
     echo -e "${GREEN}✓ En cours d'exécution${NC}"
 else
     echo -e "${RED}❌ Arrêté${NC}"
-    echo "    Redémarrer avec: systemctl restart dotation"
+    FINAL_CHECK=false
 fi
 
 # Vérifier nginx
@@ -337,42 +385,46 @@ if systemctl is-active --quiet nginx; then
     echo -e "${GREEN}✓ En cours d'exécution${NC}"
 else
     echo -e "${RED}❌ Arrêté${NC}"
+    FINAL_CHECK=false
 fi
 
-# Vérifier le port 5000
-echo -n "  Port 5000 (Flask) : "
-if netstat -tlnp 2>/dev/null | grep -q ":5000 "; then
-    echo -e "${GREEN}✓ Écoute active${NC}"
+# Vérifier que l'app répond
+echo -n "  Application web : "
+if curl -s http://localhost/ > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Répond correctement${NC}"
 else
-    echo -e "${YELLOW}⚠️  Pas de réponse (l'app peut démarrer en retard)${NC}"
+    echo -e "${YELLOW}⚠️  Pas encore prête, patientez...${NC}"
+    FINAL_CHECK=false
 fi
 
-# Attendre un peu que l'app démarre
-sleep 3
+echo ""
 
-echo ""
-echo "=================================================="
-echo -e "${GREEN}🌊 À Quai est prêt !${NC}"
-echo "=================================================="
-echo ""
-echo "📍 Accès à l'application :"
-echo -e "   ${YELLOW}http://localhost${NC}"
-echo "   ou"
-echo -e "   ${YELLOW}http://$(hostname -I | awk '{print $1}')${NC}"
-echo ""
-echo "🔐 Identifiants par défaut :"
-echo "   Utilisateur : ${YELLOW}admin${NC}"
-echo "   Mot de passe : ${YELLOW}admin${NC}"
-echo ""
-echo "📖 Première utilisation :"
-echo "   1. Accédez à http://localhost/login"
-echo "   2. Connectez-vous avec admin/admin"
-echo "   3. Suivez le wizard de configuration"
-echo ""
-echo "📊 Vérifier le statut :"
-echo "   systemctl status dotation"
-echo ""
-echo "📝 Voir les logs :"
-echo "   journalctl -u dotation -f"
-echo ""
+if [ "$FINAL_CHECK" = true ]; then
+    echo "=================================================="
+    echo -e "${GREEN}🌊 À Quai est prêt et fonctionnel !${NC}"
+    echo "=================================================="
+    echo ""
+    echo "📍 Accédez à l'application :"
+    APP_IP=$(hostname -I | awk '{print $1}')
+    echo -e "   🌐 ${GREEN}http://${APP_IP}${NC}"
+    echo ""
+    echo "🔐 Identifiants par défaut :"
+    echo "   📧 Utilisateur : ${GREEN}admin${NC}"
+    echo "   🔑 Mot de passe : ${GREEN}admin${NC}"
+    echo ""
+    echo "⚠️  Changez le mot de passe admin immédiatement après la première connexion !"
+    echo ""
+else
+    echo "=================================================="
+    echo -e "${YELLOW}⚠️  Installation complétée mais l'app n'est pas encore prête${NC}"
+    echo "=================================================="
+    echo ""
+    echo "Attendez quelques secondes et vérifiez les logs :"
+    echo -e "   ${YELLOW}journalctl -u dotation -f${NC}"
+    echo ""
+    echo "En cas d'erreur, consultez :"
+    echo -e "   ${YELLOW}journalctl -u dotation -n 50${NC}"
+    echo ""
+fi
+
 echo "=================================================="
