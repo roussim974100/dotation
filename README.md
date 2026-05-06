@@ -353,6 +353,10 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Déploiement Windows — IIS + Waitress
 
+> ⚠️ **ATTENTION** — Cette approche **n'a pas été testée en production**. Elle est fournie à titre informatif.
+> 
+> Le déploiement standard et validé est **Debian 12+ avec Gunicorn + nginx**. Si vous devez utiliser Windows, contactez le support pour discuter des alternatives.
+
 Pour Windows Server avec IIS existant.
 
 ### Prérequis IIS
