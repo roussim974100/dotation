@@ -1,5 +1,37 @@
 # Historique des versions — À Quai
 
+## [3.18.3] - 2026-05-06
+
+### 🐛 Bugfixes
+
+#### Permissions manquantes dans les groupes
+- **Problème** : Le groupe admin manquait permissions critiques (forms.delete, forms.edit, forms.restitution, pools.manage)
+- **Cause** : Les groupes n'avaient pas toutes les permissions requises par les routes
+- **Solution** : Audit complet + correction des permissions manquantes
+- **Impact** : Admin et autres groupes (gestion, redaction) ont maintenant les bonnes permissions
+- **Commit** : `0702f80`
+
+#### Dossiers invisibles pour certains utilisateurs
+- **Problème** : Les utilisateurs ne voyaient aucun dossier même avec les bonnes permissions
+- **Cause** : Permissions `forms.read_list` et `forms.read_detail` manquantes
+- **Solution** : Ajout de ces permissions à tous les groupes
+- **Commit** : `00d7c87`
+
+#### Visibilité inter-services
+- **Problème** : Les utilisateurs de certains groupes ne voyaient pas les dossiers des autres services
+- **Cause** : Permission `forms.view_all` manquante
+- **Solution** : Ajout de `forms.view_all` à tous les groupes
+- **Commit** : `a88fbc7`
+
+### ✅ Validations
+
+- ✅ Tous les dossiers visibles pour les administrateurs
+- ✅ Permissions cohérentes entre groupes
+- ✅ Routes critiques accessibles avec les bonnes permissions
+- ✅ Audit complet des permissions effectué
+
+---
+
 ## [3.18.2] - 2026-05-06
 
 ### 🐛 Bugfixes
