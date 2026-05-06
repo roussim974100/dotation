@@ -176,7 +176,8 @@ def extract_items(payload):
 
 
 def summarize_assignment_progress(payload):
-    requested_items = extract_items(payload)
+    all_items = extract_items(payload)
+    requested_items = [item for item in all_items if item.get("assigned")]
     total_requested = len(requested_items)
     completed = 0
     for item in requested_items:
