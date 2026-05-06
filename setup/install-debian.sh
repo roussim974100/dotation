@@ -2,7 +2,7 @@
 # Installation automatique d'À Quai sur Debian/Ubuntu
 # Usage: sudo bash install-debian.sh
 
-set -e
+set -Eeuo pipefail
 
 # Couleurs
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # Configuration
 INSTALL_DIR="/opt/dotation"
 GIT_REPO="https://github.com/roussim974100/dotation.git"
-GIT_BRANCH="main"
+GIT_BRANCH="${GIT_BRANCH:-dev}"
 
 echo -e "${GREEN}🌊 Installation d'À Quai${NC}"
 echo "=================================================="
@@ -129,6 +129,12 @@ else
     exit 1
 fi
 
+echo "  📦 Installation de Gunicorn..."
+pip install gunicorn || {
+    echo -e "  ${RED}⚠️  Erreur lors de l'installation de Gunicorn${NC}"
+    exit 1
+}
+
 echo -e "  ${GREEN}✓${NC} Dépendances installées"
 
 echo ""
@@ -198,11 +204,10 @@ echo -e "  ${GREEN}✓${NC} nginx configuré"
 echo "  🗄️  Initialisation de la base de données..."
 cd "$INSTALL_DIR"
 source venv/bin/activate
-python backend/app.py &
-APP_PID=$!
-sleep 3
-kill $APP_PID 2>/dev/null || true
-sleep 1
+python -c "from backend.app import init_db, init_users_db; init_db(); init_users_db()" || {
+    echo -e "  ${RED}❌ Erreur lors de l'initialisation de la base${NC}"
+    exit 1
+}
 
 echo -e "  ${GREEN}✓${NC} Base de données initialisée"
 
@@ -218,10 +223,11 @@ After=network.target
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/opt/dotation
+WorkingDirectory=/opt/dotation/backend
 Environment="FLASK_ENV=production"
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/opt/dotation/venv/bin/python /opt/dotation/backend/app.py
+Environment="HOME=/opt/dotation/backend/data"
+ExecStart=/opt/dotation/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 --timeout 120 --access-logfile - --error-logfile - app:app
 Restart=always
 RestartSec=10
 StandardOutput=journal
