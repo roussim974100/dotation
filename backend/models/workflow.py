@@ -152,9 +152,10 @@ def extract_items(payload):
 
     extracted = []
     for item_key, category, label, details in items:
-        if not isinstance(details, dict) or not details.get("selected"):
+        if not isinstance(details, dict):
             continue
 
+        is_selected = details.get("selected", False)
         state = item_states.get(item_key, {})
         return_state = state.get("state") or state.get("condition") or "pending"
         extracted.append(
@@ -162,7 +163,7 @@ def extract_items(payload):
                 "item_key": item_key,
                 "category": category,
                 "label": label,
-                "assigned": True,
+                "assigned": bool(is_selected),
                 "returned": return_state in {"returned", "returned_damaged", "transferred", "conforme", "degrade"},
                 "returned_at": state.get("returnedAt"),
                 "return_condition": return_state,
