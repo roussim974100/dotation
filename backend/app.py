@@ -154,6 +154,16 @@ def seed_default_groups(connection):
          ["users.manage", "forms.create", "forms.view_all", "forms.export", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.create", "forms.view_all"], "full"),
+        ("administration", "Administration", "Complet total et gestion des utilisateurs",
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "pools.manage", "users.manage"], "full"),
+        ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "unc.view_all"], "full"),
+        ("gestion", "Gestion", "Gestion avancée avec restitution et export",
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage"], "full"),
+        ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
+         ["forms.read_list", "forms.read_detail", "forms.export"], "full"),
+        ("redaction", "Rédaction", "Création et modification des fiches en cours",
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.export"], "full"),
     ]
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
