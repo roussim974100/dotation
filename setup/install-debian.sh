@@ -33,6 +33,26 @@ if ! grep -q "Debian\|Ubuntu" /etc/os-release; then
     exit 1
 fi
 
+echo ""
+echo -e "${YELLOW}🔄 Mise à jour du système${NC}"
+read -p "Voulez-vous mettre à jour les packages du système ? (y/n) [recommandé] : " -n 1 -r UPDATE_SYS
+echo
+if [[ $UPDATE_SYS =~ ^[Yy]$ ]]; then
+    echo "  📦 Mise à jour du système en cours..."
+    apt-get update || {
+        echo -e "  ${RED}❌ Erreur lors de apt-get update${NC}"
+        exit 1
+    }
+    apt-get upgrade -y || {
+        echo -e "  ${RED}❌ Erreur lors de apt-get upgrade${NC}"
+        exit 1
+    }
+    echo -e "  ${GREEN}✓${NC} Système mis à jour"
+else
+    echo -e "  ${YELLOW}⚠️  Mise à jour système ignorée${NC}"
+fi
+
+echo ""
 echo -e "${YELLOW}📋 Vérification des prérequis...${NC}"
 
 # Vérifier/installer Python 3 (flexible sur la version)
