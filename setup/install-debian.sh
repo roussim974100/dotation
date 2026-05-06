@@ -35,23 +35,27 @@ fi
 
 echo -e "${YELLOW}📋 Vérification des prérequis...${NC}"
 
-# Vérifier/installer Python 3.11
-if ! command -v python3.11 &> /dev/null; then
-    echo "  📦 Installation de Python 3.11..."
+# Vérifier/installer Python 3 (flexible sur la version)
+if ! command -v python3 &> /dev/null; then
+    echo "  📦 Installation de Python 3..."
     apt-get update
-    apt-get install -y python3.11 python3.11-venv python3.11-dev || {
-        echo "  ⚠️  Python 3.11 non disponible, utilisation de Python 3.10..."
-        apt-get install -y python3.10 python3.10-venv python3.10-dev
+    apt-get install -y python3 python3-venv python3-dev || {
+        echo -e "  ${RED}❌ Impossible d'installer Python 3${NC}"
+        exit 1
     }
 fi
 
 # Vérifier que python3 -m venv est disponible
-if ! python3.11 -m venv --help &>/dev/null && ! python3.10 -m venv --help &>/dev/null; then
+if ! python3 -m venv --help &>/dev/null; then
     echo "  📦 Installation de python3-venv..."
-    apt-get install -y python3-venv
+    apt-get install -y python3-venv || {
+        echo -e "  ${RED}❌ Impossible d'installer python3-venv${NC}"
+        exit 1
+    }
 fi
 
-echo -e "  ${GREEN}✓${NC} Python installé"
+PYTHON_VERSION=$(python3 --version 2>&1)
+echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION installé"
 
 # Vérifier/installer git
 if ! command -v git &> /dev/null; then
@@ -94,15 +98,12 @@ echo -e "  ${GREEN}✓${NC} Code téléchargé"
 echo ""
 echo -e "${YELLOW}🐍 Configuration Python...${NC}"
 
-# Créer venv avec fallback
+# Créer venv
 if [ ! -d "venv" ]; then
     echo "  🔧 Création de l'environnement virtuel..."
-    if python3.11 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3.11"
-    elif python3.10 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3.10"
-    elif python3 -m venv venv 2>/dev/null; then
-        echo "  ✓ venv créé avec Python 3"
+    if python3 -m venv venv 2>/dev/null; then
+        PYTHON_USED=$(./venv/bin/python --version 2>&1)
+        echo "  ✓ venv créé avec $PYTHON_USED"
     else
         echo -e "  ${RED}❌ Impossible de créer l'environnement virtuel${NC}"
         exit 1
