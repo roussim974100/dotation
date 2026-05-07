@@ -1906,45 +1906,19 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // CRITICAL FIX #2: Lire l'état ACTUEL des checkboxes du DOM, pas les données sauvegardées
-  // Cela garantit que nous retournons les sélections réelles du formulaire
-  const result = {};
-  const savedData = window._savedMaterielData || {};
-
-  // Construire la map avec l'état ACTUEL des checkboxes
-  for (const [key, item] of Object.entries(savedData)) {
-    const checkboxId = `checkbox_materiel_${key}`;
-    const checkbox = document.getElementById(checkboxId);
-    const selected = checkbox ? checkbox.checked : false;
-
-    result[key] = {
-      ...item,
-      selected: selected
-    };
-  }
-
-  return result;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedMaterielData || {};
 }
 
 function buildIntangibleSelectionMap() {
-  // CRITICAL FIX #2: Lire l'état ACTUEL des checkboxes du DOM, pas les données sauvegardées
-  // Cela garantit que nous retournons les sélections réelles du formulaire
-  const result = {};
-  const savedData = window._savedImmaterielData || {};
-
-  // Construire la map avec l'état ACTUEL des checkboxes
-  for (const [key, item] of Object.entries(savedData)) {
-    const checkboxId = `checkbox_immateriel_${key}`;
-    const checkbox = document.getElementById(checkboxId);
-    const selected = checkbox ? checkbox.checked : false;
-
-    result[key] = {
-      ...item,
-      selected: selected
-    };
-  }
-
-  return result;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedImmaterielData || {};
 }
 
 function updateCurrentPayload() {
