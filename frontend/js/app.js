@@ -263,7 +263,10 @@ function bindProgressIndicatorRefresh() {
   if (!form || form.dataset.boundProgressIndicators) {
     return;
   }
-  const refresh = () => refreshProgressIndicators();
+  const refresh = () => {
+    refreshProgressIndicators();
+    updateCurrentPayload();  // CRITICAL FIX #6: Sync payload on form input/change
+  };
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.dataset.boundProgressIndicators = "true";
