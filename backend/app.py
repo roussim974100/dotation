@@ -16,6 +16,7 @@ from models.forms import migrate_field_suggestions_from_history
 import importlib
 import pkgutil
 import routes as _routes_pkg
+from permissions import validate_permissions_at_startup
 
 
 class _AutoSecureSessionInterface(SecureCookieSessionInterface):
@@ -32,6 +33,10 @@ app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
 app.session_interface = _AutoSecureSessionInterface()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Valider les permissions au démarrage (dev uniquement)
+if os.environ.get("FLASK_ENV") == "development":
+    validate_permissions_at_startup()
 
 for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
     _mod = importlib.import_module(f"routes.{_modname}")
