@@ -931,37 +931,9 @@ function populateAdditionalResources(data = {}) {
   const isLocked = Boolean(data.meta?.lockedAt);
 
   resources.forEach((resource) => {
-    // Pour les ressources mutualisées avec items disponibles
-      // Créer des cases à cocher pour chaque item disponible
-      resource.availableItems.forEach((item) => {
-        let itemCheckbox = document.getElementById(itemCheckboxId);
-        if (!itemCheckbox) {
-          // Créer le checkbox s'il n'existe pas
-          const container = document.getElementById(`dynamic_resource_fields_wrap_${resource.id}`);
-          if (container) {
-            const label = document.createElement("label");
-            container.prepend(label);
-            itemCheckbox = document.getElementById(itemCheckboxId);
-            // Appliquer le verrou immédiatement si le dossier est finalisé
-            if (itemCheckbox && isLocked) {
-              itemCheckbox.disabled = true;
-            }
-          }
-        }
-        // Cocher si l'item était précédemment sélectionné
-        if (itemCheckbox) {
-          itemCheckbox.checked = Boolean(item.selected);
-        }
-      });
-      // Marquer le resource comme sélectionné si des items sont disponibles
-      const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
-      if (checkbox && resource.availableItems.length > 0) {
-        checkbox.checked = true;
-      }
-    }
-
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     const details = document.getElementById(`dynamic_resource_details_${resource.id}`);
+    if (checkbox) {
       checkbox.checked = Boolean(resource.selected);
     }
     if (details) {
