@@ -2331,6 +2331,23 @@ function populateForm(data, signaturePad) {
 
   // Envoyer les logs au serveur après un délai
   setTimeout(sendConsoleLogs, 500);
+
+  // CRITICAL FIX #1: Créer window.currentPayload avec le contenu complet au chargement
+  window.currentPayload = {
+    meta: data.meta || {},
+    beneficiaire: data.beneficiaire || {},
+    dossier: data.dossier || {},
+    workflow: data.workflow || {},
+    validation: data.validation || {},
+    resources: data.resources || { additional: [] },
+    restitution: data.restitution || {},
+    materiel: data.materiel || {},
+    immateriel: data.immateriel || {},
+    retraits: data.retraits || {},
+    unc_acces: data.unc_acces || [],
+    unc_ref_ad: data.unc_ref_ad || ""
+  };
+  console.log("✅ window.currentPayload initialized", window.currentPayload);
 }
 
 function formatStatusLabel(status) {
