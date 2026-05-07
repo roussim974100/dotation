@@ -1897,39 +1897,45 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // Utiliser les données sauvegardées comme base mais mettre à jour selected/details
-  // à partir des ressources.additional actuellement affichées dans le formulaire
-  const savedData = JSON.parse(JSON.stringify(window._savedMaterielData || {}));
-  const additional = window.currentPayload?.resources?.additional || [];
+  // CRITICAL FIX #2: Lire l'état ACTUEL des checkboxes du DOM, pas les données sauvegardées
+  // Cela garantit que nous retournons les sélections réelles du formulaire
+  const result = {};
+  const savedData = window._savedMaterielData || {};
 
-  // Mettre à jour selected et details pour chaque item depuis les ressources.additional
+  // Construire la map avec l'état ACTUEL des checkboxes
   for (const [key, item] of Object.entries(savedData)) {
-    const legacyCode = item?.code || item?.id || key;
-    const additionalResource = additional.find(r => r.code === legacyCode || r.id === legacyCode);
-    if (additionalResource) {
-      item.selected = Boolean(additionalResource.selected);
-      if (additionalResource.details) item.details = additionalResource.details;
-    }
+    const checkboxId = `checkbox_materiel_${key}`;
+    const checkbox = document.getElementById(checkboxId);
+    const selected = checkbox ? checkbox.checked : false;
+
+    result[key] = {
+      ...item,
+      selected: selected
+    };
   }
-  return savedData;
+
+  return result;
 }
 
 function buildIntangibleSelectionMap() {
-  // Utiliser les données sauvegardées comme base mais mettre à jour selected/details
-  // à partir des ressources.additional actuellement affichées dans le formulaire
-  const savedData = JSON.parse(JSON.stringify(window._savedImmaterielData || {}));
-  const additional = window.currentPayload?.resources?.additional || [];
+  // CRITICAL FIX #2: Lire l'état ACTUEL des checkboxes du DOM, pas les données sauvegardées
+  // Cela garantit que nous retournons les sélections réelles du formulaire
+  const result = {};
+  const savedData = window._savedImmaterielData || {};
 
-  // Mettre à jour selected et details pour chaque item depuis les ressources.additional
+  // Construire la map avec l'état ACTUEL des checkboxes
   for (const [key, item] of Object.entries(savedData)) {
-    const legacyCode = item?.code || item?.id || key;
-    const additionalResource = additional.find(r => r.code === legacyCode || r.id === legacyCode);
-    if (additionalResource) {
-      item.selected = Boolean(additionalResource.selected);
-      if (additionalResource.details) item.details = additionalResource.details;
-    }
+    const checkboxId = `checkbox_immateriel_${key}`;
+    const checkbox = document.getElementById(checkboxId);
+    const selected = checkbox ? checkbox.checked : false;
+
+    result[key] = {
+      ...item,
+      selected: selected
+    };
   }
-  return savedData;
+
+  return result;
 }
 
 function collectRequestedResourcesFromFormData(formData) {
