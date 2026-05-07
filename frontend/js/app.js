@@ -1022,13 +1022,6 @@ function populateAdditionalResources(data = {}) {
         }
       }
     });
-
-    // Restaurer l'état mutualisé (symétrique : tous les membres voient le même toggle)
-      if (toggle) {
-        toggle.checked = true;
-      }
-      state.enabled = true;
-    }
   });
   bindDynamicResourceToggles();
   refreshProgressIndicators();
