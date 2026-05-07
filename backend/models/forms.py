@@ -258,11 +258,15 @@ def persist_form(payload, allow_locked_update=False):
         raise AppError("invalid_form_data", "Les champs nom et prénom sont obligatoires.")
     payload = _sanitize_unc_acces(payload)
 
-    # Nettoyer les anciennes clés materiel/immateriel si le nouveau format resources a été utilisé
-    # (même si resources.additional est vide - c'est normal si l'utilisateur a tout décoché).
-    # Cela évite que les anciennes données persistent et s'affichent en fallback au chargement suivant.
-    # Condition : si resources existe ET contient une clé "additional" (même si vide)
-    if "resources" in payload and "additional" in payload.get("resources", {}):
+    # CRITICAL FIX #3: Nettoyer les anciennes clés materiel/immateriel si le nouveau format resources a été utilisé
+    # Amélioration : ne nettoyer que si resources.additional a du contenu réel (sélections ou détails)
+    # Cela évite les fausses suppressions si resources.additional est vide mais materiel/immateriel ont du contenu
+    additional = payload.get("resources", {}).get("additional", [])
+    has_actual_resources = any(
+        r.get("selected") or r.get("details") or r.get("fields")
+        for r in additional
+    )
+    if "resources" in payload and "additional" in payload.get("resources", {}) and has_actual_resources:
         payload.pop("materiel", None)
         payload.pop("immateriel", None)
 
