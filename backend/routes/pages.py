@@ -351,14 +351,6 @@ def executive_dashboard_page():
     return send_from_directory(FRONTEND_DIR, "executive-dashboard.html")
 
 
-@bp.route("/pools.html")
-@login_required
-def pools_page():
-    if not has_permission("forms.read_list"):
-        return redirect("/")
-    return send_from_directory(FRONTEND_DIR, "pools.html")
-
-
 @bp.route("/logs.html")
 @login_required
 def logs_page():
