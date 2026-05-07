@@ -5,7 +5,7 @@
 ### 🐛 Bugfixes
 
 #### Permissions manquantes dans les groupes
-- **Problème** : Le groupe admin manquait permissions critiques (forms.delete, forms.edit, forms.restitution, pools.manage)
+- **Problème** : Le groupe admin manquait permissions critiques (forms.delete, forms.edit, forms.restitution)
 - **Cause** : Les groupes n'avaient pas toutes les permissions requises par les routes
 - **Solution** : Audit complet + correction des permissions manquantes
 - **Impact** : Admin et autres groupes (gestion, redaction) ont maintenant les bonnes permissions
@@ -101,11 +101,6 @@
 ## [3.18.0] - 2026-05-06
 
 ### ✨ Nouvelles fonctionnalités
-
-#### Sélecteur d'équipement mutualisé dans le formulaire
-- Intégration du système de pools partagés dans l'interface de formulaire
-- Support multi-sélection pour les ressources partagées
-- Synchronisation automatique avec les pools
 
 #### Navigation restitution 5 onglets
 - Phase 1 : Dates de restitution

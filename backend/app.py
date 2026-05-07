@@ -454,38 +454,6 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_dotation_forms_status
                 ON dotation_forms(status);
 
-            CREATE TABLE IF NOT EXISTS shared_pools (
-                id TEXT PRIMARY KEY,
-                label TEXT NOT NULL,
-                notes TEXT,
-                owner_form_id TEXT,
-                resource_catalog_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS shared_pool_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pool_id TEXT NOT NULL,
-                resource_type TEXT NOT NULL,
-                label TEXT NOT NULL,
-                serial_number TEXT,
-                notes TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS shared_pool_members (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pool_id TEXT NOT NULL,
-                form_id TEXT,
-                beneficiary_name TEXT,
-                added_at TEXT NOT NULL,
-                removed_at TEXT,
-                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
-                FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
-            );
-
             CREATE TABLE IF NOT EXISTS signature_views (
                 id TEXT PRIMARY KEY,
                 form_id TEXT NOT NULL,
@@ -535,9 +503,6 @@ def init_db():
         )
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         ensure_column(connection, "app_logs", "target_label", "target_label TEXT")
-        ensure_column(connection, "shared_pools", "owner_form_id", "owner_form_id TEXT")
-        ensure_column(connection, "shared_pools", "resource_catalog_id", "resource_catalog_id TEXT")
-        ensure_column(connection, "shared_pool_members", "removed_at", "removed_at TEXT")
         ensure_column(connection, "dotation_forms", "source_form_id", "source_form_id TEXT")
         ensure_column(connection, "dotation_items", "resource_type", "resource_type TEXT")
         ensure_column(connection, "dotation_items", "serial_number", "serial_number TEXT")
