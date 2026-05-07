@@ -916,14 +916,11 @@ function getAdditionalResourcesData() {
   })).map((resource) => ({
     ...resource,
     details: resource.details || summarizeDynamicResource(resource)
-  })).filter((resource) => (
-    resource.selected
-    || resource.details
-    || Object.keys(resource.fields).length
-    || resource.assignedAt
-    || resource.conditionAttribution
-    || resource.conditionNotes
-  ));
+  })).filter((resource) => {
+    const hasContent = resource.details || Object.keys(resource.fields).length || resource.assignedAt || resource.conditionAttribution || resource.conditionNotes;
+    // Inclure si sélectionnée, ou si elle a du contenu (pour permettre la suppression au serveur)
+    return resource.selected || hasContent;
+  });
 }
 
 function populateAdditionalResources(data = {}) {
