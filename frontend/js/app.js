@@ -2087,25 +2087,14 @@ function buildSelectedItems() {
   // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
   const selectedItems = {};
 
-  // Collecter les items de pool sélectionnés
-    const itemId = checkbox.dataset.poolItemId;
-    if (itemId) {
-      if (!selectedItems.poolItems) {
-        selectedItems.poolItems = [];
-      }
-      selectedItems.poolItems.push(itemId);
-    }
-  });
-
   // Collecter les ressources dynamiques sélectionnées
   const additionalResources = getAdditionalResourcesData();
   additionalResources.forEach((resource) => {
-      const key = resource.triggerKey || String(resource.id);
-      if (!selectedItems[key]) {
-        selectedItems[key] = [];
-      }
-      selectedItems[key].push(resource.id);
+    const key = resource.triggerKey || String(resource.id);
+    if (!selectedItems[key]) {
+      selectedItems[key] = [];
     }
+    selectedItems[key].push(resource.id);
   });
 
   return selectedItems;
