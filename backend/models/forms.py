@@ -258,6 +258,14 @@ def persist_form(payload, allow_locked_update=False):
         raise AppError("invalid_form_data", "Les champs nom et prénom sont obligatoires.")
     payload = _sanitize_unc_acces(payload)
 
+    # Nettoyer les anciennes clés materiel/immateriel si le nouveau format resources a été utilisé
+    # (même si resources.additional est vide - c'est normal si l'utilisateur a tout décoché).
+    # Cela évite que les anciennes données persistent et s'affichent en fallback au chargement suivant.
+    # Condition : si resources existe ET contient une clé "additional" (même si vide)
+    if "resources" in payload and "additional" in payload.get("resources", {}):
+        payload.pop("materiel", None)
+        payload.pop("immateriel", None)
+
     payload = normalize_workflow_before_save(payload)
     form_id = payload.setdefault("meta", {}).get("id") or str(int(datetime.now().timestamp() * 1000))
     payload["meta"]["id"] = form_id
