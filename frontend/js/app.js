@@ -1204,10 +1204,6 @@ function applyLockState(locked) {
       element.disabled = false;
       return;
     }
-    // Ne pas réactiver un toggle mutualisé bloqué par la présence de membres
-    if (!locked && element.dataset.membersLocked === "true") {
-      return;
-    }
 
     // Désactiver l'élément de formulaire
     element.disabled = locked;

@@ -547,9 +547,7 @@ def get_form_route(form_id):
 @login_required
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def quick_draft():
-    """Crée un dossier brouillon minimal (nom + prénom requis).
-    Utilisé pour générer automatiquement un dossier co-utilisateur
-    lors de la déclaration d'un matériel mutualisé."""
+    """Crée un dossier brouillon minimal (nom + prénom requis)."""
     if not has_permission("forms.create"):
         return jsonify({"error": "forbidden"}), 403
     data = request.get_json(silent=True) or {}
