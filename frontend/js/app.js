@@ -2142,15 +2142,38 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
-  // (les ressources anciennes ne sont pas dans le nouveau système resources.additional)
+  // Utiliser les données sauvegardées comme base mais mettre à jour selected/details
+  // à partir des ressources.additional actuellement affichées dans le formulaire
   const savedData = JSON.parse(JSON.stringify(window._savedMaterielData || {}));
+  const additional = window.currentPayload?.resources?.additional || [];
+
+  // Mettre à jour selected et details pour chaque item depuis les ressources.additional
+  for (const [key, item] of Object.entries(savedData)) {
+    const legacyCode = item?.code || item?.id || key;
+    const additionalResource = additional.find(r => r.code === legacyCode || r.id === legacyCode);
+    if (additionalResource) {
+      item.selected = Boolean(additionalResource.selected);
+      if (additionalResource.details) item.details = additionalResource.details;
+    }
+  }
   return savedData;
 }
 
 function buildIntangibleSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
+  // Utiliser les données sauvegardées comme base mais mettre à jour selected/details
+  // à partir des ressources.additional actuellement affichées dans le formulaire
   const savedData = JSON.parse(JSON.stringify(window._savedImmaterielData || {}));
+  const additional = window.currentPayload?.resources?.additional || [];
+
+  // Mettre à jour selected et details pour chaque item depuis les ressources.additional
+  for (const [key, item] of Object.entries(savedData)) {
+    const legacyCode = item?.code || item?.id || key;
+    const additionalResource = additional.find(r => r.code === legacyCode || r.id === legacyCode);
+    if (additionalResource) {
+      item.selected = Boolean(additionalResource.selected);
+      if (additionalResource.details) item.details = additionalResource.details;
+    }
+  }
   return savedData;
 }
 
