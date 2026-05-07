@@ -2768,6 +2768,7 @@ async function saveDraft(signaturePad) {
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || "";
+    form.dataset.workflowStatus = result.summary.status;  // CRITICAL FIX #4: Syncer le workflow status post-save
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
 
     updateSaveProgress({
