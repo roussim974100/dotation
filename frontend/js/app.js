@@ -434,23 +434,10 @@ function buildDynamicResourceTrackingFields(resource) {
       </div>
     `);
   }
-  const sharedBlock = resource.category !== "immateriel"
-    ? `<div class="shared-resource-block" id="shared_block_${escapeAttribute(resource.id)}">
-        <label class="shared-toggle">
-          <input type="checkbox" class="shared-resource-toggle" id="shared_toggle_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
-          <span>Matériel mutualisé</span>
-        </label>
-        <div id="shared_panel_${escapeAttribute(resource.id)}" class="shared-panel d-none">
-          <ul class="shared-members-list" id="shared_members_${escapeAttribute(resource.id)}"></ul>
-          <button type="button" class="btn btn-xs btn-outline-primary mt-1 shared-add-btn" data-resource-id="${escapeAttribute(resource.id)}">+ Ajouter un co-utilisateur</button>
-        </div>
-       </div>`
-    : "";
-
-  if (!inputBlocks.length && !sharedBlock) {
+  if (!inputBlocks.length) {
     return "";
   }
-  return (inputBlocks.length ? `<div class="subgrid">${inputBlocks.join("")}</div>` : "") + sharedBlock;
+  return `<div class="subgrid">${inputBlocks.join("")}</div>`;
 }
 
 function syncDynamicResourceCard(resourceId) {
@@ -476,7 +463,6 @@ function bindDynamicResourceToggles() {
     }
     syncDynamicResourceCard(resource.id);
   });
-  bindSharedResourceToggles();
   initDynamicListFields();
   initDynamicEmailDomainFields();
 }
@@ -485,55 +471,33 @@ function bindDynamicResourceToggles() {
 // Matériel mutualisé — état en mémoire et rendu inline
 // ---------------------------------------------------------------------------
 
-const _sharedState = new Map(); // resourceId → { enabled: bool, poolId: string|null, members: [{formId, nom, prenom, service, auto}] }
 let retraitsSignaturePad = null; // Global reference to retraits signature pad
 
-function _getShared(resourceId) {
-  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, poolId: null, members: [] });
-  return _sharedState.get(resourceId);
 }
 
-function bindSharedResourceToggles() {
-  document.querySelectorAll(".shared-resource-toggle").forEach((toggle) => {
     if (toggle.dataset.bound) return;
     toggle.addEventListener("change", () => {
       const rid = toggle.dataset.resourceId;
-      _getShared(rid).enabled = toggle.checked;
-      document.getElementById(`shared_panel_${rid}`)?.classList.toggle("d-none", !toggle.checked);
     });
     toggle.dataset.bound = "true";
   });
-  document.querySelectorAll(".shared-add-btn").forEach((btn) => {
     if (btn.dataset.bound) return;
-    btn.addEventListener("click", () => openSharedMemberModal(btn.dataset.resourceId));
     btn.dataset.bound = "true";
   });
 }
 
-function renderSharedMembers(resourceId) {
-  const list = document.getElementById(`shared_members_${resourceId}`);
   if (!list) return;
-  const state = _getShared(resourceId);
   const hasMembers = state.members.length > 0;
 
   list.innerHTML = state.members.map((m, idx) => `
-    <li class="shared-member-row">
-      <span class="shared-member-name">${escapeHtml(m.prenom || "")} ${escapeHtml(m.nom || "")}</span>
-      ${m.service ? `<span class="shared-member-service">${escapeHtml(m.service)}</span>` : ""}
-      ${m.auto ? `<span class="shared-member-badge">Brouillon créé</span>` : ""}
-      ${m.formId ? `<a class="shared-member-link" href="form.html?id=${escapeAttribute(m.formId)}" target="_blank">Voir</a>` : ""}
     </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur — décochez pour arrêter la mutualisation</li>`;
 
-  list.querySelectorAll(".shared-member-remove").forEach((btn) => {
     btn.addEventListener("click", () => {
-      _getShared(btn.dataset.resourceId).members.splice(Number(btn.dataset.index), 1);
-      renderSharedMembers(btn.dataset.resourceId);
     });
   });
 
   // Bloquer le toggle tant qu'il y a des membres.
   // data-members-locked permet à applyLockState de ne pas écraser cet état.
-  const toggle = document.getElementById(`shared_toggle_${resourceId}`);
   if (toggle) {
     toggle.disabled = hasMembers;
     toggle.dataset.membersLocked = hasMembers ? "true" : "";
@@ -543,32 +507,15 @@ function renderSharedMembers(resourceId) {
   }
 }
 
-function openSharedMemberModal(resourceId) {
-  const modal = document.getElementById("sharedMemberModal");
   if (!modal) return;
   modal.dataset.resourceId = resourceId;
-  document.getElementById("sharedModalFormId").value = "";
-  document.getElementById("sharedModalFormSearch").value = "";
-  document.getElementById("sharedModalFormResults").classList.add("d-none");
-  document.getElementById("sharedModalFormChosen").classList.add("d-none");
-  document.getElementById("sharedModalNom").value = "";
-  document.getElementById("sharedModalPrenom").value = "";
-  document.getElementById("sharedModalService").value = "";
-  document.getElementById("sharedModalError").classList.add("d-none");
   bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
-async function saveSharedMember() {
-  const modal = document.getElementById("sharedMemberModal");
   const resourceId = modal?.dataset.resourceId;
   if (!resourceId) return;
-  const errorEl = document.getElementById("sharedModalError");
   errorEl.classList.add("d-none");
 
-  const existingFormId = document.getElementById("sharedModalFormId").value.trim();
-  const nom = document.getElementById("sharedModalNom").value.trim();
-  const prenom = document.getElementById("sharedModalPrenom").value.trim();
-  const service = document.getElementById("sharedModalService").value.trim();
 
   if (!existingFormId && (!nom || !prenom)) {
     errorEl.textContent = "Sélectionnez un dossier ou renseignez nom et prénom.";
@@ -576,21 +523,17 @@ async function saveSharedMember() {
     return;
   }
 
-  const state = _getShared(resourceId);
 
   if (existingFormId) {
     // Utiliser le dossier existant sélectionné
-    const chosenText = document.getElementById("sharedModalFormChosen").textContent || "";
     const parts = chosenText.split(" ");
     const member = { formId: existingFormId, nom: parts.slice(1).join(" ") || "?", prenom: parts[0] || "?", service: service || "", auto: false };
     state.members.push(member);
     bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
     return;
   }
 
   // Créer un brouillon automatique
-  const btn = document.getElementById("sharedModalSaveBtn");
   btn.disabled = true;
   btn.textContent = "Création…";
   try {
@@ -605,7 +548,6 @@ async function saveSharedMember() {
     if (!r.ok) throw new Error(data.error || "Erreur serveur");
     state.members.push({ formId: data.form_id, nom, prenom, service, auto: true });
     bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
   } catch (e) {
     errorEl.textContent = `Erreur : ${e.message}`;
     errorEl.classList.remove("d-none");
@@ -615,16 +557,8 @@ async function saveSharedMember() {
   }
 }
 
-function initSharedMemberModal() {
-  document.getElementById("sharedModalSaveBtn")?.addEventListener("click", saveSharedMember);
-  bindSharedFormSearch();
 }
 
-function bindSharedFormSearch() {
-  const input = document.getElementById("sharedModalFormSearch");
-  const resultsEl = document.getElementById("sharedModalFormResults");
-  const hiddenEl = document.getElementById("sharedModalFormId");
-  const chosenEl = document.getElementById("sharedModalFormChosen");
   if (!input) return;
   let deb = null;
   input.addEventListener("input", () => {
@@ -637,14 +571,11 @@ function bindSharedFormSearch() {
       try {
         const r = await fetch(`/api/forms?search=${encodeURIComponent(q)}`, { credentials: "same-origin" });
         const rows = (await r.json()).slice(0, 8);
-        if (!rows.length) { resultsEl.innerHTML = `<div class="pool-form-result pool-form-result--empty">Aucun dossier</div>`; resultsEl.classList.remove("d-none"); return; }
         resultsEl.innerHTML = rows.map((f) =>
-          `<div class="pool-form-result" data-id="${escapeAttribute(f.id)}" data-prenom="${escapeAttribute(f.prenom)}" data-nom="${escapeAttribute(f.nom)}">
             <strong>${escapeHtml(f.prenom)} ${escapeHtml(f.nom)}</strong>
             ${f.service ? ` — <span class="text-muted">${escapeHtml(f.service)}</span>` : ""}
           </div>`).join("");
         resultsEl.classList.remove("d-none");
-        resultsEl.querySelectorAll(".pool-form-result[data-id]").forEach((row) => {
           row.addEventListener("click", () => {
             hiddenEl.value = row.dataset.id;
             input.value = "";
@@ -1100,9 +1031,7 @@ function getAdditionalResourcesData() {
         .filter(([, value]) => value)
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
-    shared: _getShared(resource.id).enabled,
-    poolId: _getShared(resource.id).poolId || null,
-    sharedWith: _getShared(resource.id).members,
+
     ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
     ...resource,
@@ -1123,18 +1052,14 @@ function populateAdditionalResources(data = {}) {
 
   resources.forEach((resource) => {
     // Pour les ressources mutualisées avec items disponibles
-    if (resource.shared && Array.isArray(resource.availableItems)) {
       // Créer des cases à cocher pour chaque item disponible
       resource.availableItems.forEach((item) => {
-        const itemCheckboxId = `pool_item_${item.id}`;
         let itemCheckbox = document.getElementById(itemCheckboxId);
         if (!itemCheckbox) {
           // Créer le checkbox s'il n'existe pas
           const container = document.getElementById(`dynamic_resource_fields_wrap_${resource.id}`);
           if (container) {
             const label = document.createElement("label");
-            label.className = "equipment-toggle pool-item-toggle";
-            label.innerHTML = `<input type="checkbox" id="${itemCheckboxId}" data-pool-item-id="${item.id}" data-resource-id="${resource.id}"><span>${escapeHtml(item.label)}</span>`;
             container.prepend(label);
             itemCheckbox = document.getElementById(itemCheckboxId);
             // Appliquer le verrou immédiatement si le dossier est finalisé
@@ -1157,7 +1082,6 @@ function populateAdditionalResources(data = {}) {
 
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     const details = document.getElementById(`dynamic_resource_details_${resource.id}`);
-    if (checkbox && !resource.shared) {
       checkbox.checked = Boolean(resource.selected);
     }
     if (details) {
@@ -1248,17 +1172,10 @@ function populateAdditionalResources(data = {}) {
     });
 
     // Restaurer l'état mutualisé (symétrique : tous les membres voient le même toggle)
-    if (resource.shared) {
-      const toggle = document.getElementById(`shared_toggle_${resource.id}`);
       if (toggle) {
         toggle.checked = true;
-        document.getElementById(`shared_panel_${resource.id}`)?.classList.remove("d-none");
       }
-      const state = _getShared(resource.id);
       state.enabled = true;
-      state.poolId = resource.poolId || null;
-      state.members = Array.isArray(resource.sharedWith) ? resource.sharedWith : [];
-      renderSharedMembers(resource.id);
     }
   });
   bindDynamicResourceToggles();
@@ -2326,7 +2243,6 @@ function buildSelectedItems() {
   const selectedItems = {};
 
   // Collecter les items de pool sélectionnés
-  document.querySelectorAll('input[data-pool-item-id]:checked').forEach((checkbox) => {
     const itemId = checkbox.dataset.poolItemId;
     if (itemId) {
       if (!selectedItems.poolItems) {
@@ -2339,7 +2255,6 @@ function buildSelectedItems() {
   // Collecter les ressources dynamiques sélectionnées
   const additionalResources = getAdditionalResourcesData();
   additionalResources.forEach((resource) => {
-    if (resource.selected && !resource.shared) {
       const key = resource.triggerKey || String(resource.id);
       if (!selectedItems[key]) {
         selectedItems[key] = [];
@@ -3143,7 +3058,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
     void loadFieldSuggestions();
-    initSharedMemberModal();
     initRetraitsSection();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
@@ -3287,3 +3201,4 @@ function normalizeDossierType(value) {
 
 // Module principal de la fiche d'attribution :
 // collecte métier, validation locale et sérialisation du payload.
+
