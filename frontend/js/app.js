@@ -458,7 +458,10 @@ function bindDynamicResourceToggles() {
       return;
     }
     if (!checkbox.dataset.boundDynamicToggle) {
-      checkbox.addEventListener("change", () => syncDynamicResourceCard(resource.id));
+      checkbox.addEventListener("change", () => {
+        syncDynamicResourceCard(resource.id);
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundDynamicToggle = "true";
     }
     syncDynamicResourceCard(resource.id);
@@ -1299,7 +1302,10 @@ function initConditionalBlocks() {
       toggleField(checkbox.dataset.target, checkbox.checked);
     };
     if (!checkbox.dataset.boundToggle) {
-      checkbox.addEventListener("change", sync);
+      checkbox.addEventListener("change", () => {
+        sync();
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundToggle = "true";
     }
     sync();
@@ -1936,6 +1942,43 @@ function buildIntangibleSelectionMap() {
   }
 
   return result;
+}
+
+function updateCurrentPayload() {
+  // CRITICAL FIX #5: Mettre à jour window.currentPayload depuis le formulaire actuel
+  // Cette fonction synchronise l'état réel du DOM avec window.currentPayload
+  if (!window.currentPayload) {
+    console.warn("⚠️ updateCurrentPayload: window.currentPayload n'existe pas");
+    return;
+  }
+
+  // Mettre à jour les champs simples
+  window.currentPayload.beneficiaire = {
+    ...window.currentPayload.beneficiaire,
+    nom: document.getElementById("nom")?.value || "",
+    prenom: document.getElementById("prenom")?.value || "",
+    fonction: document.getElementById("fonction")?.value || "",
+    mandat: document.getElementById("mandat")?.value || "",
+    service: window._currentService || "",
+    qualite: document.querySelector('input[name="qualite"]:checked')?.value || ""
+  };
+
+  window.currentPayload.dossier = {
+    ...window.currentPayload.dossier,
+    type: document.getElementById("dossier_type")?.value || "arrivee",
+    serviceDestination: window._currentServiceDestination || ""
+  };
+
+  window.currentPayload.validation = {
+    ...window.currentPayload.validation,
+    rgpdAccepted: document.getElementById("rgpdCheck")?.checked || false
+  };
+
+  // Mettre à jour les sélections de ressources matérielles/immatérielles
+  window.currentPayload.materiel = buildEquipmentSelectionMap();
+  window.currentPayload.immateriel = buildIntangibleSelectionMap();
+
+  console.log("✅ window.currentPayload synchronized", window.currentPayload);
 }
 
 function collectRequestedResourcesFromFormData(formData) {
