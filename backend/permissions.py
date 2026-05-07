@@ -12,19 +12,16 @@ ROUTES_REQUIRED_PERMISSIONS = {
     "/api/admin/resources": ["users.manage"],
     "/api/admin/groups": ["users.manage"],
 
-    # Routes pools (équipement mutualisé - critiques)
-    "/api/pools": ["pools.manage"],
-
     # Routes spécialisées
     "/api/unc": ["forms.view_all"],
 }
 
 DEFAULT_GROUPS = {
-    "admin": ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "pools.manage"],
+    "admin": ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"],
     "user": ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"],
-    "administration": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"],
-    "direction": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "unc.view_all", "users.manage"],
-    "gestion": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"],
+    "administration": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"],
+    "direction": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all", "users.manage"],
+    "gestion": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"],
     "lecture": ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"],
     "redaction": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"],
 }
