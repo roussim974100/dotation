@@ -122,7 +122,9 @@ def extract_items(payload):
     materiel = payload.get("materiel", {})
     immateriel = payload.get("immateriel", {})
     restitution = payload.get("restitution", {})
-    item_states = restitution.get("items", {})
+    item_states_raw = restitution.get("items", {})
+    # Gérer le cas où items serait une liste au lieu d'un dict
+    item_states = item_states_raw if isinstance(item_states_raw, dict) else {}
 
     items = [
         ("ordinateur", "materiel", "Ordinateur", materiel.get("ordinateur", {})),
