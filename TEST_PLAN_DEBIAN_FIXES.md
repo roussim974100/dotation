@@ -1,6 +1,6 @@
 # 📋 Plan de test - Script installation Debian corrigé
 
-**Version:** v3.18.0 (branche dev)  
+**Version:** v3.18.0 (branche main)  
 **Commit:** 88d709e - `fix: corriger install-debian.sh selon rapport de test`  
 **Date:** 2026-05-05
 
@@ -46,7 +46,7 @@ Re-tester l'installation sur LXC 504 (ou LXC 503 nettoyé) pour valider que **to
 
 # 1.2 - Cloner le code avec les corrections
 cd /root
-git clone --branch dev https://github.com/roussim974100/dotation.git dotation-test
+git clone --branch main https://github.com/roussim974100/dotation.git dotation-test
 cd dotation-test
 ```
 
