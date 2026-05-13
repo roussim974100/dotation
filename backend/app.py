@@ -506,7 +506,6 @@ def init_db():
         ensure_column(connection, "dotation_forms", "source_form_id", "source_form_id TEXT")
         ensure_column(connection, "dotation_items", "resource_type", "resource_type TEXT")
         ensure_column(connection, "dotation_items", "serial_number", "serial_number TEXT")
-        ensure_column(connection, "resource_catalog", "is_pool_resource", "is_pool_resource INTEGER NOT NULL DEFAULT 0")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)
