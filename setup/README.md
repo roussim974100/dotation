@@ -23,7 +23,7 @@ Ce dossier contient des scripts d'installation automatisée pour déployer À Qu
 ### Étape 1 : Télécharger le script
 
 ```bash
-curl -o install-debian.sh https://raw.githubusercontent.com/roussim974100/dotation/dev/setup/install-debian.sh
+curl -o install-debian.sh https://raw.githubusercontent.com/roussim974100/dotation/main/setup/install-debian.sh
 ```
 
 ### Étape 2 : Rendre le script exécutable
@@ -105,7 +105,7 @@ systemctl restart dotation
 Soit téléchargez depuis GitHub directement, soit via PowerShell :
 
 ```powershell
-$url = "https://raw.githubusercontent.com/roussim974100/dotation/dev/setup/install-windows.ps1"
+$url = "https://raw.githubusercontent.com/roussim974100/dotation/main/setup/install-windows.ps1"
 $output = "C:\Users\$env:USERNAME\Downloads\install-windows.ps1"
 (New-Object System.Net.WebClient).DownloadFile($url, $output)
 ```
