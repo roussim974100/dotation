@@ -34,7 +34,7 @@ cat TEST_PLAN_DEBIAN_FIXES.md
 
 # Résumé rapide des étapes:
 # 1. Créer LXC 504 (8 cores, 2048 MB RAM)
-# 2. Cloner branche dev
+# 2. Cloner branche main
 # 3. Exécuter: sudo bash setup/install-debian.sh
 # 4. Vérifier: systemctl status dotation
 # 5. Tester: http://<IP_LXC_504>/ avec admin/admin

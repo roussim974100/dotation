@@ -1,6 +1,6 @@
 # 📋 Plan de test - Script installation Windows amélioré
 
-**Version:** v3.18.0 (branche dev)  
+**Version:** v3.18.0 (branche main)  
 **Commit:** e2c4061 - `fix: améliorer install-windows.ps1 avec vérifications robustes`  
 **Date:** 2026-05-05
 
@@ -52,11 +52,11 @@ Remove-Item -Path "C:\dotation" -Recurse -Force -ErrorAction SilentlyContinue
 ```powershell
 # Option 1 : Via Git
 cd C:\Users\$env:USERNAME\Downloads
-git clone --branch dev https://github.com/roussim974100/dotation.git dotation-test
+git clone --branch main https://github.com/roussim974100/dotation.git dotation-test
 cd dotation-test
 
 # Option 2 : Télécharger juste le script
-$url = "https://raw.githubusercontent.com/roussim974100/dotation/dev/setup/install-windows.ps1"
+$url = "https://raw.githubusercontent.com/roussim974100/dotation/main/setup/install-windows.ps1"
 $output = "C:\Users\$env:USERNAME\Downloads\install-windows.ps1"
 (New-Object System.Net.WebClient).DownloadFile($url, $output)
 ```
