@@ -567,7 +567,7 @@ def quick_draft():
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
-    return jsonify({"form_id": form_data["id"], "title": form_data["title"]}), 201
+    return jsonify({"form_id": form_data["summary"]["id"], "title": form_data["summary"]["title"]}), 201
 
 
 @bp.route("/api/forms", methods=["POST"])
