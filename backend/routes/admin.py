@@ -1163,8 +1163,8 @@ def create_admin_resource():
             INSERT INTO resource_catalog (
                 id, code, label, description, category, issuer_service, requires_return,
                 has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
-                trigger_key, field_schema_json, is_active, is_builtin, is_pool_resource, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             """,
             (
                 resource_id,
@@ -1181,7 +1181,6 @@ def create_admin_resource():
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
                 now,
                 now,
             ),
@@ -1231,7 +1230,7 @@ def update_admin_resource(resource_id):
             UPDATE resource_catalog
             SET code = ?, label = ?, description = ?, category = ?, issuer_service = ?, requires_return = ?,
                 has_assignment_date = ?, has_assignment_condition = ?, has_assignment_notes = ?, display_order = ?,
-                trigger_key = ?, field_schema_json = ?, is_active = ?, is_pool_resource = ?, updated_at = ?
+                trigger_key = ?, field_schema_json = ?, is_active = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -1248,7 +1247,6 @@ def update_admin_resource(resource_id):
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
                 now,
                 resource_id,
             ),
