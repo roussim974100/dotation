@@ -202,10 +202,10 @@ sudo bash setup/install-debian.sh
 
 ### Personnaliser la branche déployée
 
-Par défaut, le script utilise la branche `dev`. Pour une autre branche :
+Par défaut, le script utilise la branche `main` (version stable). Pour une autre branche :
 
 ```bash
-GIT_BRANCH=main sudo bash setup/install-debian.sh
+GIT_BRANCH=dev sudo bash setup/install-debian.sh
 ```
 
 ### Après l'installation
@@ -280,7 +280,7 @@ sudo apt install -y \
 ```bash
 sudo mkdir -p /opt/dotation
 sudo chown $USER:$USER /opt/dotation
-git clone --branch dev https://github.com/roussim974100/dotation.git /opt/dotation
+git clone --branch main https://github.com/roussim974100/dotation.git /opt/dotation
 cd /opt/dotation
 ```
 
@@ -474,11 +474,11 @@ X-Forwarded-Host: <DOMAINE_PUBLIC>
 
 ## Mise à jour en production
 
-### Depuis la branche dev (test)
+### Depuis la branche main (production)
 
 ```bash
 cd /opt/dotation
-git pull origin dev
+git pull origin main
 source venv/bin/activate
 pip install -r backend/requirements.txt
 systemctl restart dotation
@@ -497,7 +497,7 @@ systemctl restart dotation
 | `FLASK_ENV` | `production` | Mode de Flask |
 | `SESSION_COOKIE_SECURE` | `0` | Forcer les cookies sécurisés (HTTPS seulement) |
 | `DEBUG` | `0` | Mode debug (JAMAIS en production) |
-| `GIT_BRANCH` | `dev` | Branche à déployer (pour le script) |
+| `GIT_BRANCH` | `main` | Branche à déployer (pour le script) |
 
 Exemple au démarrage du service :
 
