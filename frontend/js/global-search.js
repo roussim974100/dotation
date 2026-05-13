@@ -27,7 +27,6 @@
     history_assignments: { status: true, timing: true, qualite: true, service: true, sort: true },
     restitutions_pending: { status: true, timing: true, qualite: true, service: true, sort: true },
     history_restitutions: { status: true, timing: true, qualite: true, service: true, sort: true },
-    pools: { search: true },
   };
 
   const FILTER_OPTIONS = {
