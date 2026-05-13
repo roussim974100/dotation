@@ -1308,23 +1308,6 @@ def delete_admin_resource(resource_id):
     return jsonify({"deleted": True})
 
 
-@bp.route("/api/resources/pool-catalog", methods=["GET"])
-@login_required
-def pool_catalog():
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
-    search = request.args.get("search", "").strip().lower()
-    with get_db() as connection:
-        rows = connection.execute(
-            """SELECT id, code, label, category, issuer_service
-               FROM resource_catalog
-               WHERE is_pool_resource = 1 AND is_active = 1 AND category != 'immateriel'
-               ORDER BY label COLLATE NOCASE"""
-        ).fetchall()
-    results = [dict(r) for r in rows if not search or search in r["label"].lower()]
-    return jsonify(results)
-
-
 @bp.route("/api/admin/users", methods=["POST"])
 @login_required
 @permission_required("users.manage")
