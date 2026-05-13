@@ -201,7 +201,6 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
     if category == "immateriel":
         has_assignment_condition = False
     is_active = bool(payload.get("is_active", bool(existing.get("is_active", True))))
-    is_pool_resource = bool(payload.get("is_pool_resource", bool(existing.get("is_pool_resource", False))))
     return {
         "code": code,
         "label": label,
@@ -216,7 +215,6 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
         "trigger_key": trigger_key,
         "field_schema": field_schema,
         "is_active": is_active,
-        "is_pool_resource": is_pool_resource,
     }
 
 
