@@ -1491,7 +1491,7 @@ def _diagnose_db_file(path):
         if "dotation_forms" in existing:
             try:
                 stats["dossiers"] = conn.execute(
-                    "SELECT COUNT(*) FROM dotation_forms WHERE is_deleted = 0"
+                    "SELECT COUNT(*) FROM dotation_forms"
                 ).fetchone()[0]
             except Exception as exc:
                 logger.warning("Diagnostic : impossible de compter les dossiers : %s", exc)
