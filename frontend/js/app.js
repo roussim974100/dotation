@@ -4,50 +4,59 @@ const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 let formDirty = false;
 
-// Capture des logs pour debug
+// Capture des logs pour debug - desactivee par defaut.
+// N'envoie de logs au backend qu'en developpement (localhost) ou si l'URL
+// contient ?debug=1. En production, ce bloc est inerte pour ne pas exfiltrer
+// de donnees personnelles via les /api/debug/logs.
+const DEBUG_LOGS_ENABLED = (function () {
+  try {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    if (new URLSearchParams(window.location.search).has('debug')) return true;
+  } catch (_) { /* ignore */ }
+  return false;
+})();
+
 let consoleLogs = [];
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
 
-console.log = function(...args) {
-  originalLog.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
-};
+if (DEBUG_LOGS_ENABLED) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
 
-console.error = function(...args) {
-  originalError.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
-};
+  console.log = function (...args) {
+    originalLog.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
+  };
 
-console.warn = function(...args) {
-  originalWarn.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
-};
+  console.error = function (...args) {
+    originalError.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
+  };
+
+  console.warn = function (...args) {
+    originalWarn.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
+  };
+}
 
 async function sendConsoleLogs() {
-  if (!consoleLogs.length) return;
+  if (!DEBUG_LOGS_ENABLED || !consoleLogs.length) return;
   try {
-    originalLog("[DEBUG] Sending " + consoleLogs.length + " logs to server");
-    const response = await fetch('/api/debug/logs', {
+    await fetch('/api/debug/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logs: consoleLogs })
     });
-    const data = await response.json();
-    originalLog("[DEBUG] Logs sent successfully: " + data.file);
     consoleLogs = [];
-  } catch (e) {
-    originalError('Failed to send logs:', e);
-  }
+  } catch (_) { /* silencieux */ }
 }
 
-// Envoyer les logs quand on quitte la page
 window.addEventListener('beforeunload', () => {
-  if (consoleLogs.length) {
+  if (DEBUG_LOGS_ENABLED && consoleLogs.length) {
     navigator.sendBeacon('/api/debug/logs', JSON.stringify({ logs: consoleLogs }));
   }
 });
