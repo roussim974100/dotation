@@ -1,11 +1,11 @@
 # À Quai — Gestion des dotations matérielles
 
-> ⚠️ **Branche de développement (`dev`)** — version `3.18.4-dev`, non destinée à la production.
+> ⚠️ **Branche de développement (`dev`)** — version `3.18.5-dev`, non destinée à la production.
 > Le README ci-dessous décrit l'installation de la version stable ; pour déployer en production, utilise la branche [`main`](https://github.com/roussim974100/dotation/tree/main).
 > Pour contribuer : voir la section [Développement local](#développement-local) en bas de page.
 
-**Version :** `3.18.4-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
-**Statut :** Développement 🛠️ | **Dernière MAJ :** 29 mai 2026
+**Version :** `3.18.5-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Statut :** Développement 🛠️ | **Dernière MAJ :** 24 juin 2026
 
 ---
 
