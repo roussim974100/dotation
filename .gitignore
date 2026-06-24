@@ -31,3 +31,20 @@ debug-appjs-check*.png
 login-*.png
 chromedriver/
 backend/.prod/
+
+# graphify outputs (large generated artefacts) - keep GRAPH_REPORT.md only
+graphify-out/cache/
+graphify-out/graph.html
+graphify-out/graph.json
+graphify-out/graph.svg
+graphify-out/graph.graphml
+graphify-out/cypher.txt
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/obsidian/
+
+# graphify temporary working files (root)
+.graphify_*
+
+# Claude Code local screenshots
+.claude/*.png

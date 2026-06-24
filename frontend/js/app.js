@@ -4,50 +4,59 @@ const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 let formDirty = false;
 
-// Capture des logs pour debug
+// Capture des logs pour debug - desactivee par defaut.
+// N'envoie de logs au backend qu'en developpement (localhost) ou si l'URL
+// contient ?debug=1. En production, ce bloc est inerte pour ne pas exfiltrer
+// de donnees personnelles via les /api/debug/logs.
+const DEBUG_LOGS_ENABLED = (function () {
+  try {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    if (new URLSearchParams(window.location.search).has('debug')) return true;
+  } catch (_) { /* ignore */ }
+  return false;
+})();
+
 let consoleLogs = [];
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
 
-console.log = function(...args) {
-  originalLog.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
-};
+if (DEBUG_LOGS_ENABLED) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
 
-console.error = function(...args) {
-  originalError.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
-};
+  console.log = function (...args) {
+    originalLog.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
+  };
 
-console.warn = function(...args) {
-  originalWarn.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
-};
+  console.error = function (...args) {
+    originalError.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
+  };
+
+  console.warn = function (...args) {
+    originalWarn.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
+  };
+}
 
 async function sendConsoleLogs() {
-  if (!consoleLogs.length) return;
+  if (!DEBUG_LOGS_ENABLED || !consoleLogs.length) return;
   try {
-    originalLog("[DEBUG] Sending " + consoleLogs.length + " logs to server");
-    const response = await fetch('/api/debug/logs', {
+    await fetch('/api/debug/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logs: consoleLogs })
     });
-    const data = await response.json();
-    originalLog("[DEBUG] Logs sent successfully: " + data.file);
     consoleLogs = [];
-  } catch (e) {
-    originalError('Failed to send logs:', e);
-  }
+  } catch (_) { /* silencieux */ }
 }
 
-// Envoyer les logs quand on quitte la page
 window.addEventListener('beforeunload', () => {
-  if (consoleLogs.length) {
+  if (DEBUG_LOGS_ENABLED && consoleLogs.length) {
     navigator.sendBeacon('/api/debug/logs', JSON.stringify({ logs: consoleLogs }));
   }
 });
@@ -263,7 +272,10 @@ function bindProgressIndicatorRefresh() {
   if (!form || form.dataset.boundProgressIndicators) {
     return;
   }
-  const refresh = () => refreshProgressIndicators();
+  const refresh = () => {
+    refreshProgressIndicators();
+    updateCurrentPayload();  // CRITICAL FIX #6: Sync payload on form input/change
+  };
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.dataset.boundProgressIndicators = "true";
@@ -434,23 +446,10 @@ function buildDynamicResourceTrackingFields(resource) {
       </div>
     `);
   }
-  const sharedBlock = resource.category !== "immateriel"
-    ? `<div class="shared-resource-block" id="shared_block_${escapeAttribute(resource.id)}">
-        <label class="shared-toggle">
-          <input type="checkbox" class="shared-resource-toggle" id="shared_toggle_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
-          <span>Matériel mutualisé</span>
-        </label>
-        <div id="shared_panel_${escapeAttribute(resource.id)}" class="shared-panel d-none">
-          <ul class="shared-members-list" id="shared_members_${escapeAttribute(resource.id)}"></ul>
-          <button type="button" class="btn btn-xs btn-outline-primary mt-1 shared-add-btn" data-resource-id="${escapeAttribute(resource.id)}">+ Ajouter un co-utilisateur</button>
-        </div>
-       </div>`
-    : "";
-
-  if (!inputBlocks.length && !sharedBlock) {
+  if (!inputBlocks.length) {
     return "";
   }
-  return (inputBlocks.length ? `<div class="subgrid">${inputBlocks.join("")}</div>` : "") + sharedBlock;
+  return `<div class="subgrid">${inputBlocks.join("")}</div>`;
 }
 
 function syncDynamicResourceCard(resourceId) {
@@ -471,192 +470,19 @@ function bindDynamicResourceToggles() {
       return;
     }
     if (!checkbox.dataset.boundDynamicToggle) {
-      checkbox.addEventListener("change", () => syncDynamicResourceCard(resource.id));
+      checkbox.addEventListener("change", () => {
+        syncDynamicResourceCard(resource.id);
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundDynamicToggle = "true";
     }
     syncDynamicResourceCard(resource.id);
   });
-  bindSharedResourceToggles();
   initDynamicListFields();
   initDynamicEmailDomainFields();
 }
 
-// ---------------------------------------------------------------------------
-// Matériel mutualisé — état en mémoire et rendu inline
-// ---------------------------------------------------------------------------
-
-const _sharedState = new Map(); // resourceId → { enabled: bool, poolId: string|null, members: [{formId, nom, prenom, service, auto}] }
 let retraitsSignaturePad = null; // Global reference to retraits signature pad
-
-function _getShared(resourceId) {
-  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, poolId: null, members: [] });
-  return _sharedState.get(resourceId);
-}
-
-function bindSharedResourceToggles() {
-  document.querySelectorAll(".shared-resource-toggle").forEach((toggle) => {
-    if (toggle.dataset.bound) return;
-    toggle.addEventListener("change", () => {
-      const rid = toggle.dataset.resourceId;
-      _getShared(rid).enabled = toggle.checked;
-      document.getElementById(`shared_panel_${rid}`)?.classList.toggle("d-none", !toggle.checked);
-    });
-    toggle.dataset.bound = "true";
-  });
-  document.querySelectorAll(".shared-add-btn").forEach((btn) => {
-    if (btn.dataset.bound) return;
-    btn.addEventListener("click", () => openSharedMemberModal(btn.dataset.resourceId));
-    btn.dataset.bound = "true";
-  });
-}
-
-function renderSharedMembers(resourceId) {
-  const list = document.getElementById(`shared_members_${resourceId}`);
-  if (!list) return;
-  const state = _getShared(resourceId);
-  const hasMembers = state.members.length > 0;
-
-  list.innerHTML = state.members.map((m, idx) => `
-    <li class="shared-member-row">
-      <span class="shared-member-name">${escapeHtml(m.prenom || "")} ${escapeHtml(m.nom || "")}</span>
-      ${m.service ? `<span class="shared-member-service">${escapeHtml(m.service)}</span>` : ""}
-      ${m.auto ? `<span class="shared-member-badge">Brouillon créé</span>` : ""}
-      ${m.formId ? `<a class="shared-member-link" href="form.html?id=${escapeAttribute(m.formId)}" target="_blank">Voir</a>` : ""}
-    </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur — décochez pour arrêter la mutualisation</li>`;
-
-  list.querySelectorAll(".shared-member-remove").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      _getShared(btn.dataset.resourceId).members.splice(Number(btn.dataset.index), 1);
-      renderSharedMembers(btn.dataset.resourceId);
-    });
-  });
-
-  // Bloquer le toggle tant qu'il y a des membres.
-  // data-members-locked permet à applyLockState de ne pas écraser cet état.
-  const toggle = document.getElementById(`shared_toggle_${resourceId}`);
-  if (toggle) {
-    toggle.disabled = hasMembers;
-    toggle.dataset.membersLocked = hasMembers ? "true" : "";
-    toggle.title = hasMembers
-      ? "Retirez d'abord tous les co-utilisateurs pour arrêter la mutualisation"
-      : "";
-  }
-}
-
-function openSharedMemberModal(resourceId) {
-  const modal = document.getElementById("sharedMemberModal");
-  if (!modal) return;
-  modal.dataset.resourceId = resourceId;
-  document.getElementById("sharedModalFormId").value = "";
-  document.getElementById("sharedModalFormSearch").value = "";
-  document.getElementById("sharedModalFormResults").classList.add("d-none");
-  document.getElementById("sharedModalFormChosen").classList.add("d-none");
-  document.getElementById("sharedModalNom").value = "";
-  document.getElementById("sharedModalPrenom").value = "";
-  document.getElementById("sharedModalService").value = "";
-  document.getElementById("sharedModalError").classList.add("d-none");
-  bootstrap.Modal.getOrCreateInstance(modal).show();
-}
-
-async function saveSharedMember() {
-  const modal = document.getElementById("sharedMemberModal");
-  const resourceId = modal?.dataset.resourceId;
-  if (!resourceId) return;
-  const errorEl = document.getElementById("sharedModalError");
-  errorEl.classList.add("d-none");
-
-  const existingFormId = document.getElementById("sharedModalFormId").value.trim();
-  const nom = document.getElementById("sharedModalNom").value.trim();
-  const prenom = document.getElementById("sharedModalPrenom").value.trim();
-  const service = document.getElementById("sharedModalService").value.trim();
-
-  if (!existingFormId && (!nom || !prenom)) {
-    errorEl.textContent = "Sélectionnez un dossier ou renseignez nom et prénom.";
-    errorEl.classList.remove("d-none");
-    return;
-  }
-
-  const state = _getShared(resourceId);
-
-  if (existingFormId) {
-    // Utiliser le dossier existant sélectionné
-    const chosenText = document.getElementById("sharedModalFormChosen").textContent || "";
-    const parts = chosenText.split(" ");
-    const member = { formId: existingFormId, nom: parts.slice(1).join(" ") || "?", prenom: parts[0] || "?", service: service || "", auto: false };
-    state.members.push(member);
-    bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
-    return;
-  }
-
-  // Créer un brouillon automatique
-  const btn = document.getElementById("sharedModalSaveBtn");
-  btn.disabled = true;
-  btn.textContent = "Création…";
-  try {
-    const csrf = await getCsrfToken();
-    const r = await fetch("/api/forms/quick-draft", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
-      body: JSON.stringify({ nom, prenom, service }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "Erreur serveur");
-    state.members.push({ formId: data.form_id, nom, prenom, service, auto: true });
-    bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
-  } catch (e) {
-    errorEl.textContent = `Erreur : ${e.message}`;
-    errorEl.classList.remove("d-none");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Ajouter";
-  }
-}
-
-function initSharedMemberModal() {
-  document.getElementById("sharedModalSaveBtn")?.addEventListener("click", saveSharedMember);
-  bindSharedFormSearch();
-}
-
-function bindSharedFormSearch() {
-  const input = document.getElementById("sharedModalFormSearch");
-  const resultsEl = document.getElementById("sharedModalFormResults");
-  const hiddenEl = document.getElementById("sharedModalFormId");
-  const chosenEl = document.getElementById("sharedModalFormChosen");
-  if (!input) return;
-  let deb = null;
-  input.addEventListener("input", () => {
-    clearTimeout(deb);
-    hiddenEl.value = "";
-    chosenEl.classList.add("d-none");
-    const q = input.value.trim();
-    if (q.length < 2) { resultsEl.classList.add("d-none"); return; }
-    deb = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/forms?search=${encodeURIComponent(q)}`, { credentials: "same-origin" });
-        const rows = (await r.json()).slice(0, 8);
-        if (!rows.length) { resultsEl.innerHTML = `<div class="pool-form-result pool-form-result--empty">Aucun dossier</div>`; resultsEl.classList.remove("d-none"); return; }
-        resultsEl.innerHTML = rows.map((f) =>
-          `<div class="pool-form-result" data-id="${escapeAttribute(f.id)}" data-prenom="${escapeAttribute(f.prenom)}" data-nom="${escapeAttribute(f.nom)}">
-            <strong>${escapeHtml(f.prenom)} ${escapeHtml(f.nom)}</strong>
-            ${f.service ? ` — <span class="text-muted">${escapeHtml(f.service)}</span>` : ""}
-          </div>`).join("");
-        resultsEl.classList.remove("d-none");
-        resultsEl.querySelectorAll(".pool-form-result[data-id]").forEach((row) => {
-          row.addEventListener("click", () => {
-            hiddenEl.value = row.dataset.id;
-            input.value = "";
-            resultsEl.classList.add("d-none");
-            chosenEl.textContent = `${row.dataset.prenom} ${row.dataset.nom}`;
-            chosenEl.classList.remove("d-none");
-          });
-        });
-      } catch { resultsEl.classList.add("d-none"); }
-    }, 280);
-  });
-}
 
 function initDynamicListFields() {
   document.querySelectorAll(".dynamic-resource-list-add").forEach((button) => {
@@ -1100,21 +926,16 @@ function getAdditionalResourcesData() {
         .filter(([, value]) => value)
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
-    shared: _getShared(resource.id).enabled,
-    poolId: _getShared(resource.id).poolId || null,
-    sharedWith: _getShared(resource.id).members,
+
     ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
     ...resource,
     details: resource.details || summarizeDynamicResource(resource)
-  })).filter((resource) => (
-    resource.selected
-    || resource.details
-    || Object.keys(resource.fields).length
-    || resource.assignedAt
-    || resource.conditionAttribution
-    || resource.conditionNotes
-  ));
+  })).filter((resource) => {
+    const hasContent = resource.details || Object.keys(resource.fields).length || resource.assignedAt || resource.conditionAttribution || resource.conditionNotes;
+    // Inclure si sélectionnée, ou si elle a du contenu (pour permettre la suppression au serveur)
+    return resource.selected || hasContent;
+  });
 }
 
 function populateAdditionalResources(data = {}) {
@@ -1122,42 +943,9 @@ function populateAdditionalResources(data = {}) {
   const isLocked = Boolean(data.meta?.lockedAt);
 
   resources.forEach((resource) => {
-    // Pour les ressources mutualisées avec items disponibles
-    if (resource.shared && Array.isArray(resource.availableItems)) {
-      // Créer des cases à cocher pour chaque item disponible
-      resource.availableItems.forEach((item) => {
-        const itemCheckboxId = `pool_item_${item.id}`;
-        let itemCheckbox = document.getElementById(itemCheckboxId);
-        if (!itemCheckbox) {
-          // Créer le checkbox s'il n'existe pas
-          const container = document.getElementById(`dynamic_resource_fields_wrap_${resource.id}`);
-          if (container) {
-            const label = document.createElement("label");
-            label.className = "equipment-toggle pool-item-toggle";
-            label.innerHTML = `<input type="checkbox" id="${itemCheckboxId}" data-pool-item-id="${item.id}" data-resource-id="${resource.id}"><span>${escapeHtml(item.label)}</span>`;
-            container.prepend(label);
-            itemCheckbox = document.getElementById(itemCheckboxId);
-            // Appliquer le verrou immédiatement si le dossier est finalisé
-            if (itemCheckbox && isLocked) {
-              itemCheckbox.disabled = true;
-            }
-          }
-        }
-        // Cocher si l'item était précédemment sélectionné
-        if (itemCheckbox) {
-          itemCheckbox.checked = Boolean(item.selected);
-        }
-      });
-      // Marquer le resource comme sélectionné si des items sont disponibles
-      const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
-      if (checkbox && resource.availableItems.length > 0) {
-        checkbox.checked = true;
-      }
-    }
-
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     const details = document.getElementById(`dynamic_resource_details_${resource.id}`);
-    if (checkbox && !resource.shared) {
+    if (checkbox) {
       checkbox.checked = Boolean(resource.selected);
     }
     if (details) {
@@ -1246,20 +1034,6 @@ function populateAdditionalResources(data = {}) {
         }
       }
     });
-
-    // Restaurer l'état mutualisé (symétrique : tous les membres voient le même toggle)
-    if (resource.shared) {
-      const toggle = document.getElementById(`shared_toggle_${resource.id}`);
-      if (toggle) {
-        toggle.checked = true;
-        document.getElementById(`shared_panel_${resource.id}`)?.classList.remove("d-none");
-      }
-      const state = _getShared(resource.id);
-      state.enabled = true;
-      state.poolId = resource.poolId || null;
-      state.members = Array.isArray(resource.sharedWith) ? resource.sharedWith : [];
-      renderSharedMembers(resource.id);
-    }
   });
   bindDynamicResourceToggles();
   refreshProgressIndicators();
@@ -1442,10 +1216,6 @@ function applyLockState(locked) {
       element.disabled = false;
       return;
     }
-    // Ne pas réactiver un toggle mutualisé bloqué par la présence de membres
-    if (!locked && element.dataset.membersLocked === "true") {
-      return;
-    }
 
     // Désactiver l'élément de formulaire
     element.disabled = locked;
@@ -1544,7 +1314,10 @@ function initConditionalBlocks() {
       toggleField(checkbox.dataset.target, checkbox.checked);
     };
     if (!checkbox.dataset.boundToggle) {
-      checkbox.addEventListener("change", sync);
+      checkbox.addEventListener("change", () => {
+        sync();
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundToggle = "true";
     }
     sync();
@@ -2142,16 +1915,56 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
-  // (les ressources anciennes ne sont pas dans le nouveau système resources.additional)
-  const savedData = JSON.parse(JSON.stringify(window._savedMaterielData || {}));
-  return savedData;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedMaterielData || {};
 }
 
 function buildIntangibleSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
-  const savedData = JSON.parse(JSON.stringify(window._savedImmaterielData || {}));
-  return savedData;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedImmaterielData || {};
+}
+
+function updateCurrentPayload() {
+  // CRITICAL FIX #5: Mettre à jour window.currentPayload depuis le formulaire actuel
+  // Cette fonction synchronise l'état réel du DOM avec window.currentPayload
+  if (!window.currentPayload) {
+    console.warn("⚠️ updateCurrentPayload: window.currentPayload n'existe pas");
+    return;
+  }
+
+  // Mettre à jour les champs simples
+  window.currentPayload.beneficiaire = {
+    ...window.currentPayload.beneficiaire,
+    nom: document.getElementById("nom")?.value || "",
+    prenom: document.getElementById("prenom")?.value || "",
+    fonction: document.getElementById("fonction")?.value || "",
+    mandat: document.getElementById("mandat")?.value || "",
+    service: window._currentService || "",
+    qualite: document.querySelector('input[name="qualite"]:checked')?.value || ""
+  };
+
+  window.currentPayload.dossier = {
+    ...window.currentPayload.dossier,
+    type: document.getElementById("dossier_type")?.value || "arrivee",
+    serviceDestination: window._currentServiceDestination || ""
+  };
+
+  window.currentPayload.validation = {
+    ...window.currentPayload.validation,
+    rgpdAccepted: document.getElementById("rgpdCheck")?.checked || false
+  };
+
+  // Mettre à jour les sélections de ressources matérielles/immatérielles
+  window.currentPayload.materiel = buildEquipmentSelectionMap();
+  window.currentPayload.immateriel = buildIntangibleSelectionMap();
+
+  console.log("✅ window.currentPayload synchronized", window.currentPayload);
 }
 
 function collectRequestedResourcesFromFormData(formData) {
@@ -2302,27 +2115,14 @@ function buildSelectedItems() {
   // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
   const selectedItems = {};
 
-  // Collecter les items de pool sélectionnés
-  document.querySelectorAll('input[data-pool-item-id]:checked').forEach((checkbox) => {
-    const itemId = checkbox.dataset.poolItemId;
-    if (itemId) {
-      if (!selectedItems.poolItems) {
-        selectedItems.poolItems = [];
-      }
-      selectedItems.poolItems.push(itemId);
-    }
-  });
-
   // Collecter les ressources dynamiques sélectionnées
   const additionalResources = getAdditionalResourcesData();
   additionalResources.forEach((resource) => {
-    if (resource.selected && !resource.shared) {
-      const key = resource.triggerKey || String(resource.id);
-      if (!selectedItems[key]) {
-        selectedItems[key] = [];
-      }
-      selectedItems[key].push(resource.id);
+    const key = resource.triggerKey || String(resource.id);
+    if (!selectedItems[key]) {
+      selectedItems[key] = [];
     }
+    selectedItems[key].push(resource.id);
   });
 
   return selectedItems;
@@ -2566,6 +2366,23 @@ function populateForm(data, signaturePad) {
 
   // Envoyer les logs au serveur après un délai
   setTimeout(sendConsoleLogs, 500);
+
+  // CRITICAL FIX #1: Créer window.currentPayload avec le contenu complet au chargement
+  window.currentPayload = {
+    meta: data.meta || {},
+    beneficiaire: data.beneficiaire || {},
+    dossier: data.dossier || {},
+    workflow: data.workflow || {},
+    validation: data.validation || {},
+    resources: data.resources || { additional: [] },
+    restitution: data.restitution || {},
+    materiel: data.materiel || {},
+    immateriel: data.immateriel || {},
+    retraits: data.retraits || {},
+    unc_acces: data.unc_acces || [],
+    unc_ref_ad: data.unc_ref_ad || ""
+  };
+  console.log("✅ window.currentPayload initialized", window.currentPayload);
 }
 
 function formatStatusLabel(status) {
@@ -2980,6 +2797,7 @@ async function saveDraft(signaturePad) {
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || "";
+    form.dataset.workflowStatus = result.summary.status;  // CRITICAL FIX #4: Syncer le workflow status post-save
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
 
     updateSaveProgress({
@@ -3120,7 +2938,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
     void loadFieldSuggestions();
-    initSharedMemberModal();
     initRetraitsSection();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
@@ -3264,3 +3081,4 @@ function normalizeDossierType(value) {
 
 // Module principal de la fiche d'attribution :
 // collecte métier, validation locale et sérialisation du payload.
+

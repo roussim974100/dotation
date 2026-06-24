@@ -8,7 +8,6 @@ _KNOWN_TABLES = {
     "dotation_forms", "dotation_items", "onboarding_dossiers",
     "resource_catalog", "service_catalog", "signature_links",
     "app_settings", "app_logs", "deleted_items",
-    "shared_pools", "shared_pool_members", "shared_pool_items",
     "persons", "audit_events", "field_suggestions",
     "signature_views", "dotation_item_selections",
     "users", "groups", "user_groups",
@@ -62,8 +61,8 @@ def normalize_reference_row(row):
     data["has_assignment_notes"] = bool(data.get("has_assignment_notes", True))
     data["is_active"] = bool(data.get("is_active", True))
     data["is_builtin"] = bool(data.get("is_builtin", False))
-    data["is_pool_resource"] = bool(data.get("is_pool_resource", False))
     data["display_order"] = int(data.get("display_order") or 100)
+    data.pop("is_pool_resource", None)
     return data
 
 

@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # Configuration
 INSTALL_DIR="/opt/dotation"
 GIT_REPO="https://github.com/roussim974100/dotation.git"
-GIT_BRANCH="${GIT_BRANCH:-dev}"
+GIT_BRANCH="${GIT_BRANCH:-main}"
 
 echo -e "${GREEN}🌊 Installation d'À Quai${NC}"
 echo "=================================================="
