@@ -672,8 +672,8 @@ async function initRestitutionPage() {
     document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return"
       ? "Restitution partielle"
       : (currentStatus === "awaiting_signature" ? "En attente de signature" : (currentStatus === "returned" ? "Restitution terminée" : "Attribution active"));
-    const materialItems = (result.items || []).filter((item) => isRestitutionEligibleItem(item));
-    const immaterielItems = (result.items || []).filter((item) => item.category === "immateriel");
+    const materialItems = (result.items || []).filter((item) => item.assigned && isRestitutionEligibleItem(item));
+    const immaterielItems = (result.items || []).filter((item) => item.assigned && item.category === "immateriel");
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
     renderImmaterielItems(immaterielItems, result.data.restitution?.immaterielActions || {});
     restoreRestitutionSignature(currentRestitution, signaturePad);
