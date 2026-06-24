@@ -21,7 +21,6 @@ from models.workflow import (
 )
 from models.forms import persist_form, row_to_summary, get_form
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS
-from models.pools import sync_shared_pools_for_form
 from pdf.attribution import build_pdf_bytes
 from pdf.restitution import build_restitution_pdf_bytes
 import urllib.parse
@@ -548,9 +547,7 @@ def get_form_route(form_id):
 @login_required
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def quick_draft():
-    """Crée un dossier brouillon minimal (nom + prénom requis).
-    Utilisé pour générer automatiquement un dossier co-utilisateur
-    lors de la déclaration d'un matériel mutualisé."""
+    """Crée un dossier brouillon minimal (nom + prénom requis)."""
     if not has_permission("forms.create"):
         return jsonify({"error": "forbidden"}), 403
     data = request.get_json(silent=True) or {}
@@ -570,7 +567,7 @@ def quick_draft():
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
-    return jsonify({"form_id": form_data["id"], "title": form_data["title"]}), 201
+    return jsonify({"form_id": form_data["summary"]["id"], "title": form_data["summary"]["title"]}), 201
 
 
 @bp.route("/api/forms", methods=["POST"])
@@ -585,10 +582,6 @@ def create_form():
     except AppError as error:
         return jsonify({"error": error.code}), error.status
     saved_id = form_data["summary"]["id"]
-    with get_db() as conn:
-        resources_obj = payload.get("resources", {})
-        additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
-        sync_shared_pools_for_form(conn, saved_id, additional)
     return jsonify(form_data), 201
 
 
@@ -604,10 +597,6 @@ def update_form(form_id):
     except AppError as error:
         return jsonify({"error": error.code}), error.status
     with get_db() as conn:
-        resources_obj = payload.get("resources", {})
-        additional = resources_obj.get("additional", []) if isinstance(resources_obj, dict) else []
-        sync_shared_pools_for_form(conn, form_id, additional)
-
         # Sauvegarder les sélections multiples d'items (multi-ordinateurs, multi-téléphones, etc.)
         from models.forms import save_item_selections
         selected_items = payload.get("selectedItems", {})

@@ -1163,8 +1163,8 @@ def create_admin_resource():
             INSERT INTO resource_catalog (
                 id, code, label, description, category, issuer_service, requires_return,
                 has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
-                trigger_key, field_schema_json, is_active, is_builtin, is_pool_resource, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             """,
             (
                 resource_id,
@@ -1181,7 +1181,6 @@ def create_admin_resource():
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
                 now,
                 now,
             ),
@@ -1231,7 +1230,7 @@ def update_admin_resource(resource_id):
             UPDATE resource_catalog
             SET code = ?, label = ?, description = ?, category = ?, issuer_service = ?, requires_return = ?,
                 has_assignment_date = ?, has_assignment_condition = ?, has_assignment_notes = ?, display_order = ?,
-                trigger_key = ?, field_schema_json = ?, is_active = ?, is_pool_resource = ?, updated_at = ?
+                trigger_key = ?, field_schema_json = ?, is_active = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -1248,7 +1247,6 @@ def update_admin_resource(resource_id):
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
                 now,
                 resource_id,
             ),
@@ -1306,23 +1304,6 @@ def delete_admin_resource(resource_id):
     if not deleted:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"deleted": True})
-
-
-@bp.route("/api/resources/pool-catalog", methods=["GET"])
-@login_required
-def pool_catalog():
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
-    search = request.args.get("search", "").strip().lower()
-    with get_db() as connection:
-        rows = connection.execute(
-            """SELECT id, code, label, category, issuer_service
-               FROM resource_catalog
-               WHERE is_pool_resource = 1 AND is_active = 1 AND category != 'immateriel'
-               ORDER BY label COLLATE NOCASE"""
-        ).fetchall()
-    results = [dict(r) for r in rows if not search or search in r["label"].lower()]
-    return jsonify(results)
 
 
 @bp.route("/api/admin/users", methods=["POST"])
@@ -1510,7 +1491,7 @@ def _diagnose_db_file(path):
         if "dotation_forms" in existing:
             try:
                 stats["dossiers"] = conn.execute(
-                    "SELECT COUNT(*) FROM dotation_forms WHERE is_deleted = 0"
+                    "SELECT COUNT(*) FROM dotation_forms"
                 ).fetchone()[0]
             except Exception as exc:
                 logger.warning("Diagnostic : impossible de compter les dossiers : %s", exc)

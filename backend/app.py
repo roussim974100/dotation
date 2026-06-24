@@ -16,6 +16,7 @@ from models.forms import migrate_field_suggestions_from_history
 import importlib
 import pkgutil
 import routes as _routes_pkg
+from permissions import validate_permissions_at_startup
 
 
 class _AutoSecureSessionInterface(SecureCookieSessionInterface):
@@ -32,6 +33,10 @@ app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
 app.session_interface = _AutoSecureSessionInterface()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Valider les permissions au démarrage (dev uniquement)
+if os.environ.get("FLASK_ENV") == "development":
+    validate_permissions_at_startup()
 
 for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
     _mod = importlib.import_module(f"routes.{_modname}")
@@ -151,15 +156,15 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "pools.manage"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "unc.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
         ("gestion", "Gestion", "Gestion avancée avec restitution et export",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all"], "full"),
         ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
          ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
         ("redaction", "Rédaction", "Création et modification des fiches en cours",
@@ -209,15 +214,15 @@ def migrate_missing_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "pools.manage"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "users.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage", "unc.view_all"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
         ("gestion", "Gestion", "Gestion avancée avec restitution et export",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "pools.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all"], "full"),
         ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
          ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
         ("redaction", "Rédaction", "Création et modification des fiches en cours",
@@ -449,38 +454,6 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_dotation_forms_status
                 ON dotation_forms(status);
 
-            CREATE TABLE IF NOT EXISTS shared_pools (
-                id TEXT PRIMARY KEY,
-                label TEXT NOT NULL,
-                notes TEXT,
-                owner_form_id TEXT,
-                resource_catalog_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS shared_pool_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pool_id TEXT NOT NULL,
-                resource_type TEXT NOT NULL,
-                label TEXT NOT NULL,
-                serial_number TEXT,
-                notes TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS shared_pool_members (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pool_id TEXT NOT NULL,
-                form_id TEXT,
-                beneficiary_name TEXT,
-                added_at TEXT NOT NULL,
-                removed_at TEXT,
-                FOREIGN KEY(pool_id) REFERENCES shared_pools(id) ON DELETE CASCADE,
-                FOREIGN KEY(form_id) REFERENCES dotation_forms(id) ON DELETE SET NULL
-            );
-
             CREATE TABLE IF NOT EXISTS signature_views (
                 id TEXT PRIMARY KEY,
                 form_id TEXT NOT NULL,
@@ -530,13 +503,9 @@ def init_db():
         )
         ensure_column(connection, "signature_links", "link_type", "link_type TEXT NOT NULL DEFAULT 'assignment'")
         ensure_column(connection, "app_logs", "target_label", "target_label TEXT")
-        ensure_column(connection, "shared_pools", "owner_form_id", "owner_form_id TEXT")
-        ensure_column(connection, "shared_pools", "resource_catalog_id", "resource_catalog_id TEXT")
-        ensure_column(connection, "shared_pool_members", "removed_at", "removed_at TEXT")
         ensure_column(connection, "dotation_forms", "source_form_id", "source_form_id TEXT")
         ensure_column(connection, "dotation_items", "resource_type", "resource_type TEXT")
         ensure_column(connection, "dotation_items", "serial_number", "serial_number TEXT")
-        ensure_column(connection, "resource_catalog", "is_pool_resource", "is_pool_resource INTEGER NOT NULL DEFAULT 0")
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)

@@ -638,7 +638,6 @@ function populateResourceForm(resourceId) {
   byId("resource_has_assignment_date").checked = resource.has_assignment_date !== false;
   byId("resource_has_assignment_condition").checked = Boolean(resource.has_assignment_condition);
   byId("resource_has_assignment_notes").checked = resource.has_assignment_notes !== false;
-  byId("resource_is_pool_resource").checked = Boolean(resource.is_pool_resource);
   syncResourceTrackingOptions();
   renderResourceFieldSchema(resource.field_schema || []);
 }
@@ -954,7 +953,6 @@ async function saveResource() {
     has_assignment_notes: Boolean(byId("resource_has_assignment_notes")?.checked),
     display_order: Number.parseInt(byId("resource_display_order")?.value || "100", 10) || 100,
     is_active: Boolean(byId("resource_active")?.checked),
-    is_pool_resource: Boolean(byId("resource_is_pool_resource")?.checked),
     field_schema: collectResourceFieldSchema()
   };
   if (!payload.label) {
