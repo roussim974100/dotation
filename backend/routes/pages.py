@@ -46,33 +46,6 @@ def build_login_forensic_details(username, auth_state):
 # Auth
 # ---------------------------------------------------------------------------
 
-@bp.route("/api/emergency-login", methods=["POST"])
-def emergency_login():
-    """Route d'urgence temporaire pour debugger les problèmes CSRF.
-    À SUPPRIMER une fois le problème résolu."""
-    data = request.get_json() or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
-
-    if username == "admsamir" and password == "MotDePasse74500":
-        session["user"] = username
-        session.modified = True
-        with get_db() as connection:
-            insert_app_log(
-                connection,
-                "security",
-                "login",
-                "Connexion reussie (emergency-login)",
-                "user",
-                username,
-                {"ip": get_request_client_ip()},
-                actor=username,
-            )
-        return jsonify({"ok": True, "redirect": "/"}), 200
-
-    return jsonify({"error": "invalid"}), 401
-
-
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -349,14 +322,6 @@ def executive_dashboard_page():
     if not has_permission("forms.view_all"):
         return redirect("/")
     return send_from_directory(FRONTEND_DIR, "executive-dashboard.html")
-
-
-@bp.route("/pools.html")
-@login_required
-def pools_page():
-    if not has_permission("forms.read_list"):
-        return redirect("/")
-    return send_from_directory(FRONTEND_DIR, "pools.html")
 
 
 @bp.route("/logs.html")
