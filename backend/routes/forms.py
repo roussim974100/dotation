@@ -592,12 +592,6 @@ def update_form(form_id):
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
-    with get_db() as conn:
-        # Sauvegarder les sélections multiples d'items (multi-ordinateurs, multi-téléphones, etc.)
-        from models.forms import save_item_selections
-        selected_items = payload.get("selectedItems", {})
-        if selected_items:
-            save_item_selections(conn, form_id, selected_items)
     return jsonify(form_data)
 
 

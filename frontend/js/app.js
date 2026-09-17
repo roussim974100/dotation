@@ -2119,23 +2119,6 @@ function populateUncAcces(entries = []) {
   entries.forEach(e => list.appendChild(createUncRow(e)));
 }
 
-function buildSelectedItems() {
-  // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
-  const selectedItems = {};
-
-  // Collecter les ressources dynamiques sélectionnées
-  const additionalResources = getAdditionalResourcesData();
-  additionalResources.forEach((resource) => {
-    const key = resource.triggerKey || String(resource.id);
-    if (!selectedItems[key]) {
-      selectedItems[key] = [];
-    }
-    selectedItems[key].push(resource.id);
-  });
-
-  return selectedItems;
-}
-
 function getFormData(signaturePad) {
   // Produit le payload métier complet qui sera envoyé à l'API.
   const now = new Date().toISOString();
@@ -2192,7 +2175,6 @@ function getFormData(signaturePad) {
     resources: {
       additional: getAdditionalResourcesData()
     },
-    selectedItems: buildSelectedItems(),
     unc_acces: getUncAccesData(),
     unc_ref_ad: getUncRefAd(),
     restitution: currentRestitutionData,
