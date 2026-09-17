@@ -16,7 +16,7 @@ from database import get_db
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
-    summarize_dynamic_resource, collect_resource_entries,
+    summarize_resource_item_details, collect_resource_entries,
     derive_restitution_workflow_status, collect_resource_validation_errors,
 )
 from models.forms import persist_form, row_to_summary, get_form
@@ -103,11 +103,7 @@ def build_excel_workbook(rows, item_rows):
 
     for row in item_rows:
         details = json.loads(row["details_json"] or "{}")
-        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
-            str(value).strip()
-            for key, value in details.items()
-            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
-        )
+        detail_text = summarize_resource_item_details(details)
         resource_rows_xml.append(
             "<Row>" + "".join(
                 [

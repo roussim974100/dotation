@@ -45,11 +45,62 @@ def summarize_dynamic_resource(resource):
     # Une ressource dynamique peut être décrite par plusieurs champs saisis
     # ou par un simple détail libre; on prépare ici un résumé stable.
     fields = resource.get("fields") or {}
-    if isinstance(fields, dict):
-        values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
-        if values:
-            return " - ".join(values)
+    if isinstance(fields, dict) and fields:
+        field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
+        if field_schema:
+            # Schéma connu : on restitue "Libellé : valeur" dans l'ordre du schéma pour que
+            # chaque valeur soit identifiable dans les PDF/Excel (au lieu d'un join anonyme).
+            # Comparaison insensible à la casse : normalize_resource_field_schema met la clé
+            # en minuscules (slugify_field_key), alors que certaines ressources historiques
+            # (ex. téléphone : numeroSerie) ont leurs valeurs enregistrées en camelCase -
+            # même repli que is_dynamic_resource_complete.
+            fields_lower = {str(key).lower(): value for key, value in fields.items()}
+            parts = []
+            matched_keys_lower = set()
+            for field in field_schema:
+                key_lower = field["key"].lower()
+                matched_keys_lower.add(key_lower)
+                raw_value = fields.get(field["key"])
+                if raw_value is None:
+                    raw_value = fields_lower.get(key_lower)
+                value = str(raw_value or "").strip()
+                if value:
+                    parts.append(f"{field['label']} : {value}")
+            # Valeurs présentes mais hors schéma courant (champ renommé/supprimé depuis) :
+            # on les restitue quand même brutes plutôt que de les faire disparaître.
+            for key, value in fields.items():
+                if str(key).lower() in matched_keys_lower:
+                    continue
+                value = str(value or "").strip()
+                if value:
+                    parts.append(value)
+            if parts:
+                return " - ".join(parts)
+        else:
+            values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
+            if values:
+                return " - ".join(values)
     return str(resource.get("details") or "").strip()
+
+
+# Cles techniques de suivi a exclure du resume brut d'un item statique (non "fields").
+_ITEM_DETAIL_EXCLUDED_KEYS = {"selected", "conditionAttribution", "conditionNotes"}
+
+
+def summarize_resource_item_details(details):
+    # Resume les details bruts d'un item de dotation_items.details_json pour les exports
+    # (Excel, signature de restitution) : passe par summarize_dynamic_resource si la
+    # ressource a une structure "fields" (ressource dynamique admin), sinon reprend a plat
+    # les valeurs d'un item statique (ordinateur, telephone...) en excluant les cles de suivi.
+    if not isinstance(details, dict):
+        return ""
+    if details.get("fields"):
+        return summarize_dynamic_resource(details)
+    return " - ".join(
+        str(value).strip()
+        for key, value in details.items()
+        if key not in _ITEM_DETAIL_EXCLUDED_KEYS and str(value or "").strip()
+    )
 
 
 def uses_dynamic_resource_assignment_date(resource):

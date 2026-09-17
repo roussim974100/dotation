@@ -14,7 +14,7 @@ from models.audit import insert_audit_event, insert_app_log
 from models.workflow import (
     collect_resource_entries, collect_resource_validation_errors,
     compute_effective_workflow_status, summarize_assignment_progress,
-    summarize_dynamic_resource, is_restitution_eligible_material_details,
+    summarize_resource_item_details, is_restitution_eligible_material_details,
     describe_assignment_condition, extract_items,
 )
 from models.dossier import sync_person_and_dossier
@@ -598,11 +598,7 @@ def build_restitution_signature_public_payload(form_data, link_row):
     for item_key, state in (restitution.get("items") or {}).items():
         item = material_index.get(item_key, {})
         details = item.get("details") or {}
-        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
-            str(value).strip()
-            for key, value in details.items()
-            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
-        )
+        detail_text = summarize_resource_item_details(details)
         restitution_items.append(
             {
                 "label": item.get("label") or item_key,
