@@ -715,14 +715,12 @@ function populateResourceForm(resourceId) {
   renderResourceFieldSchema(resource.field_schema || []);
 }
 
-async function loadUsers() {
-  if (!byId("userTableBody")) {
-    currentUsers = await adminRequest("/api/admin/users");
-    updateAdminMetrics();
+function renderUserTable() {
+  const table = byId("userTableBody");
+  if (!table) {
     return;
   }
-  currentUsers = await adminRequest("/api/admin/users");
-  byId("userTableBody").innerHTML = currentUsers.map((user) => {
+  table.innerHTML = sortAdminTable("user", currentUsers).map((user) => {
     const statusMeta = getUserStatusMeta(user);
     const statusAction = user.status === "pending"
       ? `<button class="btn btn-sm btn-outline-success" type="button" data-admin-action="approveUser" data-username="${escapeHtml(user.username)}">Valider</button>`
@@ -743,6 +741,12 @@ async function loadUsers() {
       </tr>
     `;
   }).join("");
+}
+
+async function loadUsers() {
+  currentUsers = await adminRequest("/api/admin/users");
+  bindAdminSortableHeaders("user", "userTableBody", renderUserTable);
+  renderUserTable();
   updateAdminMetrics();
 }
 
@@ -982,14 +986,76 @@ function showCsvFeedback(el, msg, isError) {
   el.classList.remove("d-none");
 }
 
-async function loadResources() {
-  currentResources = await adminRequest("/api/admin/resources");
-  const table = byId("resourceTableBody");
-  if (!table) {
-    updateAdminMetrics();
+// Tri des tableaux admin (ressources / comptes) : trie un tableau deja en memoire et
+// re-rend sans re-fetcher le serveur - meme principe que le tri par en-tete du dashboard
+// (storage.js applyDashboardSort) mais adapte a des listes chargees une fois.
+const adminTableSortState = {
+  resource: { field: null, direction: "asc" },
+  user: { field: null, direction: "asc" },
+};
+
+const ADMIN_SORT_GETTERS = {
+  resource: {
+    label: (r) => (r.label || "").toLocaleLowerCase("fr"),
+    category: (r) => (r.category || "").toLocaleLowerCase("fr"),
+    service: (r) => (r.issuer_service || "").toLocaleLowerCase("fr"),
+    fields: (r) => (r.field_schema || []).length || 0,
+    active: (r) => (r.is_active ? 1 : 0),
+  },
+  user: {
+    username: (u) => (u.username || "").toLocaleLowerCase("fr"),
+    service: (u) => (u.service || "").toLocaleLowerCase("fr"),
+    status: (u) => (u.status || "").toLocaleLowerCase("fr"),
+  },
+};
+
+function sortAdminTable(table, items) {
+  const state = adminTableSortState[table];
+  const getValue = state.field && ADMIN_SORT_GETTERS[table][state.field];
+  if (!getValue) {
+    return items;
+  }
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    const va = getValue(a);
+    const vb = getValue(b);
+    const cmp = typeof va === "string" ? va.localeCompare(vb, "fr") : (va || 0) - (vb || 0);
+    return state.direction === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function bindAdminSortableHeaders(table, tableBodyId, onSortChange) {
+  const thead = byId(tableBodyId)?.closest("table")?.querySelector("thead");
+  if (!thead || thead.dataset.sortBound === "true") {
     return;
   }
-  table.innerHTML = currentResources.map((resource) => `
+  thead.addEventListener("click", (event) => {
+    const th = event.target.closest("th[data-sort-field]");
+    if (!th) {
+      return;
+    }
+    const field = th.dataset.sortField;
+    const state = adminTableSortState[table];
+    state.direction = state.field === field ? (state.direction === "asc" ? "desc" : "asc") : "asc";
+    state.field = field;
+    thead.querySelectorAll("th[data-sort-field]").forEach((h) => {
+      const active = h.dataset.sortField === field;
+      h.classList.toggle("is-sorted-asc", active && state.direction === "asc");
+      h.classList.toggle("is-sorted-desc", active && state.direction === "desc");
+      h.setAttribute("aria-sort", active ? (state.direction === "asc" ? "ascending" : "descending") : "none");
+    });
+    onSortChange();
+  });
+  thead.dataset.sortBound = "true";
+}
+
+function renderResourceTable() {
+  const table = byId("resourceTableBody");
+  if (!table) {
+    return;
+  }
+  table.innerHTML = sortAdminTable("resource", currentResources).map((resource) => `
     <tr>
       <td data-label="Ressource">
         <div class="draft-title">${escapeHtml(resource.label)}</div>
@@ -1009,6 +1075,12 @@ async function loadResources() {
       </td>
     </tr>
   `).join("");
+}
+
+async function loadResources() {
+  currentResources = await adminRequest("/api/admin/resources");
+  bindAdminSortableHeaders("resource", "resourceTableBody", renderResourceTable);
+  renderResourceTable();
   updateAdminMetrics();
 }
 
