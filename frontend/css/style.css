@@ -2033,9 +2033,10 @@ button.export-menu__item {
 }
 
 /* Apercu flottant au survol d'un statut dans la liste */
+/* z-index > .dashboard-nav (99) pour ne pas etre masque par le bandeau sticky quand la ligne survolee est proche du haut */
 .status-hover-card {
   position: fixed;
-  z-index: 40;
+  z-index: 101;
   pointer-events: none;
   width: min(360px, calc(100vw - 2rem));
   padding: 1rem 1.1rem;
