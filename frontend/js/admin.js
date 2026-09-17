@@ -466,20 +466,25 @@ async function saveUserFromModal() {
 function createResourceFieldRow(field = {}) {
   const optionsValue = Array.isArray(field.options) ? field.options.join("\n") : "";
   const showOptions = field.type === "select";
+  const isHidden = Boolean(field.hidden);
   // data-field-key fige la cle technique d'un champ existant : reformuler le libelle
   // (correction, traduction...) ne doit plus regenerer la cle et orpheliner les valeurs
   // deja enregistrees dans les dossiers. Vide pour un champ nouvellement ajoute : sa cle
   // sera derivee du libelle a la sauvegarde, comme avant.
+  // data-field-hidden : champ masque (cf resource-field-remove) - reste dans le schema
+  // (donc toujours resoluble en label pour les dossiers existants) mais disparait du
+  // formulaire de dossier, alternative a la suppression reelle pour ne pas perdre les
+  // valeurs deja saisies.
   return `
-    <div class="resource-field-row" data-field-key="${escapeHtml(field.key || "")}">
+    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
-          <input class="form-control resource-field-label" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série">
+          <input class="form-control resource-field-label" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série" ${isHidden ? "disabled" : ""}>
         </div>
         <div class="col-md-4">
           <label class="form-label">Type</label>
-          <select class="form-select resource-field-type">
+          <select class="form-select resource-field-type" ${isHidden ? "disabled" : ""}>
             <option value="text" ${field.type === "text" ? "selected" : ""}>Texte</option>
             <option value="textarea" ${field.type === "textarea" ? "selected" : ""}>Texte long</option>
             <option value="select" ${field.type === "select" ? "selected" : ""}>Liste déroulante</option>
@@ -490,21 +495,72 @@ function createResourceFieldRow(field = {}) {
         </div>
         <div class="col-md-3">
           <label class="form-check">
-            <input class="form-check-input resource-field-required" type="checkbox" ${field.required ? "checked" : ""}>
+            <input class="form-check-input resource-field-required" type="checkbox" ${field.required ? "checked" : ""} ${isHidden ? "disabled" : ""}>
             <span class="form-check-label">Champ obligatoire</span>
           </label>
         </div>
         <div class="col-12 resource-field-options ${showOptions ? "" : "d-none"}">
           <label class="form-label">Choix de la liste</label>
-          <textarea class="form-control resource-field-options-input" rows="3" placeholder="Une option par ligne">${escapeHtml(optionsValue)}</textarea>
+          <textarea class="form-control resource-field-options-input" rows="3" placeholder="Une option par ligne" ${isHidden ? "disabled" : ""}>${escapeHtml(optionsValue)}</textarea>
           <div class="form-text">Ajoutez une valeur par ligne pour la liste déroulante.</div>
         </div>
-        <div class="col-12 d-flex justify-content-md-end">
+        <div class="col-12 resource-field-hidden-banner ${isHidden ? "" : "d-none"}">
+          <span class="status-pill">Champ masqué — conserve les données déjà saisies, retiré du formulaire de dossier</span>
+        </div>
+        <div class="col-12 d-flex justify-content-md-end gap-2">
+          <button class="btn btn-outline-secondary resource-field-unhide ${isHidden ? "" : "d-none"}" type="button">Réafficher</button>
           <button class="btn btn-outline-danger resource-field-remove" type="button">Suppr.</button>
         </div>
       </div>
     </div>
   `;
+}
+
+async function handleResourceFieldRemove(row) {
+  const label = row.querySelector(".resource-field-label")?.value.trim() || "ce champ";
+  const existingKey = row.dataset.fieldKey || "";
+  // Champ pas encore enregistre (nouvelle ligne) : rien a perdre, on retire directement.
+  if (!existingKey || !editingResourceId) {
+    row.remove();
+    return;
+  }
+  let count = 0;
+  try {
+    const usage = await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}/fields/${encodeURIComponent(existingKey)}/usage`);
+    count = Number(usage?.count) || 0;
+  } catch (error) {
+    // Impossible de verifier l'usage : on reste prudent et on demande confirmation simple.
+    count = -1;
+  }
+  if (count === 0) {
+    const confirmed = await askConfirm(`Aucun dossier n'utilise "${label}". Le supprimer ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
+    if (confirmed) {
+      row.remove();
+    }
+    return;
+  }
+  const usageText = count > 0 ? `est utilisé par ${count} dossier(s)` : "est peut-être déjà utilisé (vérification impossible)";
+  const preferHide = await askConfirm(
+    `Le champ "${label}" ${usageText}. Le masquer conserve les données déjà saisies et le retire simplement du formulaire — recommandé plutôt qu'une suppression définitive.`,
+    { title: "Champ utilisé", confirmLabel: "Masquer le champ", confirmClass: "btn-warning", cancelLabel: "Autre option" }
+  );
+  if (preferHide) {
+    row.dataset.fieldHidden = "true";
+    row.classList.add("resource-field-row--hidden");
+    row.querySelectorAll(".resource-field-label, .resource-field-type, .resource-field-required, .resource-field-options-input").forEach((el) => {
+      el.disabled = true;
+    });
+    row.querySelector(".resource-field-hidden-banner")?.classList.remove("d-none");
+    row.querySelector(".resource-field-unhide")?.classList.remove("d-none");
+    return;
+  }
+  const confirmedDelete = await askConfirm(
+    `Supprimer définitivement "${label}" ? Les données déjà saisies pour ce champ seront perdues au prochain enregistrement des dossiers concernés.`,
+    { confirmLabel: "Supprimer définitivement", confirmClass: "btn-danger" }
+  );
+  if (confirmedDelete) {
+    row.remove();
+  }
 }
 
 function bindResourceFieldRows() {
@@ -522,7 +578,16 @@ function bindResourceFieldRows() {
       optionsWrap?.classList.toggle("d-none", typeInput.value !== "select");
     });
     row.querySelector(".resource-field-remove")?.addEventListener("click", () => {
-      row.remove();
+      void handleResourceFieldRemove(row);
+    });
+    row.querySelector(".resource-field-unhide")?.addEventListener("click", () => {
+      row.dataset.fieldHidden = "false";
+      row.classList.remove("resource-field-row--hidden");
+      row.querySelectorAll(".resource-field-label, .resource-field-type, .resource-field-required, .resource-field-options-input").forEach((el) => {
+        el.disabled = false;
+      });
+      row.querySelector(".resource-field-hidden-banner")?.classList.add("d-none");
+      row.querySelector(".resource-field-unhide")?.classList.add("d-none");
     });
     row.dataset.bound = "true";
   });
@@ -557,6 +622,7 @@ function collectResourceFieldSchema() {
       type,
       placeholder: "",
       required: Boolean(row.querySelector(".resource-field-required")?.checked),
+      hidden: row.dataset.fieldHidden === "true",
       options
     };
   }).filter((field) => field.label && field.key);

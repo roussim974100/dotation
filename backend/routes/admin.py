@@ -30,6 +30,7 @@ from models.settings import (
     build_public_settings_payload, resolve_theme_id, resolve_dark_mode,
 )
 from models.catalog import normalize_resource_catalog_payload
+from models.workflow import count_resource_field_usage
 from models.forms import persist_form
 from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR
 
@@ -1304,6 +1305,23 @@ def delete_admin_resource(resource_id):
     if not deleted:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"deleted": True})
+
+
+@bp.route("/api/admin/resources/<resource_id>/fields/<field_key>/usage", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def admin_resource_field_usage(resource_id, field_key):
+    # Nombre de dossiers ayant deja une valeur sur ce champ : appele avant suppression
+    # reelle d'un champ dans l'admin pour avertir et proposer le masquage a la place.
+    with get_db() as connection:
+        resource_row = connection.execute(
+            "SELECT code FROM resource_catalog WHERE id = ?",
+            (resource_id,),
+        ).fetchone()
+        if not resource_row:
+            return jsonify({"error": "not_found"}), 404
+        count = count_resource_field_usage(connection, resource_row["code"], field_key)
+    return jsonify({"count": count})
 
 
 @bp.route("/api/admin/users", methods=["POST"])

@@ -905,6 +905,17 @@ body.login-shell {
   color: var(--muted);
 }
 
+/* Champ masque (cf. Suppr. -> Masquer) : reste dans le schema, retire du formulaire dossier */
+.resource-field-row--hidden {
+  opacity: 0.6;
+  background: repeating-linear-gradient(135deg, #f4f6f8, #f4f6f8 10px, #eef1f4 10px, #eef1f4 20px);
+}
+
+.resource-field-hidden-banner .status-pill {
+  background: rgba(214, 163, 64, 0.16);
+  color: #8a5a00;
+}
+
 .progress-required-field {
   border-color: #d6a53a !important;
   box-shadow: 0 0 0 0.18rem rgba(214, 165, 58, 0.14);
@@ -3352,6 +3363,15 @@ button.export-menu__item {
 [data-color-mode="dark"] .restitution-row {
   background: var(--surface);
   border-color: var(--border);
+}
+
+[data-color-mode="dark"] .resource-field-row--hidden {
+  background: repeating-linear-gradient(135deg, var(--surface), var(--surface) 10px, var(--surface-alt) 10px, var(--surface-alt) 20px);
+}
+
+[data-color-mode="dark"] .resource-field-hidden-banner .status-pill {
+  background: color-mix(in srgb, #d6a340 22%, var(--surface));
+  color: #e8a060;
 }
 
 /* Signature, RGPD, status cards */

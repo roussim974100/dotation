@@ -788,8 +788,16 @@ async function loadDynamicResourceReferences() {
 
   const buildResourceCard = (resource) => {
     const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+    const visibleFieldSchema = fieldSchema.filter((field) => !field.hidden);
+    // Champs masques (cf admin Ressources) : rendus en input hidden pour que leur valeur
+    // deja saisie survive au prochain enregistrement (getDynamicResourceFieldValue les lit
+    // normalement), sans les proposer a la saisie.
+    const hiddenFieldsMarkup = fieldSchema
+      .filter((field) => field.hidden)
+      .map((field) => `<input type="hidden" class="dynamic-resource-field" id="dynamic_resource_${escapeAttribute(resource.id)}_${escapeAttribute(field.key)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}">`)
+      .join("");
     const fieldsMarkup = fieldSchema.length
-      ? `<div class="subgrid">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
+      ? `${visibleFieldSchema.length ? `<div class="subgrid">${visibleFieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>` : ""}${hiddenFieldsMarkup}`
       : `
         <div class="mt-3">
           <label class="form-label" for="dynamic_resource_details_${escapeAttribute(resource.id)}">Précision / Détails</label>

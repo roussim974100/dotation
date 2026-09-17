@@ -225,7 +225,9 @@ function isDynamicResourceComplete(resource) {
     : (Array.isArray(resource.field_schema) ? resource.field_schema : []);
   const fieldValues = resource.fields || {};
   if (fieldSchema.length) {
-    const hasMissingRequiredField = fieldSchema.some((field) => field.required && !String(fieldValues[field.key] || "").trim());
+    // Un champ masque (cf admin Ressources) n'a plus de saisie possible depuis le
+    // formulaire : on ne peut donc plus exiger de valeur meme s'il est marque obligatoire.
+    const hasMissingRequiredField = fieldSchema.some((field) => !field.hidden && field.required && !String(fieldValues[field.key] || "").trim());
     if (hasMissingRequiredField) {
       return false;
     }

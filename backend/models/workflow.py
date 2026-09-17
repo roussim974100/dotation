@@ -33,6 +33,10 @@ def normalize_resource_field_schema(raw_schema):
             "required": bool(field.get("required", False)),
             "options": [str(option).strip() for option in options if str(option or "").strip()],
             "suggest": bool(field.get("suggest", False)),
+            # Masque : le champ reste dans le schema (donc toujours resoluble en label pour
+            # les dossiers existants et les exports) mais disparait du formulaire de saisie.
+            # Alternative a la suppression reelle pour ne pas perdre les valeurs deja saisies.
+            "hidden": bool(field.get("hidden", False)),
         })
     return normalized
 
@@ -135,6 +139,10 @@ def is_dynamic_resource_complete(resource):
     field_values_lower = {k.lower(): v for k, v in field_values.items()}
     if field_schema:
         for field in field_schema:
+            if field.get("hidden"):
+                # Champ masque : plus de saisie possible depuis le formulaire, on ne peut
+                # donc plus exiger de valeur meme si le champ est marque obligatoire.
+                continue
             value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
             if field.get("required") and not value:
                 return False
@@ -162,6 +170,63 @@ def is_dynamic_resource_payload(resource):
         "requires_return",
     }
     return any(key in resource for key in marker_keys)
+
+
+def count_resource_field_usage(connection, resource_code, field_key):
+    # Compte les dossiers ayant une valeur non vide sur field_key pour la ressource
+    # resource_code. Utilise pour avertir avant suppression reelle d'un champ dans
+    # l'admin (cf. masquage). Scanne payload_json (ressources dynamiques additionnelles
+    # d'un dossier) et dotation_items.details_json (vue a plat pour la restitution) : les
+    # deux portent la meme donnee en double, on deduplique par dossier.
+    # Le LIKE ne sert que de pre-filtre grossier ; le comptage reel se fait apres parsing
+    # JSON et comparaison exacte (insensible a la casse) de la cle, pas sur le texte brut.
+    if not resource_code or not field_key:
+        return 0
+    key_lower = field_key.lower()
+    affected_form_ids = set()
+
+    like_pattern = f'%"{resource_code}"%'
+    rows = connection.execute(
+        "SELECT id, payload_json FROM dotation_forms WHERE payload_json LIKE ?",
+        (like_pattern,),
+    ).fetchall()
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        resources_obj = payload.get("resources") or {}
+        additional = resources_obj.get("additional") or [] if isinstance(resources_obj, dict) else []
+        for resource in additional:
+            if not isinstance(resource, dict):
+                continue
+            if (resource.get("code") or resource.get("id")) != resource_code:
+                continue
+            fields = resource.get("fields") or {}
+            if not isinstance(fields, dict):
+                continue
+            value = next((v for k, v in fields.items() if str(k).lower() == key_lower), None)
+            if str(value or "").strip():
+                affected_form_ids.add(row["id"])
+                break
+
+    item_rows = connection.execute(
+        "SELECT form_id, details_json FROM dotation_items WHERE item_key = ?",
+        (resource_code,),
+    ).fetchall()
+    for row in item_rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        fields = details.get("fields") or {}
+        if not isinstance(fields, dict):
+            continue
+        value = next((v for k, v in fields.items() if str(k).lower() == key_lower), None)
+        if str(value or "").strip():
+            affected_form_ids.add(row["form_id"])
+
+    return len(affected_form_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +445,8 @@ def collect_resource_validation_errors(payload):
         field_values_lower = {k.lower(): v for k, v in field_values.items()}
         if field_schema:
             for field in field_schema:
+                if field.get("hidden"):
+                    continue
                 value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
                 if field.get("required") and not value:
                     errors.append(f"{resource.get('label') or 'Ressource'} : {field['label']} manquant")
