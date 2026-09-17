@@ -172,6 +172,33 @@ body.login-shell {
   color: var(--brand-dark);
 }
 
+/* Pastille d'environnement (cf. branding.js applyEnvironmentBadge) */
+.env-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  cursor: help;
+}
+
+.env-badge--dev {
+  color: #7a4312;
+  background: #ffe7d1;
+  border: 1px solid #f3ba87;
+}
+
+[data-color-mode="dark"] .env-badge--dev {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+}
+
 .app-subtitle {
   max-width: 55rem;
   margin: 0.45rem 0 0;

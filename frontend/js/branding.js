@@ -693,6 +693,30 @@ function applyBrandingTheme(settings) {
   root.style.setProperty("--border", palette.border);
 }
 
+// Pastille d'environnement dans l'en-tete : reconnaitre en un coup d'oeil qu'on est
+// sur la branche dev (utile en preprod pour savoir ce qui a ete deploye). Injectee en
+// JS (pas dans le HTML) pour ne pas dupliquer le markup sur chaque page.
+function applyEnvironmentBadge() {
+  const suffix = (APP_BUILD_VERSION.split("-")[1] || "").toLowerCase();
+  if (suffix !== "dev") {
+    document.getElementById("envBadge")?.remove();
+    return;
+  }
+  const title = document.querySelector(".app-header .app-title");
+  if (!title) {
+    return;
+  }
+  let badge = document.getElementById("envBadge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.id = "envBadge";
+    badge.className = "env-badge env-badge--dev";
+    badge.title = "Cette instance tourne sur la branche de developpement (dev)";
+    title.appendChild(badge);
+  }
+  badge.textContent = "DEV";
+}
+
 function applyBrandingContent(settings) {
   const orgName = settings?.orgName || APP_FIXED_NAME;
   const appName = APP_FIXED_NAME;
@@ -759,6 +783,7 @@ function applyBrandingContent(settings) {
   document.querySelectorAll("[data-app-version]").forEach((node) => {
     node.textContent = APP_BUILD_VERSION;
   });
+  applyEnvironmentBadge();
 
   // Radios qualité dynamiques
   const beneficiaryTypes = settings?.beneficiaryTypes || [
