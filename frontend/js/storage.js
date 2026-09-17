@@ -1102,6 +1102,12 @@ async function renderDraftList() {
       if (draftList) draftList.innerHTML = "";
       if (restitutionList) restitutionList.innerHTML = "";
       if (historyList) historyList.innerHTML = "";
+      // Vider aussi les boutons "Voir plus" : sinon ils gardent le HTML du
+      // rendu precedent (non filtre) et restent affiches sur une liste vide.
+      ["assignmentLoadMoreWrap", "restitutionLoadMoreWrap", "historyLoadMoreWrap"].forEach((id) => {
+        const wrap = document.getElementById(id);
+        if (wrap) wrap.innerHTML = "";
+      });
       dashboardSelectedIds = new Set();
       const filtersActive = hasActiveFilters() && sortedDrafts.length > 0;
       filterEmptyState?.classList.toggle("d-none", !filtersActive);
