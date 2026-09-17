@@ -466,8 +466,12 @@ async function saveUserFromModal() {
 function createResourceFieldRow(field = {}) {
   const optionsValue = Array.isArray(field.options) ? field.options.join("\n") : "";
   const showOptions = field.type === "select";
+  // data-field-key fige la cle technique d'un champ existant : reformuler le libelle
+  // (correction, traduction...) ne doit plus regenerer la cle et orpheliner les valeurs
+  // deja enregistrees dans les dossiers. Vide pour un champ nouvellement ajoute : sa cle
+  // sera derivee du libelle a la sauvegarde, comme avant.
   return `
-    <div class="resource-field-row">
+    <div class="resource-field-row" data-field-key="${escapeHtml(field.key || "")}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
@@ -536,7 +540,10 @@ function appendResourceFieldRow(field = {}) {
 function collectResourceFieldSchema() {
   return Array.from(document.querySelectorAll(".resource-field-row")).map((row, index) => {
     const label = row.querySelector(".resource-field-label")?.value.trim() || "";
-    const key = slugifyFieldKey(label || `champ_${index + 1}`);
+    // Cle figee a la creation du champ (cf. createResourceFieldRow) : on ne re-derive
+    // du libelle que si le champ est nouveau (pas encore de cle enregistree).
+    const existingKey = row.dataset.fieldKey || "";
+    const key = existingKey || slugifyFieldKey(label || `champ_${index + 1}`);
     const type = row.querySelector(".resource-field-type")?.value || "text";
     const options = type === "select"
       ? String(row.querySelector(".resource-field-options-input")?.value || "")
