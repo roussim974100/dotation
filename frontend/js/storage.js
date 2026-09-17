@@ -25,7 +25,35 @@ const dashboardFilters = {
   timing: "",
   qualite: "",
   service: "",
-  sort: "recent"
+  // field: "date" (defaut) | "title" | "qualite" | "service" | "status" | "timing" | "progress"
+  // direction: "asc" | "desc". Le select #sortFilter (recent/oldest) ne pilote que le champ "date" ;
+  // le tri par clic sur un en-tete de colonne (cf bindSortableHeaders) pilote tous les champs.
+  sort: { field: "date", direction: "desc" }
+};
+
+const DASHBOARD_SORT_DEFAULT = { field: "date", direction: "desc" };
+
+// Ordre logique (pas alphabetique) pour les champs a enumeration.
+const DASHBOARD_STATUS_ORDER = {
+  draft: 0, partial_assignment: 1, awaiting_signature: 2, active: 3,
+  partial_return: 4, returned: 5, cancelled: 6
+};
+const DASHBOARD_TIMING_ORDER = { late: 0, warning: 1, neutral: 2, ok: 3 };
+
+// Une fonction par champ triable : renvoie une valeur comparable (nombre ou string).
+const DASHBOARD_SORT_VALUE_GETTERS = {
+  date: (draft) => new Date(draft.updatedAt || draft.assignedAt || 0).getTime(),
+  title: (draft) => (draft.title || "").toLocaleLowerCase("fr"),
+  qualite: (draft) => (formatQualiteLabel(draft) || "").toLocaleLowerCase("fr"),
+  service: (draft) => (getDraftServiceValue(draft) || "").toLocaleLowerCase("fr"),
+  status: (draft) => DASHBOARD_STATUS_ORDER[draft.status || "draft"] ?? 99,
+  timing: (draft) => DASHBOARD_TIMING_ORDER[getDraftProgressMetrics(draft).timingStatus] ?? 99,
+  progress: (draft) => getDraftProgressMetrics(draft).ratio || 0,
+  // Ecart remise/restitution (restitutions-pending.html uniquement) : negatif = restitue
+  // en avance, positif = en retard. Neutre si l'une des deux dates manque.
+  recovery: (draft) => (draft.returnedAt && draft.assignedAt)
+    ? new Date(draft.returnedAt).getTime() - new Date(draft.assignedAt).getTime()
+    : 0,
 };
 
 function hasActiveFilters() {
@@ -44,7 +72,8 @@ function updateFilterBadge() {
     dashboardFilters.timing,
     dashboardFilters.qualite,
     dashboardFilters.service,
-    dashboardFilters.sort !== "recent" ? dashboardFilters.sort : "",
+    (dashboardFilters.sort.field !== DASHBOARD_SORT_DEFAULT.field
+      || dashboardFilters.sort.direction !== DASHBOARD_SORT_DEFAULT.direction) ? "sort" : "",
   ].filter(Boolean).length;
   badge.textContent = count;
   badge.classList.toggle("d-none", count === 0);
@@ -594,13 +623,13 @@ function getDashboardViewMode() {
 
 function sortDraftsForDisplay(drafts) {
   const sorted = [...drafts];
+  const { field, direction } = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+  const getValue = DASHBOARD_SORT_VALUE_GETTERS[field] || DASHBOARD_SORT_VALUE_GETTERS.date;
   sorted.sort((left, right) => {
-    const leftDate = new Date(left.updatedAt || left.assignedAt || 0).getTime();
-    const rightDate = new Date(right.updatedAt || right.assignedAt || 0).getTime();
-    if (dashboardFilters.sort === "oldest") {
-      return leftDate - rightDate;
-    }
-    return rightDate - leftDate;
+    const a = getValue(left);
+    const b = getValue(right);
+    const cmp = typeof a === "string" ? a.localeCompare(b, "fr") : (a || 0) - (b || 0);
+    return direction === "asc" ? cmp : -cmp;
   });
   return sorted;
 }
@@ -2172,6 +2201,63 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function resetDashboardPagination() {
+  assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
+  restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
+  historyDisplayCount = DASHBOARD_PAGE_SIZE;
+}
+
+// Point d'entree unique pour changer le tri (select #sortFilter ou clic sur en-tete de
+// colonne) : garde les deux UI synchronisees avec dashboardFilters.sort.
+function applyDashboardSort(field, direction) {
+  dashboardFilters.sort = { field, direction };
+  resetDashboardPagination();
+  syncSortUI();
+  updateFilterBadge();
+  void renderDraftList();
+}
+
+// Reflete l'etat de tri courant sur le select "Trier par" (uniquement pertinent pour le
+// champ "date") et sur les en-tetes de colonne triables (chevron + aria-sort).
+function syncSortUI() {
+  const { field, direction } = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+  const sortFilter = document.getElementById("sortFilter");
+  if (sortFilter) {
+    sortFilter.value = field === "date" ? (direction === "asc" ? "oldest" : "recent") : "";
+  }
+  document.querySelectorAll(".draft-table th[data-sort-field]").forEach((th) => {
+    const isActive = th.dataset.sortField === field;
+    th.classList.toggle("is-sorted-asc", isActive && direction === "asc");
+    th.classList.toggle("is-sorted-desc", isActive && direction === "desc");
+    th.setAttribute("aria-sort", isActive ? (direction === "asc" ? "ascending" : "descending") : "none");
+  });
+}
+
+// Delegation de clic sur les en-tetes triables : un clic sur un champ deja actif inverse
+// le sens, un clic sur un nouveau champ demarre en ascendant (desc pour "date", pour
+// rester coherent avec le tri "plus recent d'abord" historique par defaut).
+function bindSortableHeaders() {
+  document.querySelectorAll(".draft-table thead").forEach((thead) => {
+    if (thead.dataset.sortBound === "true") {
+      return;
+    }
+    thead.addEventListener("click", (event) => {
+      const th = event.target.closest("th[data-sort-field]");
+      if (!th) {
+        return;
+      }
+      const field = th.dataset.sortField;
+      const current = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+      const direction = current.field === field
+        ? (current.direction === "asc" ? "desc" : "asc")
+        : (field === "date" ? "desc" : "asc");
+      applyDashboardSort(field, direction);
+    });
+    thead.dataset.sortBound = "true";
+  });
+  syncSortUI();
+}
+
 function bindDashboardFilters() {
   const searchInput = document.getElementById("searchInput");
   const statusFilter = document.getElementById("statusFilter");
@@ -2185,52 +2271,45 @@ function bindDashboardFilters() {
     return;
   }
 
-  function resetPagination() {
-    assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
-    restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
-    historyDisplayCount = DASHBOARD_PAGE_SIZE;
-  }
+  bindSortableHeaders();
 
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   statusFilter.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   timingFilter.addEventListener("change", (event) => {
     dashboardFilters.timing = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   qualiteFilter.addEventListener("change", (event) => {
     dashboardFilters.qualite = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   serviceFilter.addEventListener("change", (event) => {
     dashboardFilters.service = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   sortFilter.addEventListener("change", (event) => {
-    dashboardFilters.sort = event.target.value || "recent";
-    resetPagination();
-    updateFilterBadge();
-    void renderDraftList();
+    applyDashboardSort("date", event.target.value === "oldest" ? "asc" : "desc");
   });
 
   resetButton.addEventListener("click", () => {
@@ -2239,13 +2318,13 @@ function bindDashboardFilters() {
     dashboardFilters.timing = "";
     dashboardFilters.qualite = "";
     dashboardFilters.service = "";
-    dashboardFilters.sort = "recent";
+    dashboardFilters.sort = { ...DASHBOARD_SORT_DEFAULT };
     if (searchInput) searchInput.value = "";
     if (statusFilter) statusFilter.value = "";
     if (timingFilter) timingFilter.value = "";
     if (qualiteFilter) qualiteFilter.value = "";
     if (serviceFilter) serviceFilter.value = "";
-    if (sortFilter) sortFilter.value = "recent";
+    syncSortUI();
     updateFilterBadge();
     void renderDraftList();
   });

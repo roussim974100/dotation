@@ -1454,6 +1454,37 @@ body.login-shell {
   color: var(--muted);
 }
 
+/* En-tetes triables (cf. bindSortableHeaders, storage.js) */
+.draft-table th[data-sort-field] {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.draft-table th[data-sort-field]:hover {
+  color: var(--brand);
+}
+
+.draft-table th[data-sort-field]::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  margin-left: 0.3em;
+  opacity: 0.35;
+}
+
+.draft-table th[data-sort-field].is-sorted-asc::after {
+  content: "\25B2"; /* triangle plein vers le haut */
+  opacity: 1;
+  color: var(--brand);
+}
+
+.draft-table th[data-sort-field].is-sorted-desc::after {
+  content: "\25BC"; /* triangle plein vers le bas */
+  opacity: 1;
+  color: var(--brand);
+}
+
 .draft-check-col {
   width: 42px;
   text-align: center;
