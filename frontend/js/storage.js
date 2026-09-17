@@ -432,11 +432,20 @@ function buildDashboardRow(draft, permissions) {
       ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
       : "Prise de fonction non renseignée";
 
-  return `
-    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
+  // La case a cocher (selection multiple) n'est utile/branchee que sur la vue "active"
+  // (bindSelectionActions n'est active que pour ce viewMode) : sur les historiques,
+  // rendre quand meme un <td class="draft-check-col"> decalerait toutes les colonnes
+  // d'un cran par rapport aux <th> de ces pages, qui n'ont pas de colonne case a cocher.
+  const checkboxCell = viewMode === "active"
+    ? `
       <td class="draft-check-col">
         ${(permissions.canExport || permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(title)}">` : ""}
-      </td>
+      </td>`
+    : "";
+
+  return `
+    <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
+      ${checkboxCell}
       <td data-label="Dossier">
         <div class="draft-title-wrap">
           <span class="draft-title">${escapeHtml(title)}</span>
