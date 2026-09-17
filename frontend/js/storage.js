@@ -768,11 +768,11 @@ function filterDraftsForCurrentView(drafts) {
   const viewMode = getDashboardViewMode();
 
   if (viewMode === "history_assignments") {
-    return drafts.filter((draft) => isCompletedAssignmentDraft(draft));
+    return applyDashboardFilters(drafts.filter((draft) => isCompletedAssignmentDraft(draft)));
   }
 
   if (viewMode === "history_restitutions") {
-    return drafts.filter((draft) => isCompletedRestitutionDraft(draft));
+    return applyDashboardFilters(drafts.filter((draft) => isCompletedRestitutionDraft(draft)));
   }
 
   if (viewMode === "restitutions_pending") {
