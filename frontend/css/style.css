@@ -14,6 +14,39 @@
   --radius-md: 14px;
   --font-ui: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   --font-brand: Georgia, "Times New Roman", serif;
+
+  /* Harmonisation Bootstrap sur le bleu maison : sans ca, .btn-primary rend en bleu
+     Bootstrap par defaut (#0d6efd), different du bleu institutionnel utilise partout
+     ailleurs (header, chips, barres de progression) -> deux bleus qui cohabitent. */
+  --bs-primary: var(--brand);
+  --bs-primary-rgb: 15, 91, 141;
+}
+
+/* .btn-primary / .btn-outline-primary consomment leurs propres variables --bs-btn-*
+   (valeurs figees a la compilation Sass de Bootstrap, --bs-primary seul ne suffit pas
+   a les faire changer) : on les recible explicitement sur le bleu maison. */
+.btn-primary {
+  --bs-btn-bg: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand-dark);
+  --bs-btn-hover-border-color: var(--brand-dark);
+  --bs-btn-active-bg: var(--brand-dark);
+  --bs-btn-active-border-color: var(--brand-dark);
+  --bs-btn-disabled-bg: var(--brand);
+  --bs-btn-disabled-border-color: var(--brand);
+  --bs-btn-focus-shadow-rgb: 15, 91, 141;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand);
+  --bs-btn-hover-border-color: var(--brand);
+  --bs-btn-active-bg: var(--brand);
+  --bs-btn-active-border-color: var(--brand);
+  --bs-btn-disabled-color: var(--brand);
+  --bs-btn-disabled-border-color: var(--brand);
+  --bs-btn-focus-shadow-rgb: 15, 91, 141;
 }
 
 * {
@@ -540,7 +573,7 @@ body.login-shell {
   flex: 1;
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .filter-toolbar__actions {
@@ -1296,6 +1329,17 @@ body.login-shell {
   margin-bottom: 0;
 }
 
+/* Affordance de clic : la ligne ouvre l'apercu rapide (bindQuickPreviews) sauf sur
+   boutons/liens/actions, deja exclus cote JS - le survol doit le signaler visuellement. */
+.draft-table tbody tr.draft-row {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.draft-table tbody tr.draft-row:hover {
+  background-color: var(--surface-alt);
+}
+
 /* Pagination du journal */
 .logs-pagination {
   display: flex;
@@ -1944,10 +1988,11 @@ button.export-menu__item {
   border-color: #f3ba87;
 }
 
+/* Violet distinct du bleu "returned" : les deux ne doivent jamais se confondre au scan rapide */
 .status-chip--awaiting_signature {
-  color: #18436d;
-  background: #ddefff;
-  border-color: #9cc7f0;
+  color: #4a2382;
+  background: #eee3fb;
+  border-color: #c6a8f0;
 }
 
 .status-chip--returned {
@@ -1956,10 +2001,11 @@ button.export-menu__item {
   border-color: #9cc7f0;
 }
 
+/* Teal distinct de l'orange "partial_assignment" : phase restitution vs phase attribution */
 .status-chip--partial_return {
-  color: #7a4312;
-  background: #ffe7d1;
-  border-color: #f3ba87;
+  color: #0b5c52;
+  background: #d9f5f2;
+  border-color: #8ed9d1;
 }
 
 .status-chip--cancelled {
@@ -1997,9 +2043,9 @@ button.export-menu__item {
 }
 
 .timing-chip--neutral {
-  color: #18436d;
-  background: #ddefff;
-  border-color: #9cc7f0;
+  color: #475569;
+  background: #eef1f4;
+  border-color: #cbd5e0;
 }
 
 .resource-progress {
@@ -3288,14 +3334,24 @@ button.export-menu__item {
   border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
 }
 
-[data-color-mode="dark"] .status-chip--partial_assignment,
-[data-color-mode="dark"] .status-chip--partial_return {
+[data-color-mode="dark"] .status-chip--partial_assignment {
   color: #e8a060;
   background: color-mix(in srgb, #8a4b12 25%, var(--surface));
   border-color: color-mix(in srgb, #c87830 40%, var(--border));
 }
 
-[data-color-mode="dark"] .status-chip--awaiting_signature,
+[data-color-mode="dark"] .status-chip--partial_return {
+  color: #5fd1c0;
+  background: color-mix(in srgb, #0b5c52 28%, var(--surface));
+  border-color: color-mix(in srgb, #1f9484 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--awaiting_signature {
+  color: #c9a6f0;
+  background: color-mix(in srgb, #4a2382 28%, var(--surface));
+  border-color: color-mix(in srgb, #7c4bc4 40%, var(--border));
+}
+
 [data-color-mode="dark"] .status-chip--returned {
   color: #7ab8e8;
   background: color-mix(in srgb, #18436d 28%, var(--surface));
@@ -3328,9 +3384,9 @@ button.export-menu__item {
 }
 
 [data-color-mode="dark"] .timing-chip--neutral {
-  color: #7ab8e8;
-  background: color-mix(in srgb, #18436d 28%, var(--surface));
-  border-color: color-mix(in srgb, #3a80b8 40%, var(--border));
+  color: var(--muted);
+  background: var(--surface-alt);
+  border-color: var(--border);
 }
 
 /* Progress bars */
