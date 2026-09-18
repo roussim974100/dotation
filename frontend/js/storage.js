@@ -473,6 +473,15 @@ function buildDashboardRow(draft, permissions) {
       </td>`
     : "";
 
+  // Sur les vues "finalisees" (history_assignments/history_restitutions), le statut
+  // est constant pour tous les dossiers affiches (toujours "active" ou toujours
+  // "returned") : la colonne Avancement n'y apporte aucune information, retiree
+  // en meme temps que son filtre (cf. commit 203fc9c).
+  const isHistoryView = viewMode === "history_assignments" || viewMode === "history_restitutions";
+  const avancementCell = isHistoryView
+    ? ""
+    : `<td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>`;
+
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
       ${checkboxCell}
@@ -486,7 +495,7 @@ function buildDashboardRow(draft, permissions) {
         ${startAtLabel ? `<div class="draft-meta">${startAtLabel}</div>` : ""}
       </td>
       <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
+      ${avancementCell}
       <td data-label="Pilotage">
         <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
         ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
