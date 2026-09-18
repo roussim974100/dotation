@@ -2331,7 +2331,7 @@ function bindDashboardFilters() {
   const sortFilter = document.getElementById("sortFilter");
   const resetButton = document.getElementById("resetFiltersBtn");
 
-  if (!searchInput || !statusFilter || !timingFilter || !qualiteFilter || !serviceFilter || !sortFilter || !resetButton) {
+  if (!searchInput || !timingFilter || !qualiteFilter || !serviceFilter || !sortFilter || !resetButton) {
     return;
   }
 
@@ -2344,7 +2344,7 @@ function bindDashboardFilters() {
     void renderDraftList();
   });
 
-  statusFilter.addEventListener("change", (event) => {
+  statusFilter?.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
     resetDashboardPagination();
     updateFilterBadge();
