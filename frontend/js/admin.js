@@ -662,6 +662,7 @@ function populateServiceForm(serviceId) {
   setNotice("serviceEditNotice", "Mettez à jour le libellé ou désactivez le service sans perdre l'historique des dossiers.", true);
   byId("service_label").value = service.label || "";
   byId("service_active").checked = Boolean(service.is_active);
+  byId("serviceFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resetResourceForm() {
@@ -713,6 +714,7 @@ function populateResourceForm(resourceId) {
   byId("resource_has_assignment_notes").checked = resource.has_assignment_notes !== false;
   syncResourceTrackingOptions();
   renderResourceFieldSchema(resource.field_schema || []);
+  byId("resourceFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderUserTable() {

@@ -630,6 +630,14 @@ async function populateUserMenuIdentity() {
     if (nameEl) nameEl.textContent = user.username || "";
     if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
     if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
+
+    const permissions = user.permissions || [];
+    if (permissions.includes("users.manage") || permissions.includes("*")) {
+      document.getElementById("adminLink")?.classList.remove("d-none");
+    }
+    if (user.groups?.includes("direction") || user.is_admin) {
+      document.getElementById("execDashboardLink")?.classList.remove("d-none");
+    }
   } catch (_) {
     // silently ignore
   }
