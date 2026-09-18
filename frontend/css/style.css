@@ -1953,6 +1953,7 @@ button.export-menu__item {
   background: color-mix(in srgb, var(--surface) 98%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  border-radius: var(--radius-md);
 }
 
 .dashboard-nav__link {
@@ -3305,9 +3306,25 @@ button.export-menu__item {
   color: var(--brand);
 }
 
+[data-color-mode="dark"] .workflow-dialog__item.is-done .workflow-dialog__state {
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #e88080;
+}
+
 /* Branding save loader */
 [data-color-mode="dark"] .branding-save-loader__item.is-active .branding-save-loader__state {
   color: var(--brand);
+}
+
+[data-color-mode="dark"] .branding-save-loader__item.is-done .branding-save-loader__state {
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .branding-save-loader__item.is-error .branding-save-loader__state {
+  color: #e88080;
 }
 
 /* Couleurs texte fixes */
@@ -3323,6 +3340,11 @@ button.export-menu__item {
 
 [data-color-mode="dark"] .draft-title {
   color: var(--text);
+}
+
+[data-color-mode="dark"] .user-menu__item--danger:hover,
+[data-color-mode="dark"] .user-menu__item--danger:focus {
+  color: #e88080;
 }
 
 [data-color-mode="dark"] .draft-unc-badge {
@@ -4488,6 +4510,19 @@ select[data-locked-from-source]:focus {
   outline-offset: 1px;
 }
 
+[data-color-mode="dark"] input[data-locked-from-source],
+[data-color-mode="dark"] select[data-locked-from-source] {
+  background-color: var(--surface-alt);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] input[data-locked-from-source]:focus,
+[data-color-mode="dark"] select[data-locked-from-source]:focus {
+  background-color: var(--surface-alt);
+  border-color: var(--border);
+}
+
 /* Badge visuel pour indiquer les champs verrouillés */
 .section-personne [data-locked-from-source]::after {
   content: " 🔒";
@@ -4664,4 +4699,14 @@ main {
 
 [data-color-mode="dark"] .sig-success__summary {
   background: var(--surface-alt);
+}
+
+[data-color-mode="dark"] .sig-success__decision-confirmed {
+  color: #6bc990;
+  background: color-mix(in srgb, #0a4d28 25%, var(--surface));
+}
+
+[data-color-mode="dark"] .sig-success__decision-reservation {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
 }
