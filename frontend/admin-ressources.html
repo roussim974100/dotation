@@ -177,7 +177,6 @@
           <div class="col-12">
             <div class="header-actions">
               <button class="btn btn-primary" id="saveResourceBtn" type="button">Ajouter la ressource</button>
-              <button class="btn btn-outline-secondary d-none" id="cancelResourceEditBtn" type="button">Annuler la modification</button>
             </div>
           </div>
         </div>
@@ -198,6 +197,107 @@
           </table>
         </div>
       </section>
+
+      <div class="password-generator-modal d-none" id="resourceEditModal" aria-hidden="true">
+        <div class="password-generator-modal__backdrop" data-resource-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="resourceEditModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Ressource</p>
+              <h2 class="section-title" id="resourceEditModalTitle">Modifier la ressource</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-resource-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <input id="modalResourceCode" type="hidden">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="modalResourceLabel">Libellé</label>
+                <input class="form-control" id="modalResourceLabel" placeholder="Badge visiteur">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="modalResourceCategory">Catégorie</label>
+                <select class="form-select" id="modalResourceCategory">
+                  <option value="materiel">Matériel</option>
+                  <option value="immateriel">Immatériel</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="modalResourceIssuer">Service émetteur</label>
+                <select class="form-select" id="modalResourceIssuer">
+                  <option value="">Sélectionner un service</option>
+                </select>
+              </div>
+              <div class="col-12 d-flex gap-3">
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="modalResourceRequiresReturn">
+                  <span class="form-check-label">Restituable</span>
+                </label>
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="modalResourceActive">
+                  <span class="form-check-label">Active</span>
+                </label>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="modalResourceDescription">Description</label>
+                <textarea class="form-control" id="modalResourceDescription" rows="2" placeholder="Résumé court de la ressource et de son usage"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modalResourceDisplayOrder">Position dans la liste</label>
+                <select class="form-select" id="modalResourceDisplayOrder">
+                  <option value="10">Tout en haut</option>
+                  <option value="30">Début de liste</option>
+                  <option value="60" selected>Position standard</option>
+                  <option value="90">Plus bas</option>
+                  <option value="120">Fin de liste</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <div class="content-card admin-inner-card">
+                  <div class="section-heading mb-3">
+                    <div>
+                      <p class="panel-eyebrow">Suivi</p>
+                      <h3 class="section-title">Suivi à l'attribution</h3>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-3">
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentDate">
+                      <span class="form-check-label">Afficher la date d'attribution</span>
+                    </label>
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentCondition">
+                      <span class="form-check-label">Afficher l'état à la remise</span>
+                    </label>
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentNotes">
+                      <span class="form-check-label">Afficher l'observation de remise</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="content-card admin-inner-card">
+                  <div class="section-heading mb-3">
+                    <div>
+                      <p class="panel-eyebrow">Champs</p>
+                      <h3 class="section-title">Structure de la ressource</h3>
+                    </div>
+                    <div class="header-actions">
+                      <button class="btn btn-outline-primary" id="modalAddResourceFieldBtn" type="button">Ajouter un champ</button>
+                    </div>
+                  </div>
+                  <div id="modalResourceFieldRows" class="resource-field-builder"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-resource-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="modalSaveResourceBtn" type="button">Enregistrer</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </main>

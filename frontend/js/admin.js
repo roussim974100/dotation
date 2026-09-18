@@ -74,9 +74,7 @@ function slugifyFieldKey(value) {
     .replace(/^_+|_+$/g, "");
 }
 
-function syncResourceCodeFromLabel(force = false) {
-  const labelInput = byId("resource_label");
-  const codeInput = byId("resource_code");
+function syncResourceCodeFromLabel(force = false, labelInput = byId("resource_label"), codeInput = byId("resource_code")) {
   if (!labelInput || !codeInput) {
     return;
   }
@@ -86,8 +84,7 @@ function syncResourceCodeFromLabel(force = false) {
   codeInput.value = slugifyFieldKey(labelInput.value);
 }
 
-function renderResourceIssuerOptions(selectedValue = "") {
-  const select = byId("resource_issuer");
+function renderResourceIssuerOptions(selectedValue = "", select = byId("resource_issuer")) {
   if (!select) {
     return;
   }
@@ -107,10 +104,8 @@ function renderResourceIssuerOptions(selectedValue = "") {
   select.value = normalizedSelectedValue;
 }
 
-function syncResourceTrackingOptions() {
-  const category = byId("resource_category")?.value || "materiel";
-  const conditionInput = byId("resource_has_assignment_condition");
-  const notesInput = byId("resource_has_assignment_notes");
+function syncResourceTrackingOptions(categoryInput = byId("resource_category"), conditionInput = byId("resource_has_assignment_condition"), notesInput = byId("resource_has_assignment_notes")) {
+  const category = categoryInput?.value || "materiel";
   if (!conditionInput || !notesInput) {
     return;
   }
@@ -136,8 +131,7 @@ function formatResourceTrackingSummary(resource) {
   return labels.length ? labels.join(", ") : "Aucun suivi";
 }
 
-function renderResourceDisplayOrderOptions(selectedValue = 60) {
-  const select = byId("resource_display_order");
+function renderResourceDisplayOrderOptions(selectedValue = 60, select = byId("resource_display_order")) {
   if (!select) {
     return;
   }
@@ -563,8 +557,8 @@ async function handleResourceFieldRemove(row) {
   }
 }
 
-function bindResourceFieldRows() {
-  document.querySelectorAll(".resource-field-row").forEach((row) => {
+function bindResourceFieldRows(containerId = "resourceFieldRows") {
+  byId(containerId)?.querySelectorAll(".resource-field-row").forEach((row) => {
     if (row.dataset.bound === "true") {
       return;
     }
@@ -593,17 +587,21 @@ function bindResourceFieldRows() {
   });
 }
 
-function appendResourceFieldRow(field = {}) {
-  const container = byId("resourceFieldRows");
+function appendResourceFieldRow(field = {}, containerId = "resourceFieldRows") {
+  const container = byId(containerId);
   if (!container) {
     return;
   }
   container.insertAdjacentHTML("beforeend", createResourceFieldRow(field));
-  bindResourceFieldRows();
+  bindResourceFieldRows(containerId);
 }
 
-function collectResourceFieldSchema() {
-  return Array.from(document.querySelectorAll(".resource-field-row")).map((row, index) => {
+function collectResourceFieldSchema(containerId = "resourceFieldRows") {
+  const container = byId(containerId);
+  if (!container) {
+    return [];
+  }
+  return Array.from(container.querySelectorAll(".resource-field-row")).map((row, index) => {
     const label = row.querySelector(".resource-field-label")?.value.trim() || "";
     // Cle figee a la creation du champ (cf. createResourceFieldRow) : on ne re-derive
     // du libelle que si le champ est nouveau (pas encore de cle enregistree).
@@ -628,13 +626,13 @@ function collectResourceFieldSchema() {
   }).filter((field) => field.label && field.key);
 }
 
-function renderResourceFieldSchema(fields = []) {
-  const container = byId("resourceFieldRows");
+function renderResourceFieldSchema(fields = [], containerId = "resourceFieldRows") {
+  const container = byId(containerId);
   if (!container) {
     return;
   }
   container.innerHTML = "";
-  fields.forEach((field) => appendResourceFieldRow(field));
+  fields.forEach((field) => appendResourceFieldRow(field, containerId));
 }
 
 function resetServiceForm() {
@@ -704,9 +702,6 @@ function resetResourceForm() {
     return;
   }
   editingResourceId = null;
-  byId("resourceFormTitle").textContent = "Ressources attribuables";
-  byId("saveResourceBtn").textContent = "Ajouter la ressource";
-  byId("cancelResourceEditBtn").classList.add("d-none");
   setNotice("resourceEditNotice");
   byId("resource_code").value = "";
   byId("resource_code").dataset.manual = "";
@@ -726,29 +721,89 @@ function resetResourceForm() {
 
 function populateResourceForm(resourceId) {
   const resource = currentResources.find((item) => item.id === resourceId);
-  if (!resource || !byId("resourceFormTitle")) {
+  if (!resource) {
     return;
   }
   editingResourceId = resource.id;
-  byId("resourceFormTitle").textContent = `Modifier la ressource ${resource.label}`;
-  byId("saveResourceBtn").textContent = "Enregistrer les modifications";
-  byId("cancelResourceEditBtn").classList.remove("d-none");
-  setNotice("resourceEditNotice", "Définissez ici les champs qui devront être renseignés quand la ressource est attribuée.", true);
-  byId("resource_code").value = resource.code || "";
-  byId("resource_code").dataset.manual = "true";
-  byId("resource_label").value = resource.label || "";
-  byId("resource_category").value = resource.category || "materiel";
-  renderResourceIssuerOptions(resource.issuer_service || "");
-  byId("resource_description").value = resource.description || "";
-  renderResourceDisplayOrderOptions(resource.display_order || 60);
-  byId("resource_requires_return").checked = Boolean(resource.requires_return);
-  byId("resource_active").checked = Boolean(resource.is_active);
-  byId("resource_has_assignment_date").checked = resource.has_assignment_date !== false;
-  byId("resource_has_assignment_condition").checked = Boolean(resource.has_assignment_condition);
-  byId("resource_has_assignment_notes").checked = resource.has_assignment_notes !== false;
-  syncResourceTrackingOptions();
-  renderResourceFieldSchema(resource.field_schema || []);
-  byId("resourceFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  const modalLabel = byId("modalResourceLabel");
+  const modalCode = byId("modalResourceCode");
+  const modalCategory = byId("modalResourceCategory");
+  const modalIssuer = byId("modalResourceIssuer");
+  const modalCondition = byId("modalResourceHasAssignmentCondition");
+  const modalNotes = byId("modalResourceHasAssignmentNotes");
+  modalCode.value = resource.code || "";
+  modalCode.dataset.manual = "true";
+  modalLabel.value = resource.label || "";
+  modalCategory.value = resource.category || "materiel";
+  renderResourceIssuerOptions(resource.issuer_service || "", modalIssuer);
+  byId("modalResourceDescription").value = resource.description || "";
+  renderResourceDisplayOrderOptions(resource.display_order || 60, byId("modalResourceDisplayOrder"));
+  byId("modalResourceRequiresReturn").checked = Boolean(resource.requires_return);
+  byId("modalResourceActive").checked = Boolean(resource.is_active);
+  byId("modalResourceHasAssignmentDate").checked = resource.has_assignment_date !== false;
+  modalCondition.checked = Boolean(resource.has_assignment_condition);
+  modalNotes.checked = resource.has_assignment_notes !== false;
+  syncResourceTrackingOptions(modalCategory, modalCondition, modalNotes);
+  renderResourceFieldSchema(resource.field_schema || [], "modalResourceFieldRows");
+  openResourceEditModal();
+}
+
+function openResourceEditModal() {
+  const modal = byId("resourceEditModal");
+  if (modal) {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeResourceEditModal() {
+  const modal = byId("resourceEditModal");
+  if (modal) {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingResourceId = null;
+}
+
+async function saveResourceFromModal() {
+  syncResourceCodeFromLabel(false, byId("modalResourceLabel"), byId("modalResourceCode"));
+  const payload = {
+    code: byId("modalResourceCode")?.value.trim() || "",
+    label: byId("modalResourceLabel")?.value.trim() || "",
+    description: byId("modalResourceDescription")?.value.trim() || "",
+    category: byId("modalResourceCategory")?.value || "materiel",
+    issuer_service: byId("modalResourceIssuer")?.value || "",
+    requires_return: Boolean(byId("modalResourceRequiresReturn")?.checked),
+    has_assignment_date: Boolean(byId("modalResourceHasAssignmentDate")?.checked),
+    has_assignment_condition: Boolean(byId("modalResourceHasAssignmentCondition")?.checked),
+    has_assignment_notes: Boolean(byId("modalResourceHasAssignmentNotes")?.checked),
+    display_order: Number.parseInt(byId("modalResourceDisplayOrder")?.value || "100", 10) || 100,
+    is_active: Boolean(byId("modalResourceActive")?.checked),
+    field_schema: collectResourceFieldSchema("modalResourceFieldRows")
+  };
+  if (!payload.label) {
+    showToast("Le libellé de la ressource est obligatoire.", "error");
+    return;
+  }
+  if (!payload.code) {
+    showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
+    return;
+  }
+  if (!editingResourceId) {
+    showToast("Erreur : aucune ressource en cours d'édition", "error");
+    return;
+  }
+  try {
+    await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+    showToast("Ressource mise à jour.");
+    closeResourceEditModal();
+    await loadResources();
+  } catch (error) {
+    showToast(`Impossible d'enregistrer la ressource : ${error.message}`, "error");
+  }
 }
 
 function renderUserTable() {
@@ -1137,17 +1192,10 @@ async function saveResource() {
     showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
     return;
   }
-  if (!editingResourceId) {
-    await adminRequest("/api/admin/resources", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  } else {
-    await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-  }
+  await adminRequest("/api/admin/resources", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
   resetResourceForm();
   await loadResources();
 }
@@ -1171,7 +1219,7 @@ async function deleteResource(resourceId) {
     method: "DELETE"
   });
   if (editingResourceId === resourceId) {
-    resetResourceForm();
+    closeResourceEditModal();
   }
   await loadResources();
 }
@@ -1295,17 +1343,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     byId("saveResourceBtn")?.addEventListener("click", async () => {
-      const wasEditingResource = Boolean(editingResourceId);
       try {
         await saveResource();
-        alert(wasEditingResource ? "Ressource mise à jour." : "Ressource ajoutée.");
+        alert("Ressource ajoutée.");
       } catch (error) {
         alert(`Impossible d'enregistrer la ressource : ${error.message}`);
       }
     });
 
-    byId("cancelResourceEditBtn")?.addEventListener("click", () => {
-      resetResourceForm();
+    byId("modalAddResourceFieldBtn")?.addEventListener("click", () => {
+      appendResourceFieldRow({}, "modalResourceFieldRows");
+    });
+
+    byId("modalResourceCategory")?.addEventListener("change", () => {
+      syncResourceTrackingOptions(byId("modalResourceCategory"), byId("modalResourceHasAssignmentCondition"), byId("modalResourceHasAssignmentNotes"));
+    });
+
+    byId("modalSaveResourceBtn")?.addEventListener("click", async () => {
+      await saveResourceFromModal();
+    });
+
+    document.querySelectorAll("[data-resource-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeResourceEditModal();
+      });
     });
 
     initPasswordGeneratorModal();
