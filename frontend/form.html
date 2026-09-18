@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <!-- En-tête de la fiche d'attribution. -->
 <header class="app-header app-header--compact">
   <div class="container app-header__inner">
@@ -44,7 +45,7 @@
 </header>
 
 <!-- Formulaire métier principal : identité, ressources, validation et impression. -->
-<main class="container py-4 py-lg-5">
+<main id="main" class="container py-4 py-lg-5">
   <div id="pageLoader" class="page-loader">
     <div class="page-loader__panel">
       <div class="page-loader__spinner"></div>
@@ -119,6 +120,7 @@
             <select class="form-select" id="service" name="service">
               <option value="">Sélectionner un service</option>
             </select>
+            <label class="visually-hidden" for="service_custom">Autre service</label>
             <input class="form-control mt-2 d-none" id="service_custom" name="service_custom" placeholder="Autre service">
           </div>
           <div class="col-md-6 col-lg-3" id="fonctionFieldBlock">
@@ -138,6 +140,7 @@
             <select class="form-select" id="service_destination" name="service_destination">
               <option value="">Sélectionner un service</option>
             </select>
+            <label class="visually-hidden" for="service_destination_custom">Service de destination</label>
             <input class="form-control mt-2 d-none" id="service_destination_custom" name="service_destination_custom" placeholder="Service de destination">
           </div>
         </div>
@@ -197,7 +200,7 @@
 
         <div class="resource-kind-block">
           <div class="unc-copy-from mb-3">
-            <p class="form-label small text-muted mb-1">Référence AD — Copier les droits de</p>
+            <label class="form-label small text-muted mb-1" for="uncCopySearch">Référence AD — Copier les droits de</label>
             <div class="position-relative">
               <input type="text" id="uncCopySearch" class="form-control form-control-sm" placeholder="Rechercher un agent (nom, prénom…)" autocomplete="off">
               <div id="uncCopyResults" class="list-group shadow-sm position-absolute w-100 d-none" style="z-index:200;top:100%"></div>

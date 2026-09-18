@@ -53,6 +53,24 @@
   box-sizing: border-box;
 }
 
+/* Lien d'evitement RGAA (12.1/12.2) : invisible tant qu'il n'a pas le focus clavier */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 0;
+  z-index: 2000;
+  padding: 0.75rem 1.25rem;
+  background: var(--brand-dark);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-md) 0;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 body,
 button,
 input,
@@ -4466,7 +4484,8 @@ select[data-locked-from-source]:focus {
   background-color: #f8f9fa;
   border-color: #dee2e6;
   box-shadow: none;
-  outline: none;
+  outline: 2px solid var(--border);
+  outline-offset: 1px;
 }
 
 /* Badge visuel pour indiquer les champs verrouillés */
