@@ -474,11 +474,11 @@ function createResourceFieldRow(field = {}) {
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
-          <input class="form-control resource-field-label" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série" ${isHidden ? "disabled" : ""}>
+          <input class="form-control resource-field-label" aria-label="Libellé du champ" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série" ${isHidden ? "disabled" : ""}>
         </div>
         <div class="col-md-4">
           <label class="form-label">Type</label>
-          <select class="form-select resource-field-type" ${isHidden ? "disabled" : ""}>
+          <select class="form-select resource-field-type" aria-label="Type du champ" ${isHidden ? "disabled" : ""}>
             <option value="text" ${field.type === "text" ? "selected" : ""}>Texte</option>
             <option value="textarea" ${field.type === "textarea" ? "selected" : ""}>Texte long</option>
             <option value="select" ${field.type === "select" ? "selected" : ""}>Liste déroulante</option>
