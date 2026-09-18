@@ -2,7 +2,7 @@
 // Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-const APP_BUILD_VERSION = "3.22.0-dev";
+const APP_BUILD_VERSION = "3.22.1-dev";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -179,7 +179,7 @@ function bindHomeBrandLinks() {
 }
 
 function ensureAppFooter() {
-  if (document.querySelector("[data-app-footer]")) {
+  if (isPublicSignaturePage() || document.querySelector("[data-app-footer]")) {
     return;
   }
 
@@ -693,10 +693,21 @@ function applyBrandingTheme(settings) {
   root.style.setProperty("--border", palette.border);
 }
 
+// Pages de signature publiques (lien envoye a un signataire externe, pas un
+// utilisateur de l'appli) : ne jamais y afficher de metadonnees internes
+// (version, pastille d'environnement, navigation/support de l'appli).
+function isPublicSignaturePage() {
+  return document.body?.dataset.publicSignaturePage === "true";
+}
+
 // Pastille d'environnement dans l'en-tete : reconnaitre en un coup d'oeil qu'on est
 // sur la branche dev (utile en preprod pour savoir ce qui a ete deploye). Injectee en
 // JS (pas dans le HTML) pour ne pas dupliquer le markup sur chaque page.
 function applyEnvironmentBadge() {
+  if (isPublicSignaturePage()) {
+    document.getElementById("envBadge")?.remove();
+    return;
+  }
   const suffix = (APP_BUILD_VERSION.split("-")[1] || "").toLowerCase();
   if (suffix !== "dev") {
     document.getElementById("envBadge")?.remove();
