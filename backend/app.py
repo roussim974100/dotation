@@ -173,10 +173,11 @@ def seed_default_groups(connection):
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe déjà : mettre à jour label/description et permissions
+            # Groupe existe déjà : mettre à jour label/description, sans écraser
+            # les permissions (potentiellement personnalisées par un admin)
             connection.execute(
-                "UPDATE groups SET label = ?, description = ?, permissions_json = ?, data_scope = ?, updated_at = ? WHERE key = ?",
-                (label, description, json.dumps(permissions), data_scope, now, key)
+                "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
+                (label, description, now, key)
             )
         else:
             # Groupe n'existe pas : créer avec les permissions par défaut
@@ -231,10 +232,11 @@ def migrate_missing_groups(connection):
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe : mettre à jour les permissions
+            # Groupe existe : mettre à jour label/description, sans écraser
+            # les permissions (potentiellement personnalisées par un admin)
             connection.execute(
-                "UPDATE groups SET label = ?, description = ?, permissions_json = ?, data_scope = ?, updated_at = ? WHERE key = ?",
-                (label, description, json.dumps(permissions), data_scope, now, key)
+                "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
+                (label, description, now, key)
             )
         else:
             # Groupe n'existe pas : créer

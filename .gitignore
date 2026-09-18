@@ -48,3 +48,6 @@ graphify-out/obsidian/
 
 # Claude Code local screenshots
 .claude/*.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

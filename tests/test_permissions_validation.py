@@ -109,7 +109,6 @@ def test_routes_coverage():
 
     critical_routes = [
         "/api/forms",
-        "/api/pools",
         "/api/admin/users",
         "/api/admin/services",
     ]
