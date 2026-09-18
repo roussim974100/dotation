@@ -419,14 +419,14 @@ def persist_form(payload, allow_locked_update=False):
     return get_form(form_id)
 
 
-def row_to_summary(row):
+def row_to_summary(row, warning_days=None):
     payload = {}
     try:
         payload = json.loads(row["payload_json"] or "{}")
     except (TypeError, json.JSONDecodeError):
         payload = {}
     effective_status = compute_effective_workflow_status(payload)
-    progress = summarize_assignment_progress(payload)
+    progress = summarize_assignment_progress(payload, warning_days)
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],
@@ -486,6 +486,7 @@ def get_form(form_id):
             (form_id,)
         ).fetchall()
         selected_item_ids = {r["item_id"] for r in selections}
+        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
 
     payload = json.loads(form_row["payload_json"])
 
@@ -519,7 +520,7 @@ def get_form(form_id):
         payload = mask_payload(payload)
 
     return {
-        "summary": row_to_summary(form_row),
+        "summary": row_to_summary(form_row, warning_days),
         "data": payload,
         "items": [
             {

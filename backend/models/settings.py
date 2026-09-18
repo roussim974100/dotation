@@ -30,6 +30,7 @@ DEFAULT_APP_SETTINGS = {
     "beneficiary_types": "agent:Agent,elu:Élu(e)",
     "setup_completed": "0",
     "restitution_phase1_unlock_days": "1",
+    "timing_warning_days": "3",
 }
 
 VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
@@ -335,6 +336,7 @@ def build_public_settings_payload(settings=None):
         "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
+        "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),
     }
 
 

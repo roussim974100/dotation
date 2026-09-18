@@ -325,7 +325,8 @@ function summarizeDraftProgressFromPayload(payload = {}) {
   if (daysUntilStart < 0) {
     return { completed, total, ratio: completed / total, timingStatus: "late", timingLabel: "En retard" };
   }
-  if (daysUntilStart <= 3) {
+  const warningDays = Number(window.APP_BRANDING?.timingWarningDays) || 3;
+  if (daysUntilStart <= warningDays) {
     return { completed, total, ratio: completed / total, timingStatus: "warning", timingLabel: "En danger" };
   }
   return { completed, total, ratio: completed / total, timingStatus: "ok", timingLabel: "Dans les temps" };

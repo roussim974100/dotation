@@ -5,6 +5,7 @@ from utils import (
     slugify_field_key, generate_id,
     format_export_datetime, format_assignment_condition_label,
 )
+from models.settings import DEFAULT_APP_SETTINGS
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +294,9 @@ def extract_items(payload):
     return extracted
 
 
-def summarize_assignment_progress(payload):
+def summarize_assignment_progress(payload, warning_days=None):
+    if warning_days is None:
+        warning_days = int(DEFAULT_APP_SETTINGS["timing_warning_days"])
     all_items = extract_items(payload)
     requested_items = [item for item in all_items if item.get("assigned")]
     total_requested = len(requested_items)
@@ -359,7 +362,7 @@ def summarize_assignment_progress(payload):
     elif days_until_start < 0:
         timing_status = "late"
         timing_label = "En retard"
-    elif days_until_start <= 3:
+    elif days_until_start <= warning_days:
         timing_status = "warning"
         timing_label = "En danger"
     else:

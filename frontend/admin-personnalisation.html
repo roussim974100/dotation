@@ -201,6 +201,21 @@
             <div class="form-text">0 = motif toujours obligatoire. 1 = libre pendant 24h (défaut).</div>
           </div>
         </div>
+
+        <div class="section-heading mt-4">
+          <div>
+            <p class="panel-eyebrow">Tableau de bord</p>
+            <h3 class="section-title">Pilotage des dossiers</h3>
+            <p class="panel-text">Nombre de jours avant la prise de fonction en dessous duquel un dossier non finalisé passe en "En danger" dans le pilotage du dashboard.</p>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="brandingTimingWarningDays">Seuil d'alerte pilotage (jours)</label>
+            <input class="form-control" id="brandingTimingWarningDays" type="number" min="1" max="60" value="3">
+            <div class="form-text">3 jours par défaut. En dessous de ce seuil, un dossier incomplet passe en "En danger".</div>
+          </div>
+        </div>
       </section>
     </div>
   </div>

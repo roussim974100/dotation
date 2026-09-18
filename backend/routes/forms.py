@@ -259,8 +259,9 @@ def list_forms():
             "SELECT * FROM dotation_forms" + where_clause + " ORDER BY updated_at DESC",
             params,
         ).fetchall()
+        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
 
-    resp = jsonify([row_to_summary(row) for row in rows])
+    resp = jsonify([row_to_summary(row, warning_days) for row in rows])
     resp.headers["ETag"] = etag
     return resp
 
