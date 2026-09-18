@@ -56,6 +56,123 @@ const DASHBOARD_SORT_VALUE_GETTERS = {
     : 0,
 };
 
+// Definition centralisee des colonnes des tableaux dashboard : une seule source pour
+// le libelle (th desktop + data-label mobile), le champ de tri et le rendu de cellule.
+// Remplace les <th> autrefois dupliques et codes en dur sur chacune des 4 pages
+// dashboard (et qui avaient deja derive : "Qualite" appelee "Etat" sur une page,
+// "Avancement" appele "Etat" sur une autre, pour les memes donnees).
+const DASHBOARD_COLUMNS = {
+  checkbox: {
+    label: null,
+    sortField: null,
+    headClass: "draft-check-col",
+    headHtml: () => `<input id="selectAllDrafts" class="form-check-input" type="checkbox" aria-label="Tout sélectionner">`,
+    render: (ctx) => `
+      <td class="draft-check-col">
+        ${(ctx.permissions.canExport || ctx.permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${ctx.draft.id}" aria-label="Sélectionner ${escapeHtml(ctx.title)}">` : ""}
+      </td>`
+  },
+  dossier: {
+    label: "Dossier",
+    sortField: "title",
+    render: (ctx) => `
+      <td data-label="Dossier">
+        <div class="draft-title-wrap">
+          <span class="draft-title">${escapeHtml(ctx.title)}</span>
+          ${(ctx.draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${ctx.draft.data.unc_acces.length} chemin${ctx.draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
+        </div>
+        <div class="draft-meta">${escapeHtml(ctx.dossierTypeLabel)}</div>
+        <div class="draft-meta">${escapeHtml(ctx.draft.nom || ctx.draft.data?.beneficiaire?.nom || "")} ${escapeHtml(ctx.draft.prenom || ctx.draft.data?.beneficiaire?.prenom || "")}</div>
+        ${ctx.startAtLabel ? `<div class="draft-meta">${ctx.startAtLabel}</div>` : ""}
+      </td>`
+  },
+  qualite: {
+    label: "Qualité",
+    sortField: "qualite",
+    render: (ctx) => `<td data-label="Qualité">${escapeHtml(formatQualiteLabel(ctx.draft))}</td>`
+  },
+  avancement: {
+    label: "Avancement",
+    sortField: "status",
+    render: (ctx) => `<td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(ctx.draft.status || "draft")}" data-status-preview-id="${ctx.draft.id}">${escapeHtml(formatDraftStatusLabel(ctx.draft))}</span></td>`
+  },
+  pilotage: {
+    label: "Pilotage",
+    sortField: "timing",
+    render: (ctx) => `
+      <td data-label="Pilotage">
+        <span class="timing-chip timing-chip--${escapeHtml(ctx.progress.timingStatus)}" data-timing-preview-id="${ctx.draft.id}">${escapeHtml(ctx.progress.timingLabel)}</span>
+        ${ctx.timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(ctx.timingOffsetLabel)}</div>` : ""}
+      </td>`
+  },
+  progression: {
+    label: "Progression",
+    sortField: "progress",
+    render: (ctx) => `
+      <td data-label="Progression">
+        <div class="resource-progress">
+          <div class="resource-progress__fraction">${ctx.progress.completed}/${ctx.progress.total}</div>
+          <div class="resource-progress__track">
+            <div class="resource-progress__bar" style="width:${ctx.progressPercent}%"></div>
+          </div>
+        </div>
+      </td>`
+  },
+  recuperation: {
+    label: "Récupération",
+    sortField: "recovery",
+    render: (ctx) => `<td data-label="Récupération">${ctx.recoveryBadge || ""}</td>`
+  },
+  derniere_modification: {
+    label: "Dernière modification",
+    sortField: "date",
+    render: (ctx) => `<td data-label="Dernière modification">${escapeHtml(formatDate(ctx.draft.updatedAt))}</td>`
+  },
+  actions: {
+    label: "Actions",
+    sortField: null,
+    headClass: "text-end",
+    render: (ctx) => `
+      <td data-label="Actions" class="draft-actions-cell">
+        <div class="draft-actions">
+          ${buildDraftActionButtons(ctx.draft, ctx.permissions)}
+        </div>
+      </td>`
+  }
+};
+
+// Colonnes visibles par vue, dans l'ordre d'affichage.
+const DASHBOARD_VIEW_COLUMNS = {
+  active: ["checkbox", "dossier", "qualite", "avancement", "pilotage", "progression", "derniere_modification", "actions"],
+  restitutions_pending: ["dossier", "qualite", "avancement", "pilotage", "progression", "recuperation", "derniere_modification", "actions"],
+  history_assignments: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
+  history_restitutions: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
+};
+
+function getDashboardViewColumns() {
+  return DASHBOARD_VIEW_COLUMNS[getDashboardViewMode()] || DASHBOARD_VIEW_COLUMNS.active;
+}
+
+function renderDashboardTableHead(containerId) {
+  const thead = document.getElementById(containerId);
+  if (!thead) {
+    return;
+  }
+  const cells = getDashboardViewColumns().map((key) => {
+    const col = DASHBOARD_COLUMNS[key];
+    if (!col) {
+      return "";
+    }
+    if (col.headHtml) {
+      return `<th class="${col.headClass || ""}">${col.headHtml()}</th>`;
+    }
+    const classAttr = col.headClass ? ` class="${col.headClass}"` : "";
+    const sortAttr = col.sortField ? ` data-sort-field="${col.sortField}"` : "";
+    return `<th${sortAttr}${classAttr}>${escapeHtml(col.label || "")}</th>`;
+  }).join("");
+  thead.innerHTML = `<tr>${cells}</tr>`;
+}
+
 function hasActiveFilters() {
   return Boolean(
     dashboardFilters.search || dashboardFilters.status || dashboardFilters.timing
@@ -405,36 +522,15 @@ function buildRestitutionsPendingRow(draft, permissions) {
     }
   }
 
+  const ctx = {
+    draft, permissions, progress, progressPercent, title, dossierTypeLabel, recoveryBadge,
+    startAtLabel: "", timingOffsetLabel: ""
+  };
+  const cells = getDashboardViewColumns().map((key) => DASHBOARD_COLUMNS[key]?.render(ctx) || "").join("");
+
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
-      <td data-label="Dossier">
-        <div class="draft-title-wrap">
-          <span class="draft-title">${escapeHtml(title)}</span>
-          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
-        </div>
-        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
-        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-      </td>
-      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
-      <td data-label="Pilotage">
-        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
-      </td>
-      <td data-label="Progression">
-        <div class="resource-progress">
-          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
-          <div class="resource-progress__track">
-            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
-          </div>
-        </div>
-      </td>
-      <td data-label="Récupération">${recoveryBadge}</td>
-      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
-      <td data-label="Actions" class="draft-actions-cell">
-        <div class="draft-actions">
-          ${buildDraftActionButtons(draft, permissions)}
-        </div>
-      </td>
+      ${cells}
     </tr>
   `;
 }
@@ -462,58 +558,15 @@ function buildDashboardRow(draft, permissions) {
       ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
       : "Prise de fonction non renseignée";
 
-  // La case a cocher (selection multiple) n'est utile/branchee que sur la vue "active"
-  // (bindSelectionActions n'est active que pour ce viewMode) : sur les historiques,
-  // rendre quand meme un <td class="draft-check-col"> decalerait toutes les colonnes
-  // d'un cran par rapport aux <th> de ces pages, qui n'ont pas de colonne case a cocher.
-  const checkboxCell = viewMode === "active"
-    ? `
-      <td class="draft-check-col">
-        ${(permissions.canExport || permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(title)}">` : ""}
-      </td>`
-    : "";
-
-  // Sur les vues "finalisees" (history_assignments/history_restitutions), le statut
-  // est constant pour tous les dossiers affiches (toujours "active" ou toujours
-  // "returned") : la colonne Avancement n'y apporte aucune information, retiree
-  // en meme temps que son filtre (cf. commit 203fc9c).
-  const isHistoryView = viewMode === "history_assignments" || viewMode === "history_restitutions";
-  const avancementCell = isHistoryView
-    ? ""
-    : `<td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>`;
+  const ctx = {
+    draft, permissions, progress, progressPercent, title, dossierTypeLabel, startAtLabel, timingOffsetLabel,
+    recoveryBadge: ""
+  };
+  const cells = getDashboardViewColumns().map((key) => DASHBOARD_COLUMNS[key]?.render(ctx) || "").join("");
 
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
-      ${checkboxCell}
-      <td data-label="Dossier">
-        <div class="draft-title-wrap">
-          <span class="draft-title">${escapeHtml(title)}</span>
-          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
-        </div>
-        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
-        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-        ${startAtLabel ? `<div class="draft-meta">${startAtLabel}</div>` : ""}
-      </td>
-      <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
-      ${avancementCell}
-      <td data-label="Pilotage">
-        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
-        ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
-      </td>
-      <td data-label="Progression">
-        <div class="resource-progress">
-          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
-          <div class="resource-progress__track">
-            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
-          </div>
-        </div>
-      </td>
-      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
-      <td data-label="Actions" class="draft-actions-cell">
-        <div class="draft-actions">
-          ${buildDraftActionButtons(draft, permissions)}
-        </div>
-      </td>
+      ${cells}
     </tr>
   `;
 }
@@ -2654,6 +2707,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  renderDashboardTableHead("draftTableHead");
   bindDashboardFilters();
   void renderDraftList();
   startDashboardAutoRefresh();
