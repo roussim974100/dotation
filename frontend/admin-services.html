@@ -99,7 +99,6 @@
           <div class="col-12">
             <div class="header-actions">
               <button class="btn btn-primary" id="saveServiceBtn" type="button">Ajouter le service</button>
-              <button class="btn btn-outline-secondary d-none" id="cancelServiceEditBtn" type="button">Annuler la modification</button>
             </div>
           </div>
         </div>
@@ -150,6 +149,35 @@
           </table>
         </div>
       </section>
+
+      <div class="password-generator-modal d-none" id="serviceEditModal" aria-hidden="true">
+        <div class="password-generator-modal__backdrop" data-service-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="serviceEditModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Service</p>
+              <h2 class="section-title" id="serviceEditModalTitle">Modifier le service</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-service-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <div class="mb-3">
+              <label class="form-label" for="modalServiceLabel">Libellé du service</label>
+              <input class="form-control" id="modalServiceLabel" type="text">
+            </div>
+            <div class="mb-3">
+              <label class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="modalServiceActive">
+                <span class="form-check-label">Service actif</span>
+              </label>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-service-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="modalSaveServiceBtn" type="button">Enregistrer</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </main>

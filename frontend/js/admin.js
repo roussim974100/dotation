@@ -642,9 +642,6 @@ function resetServiceForm() {
     return;
   }
   editingServiceId = null;
-  byId("serviceFormTitle").textContent = "Services";
-  byId("saveServiceBtn").textContent = "Ajouter le service";
-  byId("cancelServiceEditBtn").classList.add("d-none");
   setNotice("serviceEditNotice");
   byId("service_label").value = "";
   byId("service_active").checked = true;
@@ -652,17 +649,54 @@ function resetServiceForm() {
 
 function populateServiceForm(serviceId) {
   const service = currentServices.find((item) => item.id === serviceId);
-  if (!service || !byId("serviceFormTitle")) {
+  if (!service) {
     return;
   }
   editingServiceId = service.id;
-  byId("serviceFormTitle").textContent = `Modifier le service ${service.label}`;
-  byId("saveServiceBtn").textContent = "Enregistrer les modifications";
-  byId("cancelServiceEditBtn").classList.remove("d-none");
-  setNotice("serviceEditNotice", "Mettez à jour le libellé ou désactivez le service sans perdre l'historique des dossiers.", true);
-  byId("service_label").value = service.label || "";
-  byId("service_active").checked = Boolean(service.is_active);
-  byId("serviceFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  byId("modalServiceLabel").value = service.label || "";
+  byId("modalServiceActive").checked = Boolean(service.is_active);
+  openServiceEditModal();
+}
+
+function openServiceEditModal() {
+  const modal = byId("serviceEditModal");
+  if (modal) {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeServiceEditModal() {
+  const modal = byId("serviceEditModal");
+  if (modal) {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingServiceId = null;
+}
+
+async function saveServiceFromModal() {
+  const label = byId("modalServiceLabel")?.value.trim() || "";
+  const isActive = Boolean(byId("modalServiceActive")?.checked);
+  if (!label) {
+    showToast("Le libellé du service est obligatoire.", "error");
+    return;
+  }
+  if (!editingServiceId) {
+    showToast("Erreur : aucun service en cours d'édition", "error");
+    return;
+  }
+  try {
+    await adminRequest(`/api/admin/services/${encodeURIComponent(editingServiceId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ label, is_active: isActive })
+    });
+    showToast("Service mis à jour.");
+    closeServiceEditModal();
+    await loadServices();
+  } catch (error) {
+    showToast(`Impossible d'enregistrer le service : ${error.message}`, "error");
+  }
 }
 
 function resetResourceForm() {
@@ -907,17 +941,10 @@ async function saveService() {
     showToast("Le libellé du service est obligatoire.", "error");
     return;
   }
-  if (!editingServiceId) {
-    await adminRequest("/api/admin/services", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  } else {
-    await adminRequest(`/api/admin/services/${encodeURIComponent(editingServiceId)}`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-  }
+  await adminRequest("/api/admin/services", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
   resetServiceForm();
   await loadServices();
 }
@@ -941,7 +968,7 @@ async function deleteService(serviceId) {
     method: "DELETE"
   });
   if (editingServiceId === serviceId) {
-    resetServiceForm();
+    closeServiceEditModal();
   }
   await loadServices();
 }
@@ -1245,17 +1272,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     byId("saveServiceBtn")?.addEventListener("click", async () => {
-      const wasEditingService = Boolean(editingServiceId);
       try {
         await saveService();
-        alert(wasEditingService ? "Service mis à jour." : "Service ajouté.");
+        alert("Service ajouté.");
       } catch (error) {
         alert(`Impossible d'enregistrer le service : ${error.message}`);
       }
     });
 
-    byId("cancelServiceEditBtn")?.addEventListener("click", () => {
-      resetServiceForm();
+    byId("modalSaveServiceBtn")?.addEventListener("click", async () => {
+      await saveServiceFromModal();
+    });
+
+    document.querySelectorAll("[data-service-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeServiceEditModal();
+      });
     });
 
     byId("csvImportBtn")?.addEventListener("click", () => {
