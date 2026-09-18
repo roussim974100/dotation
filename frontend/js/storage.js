@@ -669,7 +669,7 @@ function buildDraftActionButtons(draft, options) {
   // PDF — action principale selon la phase
   const pdfItems = [];
   if (options.canExport) {
-    if (["returned", "partial_return"].includes(status) && hasRestitution) {
+    if (["returned", "partial_return", "awaiting_signature"].includes(status) && hasRestitution) {
       pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
       pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
     } else {
@@ -682,7 +682,7 @@ function buildDraftActionButtons(draft, options) {
 
   // E-mail — un seul groupe, actions adaptées au workflow courant
   const emailItems = [];
-  if (["returned", "partial_return"].includes(status)) {
+  if (["returned", "partial_return", "awaiting_signature"].includes(status)) {
     // Phase restitution : actions restitution uniquement
     emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
     if (options.canExport && hasRestitution) {
@@ -1671,17 +1671,76 @@ async function ensureAssignmentSignatureLink(id) {
   };
 }
 
-async function ensureRestitutionSignatureLink(id) {
+async function ensureRestitutionSignatureLink(id, validityDays) {
   let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
   if (!result?.link || result.link.status !== "active" || !result.link.url) {
     result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
-      method: "POST"
+      method: "POST",
+      body: validityDays ? JSON.stringify({ validityDays }) : undefined
     });
   }
   return {
     link: result.link,
     absoluteUrl: new URL(result.link.url, window.location.origin).href
   };
+}
+
+function askSignatureLinkValidityDays() {
+  return new Promise((resolve) => {
+    let modal = document.getElementById("signatureLinkValidityModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.className = "password-generator-modal d-none";
+      modal.id = "signatureLinkValidityModal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div class="password-generator-modal__backdrop" data-validity-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="signatureLinkValidityModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Signature à distance</p>
+              <h2 class="section-title" id="signatureLinkValidityModalTitle">Validité du lien de signature</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-validity-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <div class="mb-3">
+              <label class="form-label" for="signatureLinkValidityDays">Nombre de jours</label>
+              <input class="form-control" id="signatureLinkValidityDays" type="number" min="1" max="30" value="7">
+              <div class="form-text">Choisissez une durée entre 1 et 30 jours.</div>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-validity-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="signatureLinkValidityConfirmBtn" type="button">Générer le lien</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const input = document.getElementById("signatureLinkValidityDays");
+    input.value = "7";
+
+    const close = (value) => {
+      modal.classList.add("d-none");
+      modal.setAttribute("aria-hidden", "true");
+      resolve(value);
+    };
+
+    modal.querySelectorAll("[data-validity-modal-close]").forEach((btn) => {
+      btn.onclick = () => close(null);
+    });
+    document.getElementById("signatureLinkValidityConfirmBtn").onclick = () => {
+      const raw = Number.parseInt(input.value || "7", 10);
+      const days = Number.isFinite(raw) ? Math.min(30, Math.max(1, raw)) : 7;
+      close(days);
+    };
+
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+    input.focus();
+  });
 }
 
 async function shareSignatureLink(id) {
@@ -1736,7 +1795,11 @@ async function copyRestitutionSignatureLink(id) {
 
 async function prepareRestitutionSignatureEmail(id) {
   try {
-    const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
+    const validityDays = await askSignatureLinkValidityDays();
+    if (validityDays === null) {
+      return;
+    }
+    const { absoluteUrl } = await ensureRestitutionSignatureLink(id, validityDays);
     const result = await getDraftById(id);
     const draft = result
       ? { ...result.summary, data: result.data }
