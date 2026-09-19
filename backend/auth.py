@@ -1,12 +1,12 @@
 import json
 import os
 import re
-import threading
 import bcrypt
 from datetime import datetime
 from functools import wraps
 from flask import has_request_context, jsonify, redirect, request, session
 
+import rate_store
 from config import BASE_DIR
 from database import get_db, get_users_db
 
@@ -162,43 +162,19 @@ def delete_user(username):
 
 _LOGIN_MAX_ATTEMPTS = 10
 _LOGIN_WINDOW_SECONDS = 600
-_login_attempts: dict[str, list[float]] = {}
-_login_attempts_lock = threading.Lock()
 
 
 def _is_login_rate_limited(ip: str) -> bool:
-    now = datetime.now().timestamp()
-    with _login_attempts_lock:
-        attempts = _login_attempts.get(ip, [])
-        attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS]
-        if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
-            _login_attempts[ip] = attempts
-            return True
-        attempts.append(now)
-        _login_attempts[ip] = attempts
-        return False
+    return rate_store.hit("login", ip, _LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
 
 
 # ---------------------------------------------------------------------------
 # Rate limiting générique par IP + scope (endpoints API sensibles).
+# Les compteurs sont partagés entre les processus gunicorn (voir rate_store.py).
 # ---------------------------------------------------------------------------
 
-_API_RATE_STORES: dict[str, dict[str, list[float]]] = {}
-_api_rate_lock = threading.Lock()
-
-
 def _is_api_rate_limited(ip: str, scope: str, max_requests: int, window_seconds: int) -> bool:
-    now = datetime.now().timestamp()
-    with _api_rate_lock:
-        store = _API_RATE_STORES.setdefault(scope, {})
-        attempts = store.get(ip, [])
-        attempts = [t for t in attempts if now - t < window_seconds]
-        if len(attempts) >= max_requests:
-            store[ip] = attempts
-            return True
-        attempts.append(now)
-        store[ip] = attempts
-        return False
+    return rate_store.hit(scope, ip, max_requests, window_seconds)
 
 
 def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):

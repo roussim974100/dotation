@@ -2386,13 +2386,13 @@ function populateForm(data, signaturePad) {
             <div class="card">
               <div class="card-body">
                 <div class="form-check mb-2">
-                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
+                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
                   <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
                 </div>
                 <div class="row g-2">
                   <div class="col-md-6">
                     <label class="form-label small text-muted">État</label>
-                    <select class="form-select form-select-sm retrait-etat" data-item-key="${item.item_key}">
+                    <select class="form-select form-select-sm retrait-etat" data-item-key="${escapeHtml(item.item_key)}">
                       <option value="Bon" ${retraitsData.items?.[item.item_key]?.etat === "Bon" ? "selected" : ""}>Bon</option>
                       <option value="Dégâts" ${retraitsData.items?.[item.item_key]?.etat === "Dégâts" ? "selected" : ""}>Dégâts</option>
                       <option value="Autre" ${retraitsData.items?.[item.item_key]?.etat === "Autre" ? "selected" : ""}>Autre</option>
@@ -2400,7 +2400,7 @@ function populateForm(data, signaturePad) {
                   </div>
                   <div class="col-md-6">
                     <label class="form-label small text-muted">Notes</label>
-                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${item.item_key}" placeholder="Observations…" value="${retraitsData.items?.[item.item_key]?.notes || ""}">
+                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${escapeHtml(item.item_key)}" placeholder="Observations…" value="${escapeHtml(retraitsData.items?.[item.item_key]?.notes || "")}">
                   </div>
                 </div>
               </div>

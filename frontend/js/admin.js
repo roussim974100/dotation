@@ -1211,6 +1211,8 @@ async function loadResources() {
   bindAdminSortableHeaders("resource", "resourceTableBody", renderResourceTable);
   renderResourceTable();
   updateAdminMetrics();
+  // L'écran « Qualité du catalogue » doit refléter chaque modification (création, édition, activation, suppression).
+  if (typeof loadCatalogQuality === "function") loadCatalogQuality();
 }
 
 async function saveResource() {

@@ -17,7 +17,9 @@ Aucune faille **critique** trouvée. 1 faille majeure (contournement de la limit
 | C5 | Mineur | `update_user(**fields)` insère les noms de colonnes dans le SQL (non exploitable aujourd'hui, fragile). | Liste blanche `UPDATABLE_USER_COLUMNS`. |
 | C6 | Moyen | XSS stocké potentiel : `executive-dashboard.js` (nom, prénom, service, statut) et `app.js` (titre de dossier, libellé et clé des items de retrait) interpolés sans échappement. La CSP (`script-src` sans inline) limitait l'impact. | `escapeHtml` appliqué. |
 | C7 | Moyen | Les exports (Excel, UNC, PDF par lots) ne sont pas masqués : un groupe à portée `masked` avec `forms.export` contournait le masquage RGPD. Configurable par l'admin (groupes par défaut tous en `full`). | Export refusé (403) si portée `masked` (`can_export_unmasked`). |
-| C8 | Mineur | `pytest 9.0.2` : vulnérabilité connue PYSEC-2026-1845 (dépendance de test). | Passé en `9.0.3`. |
+| C9 | Moyen | **Compteurs de limitation en mémoire, par processus** : avec `gunicorn -w 4`, 10 essais de connexion devenaient 40, et tout repartait à zéro au redémarrage. | Compteur **partagé** entre processus et persistant (`backend/rate_store.py`, table `rate_limit_hits` de `users.db`, verrou d'écriture atomique) ; repli en mémoire si la base est indisponible. Test multi-processus : 4 processus × 5 essais = 10 passages exactement. |
+| C10 | Moyen | XSS stocké potentiel dans le rendu des retraits (`app.js`) : « Observations » et clé d'item insérées sans échappement dans des attributs. | `escapeHtml` appliqué. |
+| C8 | Mineur : vulnérabilité connue PYSEC-2026-1845 (dépendance de test). | Passé en `9.0.3`. |
 
 Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 passés.
 
@@ -26,7 +28,7 @@ Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 pass
 | # | Gravité | Constat | Décision |
 |---|---|---|---|
 | A3 | Mineur | CSP `img-src https:` et `style-src 'unsafe-inline'`. | Conservé : l'aperçu du logo en Admin > Personnalisation charge l'URL distante saisie par l'admin. L'exploiter suppose déjà une XSS. Piste : passer l'aperçu par `/api/settings/logo`. |
-| A4 | Mineur | Compteurs de limitation **en mémoire, par processus** : multipliés par le nombre de workers gunicorn, remis à zéro au redémarrage. | À stocker en base si plusieurs workers. |
+| A4 | — | *(traité : voir C9)* | Compteurs désormais partagés entre processus. |
 | A5 | Mineur | Ligne cliquable de `executive-dashboard.js` : `onclick=` inline bloqué par la CSP. | **Corrigé** : délégation d’événements (clic et clavier). |
 
 ## Conforme
@@ -43,8 +45,6 @@ Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 pass
 
 ## Non couvert (prochain audit)
 
-- Échappement : scan **heuristique** des interpolations d'objets ; les cas de gabarits construits autrement (concaténations, `insertAdjacentHTML`) n'ont pas été relus un par un.
-- `data_scope` : vérifié sur formulaires, parc et exports ; pas sur `/api/admin/dashboard-stats` (protégé par `forms.view_all`, renvoie noms et prénoms des alertes) (corrigé : noms masqués pour les groupes à portée `masked`) ni sur la recherche globale.
-- Contenu des journaux (données personnelles) et rotation.
-- Limite de la détection automatique : un client du **même réseau privé** que l'app, sans reverse proxy, peut encore forger `X-Forwarded-For` (exposition limitée au LAN). Un proxy à IP publique demande `APP_TRUSTED_PROXIES=1`.
+- Relecture **outillée** des gabarits HTML : toutes les interpolations de données saisies dans `app.js`, `storage.js`, `admin.js`, `restitution.js`, `logs.js`, `parc*.js`, `dashboard-*.js`, `admin-backup*.js`, `admin-db.js` ont été passées en revue (20 fonctions de rendu) ; les cas trouvés sont corrigés (C6, C10). Un nouveau gabarit reste à relire à chaque ajout.
+- Recherche globale : s'appuie sur `/api/forms`, déjà masqué pour les groupes à portée `masked`. Journaux : réservés au droit `users.manage`, aucun mot de passe enregistré.
 - Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions de `.app_secret_key` et `users.db`).
