@@ -1,11 +1,11 @@
 # À Quai — Gestion des dotations matérielles
 
-> ⚠️ **Branche de développement (`dev`)** — version `3.49.0-dev`, non destinée à la production.
-> Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)), `sudo bash deploy-preprod.sh` (préproduction, branche `preprod`) ou `sudo bash deploy-dev.sh` (développement, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production). Installation initiale d'une version stable : branche [`main`](https://github.com/roussim974100/dotation/tree/main).
+> **À Quai** — version `3.49.0`. La même version se **promeut** de `dev` (développement) à `preprod` (préproduction) puis à `prod` (production) : l'environnement d'un serveur est défini par son script de déploiement, pas par les fichiers.
+> Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)), `sudo bash deploy-preprod.sh` (préproduction, branche `preprod`) ou `sudo bash deploy-dev.sh` (développement, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production).
 > Nouveautés depuis la 3.18 : voir le [CHANGELOG](CHANGELOG.md). Pour contribuer : section [Développement local](#développement-local) en bas de page.
 
-**Version :** `3.49.0-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
-**Statut :** Développement 🛠️ | **Dernière MAJ :** 19 septembre 2026
+**Version :** `3.49.0` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Statut :** voir l'environnement (pastille DEV / PREPROD, absente en production) | **Dernière MAJ :** 19 septembre 2026
 
 ---
 

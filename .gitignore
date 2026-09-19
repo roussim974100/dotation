@@ -92,3 +92,5 @@ backend/*.zip
 
 # Etat, journal et verrou de la mise a jour depuis le navigateur (generes par le serveur)
 /backend/update/
+# Environnement de ce serveur (dev, preprod, prod), ecrit par deploy*.sh
+/backend/environment

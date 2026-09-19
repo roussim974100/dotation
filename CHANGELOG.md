@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [3.49.0-dev] - 2026-09-19 (version de développement, non publiée en production)
+## [3.49.0] - 2026-09-19
 
 Cumul des versions 3.19 à 3.49 depuis la 3.18.3.
 

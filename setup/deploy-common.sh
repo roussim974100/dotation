@@ -95,6 +95,9 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 echo "$$" > "$LOCK/pid"
 trap 'rm -rf "$LOCK"' EXIT
+# Environnement de ce serveur (dev, preprod ou prod) : lu par l'application pour la pastille et la version affichee.
+# Le meme code est promu d'un environnement a l'autre, c'est donc le script de deploiement qui dit « je suis preprod ».
+echo "$BRANCH" > "$DATA_DIR/environment" 2>/dev/null && chmod 644 "$DATA_DIR/environment" 2>/dev/null || true
 exec > >(tee -a "$UPDATE_DIR/update.log") 2>&1
 STATUS_READY=1
 

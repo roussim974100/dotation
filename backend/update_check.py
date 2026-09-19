@@ -1,7 +1,7 @@
 """Detection d'une nouvelle version et etat de la mise a jour depuis le navigateur.
 
 - La version installee est lue dans frontend/js/branding.js (APP_BUILD_VERSION), la meme que celle affichee a l'ecran.
-- La version disponible est lue dans le meme fichier sur la branche du canal (« -dev » -> dev, « -preprod » -> preprod, sinon prod) de GitHub.
+- La version disponible est lue dans le meme fichier sur la branche de l'environnement de l'instance (dev, preprod ou prod : voir environment.py) de GitHub.
   Le resultat est mis en cache dans <DATA_DIR>/update/check.json (partage entre les processus gunicorn, 6 h).
 - Aucun blocage : une verification automatique tourne dans un thread, un echec (reseau coupe, intranet sans sortie
   Internet) est silencieux. Desactivable : APP_UPDATE_CHECK=0. Adresse : APP_UPDATE_CHECK_URL.
@@ -15,6 +15,7 @@ import threading
 import time
 import urllib.request
 
+import environment
 from config import DATA_DIR, FRONTEND_DIR
 
 UPDATE_DIR = os.path.join(DATA_DIR, "update")
@@ -33,23 +34,14 @@ _refreshing = False
 
 
 def current_version():
-    """Version installee (lue dans branding.js), ou chaine vide si illisible."""
-    try:
-        with open(os.path.join(FRONTEND_DIR, "js", "branding.js"), encoding="utf-8") as handle:
-            match = _VERSION_RE.search(handle.read())
-        return match.group(1) if match else ""
-    except OSError:
-        return ""
+    """Version installee (APP_BUILD_VERSION de branding.js, avec ou sans suffixe), ou chaine vide si illisible."""
+    return environment.raw_version()
 
 
-def channel_for(version):
-    """Canal de mise a jour : « -dev » suit la branche dev, « -preprod » la branche preprod, toutes les autres prod."""
-    text = version or ""
-    if "-dev" in text:
-        return "dev"
-    if "-preprod" in text:
-        return "preprod"
-    return "prod"
+def channel_for(version=None):
+    """Canal de mise a jour = environnement de l'instance (dev, preprod ou prod) : voir environment.resolve_environment
+    (fichier ecrit par le script de deploiement, APP_ENVIRONMENT, suffixe de la version, sinon prod)."""
+    return environment.resolve_environment(version)
 
 
 def parse_version(version):
@@ -160,10 +152,11 @@ def status(force=False, now=None):
     """Etat complet pour l'administration. `force` = verification synchrone (bouton « Verifier maintenant »)."""
     now = time.time() if now is None else now
     installed = current_version()
+    channel = channel_for(installed)
     result = {
-        "enabled": enabled(), "current": installed, "channel": channel_for(installed), "latest": None, "available": False,
-        "checked_at": None, "error": None, "can_update": can_update(), "progress": progress(),
-        "release_notes_url": f"https://github.com/{DEFAULT_REPOSITORY}/blob/{channel_for(installed)}/CHANGELOG.md",
+        "enabled": enabled(), "current": environment.display_version(installed, channel), "channel": channel, "latest": None,
+        "available": False, "checked_at": None, "error": None, "can_update": can_update(), "progress": progress(),
+        "release_notes_url": f"https://github.com/{DEFAULT_REPOSITORY}/blob/{channel}/CHANGELOG.md",
     }
     if not result["enabled"]:
         return result

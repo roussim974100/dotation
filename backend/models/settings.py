@@ -2,6 +2,8 @@ import json
 import os
 import urllib.request
 
+import environment
+
 from database import get_db
 from utils import utc_now, slugify_field_key
 from config import (
@@ -324,6 +326,8 @@ def build_public_settings_payload(settings=None):
         "appName": "A quai",
         "dpoEmail": get_dpo_email(settings),
         "logoUrl": "/api/settings/logo",
+        "environment": environment.resolve_environment(),
+        "displayVersion": environment.display_version(),
         "logoMode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
         "themeId": theme_id,
         "themeLabel": THEME_PRESETS[theme_id]["label"],
