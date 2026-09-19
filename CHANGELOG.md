@@ -6,6 +6,9 @@
 - Indicateurs simplifiés : « Objets dégradés » (nombre d'objets actuellement dégradés) remplace le pourcentage de restitutions dégradées, souvent trompeur sur un petit parc ; retrait de la durée moyenne de détention et des détentions de plus d'un an ; six cartes sur deux lignes de trois.
 - Formulaire de dossier : rappel sous le champ identifiant — pour renuméroter un objet suivi, passer d'abord par Parc → Corriger l'identifiant afin d'éviter un doublon.
 
+### 🎨 Interface
+- Logo À Quai recadré sur son contenu (`a-quai-logo.png`) : il n'a plus de marge blanche et remplit son cadre dans les en-têtes.
+
 ## [3.49.0] - 2026-09-19
 
 Cumul des versions 3.19 à 3.49 depuis la 3.18.3.
