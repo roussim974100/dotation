@@ -720,29 +720,35 @@ function sortDraftsForDisplay(drafts) {
 }
 
 // Rendu d'un groupe d'actions : bouton direct si 1 item, dropdown si plusieurs.
-function renderActionGroup(shortLabel, tone, items) {
-  if (!items.length) return "";
-  if (items.length === 1) {
-    const item = items[0];
-    return `<button class="btn btn-sm ${tone}" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(shortLabel)}</button>`;
-  }
+// Menu "Plus d'actions" d'une ligne : sections nommees (documents, e-mail) puis, tout en bas et
+// separee, l'action destructrice. Les actions sont portees par data-action (cf. DRAFT_ACTION_MAP).
+function renderRowActionMenu(sections, dangerItems) {
+  const groups = sections.filter((section) => section.items.length);
+  if (!groups.length && !dangerItems.length) return "";
+  const button = (item, tone = "btn-outline-secondary") =>
+    `<button class="btn btn-sm ${tone}" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`;
   return `
-    <details class="draft-actions__menu" data-action-menu data-label="${escapeHtml(shortLabel)}" data-open-label="${escapeHtml(`${shortLabel} - moins d'actions`)}">
-      <summary class="btn btn-sm ${tone}"><span data-action-menu-label>${escapeHtml(shortLabel)}</span></summary>
+    <details class="draft-actions__menu" data-action-menu data-label="⋯" data-open-label="✕">
+      <summary class="btn btn-sm btn-outline-secondary" aria-label="Plus d'actions"><span data-action-menu-label>⋯</span></summary>
       <div class="draft-actions__menu-panel">
+        ${groups.map((section) => `
         <div class="draft-actions__menu-section">
-          ${items.map((item) => `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`).join("")}
-        </div>
+          <p class="draft-actions__menu-title">${escapeHtml(section.title)}</p>
+          ${section.items.map((item) => button(item)).join("")}
+        </div>`).join("")}
+        ${dangerItems.length ? `<div class="draft-actions__menu-section">${dangerItems.map((item) => button(item, "btn-outline-danger")).join("")}</div>` : ""}
       </div>
     </details>
   `;
 }
 
+// Une ligne = "Ouvrir" + l'action metier de l'etape (restituer / demander la signature) + menu "Plus".
 function buildDraftActionButtons(draft, options) {
   const id = draft.id;
   const status = draft.status || "draft";
   const hasRestitution = hasRestitutionData(draft);
   const viewMode = getDashboardViewMode();
+  const inRestitutionPhase = ["returned", "partial_return", "awaiting_signature"].includes(status);
 
   // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html
   const inRestitutionsPendingView = viewMode === "restitutions_pending";
@@ -750,64 +756,54 @@ function buildDraftActionButtons(draft, options) {
     ? "openRestitution"
     : "editDraft";
 
-  // PDF — action principale selon la phase
+  // Action metier de l'etape, mise en avant a cote de "Ouvrir".
+  let stepAction = null;
+  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+    stepAction = { action: "openRestitution", label: "Restituer" };
+  } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
+    stepAction = { action: "prepareRestitutionSignatureEmail", label: "Demander la signature" };
+  } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
+    stepAction = { action: "prepareAssignmentSignatureEmail", label: "Demander la signature" };
+  }
+
+  // Documents (PDF) — l'ordre suit la phase
   const pdfItems = [];
   if (options.canExport) {
-    if (["returned", "partial_return", "awaiting_signature"].includes(status) && hasRestitution) {
-      pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
-      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+    if (inRestitutionPhase && hasRestitution) {
+      pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF de restitution" });
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF du dossier" });
     } else {
-      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF du dossier" });
       if (hasRestitution) {
-        pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
+        pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF de restitution" });
       }
     }
   }
 
-  // E-mail — un seul groupe, actions adaptées au workflow courant
+  // E-mails — actions adaptées au workflow courant (la demande de signature est promue en bouton)
   const emailItems = [];
-  if (["returned", "partial_return", "awaiting_signature"].includes(status)) {
-    // Phase restitution : actions restitution uniquement
+  if (inRestitutionPhase) {
     emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
     if (options.canExport && hasRestitution) {
-      emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
-    }
-    if (canRequestRestitutionSignature(draft, options)) {
-      emailItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
-    }
-  } else if (status === "active") {
-    // Attribution finalisée : pas encore de restitution
-    emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
-    if (options.canExport) {
-      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
+      emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer le PDF de restitution" });
     }
   } else {
-    // En cours / en attente de signature
     emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
     if (options.canExport) {
-      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
-    }
-    if (canRequestAssignmentSignature(draft, options)) {
-      emailItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
+      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer le PDF du dossier" });
     }
   }
 
-  const managementItems = [];
-  if (options.canDelete) {
-    managementItems.push({ action: "removeDraft", id, label: "Supprimer le dossier" });
-  }
-
-  // Bouton "Restitution" : uniquement sur attribution finalisée (active) hors vue restitutions en cours
-  // (dans restitutions_pending, "Ouvrir" pointe déjà directement sur restitution.html)
-  const showRestitutionBtn = options.canRestitution && status === "active" && !inRestitutionsPendingView;
+  const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
-      ${showRestitutionBtn ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
-      ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
-      ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
-      ${renderActionGroup("Supprimer", "btn-outline-danger", managementItems)}
+      ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
+      ${renderRowActionMenu([
+        { title: "Documents", items: pdfItems },
+        { title: "Envoyer par e-mail", items: emailItems }
+      ], dangerItems)}
     </div>
   `;
 }
@@ -2354,18 +2350,24 @@ function updateExportSelectedState() {
   const restitutionExportButton = document.getElementById("exportSelectedRestitutionPdfBtn");
   const deleteButton = document.getElementById("deleteSelectedBtn");
 
+  // Actions groupees contextuelles : visibles seulement quand une ligne est cochee (et permise).
+  const setBulkState = (button) => {
+    button.disabled = selectedCount === 0;
+    button.classList.toggle("d-none", button.dataset.permitted !== "true" || selectedCount === 0);
+  };
+
   if (exportButton) {
-    exportButton.disabled = selectedCount === 0;
-    exportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} dossiers` : "PDF dossier sélectionné";
+    setBulkState(exportButton);
+    exportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} dossiers` : "PDF du dossier sélectionné";
   }
 
   if (restitutionExportButton) {
-    restitutionExportButton.disabled = selectedCount === 0;
-    restitutionExportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} restitutions` : "PDF restitution sélectionnée";
+    setBulkState(restitutionExportButton);
+    restitutionExportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} restitutions` : "PDF de la restitution sélectionnée";
   }
 
   if (deleteButton) {
-    deleteButton.disabled = selectedCount === 0;
+    setBulkState(deleteButton);
     deleteButton.textContent = selectedCount > 1 ? `Supprimer ${selectedCount} dossiers` : "Supprimer la sélection";
   }
 }
@@ -2473,7 +2475,7 @@ function bindSelectionActions(canExport, canDelete) {
   const canSelect = canExport || canDelete;
 
   if (exportButton) {
-    exportButton.classList.toggle("d-none", !canExport);
+    exportButton.dataset.permitted = String(canExport);
     exportButton.disabled = true;
     if (!exportButton.dataset.boundExportSelection) {
       exportButton.addEventListener("click", () => {
@@ -2484,7 +2486,7 @@ function bindSelectionActions(canExport, canDelete) {
   }
 
   if (restitutionExportButton) {
-    restitutionExportButton.classList.toggle("d-none", !canExport);
+    restitutionExportButton.dataset.permitted = String(canExport);
     restitutionExportButton.disabled = true;
     if (!restitutionExportButton.dataset.boundExportRestitutionSelection) {
       restitutionExportButton.addEventListener("click", () => {
@@ -2495,7 +2497,7 @@ function bindSelectionActions(canExport, canDelete) {
   }
 
   if (deleteButton) {
-    deleteButton.classList.toggle("d-none", !canDelete);
+    deleteButton.dataset.permitted = String(canDelete);
     deleteButton.disabled = true;
     if (!deleteButton.dataset.boundDeleteSelection) {
       deleteButton.addEventListener("click", () => {
@@ -2534,6 +2536,7 @@ function bindSelectionActions(canExport, canDelete) {
     });
     input.dataset.boundSelect = "true";
   });
+  updateExportSelectedState();
 }
 
 async function removeDraft(id) {
