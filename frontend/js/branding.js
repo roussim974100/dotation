@@ -5,7 +5,7 @@ const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 // Numéro de version, IDENTIQUE dans toutes les branches (dev, preprod, prod) : l'environnement est décidé par le serveur.
 const APP_BUILD_VERSION = "3.49.1";
 const APP_FIXED_NAME = "A quai";
-const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
+const APP_PRIMARY_LOGO_URL = "/assets/a-quai-logo.png";
 const COOKIECONSENT_VERSION = "3.1.0";
 const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
 const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
