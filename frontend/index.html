@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell" data-dashboard-view="active">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <!-- En-tête principal du tableau de bord applicatif. -->
 <header class="app-header">
   <div class="container app-header__inner">
@@ -17,7 +18,7 @@
       <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
       <div>
         <h1 class="app-title">Attributions en cours</h1>
-        <p class="app-subtitle">Arrivées, mobilités internes, ressources attribuées et restitutions.</p>
+        <p class="app-subtitle">Arrivées, mobilités internes et ressources attribuées.</p>
       </div>
     </div>
     <div class="header-actions">
@@ -46,69 +47,62 @@
 </header>
 
 <!-- Attributions en cours : recherche, suivi des dossiers et actions de gestion. -->
-<main class="container py-4 py-lg-5">
-  <section class="hero-panel mb-4">
-    <div>
-      <h2 class="panel-title">Attributions en cours</h2>
-      <p class="panel-text">Concentrez-vous sur les dossiers et restitutions qui demandent encore une action, puis basculez vers les historiques dédiés quand tout est terminé.</p>
-    </div>
-    <div class="hero-panel__meta">
-      <div class="hero-panel__stats hero-panel__stats--single">
-        <div class="stat-card">
-          <span class="stat-card__label">Dossiers à compléter</span>
-          <strong class="stat-card__value" id="assignmentDraftCount">0</strong>
-        </div>
+<main id="main" class="container py-4 py-lg-5">
+
+  <nav class="dashboard-nav mb-4" id="dashboardNav" aria-label="Navigation dossiers"></nav>
+
+  <div class="filter-toolbar">
+    <div class="filter-toolbar__grid">
+      <div class="filter-toolbar__search">
+        <label class="form-label" for="searchInput">Recherche</label>
+        <input id="searchInput" class="form-control" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
+      </div>
+      <div>
+        <label class="form-label" for="statusFilter">Avancement</label>
+        <select id="statusFilter" class="form-select">
+          <option value="">Tous les avancements</option>
+          <option value="draft">À compléter</option>
+          <option value="partial_assignment">Attribution partielle</option>
+          <option value="awaiting_signature">En attente de signature</option>
+          <option value="active">Attribution active</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="timingFilter">Pilotage</label>
+        <select id="timingFilter" class="form-select">
+          <option value="">Tous les pilotages</option>
+          <option value="ok">Prêt / Dans les temps</option>
+          <option value="warning">En danger</option>
+          <option value="late">En retard</option>
+          <option value="neutral">À planifier</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="qualiteFilter">Qualité</label>
+        <select id="qualiteFilter" class="form-select">
+          <option value="">Tous</option>
+          <option value="agent">Agent</option>
+          <option value="elu">Élu(e)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="serviceFilter">Service</label>
+        <select id="serviceFilter" class="form-select">
+          <option value="">Tous les services</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="sortFilter">Trier par</label>
+        <select id="sortFilter" class="form-select">
+          <option value="recent">Plus récents d'abord</option>
+          <option value="oldest">Plus anciens d'abord</option>
+        </select>
       </div>
     </div>
-  </section>
-
-  <nav class="dashboard-nav mb-4" aria-label="Navigation dossiers">
-    <a class="dashboard-nav__link is-active" href="index.html">Attributions en cours</a>
-    <a class="dashboard-nav__link" href="assignments-completed.html">Attributions finalisées</a>
-    <a class="dashboard-nav__link" href="restitutions-pending.html">Restitutions en cours</a>
-    <a class="dashboard-nav__link" href="restitutions-completed.html">Restitutions finalisées</a>
-    <a class="dashboard-nav__link" href="pools.html">Parc mutualisé</a>
-  </nav>
-
-  <div class="mb-4" style="display: flex; gap: 12px; align-items: center;">
-    <input id="searchInput" class="form-control form-control-sm" type="search"
-           placeholder="Rechercher par nom, prénom, service, titre…" autocomplete="off"
-           style="max-width: 300px;">
-  </div>
-
-  <!-- Filtres cachés (contrôlés via Ctrl+K et utilisés par storage.js) -->
-  <div style="display: none;">
-    <select id="statusFilter">
-      <option value="">Tous les avancements</option>
-      <option value="draft">À compléter</option>
-      <option value="partial_assignment">Attribution partielle</option>
-      <option value="awaiting_signature">En attente de signature</option>
-      <option value="active">Attribution active</option>
-      <option value="returned">Restitution terminée</option>
-      <option value="partial_return">Restitution partielle</option>
-      <option value="cancelled">Dossier annulé</option>
-    </select>
-    <select id="timingFilter">
-      <option value="">Tous les pilotages</option>
-      <option value="ok">Prêt / Dans les temps</option>
-      <option value="warning">En danger</option>
-      <option value="late">En retard</option>
-      <option value="neutral">À planifier</option>
-    </select>
-    <select id="qualiteFilter">
-      <option value="">Tous</option>
-      <option value="agent">Agent</option>
-      <option value="elu">Élu(e)</option>
-    </select>
-    <select id="serviceFilter">
-      <option value="">Tous les services</option>
-    </select>
-    <select id="sortFilter">
-      <option value="recent">Plus récents d'abord</option>
-      <option value="oldest">Plus anciens d'abord</option>
-    </select>
-    <button id="resetFiltersBtn">Réinitialiser</button>
-    <span id="filterActiveBadge" class="d-none">0</span>
+    <div class="filter-toolbar__actions">
+      <span id="filterActiveBadge" class="status-pill d-none">0</span>
+      <button id="resetFiltersBtn" class="btn btn-outline-secondary btn-sm" type="button">Réinitialiser</button>
+    </div>
   </div>
 
   <section class="content-card">
@@ -116,9 +110,8 @@
     <div id="dashboardUpdateNotice" class="dashboard-update-notice d-none" role="status" aria-live="polite"></div>
 
     <div class="dashboard-toolbar mb-3">
-      <div>
-        <p class="panel-eyebrow">Sélection</p>
-        <h3 class="section-title">Actions groupées sur les dossiers</h3>
+      <div class="dashboard-toolbar__info">
+        <span id="assignmentCountBadge" class="dashboard-group__badge">0</span>
         <p class="panel-text mb-0" id="dashboardRefreshInfo">Mise à jour automatique active.</p>
       </div>
       <div class="dashboard-toolbar__actions">
@@ -131,37 +124,15 @@
           </div>
         </details>
         <button id="exportSelectedPdfBtn" class="btn btn-outline-success d-none" type="button">PDF dossiers sélectionnés</button>
-        <button id="exportSelectedRestitutionPdfBtn" class="btn btn-outline-secondary d-none" type="button">PDF restitutions sélectionnées</button>
         <button id="deleteSelectedBtn" class="btn btn-outline-danger d-none" type="button">Supprimer la sélection</button>
       </div>
     </div>
 
     <div class="dashboard-groups">
       <section class="dashboard-group">
-        <div class="dashboard-group__header">
-          <div>
-            <p class="panel-eyebrow">Attributions</p>
-            <h3 class="section-title">Attributions en cours</h3>
-          </div>
-          <span id="assignmentCountBadge" class="dashboard-group__badge">0</span>
-        </div>
         <div class="table-responsive">
           <table class="table align-middle draft-table">
-            <thead>
-              <tr>
-                <th class="draft-check-col">
-                  <input id="selectAllDrafts" class="form-check-input" type="checkbox" aria-label="Tout sélectionner">
-                </th>
-                <th>Dossier</th>
-                <th>État</th>
-                <th>Avancement</th>
-                <th>Pilotage</th>
-                <th>Progression</th>
-
-                <th>Dernière modification</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
+            <thead id="draftTableHead"></thead>
             <tbody id="draftList"></tbody>
           </table>
         </div>
@@ -213,3 +184,4 @@
 <script src="js/dashboard-panel.js"></script>
 </body>
 </html>
+

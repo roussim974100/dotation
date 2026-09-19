@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <!-- En-tête commun de l'espace d'administration. -->
 <header class="app-header">
   <div class="container app-header__inner">
@@ -44,7 +45,7 @@
 </header>
 
 <!-- Mise en page en deux colonnes : navigation latérale + contenu métier. -->
-<main class="container py-4 py-lg-5">
+<main id="main" class="container py-4 py-lg-5">
   <div class="admin-layout">
     <aside class="content-card admin-sidebar">
       <p class="panel-eyebrow">Navigation</p>
@@ -80,60 +81,6 @@
         </div>
       </section>
 
-      <section class="content-card mb-4" id="admin-users-create">
-        <div class="section-heading">
-          <div>
-            <p class="panel-eyebrow">Comptes</p>
-            <h2 class="section-title" id="userFormTitle">Nouveau compte</h2>
-            <p class="panel-text">Créez un compte ou ajustez ses droits sans quitter cette zone.</p>
-          </div>
-        </div>
-        <div id="userEditNotice" class="alert alert-info d-none" role="alert"></div>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label" for="admin_username">Identifiant</label>
-            <input class="form-control" id="admin_username" placeholder="Identifiant">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" for="admin_password">Mot de passe</label>
-            <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
-            <div class="form-text">12 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.</div>
-            <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Générer un mot de passe</button>
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <label class="form-check">
-              <input class="form-check-input" type="checkbox" id="admin_active" checked>
-              <span class="form-check-label">Compte actif</span>
-            </label>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" for="admin_service">Service (optionnel)</label>
-            <select class="form-select" id="admin_service">
-              <option value="">— Aucun service —</option>
-            </select>
-            <div class="form-text">Restreint les suggestions UNC aux dossiers de ce service.</div>
-          </div>
-          <div class="col-md-4 d-flex align-items-end pb-1">
-            <div>
-              <label class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="admin_db_manage">
-                <span class="form-check-label">Gestion base de données</span>
-              </label>
-              <div class="form-text mt-1">Export, diagnostic et import de la base.</div>
-            </div>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Groupe</label>
-            <div id="groupSelector" class="choice-group"></div>
-          </div>
-          <div class="col-12">
-            <div class="header-actions">
-              <button class="btn btn-primary" id="saveUserBtn" type="button">Créer l'utilisateur</button>
-              <button class="btn btn-outline-secondary d-none" id="cancelUserEditBtn" type="button">Annuler la modification</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- Modal d'édition utilisateur -->
       <div class="password-generator-modal d-none" id="userEditModal" aria-hidden="true">
@@ -155,6 +102,22 @@
               <label class="form-label" for="modalAdminPassword">Mot de passe (laisser vide pour ne pas changer)</label>
               <input class="form-control" id="modalAdminPassword" type="password" placeholder="Nouveau mot de passe">
               <div class="form-text">Si renseigné: 12 caractères min, majuscule, minuscule, chiffre, caractère spécial.</div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="modalAdminFirstName">Prénom</label>
+                <input class="form-control" id="modalAdminFirstName" type="text" autocomplete="off">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modalAdminLastName">Nom</label>
+                <input class="form-control" id="modalAdminLastName" type="text" autocomplete="off">
+              </div>
+              <div class="form-text mt-0">Seul un administrateur peut modifier ces champs une fois renseignés.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="modalAdminEmail">Adresse e-mail (optionnel)</label>
+              <input class="form-control" id="modalAdminEmail" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
+              <div class="form-text">Servira aux futurs envois automatiques (demandes d'attribution de ressources).</div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="modalAdminService">Service (optionnel)</label>
@@ -186,18 +149,8 @@
         </div>
       </div>
 
-      <section class="content-card mb-4" id="admin-groups">
-        <div class="section-heading">
-          <div>
-            <p class="panel-eyebrow">Droits</p>
-            <h2 class="section-title">Groupes disponibles</h2>
-            <p class="panel-text">Référence rapide des groupes et de leurs permissions.</p>
-          </div>
-        </div>
-        <div id="groupCards" class="equipment-grid equipment-grid--compact"></div>
-      </section>
 
-      <section class="content-card" id="admin-users-list">
+      <section class="content-card mb-4" id="admin-users-list">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Comptes</p>
@@ -209,16 +162,94 @@
           <table class="table align-middle draft-table">
             <thead>
               <tr>
-                <th>Utilisateur</th>
+                <th data-sort-field="username">Utilisateur</th>
                 <th>Groupes</th>
-                <th>Service</th>
-                <th>État</th>
+                <th data-sort-field="service">Service</th>
+                <th data-sort-field="status">État</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody id="userTableBody"></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="content-card mb-4" id="admin-users-create" data-create-section data-create-trigger="+ Nouveau compte">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Comptes</p>
+            <h2 class="section-title" id="userFormTitle">Nouveau compte</h2>
+            <p class="panel-text">Créez un compte ou ajustez ses droits sans quitter cette zone.</p>
+          </div>
+        </div>
+        <div id="userEditNotice" class="alert alert-info d-none" role="alert"></div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="admin_username">Identifiant</label>
+            <input class="form-control" id="admin_username" placeholder="Identifiant">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_password">Mot de passe</label>
+            <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
+            <div class="form-text">12 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.</div>
+            <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Générer un mot de passe</button>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" id="admin_active" checked>
+              <span class="form-check-label">Compte actif</span>
+            </label>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="admin_first_name">Prénom</label>
+            <input class="form-control" id="admin_first_name" type="text" autocomplete="off">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="admin_last_name">Nom</label>
+            <input class="form-control" id="admin_last_name" type="text" autocomplete="off">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_email">Adresse e-mail (optionnel)</label>
+            <input class="form-control" id="admin_email" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_service">Service (optionnel)</label>
+            <select class="form-select" id="admin_service">
+              <option value="">— Aucun service —</option>
+            </select>
+            <div class="form-text">Restreint les suggestions UNC aux dossiers de ce service.</div>
+          </div>
+          <div class="col-md-4 d-flex align-items-end pb-1">
+            <div>
+              <label class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="admin_db_manage">
+                <span class="form-check-label">Gestion base de données</span>
+              </label>
+              <div class="form-text mt-1">Export, diagnostic et import de la base.</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Groupe</label>
+            <div id="groupSelector" class="choice-group"></div>
+          </div>
+          <div class="col-12">
+            <div class="header-actions">
+              <button class="btn btn-primary" id="saveUserBtn" type="button">Créer l'utilisateur</button>
+              <button class="btn btn-outline-secondary d-none" id="cancelUserEditBtn" type="button">Annuler la modification</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-card mb-4" id="admin-groups">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Droits</p>
+            <h2 class="section-title">Groupes disponibles</h2>
+            <p class="panel-text">Référence rapide des groupes et de leurs permissions.</p>
+          </div>
+        </div>
+        <div id="groupCards" class="equipment-grid equipment-grid--compact"></div>
       </section>
     </div>
   </div>

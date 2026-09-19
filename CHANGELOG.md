@@ -1,11 +1,54 @@
 # Historique des versions — À Quai
 
+## [3.49.0] - 2026-09-19
+
+Cumul des versions 3.19 à 3.49 depuis la 3.18.3.
+
+### 🗃️ Parc matériel et stocks
+- **Assistant de création de ressource** en 5 étapes (mode de suivi, modèle, identité, champs, récapitulatif avec aperçu en direct) et écran « Qualité du catalogue ».
+- **Suivi par objet** : historique de vie de chaque objet (attribué, restitué, dégradé, perdu, retrouvé, réparation, réformé, transféré), page *Parc matériel* avec frise chronologique, correction d'identifiant, fusion de doublons, réservation d'un objet choisi dans un brouillon (libérée après 30 jours), import CSV du parc initial, indicateurs.
+- **Suivi par quantité** : stock par taille alimenté par les dossiers signés, réception / ajustement / perte, seuil d'alerte « Stock bas », historique des mouvements.
+- Reprise d'un matériel déjà restitué dans le formulaire, avertissement de doublon de numéro de série.
+- RGPD : anonymisation des anciens détenteurs après une durée réglable (5 ans par défaut). Nouveau droit `parc.manage`.
+
+### 💾 Sauvegardes (Administration > Base de données)
+- Sauvegarde multi-bases en une archive, **chiffrement par mot de passe** (AES-256-GCM), analyse avant restauration.
+- Destinations réseau (partages SMB/NFS montés), test d'accès, envoi manuel, historique.
+- **Sauvegarde automatique** planifiée (fréquence, jour, heure, rétention, alertes, script `backup_cli`).
+
+### 👤 Comptes
+- Adresse e-mail facultative, nom et prénom, page **Mon profil** (identifiant figé).
+
+### ✍️ Signature et restitution
+- « Enregistrer » séparé de la génération du lien de signature à distance, qui se fait depuis le tableau de bord.
+- Restitution d'une personne **sans attribution enregistrée** (régularisation).
+- Pages de signature publiques : plus d'informations internes (version, pied de page, pastille DEV).
+
+### 🖥️ Interface
+- Attributions et restitutions séparées, onglets à compteurs, tableaux compacts, actions de ligne + menu « Plus », actions groupées, édition des services et ressources en modale, tri par clic sur les en-têtes, raccourcis clavier, cibles tactiles de 44 px.
+- Audit d'accessibilité outillé (axe-core) : correctifs sur ~18 pages.
+- Seuil « En danger » configurable (Administration > Personnalisation).
+
+### 🔒 Sécurité (audit du 19/09, voir `docs/AUDIT_SECURITE_2026-09.md`)
+- **Limitation des tentatives de connexion non contournable** (elle reposait sur l'en-tête `X-Forwarded-For`, falsifiable) ; confiance dans les proxys **automatique** (`backend/proxy.py`).
+- Exports refusés aux groupes à portée « masquée » ; alertes du tableau de bord masquées.
+- Échappement HTML de données saisies, URL du logo limitée à http(s), plafond de taille des requêtes (`APP_MAX_UPLOAD_MB`), liste blanche de colonnes sur les comptes.
+
+### 🚀 Déploiement
+- `deploy.sh` (production, branche `prod` figée) et `deploy-dev.sh` (branche `dev`) : sauvegarde, code, dépendances dans le venv du service, redémarrage et **vérification que l'application répond**. Logique commune dans `setup/deploy-common.sh`.
+- **Nouvelle version disponible** : bandeau dans l'administration (vérification toutes les 6 h, silencieuse sans Internet, désactivable).
+- **Mise à jour depuis le navigateur** (facultative, désactivée par défaut) : l'application dépose une demande, une unité systemd lance le script en root (`setup/install-web-update.sh`) ; mot de passe exigé, journal d'audit, suivi de progression.
+- **Retour arrière automatique** du code et des bases si la nouvelle version ne répond pas ; verrou contre les lancements simultanés.
+- **Préproduction** : script `deploy-preprod.sh` (branche `preprod` figée), pastille **PREPROD** (version `-preprod`), et canal de mise à jour dédié.
+- `cryptography` est importée à la demande : sans elle, l'application démarre (seules les sauvegardes chiffrées sont indisponibles).
+- **Première mise à jour depuis une ancienne version : voir le README** (deux passages de `deploy.sh`, sauvegarde préalable).
+
 ## [3.18.3] - 2026-05-06
 
 ### 🐛 Bugfixes
 
 #### Permissions manquantes dans les groupes
-- **Problème** : Le groupe admin manquait permissions critiques (forms.delete, forms.edit, forms.restitution, pools.manage)
+- **Problème** : Le groupe admin manquait permissions critiques (forms.delete, forms.edit, forms.restitution)
 - **Cause** : Les groupes n'avaient pas toutes les permissions requises par les routes
 - **Solution** : Audit complet + correction des permissions manquantes
 - **Impact** : Admin et autres groupes (gestion, redaction) ont maintenant les bonnes permissions
@@ -101,11 +144,6 @@
 ## [3.18.0] - 2026-05-06
 
 ### ✨ Nouvelles fonctionnalités
-
-#### Sélecteur d'équipement mutualisé dans le formulaire
-- Intégration du système de pools partagés dans l'interface de formulaire
-- Support multi-sélection pour les ressources partagées
-- Synchronisation automatique avec les pools
 
 #### Navigation restitution 5 onglets
 - Phase 1 : Dates de restitution

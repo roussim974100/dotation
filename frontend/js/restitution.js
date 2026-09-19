@@ -267,17 +267,6 @@ function toggleSignatureMode() {
   const mode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
   document.getElementById("restitutionSignatureCanvasWrap")?.classList.toggle("d-none", mode !== "signed");
   document.getElementById("restitutionSignatureReasonWrap")?.classList.toggle("d-none", mode !== "impossible");
-  document.getElementById("restitutionLinkValidityWrap")?.classList.toggle("d-none", mode !== "deferred");
-  const saveButton = document.getElementById("saveRestitutionBtn");
-  const pendingButton = document.getElementById("saveRestitutionPendingBtn");
-  if (saveButton) {
-    saveButton.textContent = mode === "deferred"
-      ? "Enregistrer et générer le lien"
-      : "Finaliser la restitution";
-  }
-  if (pendingButton) {
-    pendingButton.classList.toggle("d-none", mode === "deferred");
-  }
 }
 
 function renderRestitutionItems(items, existingStates) {
@@ -450,16 +439,6 @@ function restoreRestitutionSignature(restitution, signaturePad) {
   }
   signaturePad.restore(status === "signed" ? (restitution?.signatureDataUrl || "") : "");
   toggleSignatureMode();
-}
-
-function getRestitutionLinkValidityDays() {
-  const field = document.getElementById("restitution_link_validity_days");
-  const rawValue = Number.parseInt(field?.value || "7", 10);
-  const sanitized = Number.isFinite(rawValue) ? Math.min(30, Math.max(1, rawValue)) : 7;
-  if (field) {
-    field.value = String(sanitized);
-  }
-  return sanitized;
 }
 
 function applyRestitutionSignatureProtection(locked) {
@@ -636,21 +615,21 @@ async function initRestitutionPage() {
     const id = params.get("id");
     if (!id) {
       alert("Aucune fiche selectionnee.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 
     const result = await getDraftById(id);
     if (!result?.data) {
       alert("Fiche introuvable.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 
     const currentStatus = result.summary?.status || result.data?.workflow?.status;
     if (!["active", "partial_return", "awaiting_signature", "returned"].includes(currentStatus)) {
       alert("La restitution n'est disponible que pour les dossiers avec materiel a restituer ou deja restitue.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
     const readOnlyMode = currentStatus === "returned";
@@ -668,12 +647,13 @@ async function initRestitutionPage() {
     });
 
     document.getElementById("restitutionTitle").textContent = `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`;
+    renderRestitutionSteps({ current: 2, id: new URLSearchParams(window.location.search).get("id"), name: document.getElementById("restitutionTitle").textContent, phase1Validated: true });
     document.getElementById("restitutionSubtitle").textContent = result.data.beneficiaire.service || result.data.beneficiaire.mandat || "Fiche active";
     document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return"
       ? "Restitution partielle"
       : (currentStatus === "awaiting_signature" ? "En attente de signature" : (currentStatus === "returned" ? "Restitution terminée" : "Attribution active"));
-    const materialItems = (result.items || []).filter((item) => isRestitutionEligibleItem(item));
-    const immaterielItems = (result.items || []).filter((item) => item.category === "immateriel");
+    const materialItems = (result.items || []).filter((item) => item.assigned && isRestitutionEligibleItem(item));
+    const immaterielItems = (result.items || []).filter((item) => item.assigned && item.category === "immateriel");
     renderRestitutionItems(materialItems, result.data.restitution?.items || {});
     renderImmaterielItems(immaterielItems, result.data.restitution?.immaterielActions || {});
     restoreRestitutionSignature(currentRestitution, signaturePad);
@@ -786,39 +766,6 @@ async function initRestitutionPage() {
       });
     }
 
-    async function shareRestitutionSignatureLink() {
-      try {
-        await saveRestitution(buildRestitutionPayload(true), { keepPending: false });
-
-        const linkResult = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-signature-link`, {
-          method: "POST",
-          body: JSON.stringify({
-            validityDays: getRestitutionLinkValidityDays()
-          })
-        });
-
-        await window.playCompletionCelebration("boat");
-        await window.askWorkflowDialog({
-          title: "Lien de signature prêt",
-          text: "La restitution est enregistrée et le lien de signature à distance est désormais disponible pour l'envoi par e-mail ou la copie du lien.",
-          steps: [
-            { label: "Restitution enregistrée", status: "done" },
-            { label: "Lien de signature préparé", status: "done" }
-          ],
-          hideSpinner: true,
-          showConfirm: true,
-          confirmLabel: "OK"
-        });
-        window.location.href = "index.html";
-      } catch (error) {
-        window.closeWorkflowDialog();
-        await showRestitutionInfoDialog(
-          "Erreur de restitution",
-          error.message || "Impossible de générer le lien de signature de restitution."
-        );
-      }
-    }
-
     document.getElementById("saveRestitutionPendingBtn")?.addEventListener("click", async () => {
       const workflowLabels = [
         "Préparation des éléments de restitution",
@@ -827,11 +774,6 @@ async function initRestitutionPage() {
         "Retour au tableau de bord"
       ];
       try {
-        const selectedSignatureMode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
-        if (selectedSignatureMode === "deferred") {
-          throw new Error("Utilisez le bouton de finalisation pour générer un lien de signature à distance.");
-        }
-
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution est enregistrée en attente de finalisation.",
@@ -853,7 +795,7 @@ async function initRestitutionPage() {
           showConfirm: true,
           confirmLabel: "OK"
         });
-        window.location.href = "index.html";
+        window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();
         await showRestitutionInfoDialog(
@@ -877,21 +819,11 @@ async function initRestitutionPage() {
           steps: createRestitutionWorkflowSteps(workflowLabels, 0)
         });
 
-        const selectedSignatureMode = document.querySelector('input[name="restitution_signature_status"]:checked')?.value || "signed";
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La cohérence des états et du mode de signature est en cours de vérification.",
           steps: createRestitutionWorkflowSteps(workflowLabels, 1)
         });
-        if (selectedSignatureMode === "deferred") {
-          window.showWorkflowDialog({
-            title: "Enregistrement de la restitution",
-            text: "La restitution est enregistrée et le lien de signature va être préparé.",
-            steps: createRestitutionWorkflowSteps(workflowLabels, 2)
-          });
-          await shareRestitutionSignatureLink();
-          return;
-        }
 
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
@@ -915,7 +847,7 @@ async function initRestitutionPage() {
           showConfirm: true,
           confirmLabel: "OK"
         });
-        window.location.href = "index.html";
+        window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();
         await showRestitutionInfoDialog(
@@ -932,7 +864,7 @@ async function initRestitutionPage() {
     console.error("Erreur lors du chargement de la restitution", error);
     hideRestitutionLoader();
     alert("Impossible de charger la restitution.");
-    window.location.href = "index.html";
+    window.location.href = "restitutions-pending.html";
   }
 }
 

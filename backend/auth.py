@@ -1,12 +1,12 @@
 import json
 import os
 import re
-import threading
 import bcrypt
 from datetime import datetime
 from functools import wraps
 from flask import has_request_context, jsonify, redirect, request, session
 
+import rate_store
 from config import BASE_DIR
 from database import get_db, get_users_db
 
@@ -71,15 +71,28 @@ def update_group(key, permissions):
         return False
 
 
-def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False):
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def normalize_email(value):
+    """Adresse e-mail d'un compte : facultative. Retourne (adresse nettoyee, erreur) ; erreur = None si valide."""
+    email = str(value or "").strip().lower()
+    if not email:
+        return "", None
+    if len(email) > 254 or not _EMAIL_RE.match(email):
+        return email, "invalid_email"
+    return email, None
+
+
+def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False, email="", first_name="", last_name=""):
     """Crée un nouvel utilisateur. Affecte le premier utilisateur au groupe admin automatiquement."""
     try:
         from utils import utc_now
         with get_users_db() as conn:
             now = utc_now()
             conn.execute(
-                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                (username, password_hash, int(is_active), status, service, int(db_manage), now, now)
+                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, email, first_name, last_name, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (username, password_hash, int(is_active), status, service, int(db_manage), email or "", first_name or "", last_name or "", now, now)
             )
             # Si c'est le premier utilisateur ET qu'il n'a pas de groupe, l'affecter au groupe admin
             user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -96,13 +109,21 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
         return False
 
 
+# Colonnes modifiables de users : liste blanche, car les noms de colonnes sont inseres dans le SQL.
+UPDATABLE_USER_COLUMNS = frozenset({
+    "password_hash", "is_active", "status", "service", "db_manage", "email", "first_name", "last_name",
+})
+
+
 def update_user(username, **fields):
     """Met à jour un utilisateur."""
     try:
         from utils import utc_now
+        update_fields = {k: v for k, v in fields.items() if k != "groups"}
+        if not set(update_fields) <= UPDATABLE_USER_COLUMNS:
+            return False
         with get_users_db() as conn:
             # Mettre à jour les colonnes
-            update_fields = {k: v for k, v in fields.items() if k != "groups"}
             if update_fields:
                 update_fields["updated_at"] = utc_now()
                 cols = ", ".join(f"{k}=?" for k in update_fields.keys())
@@ -141,43 +162,19 @@ def delete_user(username):
 
 _LOGIN_MAX_ATTEMPTS = 10
 _LOGIN_WINDOW_SECONDS = 600
-_login_attempts: dict[str, list[float]] = {}
-_login_attempts_lock = threading.Lock()
 
 
 def _is_login_rate_limited(ip: str) -> bool:
-    now = datetime.now().timestamp()
-    with _login_attempts_lock:
-        attempts = _login_attempts.get(ip, [])
-        attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS]
-        if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
-            _login_attempts[ip] = attempts
-            return True
-        attempts.append(now)
-        _login_attempts[ip] = attempts
-        return False
+    return rate_store.hit("login", ip, _LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
 
 
 # ---------------------------------------------------------------------------
 # Rate limiting générique par IP + scope (endpoints API sensibles).
+# Les compteurs sont partagés entre les processus gunicorn (voir rate_store.py).
 # ---------------------------------------------------------------------------
 
-_API_RATE_STORES: dict[str, dict[str, list[float]]] = {}
-_api_rate_lock = threading.Lock()
-
-
 def _is_api_rate_limited(ip: str, scope: str, max_requests: int, window_seconds: int) -> bool:
-    now = datetime.now().timestamp()
-    with _api_rate_lock:
-        store = _API_RATE_STORES.setdefault(scope, {})
-        attempts = store.get(ip, [])
-        attempts = [t for t in attempts if now - t < window_seconds]
-        if len(attempts) >= max_requests:
-            store[ip] = attempts
-            return True
-        attempts.append(now)
-        store[ip] = attempts
-        return False
+    return rate_store.hit(scope, ip, max_requests, window_seconds)
 
 
 def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
@@ -188,7 +185,7 @@ def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
 
         @wraps(view)
         def wrapped_view(*args, **kwargs):
-            ip = get_request_client_ip() or "unknown"
+            ip = get_rate_limit_key()
             if _is_api_rate_limited(ip, _scope, max_requests, window_seconds):
                 return jsonify({"error": "rate_limit_exceeded"}), 429
             return view(*args, **kwargs)
@@ -267,6 +264,9 @@ def build_user_context(username):
         "is_admin": "admin" in groups or "*" in permissions,
         "service": (user.get("service") or "") if user else "",
         "db_manage": bool(user.get("db_manage", False)) if user else False,
+        "first_name": (user.get("first_name") or "") if user else "",
+        "last_name": (user.get("last_name") or "") if user else "",
+        "email": (user.get("email") or "") if user else "",
     }
 
 
@@ -377,7 +377,16 @@ def extract_first_forwarded_ip(value):
     return ""
 
 
+def get_rate_limit_key():
+    """Cle de limitation : IP vue par le serveur (corrigee par ProxyFix selon les proxys de confiance).
+    Ne jamais utiliser l'en-tete X-Forwarded-For brut ici : son premier element est fourni par le client."""
+    if not has_request_context():
+        return "unknown"
+    return str(request.remote_addr or "").strip() or "unknown"
+
+
 def get_request_client_ip():
+    """IP declaree (journaux, information) : peut etre falsifiee par le client, pas pour la securite."""
     if not has_request_context():
         return ""
     forwarded_ip = extract_first_forwarded_ip(request.headers.get("X-Forwarded-For"))
