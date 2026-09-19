@@ -36,6 +36,9 @@ Cumul des versions 3.19 à 3.48 depuis la 3.18.3.
 
 ### 🚀 Déploiement
 - `deploy.sh` (production, branche `prod` figée) et `deploy-dev.sh` (branche `dev`) : sauvegarde, code, dépendances dans le venv du service, redémarrage et **vérification que l'application répond**. Logique commune dans `setup/deploy-common.sh`.
+- **Nouvelle version disponible** : bandeau dans l'administration (vérification toutes les 6 h, silencieuse sans Internet, désactivable).
+- **Mise à jour depuis le navigateur** (facultative, désactivée par défaut) : l'application dépose une demande, une unité systemd lance le script en root (`setup/install-web-update.sh`) ; mot de passe exigé, journal d'audit, suivi de progression.
+- **Retour arrière automatique** du code et des bases si la nouvelle version ne répond pas ; verrou contre les lancements simultanés.
 - `cryptography` est importée à la demande : sans elle, l'application démarre (seules les sauvegardes chiffrées sont indisponibles).
 - **Première mise à jour depuis une ancienne version : voir le README** (deux passages de `deploy.sh`, sauvegarde préalable).
 

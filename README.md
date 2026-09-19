@@ -564,6 +564,27 @@ Si une dépendance manque après l'étape 2, l'application **démarre quand mêm
 
 > Le dossier `backend/venv/` est suivi par git (héritage) : `deploy.sh` l'ignore dans son contrôle des modifications locales. Ne pas le retirer de git sans protéger les serveurs existants, un `git pull` supprimerait alors leur venv.
 
+### Nouvelle version disponible et mise à jour depuis le navigateur
+
+**Bandeau « nouvelle version »** (activé par défaut) : dans *Administration*, l'application compare sa version à celle de la branche de son canal sur GitHub (`dev` pour une version `-dev`, `prod` sinon) et affiche « Nouvelle version X disponible » avec le lien vers les notes de version. La vérification est faite au plus toutes les 6 heures, sans jamais ralentir la page ; sans accès à Internet elle échoue en silence. Pour la couper : `APP_UPDATE_CHECK=0`.
+
+**Bouton « Mettre à jour maintenant »** (facultatif, **désactivé par défaut**) : à activer une seule fois sur le serveur.
+
+```bash
+cd /opt/dotation
+sudo bash setup/install-web-update.sh          # installe l'unité de surveillance, propose de redémarrer le service
+sudo bash setup/install-web-update.sh --uninstall   # pour le retirer
+```
+
+Comment ça marche, et pourquoi c'est sûr :
+- l'application **ne lance aucune commande** : elle dépose un simple fichier de demande (`<données>/update/request.json`) ;
+- une unité systemd (`dotation-update.path`) surveille ce fichier et lance `deploy.sh` (ou `deploy-dev.sh`) **en root** ; la branche est figée, le contenu de la demande n'est jamais lu ;
+- l'administrateur doit avoir le droit `users.manage` **et retaper son mot de passe** ; l'action est inscrite au journal d'audit ;
+- avant la mise à jour, les bases sont sauvegardées ; si la nouvelle version ne répond pas, **le code et les bases sont rétablis automatiquement** ;
+- la page suit la progression (sauvegarde, code, dépendances, redémarrage) et annonce la fin ou l'échec ; le journal complet est dans `<données>/update/update.log`.
+
+Non disponible sous Windows (le bandeau reste affiché, avec la commande à lancer).
+
 ### Dépannage après une mise à jour
 
 | Symptôme | Cause probable | Vérification / correctif |
@@ -591,6 +612,9 @@ Pour revenir en arrière : arrêter le service, recopier les fichiers de `backen
 | `GIT_BRANCH` | `main` | Branche à déployer (pour le script) |
 | `APP_SECRET_KEY` | fichier `.app_secret_key` généré au 1er démarrage | Clé de signature des sessions (à fixer en environnement multi-serveurs) |
 | `APP_MAX_UPLOAD_MB` | `100` | Taille maximale d'une requête (import CSV, logo, restauration de base) |
+| `APP_UPDATE_CHECK` | `1` | `0` désactive la vérification « nouvelle version » (aucune requête vers GitHub) |
+| `APP_UPDATE_CHECK_URL` | GitHub, branche du canal | Adresse (http/https) du fichier `branding.js` à interroger, pour un miroir interne |
+| `APP_ALLOW_WEB_UPDATE` | `0` | Posé par `setup/install-web-update.sh` : affiche le bouton de mise à jour (exige l'unité systemd installée) |
 | `APP_TRUSTED_PROXIES` | automatique | Surcharge **facultative** de la confiance dans `X-Forwarded-*` : `0` = jamais, `N` = forcer N proxys (proxy à IP publique). Voir « Adresse IP des clients » |
 
 Exemple au démarrage du service :

@@ -1,0 +1,11 @@
+# Lance le script de deploiement (branche figee) quand la demande apparait. Tourne en root, jamais l'application.
+# Le contenu de la demande n'est PAS lu : elle sert uniquement de declencheur.
+# Modele : @APP_DIR@ et @DEPLOY_SCRIPT@ sont remplaces par setup/install-web-update.sh.
+[Unit]
+Description=Mise a jour d'A Quai (lancee depuis l'administration)
+
+[Service]
+Type=oneshot
+WorkingDirectory=@APP_DIR@
+ExecStart=/bin/bash @APP_DIR@/@DEPLOY_SCRIPT@ --from-web
+TimeoutStartSec=1200
