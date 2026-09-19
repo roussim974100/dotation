@@ -75,3 +75,42 @@ def test_only_fields_defined_by_the_resource_are_returned():
     row = _row("SN5", "conforme", "2026-05-01", 1, legacy=True, assignedAt="2025-11-15", conditionAttribution="neuf", selected=True)
     units = compute_available_units([row], "numeroSerie", {"numeroSerie", "marque", "modele"})
     assert set(units[0]["fields"]) == {"numeroSerie", "marque", "modele"}
+
+
+# --- avertissement de doublon -------------------------------------------------------------
+
+from models.inventory import find_current_holder
+
+
+def _holder_row(serial, condition, when, item_id, form_id, service="DSI"):
+    row = _row(serial, condition, when, item_id)
+    row.update({"form_id": form_id, "service": service})
+    return row
+
+
+def test_unit_pending_in_another_dossier_is_reported():
+    rows = [_holder_row("SN1", "pending", "2026-06-01", 1, "F-A", "Police")]
+    assert find_current_holder(rows, "numeroSerie", "sn1", "F-B") == {"service": "Police", "since": "2026-06-01"}
+
+
+def test_unit_held_by_the_dossier_being_edited_is_not_a_conflict():
+    rows = [_holder_row("SN1", "pending", "2026-06-01", 1, "F-A")]
+    assert find_current_holder(rows, "numeroSerie", "SN1", "F-A") is None
+
+
+def test_returned_or_lost_unit_is_not_a_conflict():
+    for condition in ("conforme", "degrade", "non_restitue"):
+        rows = [_holder_row("SN1", condition, "2026-06-01", 1, "F-A")]
+        assert find_current_holder(rows, "numeroSerie", "SN1", "F-B") is None
+
+
+def test_latest_dossier_decides_who_holds_the_unit():
+    rows = [_holder_row("SN1", "pending", "2026-05-01", 1, "F-A"), _holder_row("SN1", "conforme", "2026-05-20", 2, "F-A"),
+            _holder_row("SN1", "pending", "2026-06-01", 3, "F-C", "RH")]
+    assert find_current_holder(rows, "numeroSerie", "SN1", "F-B")["service"] == "RH"
+
+
+def test_unknown_or_empty_value_is_never_a_conflict():
+    rows = [_holder_row("SN1", "pending", "2026-06-01", 1, "F-A")]
+    assert find_current_holder(rows, "numeroSerie", "AUTRE", "F-B") is None
+    assert find_current_holder(rows, "numeroSerie", "", "F-B") is None

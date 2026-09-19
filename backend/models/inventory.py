@@ -76,6 +76,44 @@ def compute_available_units(rows, identifier_key, field_keys=None):
     return units
 
 
+def find_current_holder(rows, identifier_key, value, exclude_form_id=None):
+    """Si l'unite `value` est actuellement attribuee dans un AUTRE dossier (sa derniere ligne n'est pas
+    restituee), retourne {service, since} ; sinon None. rows : lignes avec form_id, service, sort_key."""
+    target = normalize_identifier(value)
+    if not target:
+        return None
+    latest = None
+    for row in rows:
+        try:
+            details = row["details_json"] if isinstance(row["details_json"], dict) else json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        if normalize_identifier(_fields_of(details).get(identifier_key)) != target:
+            continue
+        order = (str(row.get("sort_key") or ""), row.get("item_id") or 0)
+        if latest is None or order > latest[0]:
+            latest = (order, row)
+    if not latest:
+        return None
+    row = latest[1]
+    if row.get("form_id") == exclude_form_id:
+        return None  # c'est ce dossier lui-meme
+    if (row.get("return_condition") or "pending") in READY_CONDITIONS | DEGRADED_CONDITIONS | {"non_restitue"}:
+        return None  # restitue (ou declare perdu) : plus attribue
+    return {"service": row.get("service") or "", "since": str(row.get("sort_key") or "")}
+
+
+def list_holder_rows(connection, resource_code):
+    return [dict(row) for row in connection.execute(
+        """
+        SELECT i.id AS item_id, i.form_id, i.details_json, i.return_condition, f.service AS service, f.updated_at AS sort_key
+        FROM dotation_items i JOIN dotation_forms f ON f.id = i.form_id
+        WHERE i.item_key = ? AND i.assigned = 1
+        """,
+        (resource_code,),
+    ).fetchall()]
+
+
 def list_available_units(connection, resource_code, identifier_key, field_keys=None):
     rows = connection.execute(
         """

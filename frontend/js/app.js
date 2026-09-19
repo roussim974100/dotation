@@ -421,6 +421,34 @@ document.addEventListener("click", (event) => {
   if (button) void openReuseResourceModal(button.dataset.reuseResource);
 });
 
+// Avertissement (non bloquant) quand le n° de serie / badge saisi est deja attribue dans un autre dossier.
+document.addEventListener("change", async (event) => {
+  const input = event.target.closest?.(".dynamic-resource-field");
+  if (!input) return;
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(input.dataset.resourceId));
+  if (!resource || !resource.identifier_key || input.dataset.fieldKey !== resource.identifier_key) return;
+  let warning = input.parentElement.querySelector(".resource-duplicate-warning");
+  if (!warning) {
+    warning = document.createElement("div");
+    warning.className = "form-text text-warning resource-duplicate-warning";
+    warning.setAttribute("role", "status");
+    input.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "";
+  const value = input.value.trim();
+  if (!value) return;
+  try {
+    const exclude = document.getElementById("dotationForm")?.dataset.draftId || "";
+    const data = await requestJson(`/api/catalog/holder/${encodeURIComponent(resource.id)}?value=${encodeURIComponent(value)}&exclude=${encodeURIComponent(exclude)}`);
+    if (data.holder) {
+      const since = data.holder.since ? ` depuis le ${new Date(data.holder.since).toLocaleDateString("fr-FR")}` : "";
+      warning.textContent = `Attention : « ${value} » est déjà attribué dans un autre dossier${data.holder.service ? ` (service ${data.holder.service})` : ""}${since}. Vérifiez qu'il a bien été restitué.`;
+    }
+  } catch (error) {
+    // Controle de confort : une erreur reseau ne doit pas gener la saisie.
+  }
+});
+
 function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
   const placeholder = field.placeholder || field.label;
