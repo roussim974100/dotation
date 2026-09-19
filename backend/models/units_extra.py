@@ -192,6 +192,8 @@ def compute_indicators(connection, resource_code=None, long_hold_days=365, now=N
         "by_status": status_counts,
         "avg_hold_days": round(sum(durations) / len(durations), 1) if durations else None,
         "damage_rate": round(100 * returned_bad / total_returns, 1) if total_returns else None,
+        "returns_total": total_returns,
+        "returns_degraded": returned_bad,
         "assignments_per_unit": round(assignments / len(units), 2) if units else None,
         "long_held": long_held,
         "long_hold_days": long_hold_days,
