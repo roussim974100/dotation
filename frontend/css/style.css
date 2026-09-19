@@ -5167,3 +5167,48 @@ section.content-card[id^="db-"] {
   color: #9db0c2;
   opacity: 1;
 }
+
+
+/* Navigation d'administration commune (admin-nav.js) : groupes, fil d'Ariane, focus et cibles tactiles. */
+.admin-nav__group {
+  margin: 0.9rem 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+}
+
+.admin-nav__link--local {
+  border-style: dashed;
+}
+
+.admin-breadcrumb .breadcrumb {
+  font-size: 0.9rem;
+}
+
+.admin-nav__link,
+.dashboard-nav__link,
+.user-menu__item {
+  min-height: 44px;
+}
+
+.admin-nav__link:focus-visible,
+.dashboard-nav__link:focus-visible,
+.user-menu__item:focus-visible,
+.admin-breadcrumb a:focus-visible {
+  outline: 3px solid var(--brand, #0f5b8d);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+  }
+  .dashboard-nav__link {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}

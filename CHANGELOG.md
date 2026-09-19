@@ -11,6 +11,11 @@ Chantier « Assistant d'organisation » : configuration de démarrage rejouable,
 - **Sécurité** : le serveur calcule le plan (`plan_org_wizard`) et n'applique que le plan aperçu (empreinte vérifiée) ; copie de sécurité de la base avant application ; une seule transaction ; entrée au journal d'audit ; droit `users.manage`, limitation de fréquence. API : `GET /api/admin/org-presets`, `POST /api/admin/org-wizard/preview` et `/apply`.
 - **Checklist de démarrage** sur le portail admin (avancement calculé sur l'état réel : nom, assistant passé, ressources, DPO, sauvegarde automatique, support, domaines e-mail) ; l'installation initiale débouche sur l'assistant.
 
+### 🧭 Navigation cohérente, moins de clics
+- **Menu du compte identique sur toutes les pages**, généré par `ui.js` : Administration, Synthèse, Parc matériel et Base de données (selon les droits) puis Mon profil, Mode sombre, Changer le mot de passe, Aide générale, Déconnexion. Corrige les pages où « Administration » ou « Synthèse » manquaient (journal, corbeille, aide…).
+- **Navigation d'administration commune** (`admin-nav.js`) : menu latéral groupé (Utilisateurs, Organisation, Apparence, Exploitation) identique sur toutes les sous-pages, ajouté au journal et à la corbeille ; page courante marquée ; **fil d'Ariane** Accueil › Administration › Page ; l'assistant d'organisation est accessible en un clic. Passer d'une sous-page à une autre : 1 clic au lieu de 2 ou 3.
+- Accessibilité : focus clavier visible, cibles de 44 px, onglets défilants sur mobile.
+
 ### 🔒 Sprint 1 : sécurité des réglages
 
 ### 🔒 Sécurité et robustesse des réglages

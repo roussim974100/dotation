@@ -574,11 +574,34 @@ function toggleDarkMode() {
   updateDarkModeLabel();
 }
 
+// Menu du compte : UNE seule definition, generee sur toutes les pages (le HTML statique des pages n'est plus qu'un repli).
+// Ordre fixe : identite, « espaces » autorises par les droits (ajoutes apres /api/session), compte, aide, deconnexion.
+function buildUserMenuPanel(menu) {
+  const panel = menu.querySelector(".user-menu__panel");
+  if (!panel) {
+    return;
+  }
+  const onAccount = window.location.pathname.endsWith("account.html") ? ' aria-current="page"' : "";
+  panel.innerHTML = `
+    <div class="user-menu__header">
+      <span class="user-menu__name" id="userMenuName"></span>
+      <span class="user-menu__role" id="userMenuRole"></span>
+    </div>
+    <div id="userMenuSpaces" class="d-none"><div class="user-menu__sep"></div></div>
+    <a class="user-menu__item" id="accountLink" href="account.html"${onAccount}>Mon profil</a>
+    <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+    <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+    <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide générale</a>
+    <div class="user-menu__sep"></div>
+    <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>`;
+}
+
 function initUserMenu() {
   const menu = document.getElementById("userMenu");
   if (!menu) {
     return;
   }
+  buildUserMenuPanel(menu);
 
   // Fermer le menu au clic externe
   document.addEventListener("click", (e) => {
@@ -636,9 +659,19 @@ const USER_MENU_FEATURE_LINKS = [
   }
 ];
 
+// Espaces du menu du compte, dans l'ordre d'affichage.
+const USER_MENU_SPACES = [
+  {
+    id: "adminLink", label: "Administration", href: "admin.html",
+    isAllowed: (user) => (user.permissions || []).includes("users.manage") || (user.permissions || []).includes("*")
+  },
+  { id: "execDashboardLink", label: "Synthèse", href: "executive-dashboard.html", isAllowed: (user) => Boolean(user.groups?.includes("direction") || user.is_admin) },
+  ...USER_MENU_FEATURE_LINKS
+];
+
 function renderUserMenuFeatureLinks(user) {
   // Meme entree dans la navigation laterale des pages d'administration.
-  document.querySelectorAll(".admin-nav").forEach((nav) => {
+  document.querySelectorAll(".admin-nav:not([data-managed])").forEach((nav) => {
     USER_MENU_FEATURE_LINKS.forEach((link) => {
       if (nav.querySelector(`[href="${link.href}"]`) || !link.isAllowed(user)) return;
       const item = document.createElement("a");
@@ -650,10 +683,10 @@ function renderUserMenuFeatureLinks(user) {
       nav.appendChild(item);
     });
   });
-  const panel = document.querySelector("#userMenu .user-menu__panel");
-  if (!panel) return;
-  const anchor = panel.querySelector(".user-menu__sep");
-  USER_MENU_FEATURE_LINKS.forEach((link) => {
+  const spaces = document.getElementById("userMenuSpaces");
+  if (!spaces) return;
+  let shown = 0;
+  USER_MENU_SPACES.forEach((link) => {
     if (document.getElementById(link.id) || !link.isAllowed(user)) return;
     const item = document.createElement("a");
     item.id = link.id;
@@ -661,8 +694,10 @@ function renderUserMenuFeatureLinks(user) {
     item.href = link.href;
     item.textContent = link.label;
     if (window.location.pathname.endsWith(link.href)) item.setAttribute("aria-current", "page");
-    panel.insertBefore(item, anchor);
+    spaces.insertBefore(item, spaces.querySelector(".user-menu__sep"));
+    shown += 1;
   });
+  spaces.classList.toggle("d-none", shown === 0);
 }
 
 async function populateUserMenuIdentity() {
@@ -677,29 +712,10 @@ async function populateUserMenuIdentity() {
     const btnEl = document.getElementById("userMenuBtn");
     const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
     if (nameEl) nameEl.textContent = fullName || user.username || "";
-    // Entree "Mon compte" : profil (e-mail, mot de passe), identite en lecture seule.
-    const panel = document.querySelector("#userMenu .user-menu__panel");
-    if (panel && !document.getElementById("accountLink")) {
-      const account = document.createElement("a");
-      account.id = "accountLink";
-      account.className = "user-menu__item";
-      account.href = "account.html";
-      account.textContent = "Mon profil";
-      if (window.location.pathname.endsWith("account.html")) account.setAttribute("aria-current", "page");
-      const anchor = panel.querySelector(".user-menu__header");
-      panel.insertBefore(account, anchor ? anchor.nextSibling : panel.firstChild);
-    }
     if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
     if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
 
     renderUserMenuFeatureLinks(user);
-    const permissions = user.permissions || [];
-    if (permissions.includes("users.manage") || permissions.includes("*")) {
-      document.getElementById("adminLink")?.classList.remove("d-none");
-    }
-    if (user.groups?.includes("direction") || user.is_admin) {
-      document.getElementById("execDashboardLink")?.classList.remove("d-none");
-    }
   } catch (_) {
     // silently ignore
   }
