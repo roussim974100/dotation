@@ -39,7 +39,7 @@ function stockCardHtml(level) {
       <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
         <div>
           <strong>${parcEsc(level.label)}</strong> ${stockChips(level)}
-          <div class="small text-muted">${level.on_hand} en stock · ${level.held} chez des agents · seuil d'alerte ${level.threshold === null ? "non défini" : level.threshold}</div>
+          <div class="small text-muted">${level.on_hand} en stock · <strong>${level.available ?? level.on_hand} disponible(s)</strong>${level.reserved ? ` (${level.reserved} réservé(s) par des brouillons)` : ""} · ${level.held} chez des agents · seuil d'alerte ${level.threshold === null ? "non défini" : level.threshold}</div>
         </div>
         <div class="draft-actions">${actions}
           <button class="btn btn-sm btn-outline-secondary" type="button" data-stock-history="${parcEsc(level.resource_code)}">Historique</button>
@@ -47,10 +47,12 @@ function stockCardHtml(level) {
       </div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>${level.has_variant ? "Taille / variante" : "Stock"}</th><th class="text-end">En stock</th><th class="text-end">Chez des agents</th><th>Dernier mouvement</th></tr></thead>
+          <thead><tr><th>${level.has_variant ? "Taille / variante" : "Stock"}</th><th class="text-end">En stock</th><th class="text-end">Réservé</th><th class="text-end">Disponible</th><th class="text-end">Chez des agents</th><th>Dernier mouvement</th></tr></thead>
           <tbody>${rows.map((row) => `
             <tr><td>${parcEsc(row.variant || (level.has_variant ? "Sans taille" : "Total"))}</td>
               <td class="text-end${row.on_hand < 0 ? " text-danger fw-bold" : ""}">${row.on_hand}</td>
+              <td class="text-end">${row.reserved ?? 0}</td>
+              <td class="text-end${(row.available ?? row.on_hand) < 0 ? " text-danger fw-bold" : ""}">${row.available ?? row.on_hand}</td>
               <td class="text-end">${row.held}</td><td>${parcEsc(parcDate(row.last_movement))}</td></tr>`).join("")}
           </tbody>
         </table>
@@ -116,7 +118,7 @@ function openStockThreshold(code) {
   const level = stockLevel(code);
   stockOpenDialog({ mode: "threshold", code }, `Seuil d'alerte · ${level?.label || code}`, `
     ${stockErrorHtml()}
-    <p class="small text-muted">Une alerte « Stock bas » s'affiche quand le total en stock atteint ce seuil. Laissez vide pour ne pas être alerté.</p>
+    <p class="small text-muted">Une alerte « Stock bas » s'affiche quand la quantité disponible (en stock moins les réservations des brouillons) atteint ce seuil. Laissez vide pour ne pas être alerté.</p>
     <div class="mb-3"><label class="form-label" for="stockThreshold">Seuil (nombre d'exemplaires)</label>
       <input class="form-control" id="stockThreshold" type="number" min="0" step="1" value="${level?.threshold ?? ""}"></div>
     <button class="btn btn-primary" type="button" data-stock-submit="true">Enregistrer</button>`);
@@ -171,9 +173,50 @@ async function submitStockDialog() {
   showToast("Stock mis à jour.", "success");
 }
 
+function initStockImport() {
+  const panel = parcEl("stockImport");
+  if (!panel || !parcCanManage) return;
+  panel.classList.remove("d-none");
+  const result = parcEl("stockImportResult");
+  const run = parcEl("stockImportRun");
+  const send = async (dryRun) => {
+    const file = parcEl("stockImportFile").files[0];
+    if (!file) { result.innerHTML = '<span class="text-danger">Choisissez un fichier CSV.</span>'; return null; }
+    const body = new FormData();
+    body.append("file", file);
+    body.append("dry_run", dryRun ? "1" : "0");
+    const response = await fetch("/api/stock/import", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": await parcCsrf() }, body });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { result.innerHTML = `<span class="text-danger">${parcEsc(data.message || `Erreur ${response.status}`)}</span>`; return null; }
+    return data;
+  };
+  const show = (report) => {
+    result.innerHTML = `<strong>${report.dry_run ? "Analyse" : "Import terminé"}</strong> : ${report.rows} ligne(s), ${report.created} ${report.dry_run ? "à ajuster" : "ajustée(s)"}, ${report.skipped} déjà à jour, ${report.errors.length} erreur(s).
+      ${report.errors.length ? `<ul class="text-danger mb-0">${report.errors.slice(0, 15).map((e) => `<li>Ligne ${e.line} : ${parcEsc(e.message)}</li>`).join("")}</ul>` : ""}`;
+  };
+  parcEl("stockImportCheck").addEventListener("click", async () => {
+    const report = await send(true);
+    if (report) { show(report); run.disabled = report.created === 0; }
+  });
+  run.addEventListener("click", async () => {
+    if (!(await askConfirm("Importer cet inventaire ? Le stock sera ajusté pour correspondre aux quantités du fichier. Les lignes en erreur sont ignorées.", { confirmLabel: "Importer" }))) return;
+    const report = await send(false);
+    if (report) { show(report); run.disabled = true; loadParcStock(); }
+  });
+  parcEl("stockImportTemplate").addEventListener("click", () => {
+    const blob = new Blob(["\ufeffressource;taille;quantite;note\nVeste;M;12;inventaire annuel\nVeste;L;5;\n"], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "modele_inventaire_stock.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+}
+
 function initParcStock() {
   if (!parcEl("parcStock")) return;
   loadParcStock();
+  initStockImport();
   document.addEventListener("click", (event) => {
     const kind = event.target.closest("[data-stock-kind]");
     if (kind) return openStockKind(kind.dataset.stockCode, kind.dataset.stockKind);

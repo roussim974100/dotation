@@ -189,3 +189,78 @@ def test_stock_routes_refuse_anonymous_and_unauthorised_users():
     assert client.post("/api/stock/veste/movements", json=body, headers=headers).status_code in (401, 403)
     assert client.put("/api/stock/veste/threshold", json={"threshold": 3}, headers=headers).status_code in (401, 403)
     assert client.post("/api/stock/veste/movements", json=body).status_code == 403  # sans jeton CSRF
+
+
+def test_import_sets_the_counted_stock_and_is_idempotent(db):
+    from models.stock import import_stock
+    csv_text = "ressource;taille;quantite;note\nveste;M;12;inventaire annuel\nveste;L;5;\ngilet;;7;\n"
+    dry = import_stock(db, csv_text, dry_run=True)
+    assert (dry["created"], dry["skipped"], dry["errors"]) == (3, 0, []) and on_hand(db) == 0  # a blanc : rien d'ecrit
+    real = import_stock(db, csv_text, actor="admin", dry_run=False)
+    assert real["created"] == 3 and on_hand(db, "veste", "M") == 12 and on_hand(db, "veste", "L") == 5 and on_hand(db, "gilet") == 7
+    again = import_stock(db, csv_text, dry_run=False)
+    assert (again["created"], again["skipped"]) == (0, 3) and on_hand(db, "veste", "M") == 12  # 2e import : aucun changement
+    # un nouvel inventaire ajuste l'ecart (12 -> 9)
+    import_stock(db, "ressource;taille;quantite\nveste;M;9\n", dry_run=False)
+    assert on_hand(db, "veste", "M") == 9
+
+
+def test_import_reports_bad_lines_without_stopping(db):
+    from models.stock import import_stock
+    text = "ressource,taille,quantite\ninconnue,M,3\nveste,M,abc\nveste,M,-2\nveste,M,4\nveste,M,6\nordinateur,,1\n"
+    report = import_stock(db, text, dry_run=False)
+    messages = " | ".join(e["message"] for e in report["errors"])
+    assert report["created"] == 1 and on_hand(db, "veste", "M") == 4  # seule la 1re ligne valide est prise
+    assert "inconnue" in messages and "abc" in messages and "-2" in messages and "Doublon" in messages and "ordinateur" in messages
+
+
+def touch_all(db):
+    """Dossiers de test recents (sinon leur reservation a deja expire : plus de 30 jours sans activite)."""
+    from datetime import datetime, timezone
+    db.execute("UPDATE dotation_forms SET updated_at = ?", (datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),))
+
+
+def test_drafts_reserve_stock_without_moving_it(db):
+    add_manual_movement(db, "veste", "receipt", 10, variant="M")
+    add_form(db, "F1", status="draft")
+    add_item(db, "F1", quantity=3, size="M")
+    add_form(db, "F2", status="awaiting_signature")
+    add_item(db, "F2", quantity=2, size="M")
+    add_form(db, "F3", status="cancelled")
+    add_item(db, "F3", quantity=4, size="M")  # un dossier annule ne reserve rien
+    touch_all(db)
+    level = next(l for l in stock_levels(db) if l["resource_code"] == "veste")
+    variant = next(v for v in level["variants"] if v["variant"] == "M")
+    assert (variant["on_hand"], variant["reserved"], variant["available"]) == (10, 5, 5)
+    assert (level["on_hand"], level["reserved"], level["available"]) == (10, 5, 5)
+
+
+def test_signature_turns_a_reservation_into_a_real_movement(db):
+    add_manual_movement(db, "veste", "receipt", 10, variant="M")
+    add_form(db, "F1", status="draft")
+    add_item(db, "F1", quantity=3)
+    touch_all(db)
+    assert next(l for l in stock_levels(db) if l["resource_code"] == "veste")["reserved"] == 3
+    db.execute("UPDATE dotation_forms SET status = 'active' WHERE id = 'F1'")
+    sync_stock_for_form(db, "F1")
+    level = next(l for l in stock_levels(db) if l["resource_code"] == "veste")
+    assert (level["on_hand"], level["reserved"], level["available"]) == (7, 0, 7)  # plus de reservation, le stock a baisse
+
+
+def test_a_stale_draft_no_longer_reserves(db):
+    add_manual_movement(db, "veste", "receipt", 10, variant="M")
+    add_form(db, "F1", status="draft")
+    add_item(db, "F1", quantity=3)
+    db.execute("UPDATE dotation_forms SET updated_at = '2020-01-01T00:00:00' WHERE id = 'F1'")
+    level = next(l for l in stock_levels(db) if l["resource_code"] == "veste")
+    assert level["reserved"] == 0 and level["available"] == 10
+
+
+def test_low_stock_alert_uses_the_available_quantity(db):
+    add_manual_movement(db, "veste", "receipt", 10, variant="M")
+    set_threshold(db, "veste", 5)
+    assert next(l for l in stock_levels(db) if l["resource_code"] == "veste")["low"] is False
+    add_form(db, "F1", status="draft")
+    add_item(db, "F1", quantity=6)
+    touch_all(db)  # 10 en stock, 6 reserves -> 4 disponibles : sous le seuil
+    assert next(l for l in stock_levels(db) if l["resource_code"] == "veste")["low"] is True
