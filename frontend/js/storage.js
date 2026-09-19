@@ -1134,23 +1134,25 @@ async function openNewRestitutionModal() {
           </div>
           <button class="btn btn-outline-secondary btn-sm" type="button" data-new-restitution-close="true">Fermer</button>
         </div>
+        <div class="btn-group w-100 mt-3" role="group" aria-label="Type de restitution">
+          <button class="btn btn-outline-primary active" type="button" id="newRestitutionModePick" aria-pressed="true">Attribution existante</button>
+          <button class="btn btn-outline-primary" type="button" id="newRestitutionModeRegul" aria-pressed="false">Personne sans attribution</button>
+        </div>
         <div class="password-generator-modal__content" id="newRestitutionPickPanel">
           <label class="form-label" for="newRestitutionSearch">Attribution concernée</label>
           <input class="form-control mb-3" id="newRestitutionSearch" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
           <div class="list-group" id="newRestitutionResults" role="list"></div>
-          <p class="form-text mb-2" id="newRestitutionHint"></p>
-          <button class="btn btn-link px-0" type="button" id="newRestitutionNoAssignmentBtn">La personne n'a pas d'attribution enregistrée ?</button>
+          <p class="form-text mb-0" id="newRestitutionHint"></p>
         </div>
         <form class="password-generator-modal__content d-none" id="newRestitutionRegulPanel" novalidate>
           <p class="form-text">Régularisation : le dossier est créé directement en restitution en cours, sans attribution.</p>
           <div id="newRestitutionRegulFields"></div>
           <fieldset class="mb-3">
             <legend class="form-label fs-6">Ressources à récupérer</legend>
-            <div id="newRestitutionRegulResources" class="regul-resources"></div>
+            <div id="newRestitutionRegulResources" class="row row-cols-1 row-cols-sm-2 g-1"></div>
           </fieldset>
           <p class="text-danger small d-none" id="newRestitutionRegulError" role="alert"></p>
-          <div class="password-generator-modal__actions">
-            <button class="btn btn-outline-secondary" type="button" id="newRestitutionRegulBack">Retour</button>
+          <div class="password-generator-modal__actions password-generator-modal__actions--sticky">
             <button class="btn btn-primary" type="submit" id="newRestitutionRegulSubmit">Créer la restitution</button>
           </div>
         </form>
@@ -1259,10 +1261,17 @@ async function setupRegularisationPanel(modal) {
   const showPanel = (name) => {
     pickPanel.classList.toggle("d-none", name !== "pick");
     regulPanel.classList.toggle("d-none", name !== "regul");
+    [["newRestitutionModePick", "pick"], ["newRestitutionModeRegul", "regul"]].forEach(([id, mode]) => {
+      const btn = document.getElementById(id);
+      btn.classList.toggle("active", name === mode);
+      btn.setAttribute("aria-pressed", String(name === mode));
+    });
     (name === "pick" ? document.getElementById("newRestitutionSearch") : document.getElementById("regul_nom"))?.focus();
   };
   showPanel("pick");
   errorEl.classList.add("d-none");
+  document.getElementById("newRestitutionModeRegul").onclick = () => showPanel("regul");
+  document.getElementById("newRestitutionModePick").onclick = () => showPanel("pick");
 
   let services = [];
   let resources = [];
@@ -1282,14 +1291,12 @@ async function setupRegularisationPanel(modal) {
   const returnable = resources.filter((res) => res.category === "materiel" && res.requires_return);
   resourcesWrap.innerHTML = returnable.length
     ? returnable.map((res) => `
-        <div class="form-check">
+        <div class="col"><div class="form-check">
           <input class="form-check-input" type="checkbox" id="regul_res_${res.id}" value="${res.id}">
           <label class="form-check-label" for="regul_res_${res.id}">${escapeHtml(res.label)}</label>
-        </div>`).join("")
+        </div></div>`).join("")
     : `<p class="form-text mb-0">Aucune ressource à restituer n'est définie dans le catalogue.</p>`;
 
-  document.getElementById("newRestitutionNoAssignmentBtn").onclick = () => showPanel("regul");
-  document.getElementById("newRestitutionRegulBack").onclick = () => showPanel("pick");
   regulPanel.onsubmit = async (event) => {
     event.preventDefault();
     const value = (key) => document.getElementById(`regul_${key}`)?.value.trim() || "";

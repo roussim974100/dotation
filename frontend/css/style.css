@@ -459,6 +459,21 @@ body.login-shell {
   flex-wrap: wrap;
 }
 
+/* Barre d'action toujours visible en bas d'une modale longue (defilement interne). */
+.password-generator-modal__actions--sticky {
+  position: sticky;
+  bottom: -1.35rem;
+  margin: 0 -1.35rem -1.35rem;
+  padding: 0.85rem 1.35rem;
+  border-top: 1px solid var(--border);
+  background: #fff;
+  border-radius: 0 0 24px 24px;
+}
+
+[data-color-mode="dark"] .password-generator-modal__actions--sticky {
+  background: var(--surface);
+}
+
 /* Contenants principaux reutilises dans les pages */
 .hero-panel,
 .content-card {
