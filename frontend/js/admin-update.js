@@ -42,30 +42,34 @@ function updateDismissed(progress) {
   }
 }
 
-function updateBannerHtml(state) {
+// Liste des bandeaux a afficher. Ils s'ajoutent : le resultat de la derniere mise a jour ne doit jamais cacher
+// l'annonce d'une nouvelle version (ni l'inverse).
+function updateViews(state) {
   const progress = state.progress || {};
   const meta = UPDATE_PROGRESS[progress.state];
   if (meta && progress.state === "running") {
-    return { tone: meta.tone, html: `<strong>${meta.title}</strong> — ${updEsc(progress.message || "préparation…")}
+    return [{ tone: meta.tone, html: `<strong>${meta.title}</strong> — ${updEsc(progress.message || "préparation…")}
       ${progress.step ? `<span class="text-muted">(étape ${updEsc(progress.step)})</span>` : ""}<br>
-      <span class="small">L'application va redémarrer quelques secondes : ne fermez pas cette page.</span>` };
+      <span class="small">L'application va redémarrer quelques secondes : ne fermez pas cette page.</span>` }];
   }
+  const views = [];
   if (meta && !updateDismissed(progress) && (Date.now() / 1000 - Number(progress.finished_at || 0)) < 24 * 3600) {
     const failed = progress.state === "failed" || progress.state === "rolled_back";
-    return { tone: meta.tone, dismissible: true, html: `<strong>${meta.title}</strong>${progress.to ? ` (${updEsc(progress.from || "")} → ${updEsc(progress.to)})` : ""}
+    const sameVersion = progress.to && progress.to === progress.from;
+    views.push({ tone: meta.tone, dismissible: true, html: `<strong>${meta.title}</strong>${progress.to ? (sameVersion ? ` (version ${updEsc(progress.to)}, code mis à jour)` : ` (${updEsc(progress.from || "")} → ${updEsc(progress.to)})`) : ""}
       ${progress.message ? `<br><span class="small">${updEsc(progress.message)}</span>` : ""}
-      ${failed ? '<br><span class="small">Le détail est dans le journal de mise à jour du serveur (dossier <code>update/</code>).</span>' : ""}` };
+      ${failed ? '<br><span class="small">Le détail est dans le journal de mise à jour du serveur (dossier <code>update/</code>).</span>' : ""}` });
   }
   if (state.available) {
     const action = state.can_update
       ? '<button class="btn btn-sm btn-primary" type="button" data-update-start="true">Mettre à jour maintenant</button>'
       : `<span class="small">Sur le serveur : <code>${updEsc(updateCommandHint(state))}</code></span>`;
-    return { tone: "info", html: `<div class="d-flex flex-wrap align-items-center gap-3">
+    views.push({ tone: "info", html: `<div class="d-flex flex-wrap align-items-center gap-3">
       <span><strong>Nouvelle version ${updEsc(state.latest)} disponible</strong> (vous utilisez ${updEsc(state.current)}).
         <a href="${updEsc(state.release_notes_url)}" target="_blank" rel="noopener">Notes de version</a></span>
-      <span class="ms-auto">${action}</span></div>` };
+      <span class="ms-auto">${action}</span></div>` });
   }
-  return null;
+  return views;
 }
 
 function renderUpdate(state) {
@@ -73,13 +77,13 @@ function renderUpdate(state) {
   const banner = updEl("updateBanner");
   const info = updEl("updateInfo");
   if (!banner) return;
-  const view = state.enabled === false && !(state.progress && state.progress.state) ? null : updateBannerHtml(state);
-  banner.className = `alert alert-${view ? view.tone : "info"} ${view ? "" : "d-none"} mb-4`;
-  banner.innerHTML = view ? `${view.html}${view.dismissible ? '<button type="button" class="btn-close float-end" data-update-dismiss="true" aria-label="Fermer"></button>' : ""}` : "";
+  const views = state.enabled === false && !(state.progress && state.progress.state) ? [] : updateViews(state);
+  banner.className = views.length ? "mb-4" : "d-none";
+  banner.innerHTML = views.map((view) => `<div class="alert alert-${view.tone} mb-2" role="status">${view.html}${view.dismissible ? '<button type="button" class="btn-close float-end" data-update-dismiss="true" aria-label="Fermer"></button>' : ""}</div>`).join("");
   if (info) {
     const checked = state.checked_at ? new Date(state.checked_at * 1000).toLocaleString("fr-FR") : null;
     info.innerHTML = `Version installée <strong>${updEsc(state.current || "?")}</strong>
-      ${state.enabled === false ? "· vérification des mises à jour désactivée" : state.error && !state.latest ? "· vérification impossible (pas d'accès à GitHub ?)" : state.available ? "" : "· à jour"}
+      ${state.enabled === false ? "· vérification des mises à jour désactivée" : state.error && !state.latest ? "· vérification impossible (pas d'accès à GitHub ?)" : state.available ? `· <strong>${updEsc(state.latest)} disponible</strong>` : "· à jour"}
       ${checked ? `<span class="text-muted">(vérifié le ${updEsc(checked)})</span>` : ""}
       ${state.enabled === false ? "" : '<button class="btn btn-link btn-sm p-0 ms-2" type="button" data-update-check="true">Vérifier maintenant</button>'}`;
   }
@@ -108,7 +112,7 @@ function startUpdatePolling() {
       }
     } catch (error) {
       const banner = updEl("updateBanner");
-      if (banner) { banner.className = "alert alert-warning mb-4"; banner.innerHTML = "<strong>Mise à jour en cours</strong> — redémarrage du service, un instant…"; }
+      if (banner) { banner.className = "mb-4"; banner.innerHTML = '<div class="alert alert-warning mb-2" role="status"><strong>Mise à jour en cours</strong> — redémarrage du service, un instant…</div>'; }
     }
   }, UPDATE_POLL_MS);
 }

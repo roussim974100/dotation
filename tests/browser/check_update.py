@@ -114,6 +114,9 @@ if __name__ == "__main__":
         check("les étapes du script sont suivies en direct (au moins 3 sur 4)", len(seen_steps) >= 3, sorted(seen_steps))
         final = driver.find_element(By.ID, "updateBanner").text
         check("la fin est annoncée : « Mise à jour terminée »", "Mise à jour terminée" in final, final[:100])
+        check("le résultat de la mise à jour ne cache PAS l'annonce de la nouvelle version (les deux bandeaux sont visibles)",
+              "Mise à jour terminée" in final and "Nouvelle version 9.9.9-dev disponible" in final, final[:160])
+        check("la ligne d'information annonce la version disponible", "9.9.9-dev disponible" in text(driver, "updateInfo"), text(driver, "updateInfo"))
         # le 403 du mauvais mot de passe est PROVOQUE par le test : Chrome le journalise comme une erreur de chargement
         errors = [e for e in inst.console_errors(driver) if not ("/api/admin/update/start" in e and "403" in e)]
         check("aucune erreur dans la console du navigateur", not errors, [e[:160] for e in errors[:3]])
