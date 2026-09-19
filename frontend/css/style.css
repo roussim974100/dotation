@@ -4945,3 +4945,12 @@ main {
 .restitution-steps__item.is-current .restitution-steps__num {
   background: rgba(255, 255, 255, 0.25);
 }
+
+
+/* Listes d'administration : action principale et menu "Plus" sur une seule ligne. */
+.draft-table td.text-end > .draft-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+}

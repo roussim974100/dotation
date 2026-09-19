@@ -176,8 +176,15 @@ function updateAdminMetrics() {
   if (usersCount) {
     usersCount.textContent = String(currentUsers.length);
   }
+  const pendingTotal = currentUsers.filter((user) => user.status === "pending").length;
   if (pendingCount) {
-    pendingCount.textContent = String(currentUsers.filter((user) => user.status === "pending").length);
+    pendingCount.textContent = String(pendingTotal);
+  }
+  const pendingBanner = byId("pendingAccountsBanner");
+  if (pendingBanner) {
+    pendingBanner.classList.toggle("d-none", pendingTotal === 0);
+    const text = byId("pendingAccountsText");
+    if (text) text.textContent = `${pendingTotal} compte${pendingTotal > 1 ? "s" : ""} en attente de validation.`;
   }
   if (servicesCount) {
     servicesCount.textContent = String(currentServices.filter((service) => service.is_active).length);
@@ -216,10 +223,11 @@ function renderGroups() {
       const hasUnc = (group.permissions || []).includes("unc.view_all");
       const uncToggle = isAdmin
         ? `<span class="status-chip status-chip--active mt-2">Accès UNC complet (admin)</span>`
-        : `<button class="btn btn-sm mt-2 ${hasUnc ? "btn-success" : "btn-outline-secondary"}"
-             type="button" data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
-             ${hasUnc ? "✓ Accès UNC complet" : "Accès UNC complet : non"}
-           </button>`;
+        : `<div class="form-check form-switch mt-2">
+             <input class="form-check-input" type="checkbox" role="switch" id="unc_${escapeHtml(key)}" ${hasUnc ? "checked" : ""}
+               data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
+             <label class="form-check-label" for="unc_${escapeHtml(key)}">Accès UNC complet</label>
+           </div>`;
       return `
         <div class="equipment-item">
           <div class="draft-title">${escapeHtml(group.label)}</div>
@@ -806,6 +814,19 @@ async function saveResourceFromModal() {
   }
 }
 
+// Ligne admin : action principale visible + menu "Plus" (desactiver / supprimer en dernier, en rouge).
+function renderAdminRowMenu(items, dangerItem) {
+  const button = (item, tone) => `<button class="btn btn-sm ${tone}" type="button" ${item.attrs}>${item.label}</button>`;
+  return `
+    <details class="draft-actions__menu">
+      <summary class="btn btn-sm btn-outline-secondary" aria-label="Plus d'actions">⋯</summary>
+      <div class="draft-actions__menu-panel">
+        ${items.length ? `<div class="draft-actions__menu-section">${items.map((item) => button(item, "btn-outline-secondary")).join("")}</div>` : ""}
+        <div class="draft-actions__menu-section">${button(dangerItem, "btn-outline-danger")}</div>
+      </div>
+    </details>`;
+}
+
 function renderUserTable() {
   const table = byId("userTableBody");
   if (!table) {
@@ -813,9 +834,14 @@ function renderUserTable() {
   }
   table.innerHTML = sortAdminTable("user", currentUsers).map((user) => {
     const statusMeta = getUserStatusMeta(user);
-    const statusAction = user.status === "pending"
-      ? `<button class="btn btn-sm btn-outline-success" type="button" data-admin-action="approveUser" data-username="${escapeHtml(user.username)}">Valider</button>`
-      : `<button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleUserState" data-username="${escapeHtml(user.username)}" data-active="${user.is_active ? "false" : "true"}">${user.is_active ? "Desactiver" : "Activer"}</button>`;
+    const username = escapeHtml(user.username);
+    const approveButton = user.status === "pending"
+      ? `<button class="btn btn-sm btn-success" type="button" data-admin-action="approveUser" data-username="${username}">Valider</button>`
+      : "";
+    const menuItems = user.status === "pending"
+      ? []
+      : [{ label: user.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleUserState" data-username="${username}" data-active="${user.is_active ? "false" : "true"}"` }];
+    const rowMenu = renderAdminRowMenu(menuItems, { label: "Supprimer", attrs: `data-admin-action="deleteUser" data-username="${username}"` });
     return `
       <tr>
         <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
@@ -824,9 +850,9 @@ function renderUserTable() {
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
-            <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateUserForm" data-username="${escapeHtml(user.username)}">Modifier</button>
-            ${statusAction}
-            <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteUser" data-username="${escapeHtml(user.username)}">Supprimer</button>
+            ${approveButton}
+            <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateUserForm" data-username="${username}">Modifier</button>
+            ${rowMenu}
           </div>
         </td>
       </tr>
@@ -978,8 +1004,10 @@ async function loadServices() {
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
           <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateServiceForm" data-id="${escapeHtml(String(service.id))}">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleServiceState" data-id="${escapeHtml(String(service.id))}" data-active="${service.is_active ? "false" : "true"}">${service.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteService" data-id="${escapeHtml(String(service.id))}">Supprimer</button>
+          ${renderAdminRowMenu(
+            [{ label: service.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleServiceState" data-id="${escapeHtml(String(service.id))}" data-active="${service.is_active ? "false" : "true"}"` }],
+            { label: "Supprimer", attrs: `data-admin-action="deleteService" data-id="${escapeHtml(String(service.id))}"` }
+          )}
         </div>
       </td>
     </tr>
@@ -1153,8 +1181,10 @@ function renderResourceTable() {
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
           <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateResourceForm" data-id="${escapeHtml(String(resource.id))}">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleResourceState" data-id="${escapeHtml(String(resource.id))}" data-active="${resource.is_active ? "false" : "true"}">${resource.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteResource" data-id="${escapeHtml(String(resource.id))}">Supprimer</button>
+          ${renderAdminRowMenu(
+            [{ label: resource.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleResourceState" data-id="${escapeHtml(String(resource.id))}" data-active="${resource.is_active ? "false" : "true"}"` }],
+            { label: "Supprimer", attrs: `data-admin-action="deleteResource" data-id="${escapeHtml(String(resource.id))}"` }
+          )}
         </div>
       </td>
     </tr>
@@ -1246,10 +1276,41 @@ async function toggleGroupUnc(groupKey, currentValue) {
   }
 }
 
+// Creation "a la demande" : la liste passe en premier, le formulaire s'ouvre via "+ Nouveau ...".
+// [data-create-panel] = bloc de champs a replier ; [data-create-section] = carte entiere a replier.
+function initAdminCreatePanels() {
+  document.querySelectorAll("[data-create-panel], [data-create-section]").forEach((target) => {
+    const card = target.closest(".content-card");
+    const heading = card?.querySelector(".section-heading");
+    if (!card || !heading || heading.querySelector("[data-create-trigger-btn]")) return;
+    const isSection = target.hasAttribute("data-create-section");
+    const label = target.dataset.createTrigger || "+ Nouveau";
+    const trigger = document.createElement("button");
+    const isOpen = () => (isSection ? !target.classList.contains("is-collapsed") : !target.classList.contains("d-none"));
+    const setOpen = (open) => {
+      if (isSection) target.classList.toggle("is-collapsed", !open);
+      else target.classList.toggle("d-none", !open);
+      trigger.textContent = open ? "Fermer" : label;
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) target.querySelector("input, select, textarea")?.focus();
+    };
+    trigger.type = "button";
+    trigger.className = "btn btn-primary ms-auto";
+    trigger.dataset.createTriggerBtn = "true";
+    trigger.addEventListener("click", () => setOpen(!isOpen()));
+    (heading.querySelector(".header-actions") || heading).appendChild(trigger);
+    setOpen(false);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  initAdminCreatePanels();
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-admin-action]");
     if (!btn) return;
+    // Interrupteur : l'etat visuel ne change qu'apres confirmation et enregistrement (re-rendu de la liste).
+    if (btn.type === "checkbox") e.preventDefault();
+    btn.closest("details.draft-actions__menu")?.removeAttribute("open");
     const action = btn.dataset.adminAction;
     const id = btn.dataset.id;
     const username = btn.dataset.username;

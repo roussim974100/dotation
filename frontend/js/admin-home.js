@@ -89,7 +89,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       fetch("/api/session", { credentials: "same-origin" }).then(r => r.ok ? r.json() : {})
     ]);
     setMetric("adminUsersCount", users.length);
-    setMetric("adminPendingCount", users.filter((user) => user.status === "pending").length);
+    const pendingTotal = users.filter((user) => user.status === "pending").length;
+    setMetric("adminPendingCount", pendingTotal);
+    document.getElementById("pendingAccountsBanner")?.classList.toggle("d-none", pendingTotal === 0);
+    const pendingText = document.getElementById("pendingAccountsText");
+    if (pendingText) pendingText.textContent = `${pendingTotal} compte${pendingTotal > 1 ? "s" : ""} en attente de validation.`;
     setMetric("adminServicesCount", services.filter((service) => service.is_active).length);
     setMetric("adminResourcesCount", resources.filter((resource) => resource.is_active).length);
     const canManageDb = session?.db_manage || session?.permissions?.includes("*");
