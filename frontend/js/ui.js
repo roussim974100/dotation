@@ -781,3 +781,36 @@ document.addEventListener("DOMContentLoaded", () => {
   initUserMenu();
 });
 
+
+
+// Fil d'Ariane et indicateur "partie 1 / partie 2" des pages de restitution.
+const RESTITUTION_STEPS = [
+  { step: 1, label: "Dates de départ", href: (id) => `restitution-phase1.html?id=${encodeURIComponent(id)}` },
+  { step: 2, label: "État du matériel", href: (id) => `restitution.html?id=${encodeURIComponent(id)}` }
+];
+
+function renderRestitutionSteps({ current, id, name, phase1Validated }) {
+  const main = document.getElementById("main");
+  if (!main || !id) return;
+  let host = document.getElementById("restitutionSteps");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "restitutionSteps";
+    host.className = "restitution-steps no-print";
+    main.prepend(host);
+  }
+  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const steps = RESTITUTION_STEPS.map((item) => {
+    const isCurrent = item.step === current;
+    const reachable = item.step === 1 || phase1Validated;
+    const inner = `<span class="restitution-steps__num">${item.step}</span> ${esc(item.label)}`;
+    return `<li class="restitution-steps__item${isCurrent ? " is-current" : ""}">${isCurrent || !reachable
+      ? `<span${isCurrent ? ' aria-current="step"' : ""}>${inner}</span>`
+      : `<a href="${item.href(id)}">${inner}</a>`}</li>`;
+  }).join("");
+  host.innerHTML = `
+    <nav class="restitution-steps__crumb" aria-label="Fil d'Ariane">
+      <a href="restitutions-pending.html">Restitutions en cours</a> <span aria-hidden="true">›</span> <span>${esc(name)}</span>
+    </nav>
+    <ol class="restitution-steps__list" aria-label="Étapes de la restitution">${steps}</ol>`;
+}

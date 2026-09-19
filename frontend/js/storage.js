@@ -816,9 +816,9 @@ function buildDraftActionButtons(draft, options) {
   if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
     stepAction = { action: "openRestitution", label: "Restituer" };
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
-    stepAction = { action: "prepareRestitutionSignatureEmail", label: "Demander la signature" };
+    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
-    stepAction = { action: "prepareAssignmentSignatureEmail", label: "Demander la signature" };
+    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
   }
 
   // Documents (PDF) — l'ordre suit la phase
@@ -849,6 +849,12 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
+  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
+  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+    ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
+    : [];
+
   const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
   return `
@@ -857,7 +863,8 @@ function buildDraftActionButtons(draft, options) {
       ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
-        { title: "Envoyer par e-mail", items: emailItems }
+        { title: "Envoyer par e-mail", items: emailItems },
+        { title: "Dossier", items: personItems }
       ], dangerItems)}
     </div>
   `;
@@ -1179,6 +1186,10 @@ function editDraft(id) {
   window.location.href = `form.html?id=${encodeURIComponent(id)}`;
 }
 
+function newAssignmentForPerson(id) {
+  window.location.href = `form.html?prefillFrom=${encodeURIComponent(id)}`;
+}
+
 function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
 }
@@ -1226,6 +1237,7 @@ async function openNewRestitutionModal() {
           </fieldset>
           <p class="text-danger small d-none" id="newRestitutionRegulError" role="alert"></p>
           <div class="password-generator-modal__actions password-generator-modal__actions--sticky">
+            <button class="btn btn-outline-primary" type="submit" id="newRestitutionRegulAnother" data-another="true">Enregistrer et créer une autre</button>
             <button class="btn btn-primary" type="submit" id="newRestitutionRegulSubmit">Créer la restitution</button>
           </div>
         </form>
@@ -1372,6 +1384,7 @@ async function setupRegularisationPanel(modal) {
 
   regulPanel.onsubmit = async (event) => {
     event.preventDefault();
+    const createAnother = event.submitter?.dataset.another === "true";
     const value = (key) => document.getElementById(`regul_${key}`)?.value.trim() || "";
     const resourceIds = [...resourcesWrap.querySelectorAll("input:checked")].map((input) => input.value);
     const showError = (message) => {
@@ -1396,7 +1409,17 @@ async function setupRegularisationPanel(modal) {
           service: value("service"), resourceIds
         })
       });
-      openRestitution(result.form_id);
+      if (createAnother) {
+        // Saisie en serie : on vide le formulaire, la liste se rafraichira a la fermeture.
+        showToast(`Restitution créée : ${result.title}.`, "success");
+        regulPanel.reset();
+        resourcesWrap.querySelectorAll("input:checked").forEach((input) => { input.checked = false; });
+        submitBtn.disabled = false;
+        document.getElementById("regul_nom")?.focus();
+        void renderDraftList();
+      } else {
+        openRestitution(result.form_id);
+      }
     } catch (error) {
       showError(error.message || "Impossible de créer la restitution.");
       submitBtn.disabled = false;
@@ -2986,7 +3009,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("newRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
-    editDraft, openRestitution, exportDraftPdf, exportRestitutionPdf,
+    editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,

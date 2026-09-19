@@ -647,6 +647,7 @@ async function initRestitutionPage() {
     });
 
     document.getElementById("restitutionTitle").textContent = `${result.data.beneficiaire.nom} ${result.data.beneficiaire.prenom}`;
+    renderRestitutionSteps({ current: 2, id: new URLSearchParams(window.location.search).get("id"), name: document.getElementById("restitutionTitle").textContent, phase1Validated: true });
     document.getElementById("restitutionSubtitle").textContent = result.data.beneficiaire.service || result.data.beneficiaire.mandat || "Fiche active";
     document.getElementById("restitutionStatus").textContent = currentStatus === "partial_return"
       ? "Restitution partielle"

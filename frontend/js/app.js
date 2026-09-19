@@ -2513,12 +2513,37 @@ async function createSignatureLink(options = {}) {
   }
 }
 
+// "Nouvelle attribution pour cette personne" : reprend l'identite d'un dossier existant, rien d'autre.
+async function prefillIdentityFromForm(sourceId) {
+  try {
+    const result = await requestJson(`/api/forms/${encodeURIComponent(sourceId)}`);
+    const person = result?.data?.beneficiaire || {};
+    ["nom", "prenom", "fonction", "mandat"].forEach((key) => {
+      const el = document.getElementById(key);
+      if (el && person[key]) el.value = person[key];
+    });
+    const radio = person.qualite && document.querySelector(`input[name="qualite"][value="${person.qualite}"]`);
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (person.service) setServiceValue(person.service);
+    showToast("Identité reprise du dossier précédent.", "info");
+  } catch (error) {
+    showToast("Impossible de reprendre l'identité du dossier précédent.", "warning");
+  }
+}
+
 async function loadDraftFromUrl(signaturePad) {
   // Ouvre une fiche existante si l'URL contient id=...
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
 
   if (!id) {
+    const prefillFrom = params.get("prefillFrom");
+    if (prefillFrom) {
+      await prefillIdentityFromForm(prefillFrom);
+    }
     form.dataset.draftId = "";
     form.dataset.lockedAt = "";
     form.dataset.workflowStatus = "draft";

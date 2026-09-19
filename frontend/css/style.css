@@ -4889,3 +4889,59 @@ main {
   color: #e8a060;
   background: color-mix(in srgb, #8a4b12 25%, var(--surface));
 }
+
+
+/* Fil d'Ariane et indicateur des parties de la restitution */
+.restitution-steps {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.restitution-steps__crumb {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.restitution-steps__list {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.restitution-steps__item > a,
+.restitution-steps__item > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem 0.35rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.restitution-steps__item.is-current > span {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.restitution-steps__num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: rgba(15, 55, 84, 0.12);
+  font-size: 0.85rem;
+}
+
+.restitution-steps__item.is-current .restitution-steps__num {
+  background: rgba(255, 255, 255, 0.25);
+}

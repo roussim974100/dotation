@@ -108,6 +108,7 @@ async function initPhase1Page() {
     // Hydrater l'en-tête
     const b = result.data.beneficiaire || {};
     if (getEl("phase1Title")) getEl("phase1Title").textContent = `${b.nom || ""} ${b.prenom || ""}`.trim() || "Dossier";
+    renderRestitutionSteps({ current: 1, id, name: getEl("phase1Title")?.textContent || "Dossier", phase1Validated: Boolean(currentRestitutionCheck.phase1ValidatedAt) });
     if (getEl("phase1Subtitle")) getEl("phase1Subtitle").textContent = b.service || b.mandat || "Fiche active";
     const statusLabels = { active: "Attribution active", partial_return: "Restitution partielle", awaiting_signature: "En attente de signature", returned: "Restitution terminée" };
     if (getEl("phase1StatusPill")) getEl("phase1StatusPill").textContent = statusLabels[status] || status;
