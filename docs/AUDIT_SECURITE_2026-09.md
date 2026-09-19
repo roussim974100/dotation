@@ -4,22 +4,30 @@ Périmètre : backend Flask (141 endpoints), mécanismes globaux (`app.py`, `aut
 
 ## Verdict
 
-Aucune faille **critique** trouvée. 2 points moyens corrigés dans ce commit, 3 points à traiter, le reste est conforme.
+Aucune faille **critique** trouvée. 1 faille majeure (contournement de la limitation de connexion) et 7 points moyens ou mineurs corrigés ; 3 points acceptés ou à surveiller.
 
-## Corrigé dans ce commit
+## Corrigé
 
 | # | Gravité | Constat | Correctif |
 |---|---|---|---|
-| C1 | Moyen | `brand_logo_url` non validée : le serveur télécharge cette URL (`models/settings.py`, `urlopen`) qui accepte `file://`, `ftp://`… (lecture locale / SSRF, réservé aux admins `users.manage`). | Seuls `http://` et `https://` acceptés, sinon vidée (`save_app_settings`). Tests : `tests/test_security_hardening.py`. |
-| C2 | Moyen | Aucun `MAX_CONTENT_LENGTH` : un upload géant (CSV, logo, restauration) était lu sans plafond, risque de saturation mémoire. | Plafond 100 Mo, réglable par `APP_MAX_UPLOAD_MB`. |
+| C1 | Moyen | `brand_logo_url` non validée : le serveur télécharge cette URL (`urlopen`, accepte `file://`, `ftp://`…). Réservé aux admins. | Seuls `http(s)://` acceptés (`save_app_settings`). |
+| C2 | Moyen | Aucun `MAX_CONTENT_LENGTH` : upload géant lu sans plafond. | Plafond 100 Mo (`APP_MAX_UPLOAD_MB`). |
+| C3 | **Majeur** | La limite de tentatives de connexion et les `@rate_limit` utilisaient le **premier `X-Forwarded-For`**, fourni par le client : contournement trivial en changeant l'en-tête à chaque essai, même derrière nginx. | Clé = `request.remote_addr` (`get_rate_limit_key`, corrigée par ProxyFix). L'IP déclarée reste utilisée pour les journaux seulement. |
+| C4 | Moyen | `ProxyFix(x_for=1)` figé : si l'app est joignable sans proxy, IP falsifiable. | Nombre de proxys de confiance configurable : `APP_TRUSTED_PROXIES` (défaut 1, mettre 0 sans proxy). |
+| C5 | Mineur | `update_user(**fields)` insère les noms de colonnes dans le SQL (non exploitable aujourd'hui, fragile). | Liste blanche `UPDATABLE_USER_COLUMNS`. |
+| C6 | Moyen | XSS stocké potentiel : `executive-dashboard.js` (nom, prénom, service, statut) et `app.js` (titre de dossier, libellé et clé des items de retrait) interpolés sans échappement. La CSP (`script-src` sans inline) limitait l'impact. | `escapeHtml` appliqué. |
+| C7 | Moyen | Les exports (Excel, UNC, PDF par lots) ne sont pas masqués : un groupe à portée `masked` avec `forms.export` contournait le masquage RGPD. Configurable par l'admin (groupes par défaut tous en `full`). | Export refusé (403) si portée `masked` (`can_export_unmasked`). |
+| C8 | Mineur | `pytest 9.0.2` : vulnérabilité connue PYSEC-2026-1845 (dépendance de test). | Passé en `9.0.3`. |
 
-## À traiter
+Tests : `tests/test_security_hardening.py` (6 tests). Suite complète : 199 passés.
 
-| # | Gravité | Constat | Recommandation |
+## Accepté / à surveiller
+
+| # | Gravité | Constat | Décision |
 |---|---|---|---|
-| A1 | Moyen | Limitation des tentatives de connexion **en mémoire, par processus** (`auth.py`) et clé = IP. `ProxyFix(x_for=1)` fait confiance à `X-Forwarded-For` : si l'app est joignable sans reverse proxy, l'IP est falsifiable (contournement + fausses IP dans les logs). Avec plusieurs workers gunicorn, le compteur est multiplié. | Ne publier que derrière le reverse proxy (bind `127.0.0.1`), ou rendre `x_for` configurable (`0` par défaut hors proxy). Option : stocker les tentatives en base. |
-| A2 | Mineur | `update_user(**fields)` construit `SET {cols}` à partir des clés reçues. Aujourd'hui les 2 appelants n'envoient que des clés fixes (`account_rules.build_self_update`, `admin.update_admin_user`), donc pas exploitable, mais fragile si un futur appelant passe des clés venant de la requête. | Liste blanche de colonnes dans `update_user`. |
-| A3 | Mineur | CSP : `img-src` autorise `https:` (exfiltration par image possible en cas d'XSS) et `style-src 'unsafe-inline'`. `script-src` est bien strict (pas d'inline). | Restreindre `img-src` à `'self' data:` si le logo distant n'est plus nécessaire côté navigateur (il est servi par le backend). |
+| A3 | Mineur | CSP `img-src https:` et `style-src 'unsafe-inline'`. | Conservé : l'aperçu du logo en Admin > Personnalisation charge l'URL distante saisie par l'admin. L'exploiter suppose déjà une XSS. Piste : passer l'aperçu par `/api/settings/logo`. |
+| A4 | Mineur | Compteurs de limitation **en mémoire, par processus** : multipliés par le nombre de workers gunicorn, remis à zéro au redémarrage. | À stocker en base si plusieurs workers. |
+| A5 | Mineur | `executive-dashboard.js` ligne ~425 : `onclick=` inline sur les lignes de service. La CSP bloque les handlers inline, donc le clic sur une ligne est probablement sans effet (défaut fonctionnel, pas de faille). | À remplacer par une délégation d'événements. |
 
 ## Conforme
 
@@ -35,7 +43,7 @@ Aucune faille **critique** trouvée. 2 points moyens corrigés dans ce commit, 3
 
 ## Non couvert (prochain audit)
 
-- Échappement dans les autres fichiers à `innerHTML` (`app.js` 34, `storage.js` 23, `admin.js` 11, `global-search.js` 8…).
-- Dépendances (`pip-audit` sur `requirements.txt`).
-- Filtrage par `data_scope` endpoint par endpoint et contenu des logs (données personnelles).
-- Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions des fichiers `.app_secret_key` et `users.db`).
+- Échappement : scan **heuristique** des interpolations d'objets ; les cas de gabarits construits autrement (concaténations, `insertAdjacentHTML`) n'ont pas été relus un par un.
+- `data_scope` : vérifié sur formulaires, parc et exports ; pas sur `/api/admin/dashboard-stats` (protégé par `forms.view_all`, renvoie noms et prénoms des alertes) ni sur la recherche globale.
+- Contenu des journaux (données personnelles) et rotation.
+- Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions de `.app_secret_key` et `users.db`).

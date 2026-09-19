@@ -38,3 +38,31 @@ def test_logo_url_accepte_http_et_https():
 def test_app_plafonne_la_taille_des_requetes():
     import app as app_module
     assert app_module.app.config["MAX_CONTENT_LENGTH"] >= 1024 * 1024
+
+
+def test_update_user_refuse_les_colonnes_hors_liste_blanche():
+    from auth import UPDATABLE_USER_COLUMNS, update_user
+    assert "password_hash" in UPDATABLE_USER_COLUMNS and "username" not in UPDATABLE_USER_COLUMNS
+    assert update_user("nobody", **{"is_active=1, password_hash": "x"}) is False
+    assert update_user("nobody", created_at="2020-01-01") is False
+
+
+def test_limitation_de_connexion_ignore_x_forwarded_for_brut():
+    """La cle de limitation vient de remote_addr : forger X-Forwarded-For ne change pas la cle."""
+    import app as app_module
+    from auth import get_rate_limit_key
+    with app_module.app.test_request_context(
+        "/", headers={"X-Forwarded-For": "1.2.3.4"}, environ_overrides={"REMOTE_ADDR": "9.9.9.9"}
+    ):
+        assert get_rate_limit_key() != "1.2.3.4"
+
+
+def test_export_interdit_aux_groupes_a_portee_masquee(monkeypatch):
+    import routes.forms as forms_routes
+    monkeypatch.setattr(forms_routes, "has_permission", lambda perm: True)
+    monkeypatch.setattr(forms_routes, "current_user", lambda: {"data_scope": "masked"})
+    assert forms_routes.can_export_unmasked() is False
+    monkeypatch.setattr(forms_routes, "current_user", lambda: {"data_scope": "full"})
+    assert forms_routes.can_export_unmasked() is True
+    monkeypatch.setattr(forms_routes, "has_permission", lambda perm: False)
+    assert forms_routes.can_export_unmasked() is False

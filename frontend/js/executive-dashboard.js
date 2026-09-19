@@ -1,3 +1,12 @@
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const STATUS_LABELS = {
   draft: "À compléter", active: "Actif",
   partial_assignment: "Attribution partielle",
@@ -380,10 +389,10 @@ function renderAlertes(alertes, seuil) {
 
   const rows = alertes.map(a => `
     <tr>
-      <td><strong>${a.nom} ${a.prenom}</strong></td>
-      <td>${a.service}</td>
+      <td><strong>${escapeHtml(a.nom)} ${escapeHtml(a.prenom)}</strong></td>
+      <td>${escapeHtml(a.service)}</td>
       <td><span class="badge bg-danger">${a.jours_blocage} j</span></td>
-      <td>${STATUS_LABELS[a.status] || a.status}</td>
+      <td>${escapeHtml(STATUS_LABELS[a.status] || a.status)}</td>
       <td class="text-end">
         <a href="form.html?id=${encodeURIComponent(a.id)}" class="btn btn-sm btn-primary">Ouvrir</a>
       </td>
@@ -414,7 +423,7 @@ function renderServicesTable(by_service) {
 
   const rows = by_service.slice(0, 20).map(s => `
     <tr style="cursor:pointer" onclick="window.location.href='/index.html?service=${encodeURIComponent(s.service)}'">
-      <td><strong>${s.service}</strong></td>
+      <td><strong>${escapeHtml(s.service)}</strong></td>
       <td>${s.count}</td>
     </tr>
   `).join("");

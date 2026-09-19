@@ -109,13 +109,21 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
         return False
 
 
+# Colonnes modifiables de users : liste blanche, car les noms de colonnes sont inseres dans le SQL.
+UPDATABLE_USER_COLUMNS = frozenset({
+    "password_hash", "is_active", "status", "service", "db_manage", "email", "first_name", "last_name",
+})
+
+
 def update_user(username, **fields):
     """Met à jour un utilisateur."""
     try:
         from utils import utc_now
+        update_fields = {k: v for k, v in fields.items() if k != "groups"}
+        if not set(update_fields) <= UPDATABLE_USER_COLUMNS:
+            return False
         with get_users_db() as conn:
             # Mettre à jour les colonnes
-            update_fields = {k: v for k, v in fields.items() if k != "groups"}
             if update_fields:
                 update_fields["updated_at"] = utc_now()
                 cols = ", ".join(f"{k}=?" for k in update_fields.keys())
@@ -201,7 +209,7 @@ def rate_limit(max_requests: int, window_seconds: int, scope: str = ""):
 
         @wraps(view)
         def wrapped_view(*args, **kwargs):
-            ip = get_request_client_ip() or "unknown"
+            ip = get_rate_limit_key()
             if _is_api_rate_limited(ip, _scope, max_requests, window_seconds):
                 return jsonify({"error": "rate_limit_exceeded"}), 429
             return view(*args, **kwargs)
@@ -393,7 +401,16 @@ def extract_first_forwarded_ip(value):
     return ""
 
 
+def get_rate_limit_key():
+    """Cle de limitation : IP vue par le serveur (corrigee par ProxyFix selon les proxys de confiance).
+    Ne jamais utiliser l'en-tete X-Forwarded-For brut ici : son premier element est fourni par le client."""
+    if not has_request_context():
+        return "unknown"
+    return str(request.remote_addr or "").strip() or "unknown"
+
+
 def get_request_client_ip():
+    """IP declaree (journaux, information) : peut etre falsifiee par le client, pas pour la securite."""
     if not has_request_context():
         return ""
     forwarded_ip = extract_first_forwarded_ip(request.headers.get("X-Forwarded-For"))

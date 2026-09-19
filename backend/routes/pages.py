@@ -10,7 +10,7 @@ from database import get_db, get_users_db
 from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
-    get_request_client_ip, extract_first_forwarded_ip, check_user,
+    get_request_client_ip, get_rate_limit_key, extract_first_forwarded_ip, check_user,
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
@@ -50,7 +50,7 @@ def build_login_forensic_details(username, auth_state):
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if _is_login_rate_limited(get_request_client_ip()):
+        if _is_login_rate_limited(get_rate_limit_key()):
             return redirect("/login?error=rate_limited")
         submitted_token = request.form.get("csrf_token") or ""
         if not submitted_token or not secrets.compare_digest(submitted_token, session.get("csrf_token", "")):

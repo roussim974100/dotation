@@ -14,6 +14,13 @@ from utils import (
 )
 from database import get_db, normalize_reference_row
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
+def can_export_unmasked():
+    """Export/PDF : droit forms.export ET portee de donnees complete. Les exports ne sont pas masques,
+    donc un groupe a portee "masked" (RGPD) ne doit pas pouvoir les generer."""
+    user = current_user() or {}
+    return has_permission("forms.export") and user.get("data_scope") != "masked"
+
+
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
     summarize_resource_item_details, collect_resource_entries,
@@ -273,7 +280,7 @@ def list_forms():
 @bp.route("/api/forms/export", methods=["GET"])
 @login_required
 def export_forms():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     status_filter = (request.args.get("status") or "").strip()
@@ -331,7 +338,7 @@ def export_forms():
 @bp.route("/api/forms/export-unc", methods=["GET"])
 @login_required
 def export_unc_access():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     _ACCES = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Ecriture", "refuse": "Acces refuse"}
@@ -377,7 +384,7 @@ def export_unc_access():
 @bp.route("/api/forms/<form_id>/pdf", methods=["GET"])
 @login_required
 def export_form_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
@@ -392,7 +399,7 @@ def export_form_pdf(form_id):
 @bp.route("/api/forms/<form_id>/restitution-pdf", methods=["GET"])
 @login_required
 def export_restitution_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
@@ -418,7 +425,7 @@ def export_restitution_pdf(form_id):
 @bp.route("/api/forms/export-pdf-batch", methods=["POST"])
 @login_required
 def export_forms_pdf_batch():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -448,7 +455,7 @@ def export_forms_pdf_batch():
 @bp.route("/api/forms/export-restitution-pdf-batch", methods=["POST"])
 @login_required
 def export_restitution_forms_pdf_batch():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -515,7 +522,7 @@ def get_retrait_items(form_id):
 @bp.route("/api/forms/<form_id>/pdf/retraits", methods=["GET"])
 @login_required
 def get_retraits_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:

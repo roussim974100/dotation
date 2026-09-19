@@ -1778,7 +1778,7 @@ function initRetraitsSection() {
       resultsDiv.innerHTML = forms
         .map(
           (f) =>
-            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${f.id}">${f.title}</button>`
+            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${escapeHtml(f.id)}">${escapeHtml(f.title)}</button>`
         )
         .join("");
       resultsDiv.classList.toggle("d-none", forms.length === 0);
@@ -1903,8 +1903,8 @@ function initRetraitsSection() {
         <div class="card">
           <div class="card-body">
             <div class="form-check mb-2">
-              <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}">
-              <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+              <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}">
+              <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
             </div>
             <div class="row g-2">
               <div class="col-md-6">
@@ -2387,7 +2387,7 @@ function populateForm(data, signaturePad) {
               <div class="card-body">
                 <div class="form-check mb-2">
                   <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
-                  <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+                  <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
                 </div>
                 <div class="row g-2">
                   <div class="col-md-6">
