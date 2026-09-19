@@ -35,7 +35,7 @@ from models.inventory import resolve_identifier_key
 from models.catalog import normalize_resource_catalog_payload
 from models.workflow import count_resource_field_usage
 from models.forms import persist_form
-from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR
+from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR, DATA_DIR
 
 bp = Blueprint("admin", __name__)
 
@@ -1551,7 +1551,7 @@ _REQUIRED_TABLES = {
 }
 _SQLITE_MAGIC = b"SQLite format 3\x00"
 _DB_MAX_SIZE = 200 * 1024 * 1024  # 200 Mo
-_BACKUP_DIR = os.path.join(BASE_DIR, "db_backups")
+_BACKUP_DIR = os.path.join(DATA_DIR, "db_backups")
 
 
 def _diagnose_db_file(path):

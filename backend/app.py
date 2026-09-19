@@ -202,7 +202,7 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
@@ -261,7 +261,7 @@ def migrate_missing_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",

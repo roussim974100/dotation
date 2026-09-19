@@ -18,7 +18,7 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 
-from config import BASE_DIR, DB_PATH, DB_USERS_PATH
+from config import BASE_DIR, DATA_DIR, DB_PATH, DB_USERS_PATH
 
 ARCHIVE_FORMAT = 1
 ENCRYPTED_MAGIC = b"AQBK-ENC1"
@@ -28,7 +28,7 @@ SCRYPT_N = 2 ** 15
 MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
 MAX_DATABASE_BYTES = 400 * 1024 * 1024
 SQLITE_MAGIC = b"SQLite format 3\x00"
-BACKUP_DIR = os.path.join(BASE_DIR, "db_backups")
+BACKUP_DIR = os.path.join(DATA_DIR, "db_backups")
 MIN_PASSWORD_LENGTH = 8
 
 # Bases sauvegardees : cle stable (nom de fichier dans l'archive), libelle, chemin, tables attendues.
