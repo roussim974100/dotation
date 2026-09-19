@@ -201,7 +201,11 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
     if category == "immateriel":
         has_assignment_condition = False
     is_active = bool(payload.get("is_active", bool(existing.get("is_active", True))))
+    tracking_mode = str(payload.get("tracking_mode") if payload.get("tracking_mode") is not None else existing.get("tracking_mode") or "").strip()
+    if tracking_mode not in {"", "unit", "none", "access"}:
+        tracking_mode = ""
     return {
+        "tracking_mode": tracking_mode,
         "code": code,
         "label": label,
         "description": description,

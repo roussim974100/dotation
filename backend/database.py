@@ -68,6 +68,9 @@ def normalize_reference_row(row):
         data["field_schema"] = []
     from models.inventory import resolve_identifier_key
     data["identifier_key"] = resolve_identifier_key(data["field_schema"]) if data.get("category") == "materiel" else None
+    from models.resource_rules import effective_tracking_mode
+    data["tracking_mode"] = data.get("tracking_mode") or ""
+    data["effective_tracking_mode"] = effective_tracking_mode(data["tracking_mode"], data.get("category"), data["field_schema"])
     data["requires_return"] = bool(data.get("requires_return"))
     data["has_assignment_date"] = bool(data.get("has_assignment_date", True))
     data["has_assignment_condition"] = bool(data.get("has_assignment_condition", False))

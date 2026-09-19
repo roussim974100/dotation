@@ -1310,7 +1310,7 @@ function initAdminCreatePanels() {
       if (open) target.querySelector("input, select, textarea")?.focus();
     };
     trigger.type = "button";
-    trigger.className = "btn btn-primary ms-auto";
+    trigger.className = `btn ${target.dataset.createTone || "btn-primary"} ms-auto`;
     trigger.dataset.createTriggerBtn = "true";
     trigger.addEventListener("click", () => setOpen(!isOpen()));
     (heading.querySelector(".header-actions") || heading).appendChild(trigger);

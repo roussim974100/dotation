@@ -77,6 +77,17 @@
         </div>
       </section>
 
+      <section class="content-card mt-4" id="catalog-quality">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Qualité</p>
+            <h2 class="section-title">Qualité du catalogue</h2>
+            <p class="panel-text">Contrôle que chaque ressource permet un historique cohérent (champ identifiant, état à la remise, service émetteur).</p>
+          </div>
+        </div>
+        <div id="catalogQuality" class="text-muted">Contrôle en cours…</div>
+      </section>
+
       <section class="content-card mt-4" id="admin-resources">
         <div class="section-heading">
           <div>
@@ -85,11 +96,12 @@
             <p class="panel-text">Définissez ce qui peut être attribué et les champs qui devront être saisis dans les dossiers.</p>
           </div>
           <div class="header-actions">
+            <button class="btn btn-primary" id="resourceWizardBtn" type="button">+ Assistant de création</button>
             <a class="btn btn-outline-primary" href="admin-ressources-ordre.html">Réorganiser l'ordre</a>
           </div>
         </div>
         <div id="resourceEditNotice" class="alert alert-info d-none" role="alert"></div>
-        <div class="row g-3 mb-4" data-create-panel data-create-trigger="+ Nouvelle ressource">
+        <div class="row g-3 mb-4" data-create-panel data-create-trigger="Création rapide (expert)" data-create-tone="btn-outline-secondary">
           <input id="resource_code" type="hidden">
           <div class="col-md-4">
             <label class="form-label" for="resource_label">Libellé</label>
@@ -307,6 +319,7 @@
 <script src="js/ui.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-resource-wizard.js"></script>
 </body>
 </html>
 

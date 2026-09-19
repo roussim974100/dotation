@@ -5002,3 +5002,16 @@ section.content-card[id^="db-"] {
   background-color: color-mix(in srgb, var(--border) 35%, var(--surface));
   cursor: not-allowed;
 }
+
+
+/* Assistant de creation de ressource : fenetre large, apercu a droite. */
+.password-generator-modal__dialog.wizard-dialog {
+  width: min(100%, 64rem);
+  max-height: min(92vh, 48rem);
+}
+
+.wizard-preview {
+  position: sticky;
+  top: 0;
+  background: var(--surface-alt, #f8fafc);
+}

@@ -532,6 +532,8 @@ def init_db():
         ensure_column(connection, "resource_catalog", "has_assignment_condition", "has_assignment_condition INTEGER NOT NULL DEFAULT 0")
         ensure_column(connection, "resource_catalog", "has_assignment_notes", "has_assignment_notes INTEGER NOT NULL DEFAULT 1")
         ensure_column(connection, "resource_catalog", "display_order", "display_order INTEGER NOT NULL DEFAULT 100")
+        # Mode de suivi (unit / none / access) choisi par l'assistant de creation ; vide = automatique.
+        ensure_column(connection, "resource_catalog", "tracking_mode", "tracking_mode TEXT NOT NULL DEFAULT ''")
         connection.execute(
             """
             UPDATE resource_catalog

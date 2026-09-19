@@ -30,6 +30,8 @@ from models.settings import (
     build_public_settings_payload, resolve_theme_id, resolve_dark_mode,
 )
 from account_rules import normalize_person_name
+from models.resource_rules import blocking_issues, catalog_quality_report, effective_tracking_mode, validate_resource
+from models.inventory import resolve_identifier_key
 from models.catalog import normalize_resource_catalog_payload
 from models.workflow import count_resource_field_usage
 from models.forms import persist_form
@@ -1158,6 +1160,9 @@ def create_admin_resource():
 
     if not resource_data["code"] or not resource_data["label"]:
         return jsonify({"error": "code_and_label_required"}), 400
+    blocking = blocking_issues(validate_resource(resource_data))
+    if blocking:
+        return jsonify({"error": "invalid_resource", "issues": blocking}), 400
 
     now = utc_now()
     with get_db() as connection:
@@ -1170,8 +1175,8 @@ def create_admin_resource():
             INSERT INTO resource_catalog (
                 id, code, label, description, category, issuer_service, requires_return,
                 has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
-                trigger_key, field_schema_json, is_active, is_builtin, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                trigger_key, field_schema_json, is_active, tracking_mode, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             """,
             (
                 resource_id,
@@ -1188,6 +1193,7 @@ def create_admin_resource():
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
+                resource_data["tracking_mode"],
                 now,
                 now,
             ),
@@ -1232,12 +1238,35 @@ def update_admin_resource(resource_id):
         ).fetchone()
         if duplicate:
             return jsonify({"error": "resource_code_exists"}), 409
+        blocking = blocking_issues(validate_resource(resource_data))
+        if blocking:
+            return jsonify({"error": "invalid_resource", "issues": blocking}), 400
+        # Garde-fous de l'historique : le code sert de cle aux lignes deja saisies, et le champ identifiant
+        # d'un suivi par objet ne peut plus etre change, masque ou supprime s'il a deja ete utilise.
+        if next_code != row["code"] and connection.execute(
+            "SELECT COUNT(*) FROM dotation_items WHERE item_key = ?", (row["code"],)
+        ).fetchone()[0]:
+            return jsonify({"error": "code_locked"}), 409
+        try:
+            old_schema = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            old_schema = []
+        if effective_tracking_mode(row["tracking_mode"], row["category"], old_schema) == "unit":
+            old_key = resolve_identifier_key(old_schema)
+            new_field = next((f for f in resource_data["field_schema"] if f.get("key") == old_key), None)
+            still_identifier = (
+                effective_tracking_mode(resource_data["tracking_mode"], resource_data["category"], resource_data["field_schema"]) == "unit"
+                and resolve_identifier_key(resource_data["field_schema"]) == old_key
+                and new_field is not None and not new_field.get("hidden")
+            )
+            if old_key and not still_identifier and count_resource_field_usage(connection, row["code"], old_key):
+                return jsonify({"error": "identifier_locked"}), 409
         connection.execute(
             """
             UPDATE resource_catalog
             SET code = ?, label = ?, description = ?, category = ?, issuer_service = ?, requires_return = ?,
                 has_assignment_date = ?, has_assignment_condition = ?, has_assignment_notes = ?, display_order = ?,
-                trigger_key = ?, field_schema_json = ?, is_active = ?, updated_at = ?
+                trigger_key = ?, field_schema_json = ?, is_active = ?, tracking_mode = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -1254,6 +1283,7 @@ def update_admin_resource(resource_id):
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
+                resource_data["tracking_mode"],
                 now,
                 resource_id,
             ),
@@ -1275,6 +1305,17 @@ def update_admin_resource(resource_id):
             target_label=resource_data["label"],
         )
     return jsonify({"updated": True, "resource": normalize_reference_row(updated_row)})
+
+
+@bp.route("/api/admin/catalog/quality", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def catalog_quality():
+    """Ressources actives dont la configuration empeche un historique coherent (a corriger dans l'admin)."""
+    with get_db() as connection:
+        rows = connection.execute("SELECT * FROM resource_catalog WHERE is_active = 1 ORDER BY category, display_order, label").fetchall()
+    resources = [normalize_reference_row(row) for row in rows]
+    return jsonify({"total": len(resources), "resources": catalog_quality_report(resources)})
 
 
 @bp.route("/api/admin/resources/<resource_id>", methods=["DELETE"])
