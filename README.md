@@ -474,6 +474,19 @@ X-Forwarded-For: <IP_CLIENT>
 X-Forwarded-Host: <DOMAINE_PUBLIC>
 ```
 
+### Adresse IP des clients et limitation des connexions
+
+**Aucun réglage n'est nécessaire.** À chaque requête, l'application regarde qui l'appelle directement (`backend/proxy.py`) :
+
+| Situation | Adresse de l'appelant direct | Comportement |
+|---|---|---|
+| Derrière un reverse proxy sur la même machine ou le même réseau privé (cas courant) | loopback ou privée (`127.0.0.1`, `10.x`, `172.16-31.x`, `192.168.x`) | Les en-têtes `X-Forwarded-*` sont lus : l'IP réelle du client est utilisée. |
+| Accès direct depuis Internet | IP publique | Les en-têtes `X-Forwarded-*` sont **ignorés** (ils seraient falsifiables). |
+
+La limitation des tentatives de connexion (10 par 10 minutes et par IP) et les limites de débit des API s'appuient sur cette IP fiable. Le même code fonctionne donc derrière un proxy comme en accès direct.
+
+Deux limites : un poste du **même réseau privé** que l'application, sans reverse proxy, peut encore forger `X-Forwarded-For` (exposition limitée au LAN) ; et un proxy à **IP publique** (par exemple un load balancer cloud) n'est pas reconnu automatiquement, il faut alors `APP_TRUSTED_PROXIES=1`.
+
 ---
 
 ## Mise à jour en production
@@ -502,6 +515,9 @@ systemctl restart dotation
 | `SESSION_COOKIE_SECURE` | `0` | Forcer les cookies sécurisés (HTTPS seulement) |
 | `DEBUG` | `0` | Mode debug (JAMAIS en production) |
 | `GIT_BRANCH` | `main` | Branche à déployer (pour le script) |
+| `APP_SECRET_KEY` | fichier `.app_secret_key` généré au 1er démarrage | Clé de signature des sessions (à fixer en environnement multi-serveurs) |
+| `APP_MAX_UPLOAD_MB` | `100` | Taille maximale d'une requête (import CSV, logo, restauration de base) |
+| `APP_TRUSTED_PROXIES` | automatique | Surcharge **facultative** de la confiance dans `X-Forwarded-*` : `0` = jamais, `N` = forcer N proxys (proxy à IP publique). Voir « Adresse IP des clients » |
 
 Exemple au démarrage du service :
 
@@ -538,6 +554,11 @@ python backend/app.py
 - ✅ Gestion des groupes et permissions granulaires
 - ✅ Audit complet des actions utilisateur
 - ✅ Journaux d'accès
+- ✅ Limitation des tentatives de connexion fondée sur l'IP réelle (non falsifiable par `X-Forwarded-For`)
+- ✅ Exports interdits aux groupes à portée de données « masquée » (RGPD)
+- ✅ Échappement HTML des données saisies, plafond de taille des requêtes
+
+Dernier audit : voir [`docs/AUDIT_SECURITE_2026-09.md`](docs/AUDIT_SECURITE_2026-09.md).
 
 ## Limites SQLite
 
