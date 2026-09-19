@@ -70,11 +70,91 @@
       <!-- Export -->
       <nav class="dashboard-nav mt-4" aria-label="Sections de la base de données">
         <a class="dashboard-nav__link" href="#db-export">Exporter</a>
-        <a class="dashboard-nav__link" href="#db-diagnose">Diagnostiquer</a>
-        <a class="dashboard-nav__link" href="#db-import">Importer</a>
+        <a class="dashboard-nav__link" href="#db-restore">Restaurer</a>
+        <a class="dashboard-nav__link" href="#db-safety">Copies de sécurité</a>
+        <a class="dashboard-nav__link" href="#db-legacy">Ancien format</a>
       </nav>
 
       <section class="content-card mt-4" id="db-export">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Sauvegarde</p>
+            <h2 class="section-title">Exporter toutes les bases</h2>
+            <p class="panel-text">Télécharge une archive unique contenant les dossiers, ressources et paramètres <strong>et</strong> les comptes et groupes. Chaque base est copiée de façon cohérente, même pendant l'utilisation de l'application.</p>
+          </div>
+        </div>
+        <ul class="list-unstyled small text-muted mb-3" id="backupDatabasesList" aria-label="Bases incluses"></ul>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="backupProtect" checked>
+          <label class="form-check-label" for="backupProtect">Protéger l'archive par un mot de passe (recommandé : elle contient des données personnelles et les comptes)</label>
+        </div>
+        <div class="row g-3" id="backupPasswordFields">
+          <div class="col-md-4">
+            <label class="form-label" for="backupPassword">Mot de passe</label>
+            <input class="form-control" id="backupPassword" type="password" autocomplete="new-password">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="backupPasswordConfirm">Confirmation</label>
+            <input class="form-control" id="backupPasswordConfirm" type="password" autocomplete="new-password">
+          </div>
+          <div class="col-12 form-text">Minimum <span id="backupMinLength">8</span> caractères. <strong>Ce mot de passe n'est pas récupérable</strong> : sans lui, l'archive est illisible. Conservez-le dans un gestionnaire de mots de passe.</div>
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-primary" id="backupExportBtn" type="button">Télécharger la sauvegarde</button>
+        </div>
+        <div id="backupExportResult" class="mt-3 d-none"></div>
+      </section>
+
+      <section class="content-card mt-4" id="db-restore">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Restauration</p>
+            <h2 class="section-title">Analyser puis restaurer une sauvegarde</h2>
+            <p class="panel-text">Le fichier est d'abord analysé (intégrité, tables, empreintes). Vous choisissez ensuite les bases à restaurer. <strong>Une copie de sécurité de chaque base remplacée est créée automatiquement.</strong></p>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="backupRestoreFile">Fichier de sauvegarde</label>
+            <input class="form-control" id="backupRestoreFile" type="file" accept=".aqbak,.zip">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="backupRestorePassword">Mot de passe (si protégée)</label>
+            <input class="form-control" id="backupRestorePassword" type="password" autocomplete="off">
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-outline-secondary w-100" id="backupAnalyseBtn" type="button">Analyser</button>
+          </div>
+        </div>
+        <div id="backupAnalyseResult" class="mt-3 d-none"></div>
+        <div id="backupRestoreChoice" class="mt-3 d-none">
+          <fieldset>
+            <legend class="form-label fs-6">Bases à restaurer</legend>
+            <div id="backupRestoreKeys"></div>
+          </fieldset>
+          <div class="alert alert-warning mt-3" role="alert">
+            Les données actuelles des bases cochées seront remplacées. Si les comptes sont restaurés, votre session peut être invalidée : reconnectez-vous.
+          </div>
+          <button class="btn btn-danger" id="backupRestoreBtn" type="button">Restaurer la sélection</button>
+        </div>
+        <div id="backupRestoreResult" class="mt-3 d-none"></div>
+      </section>
+
+      <section class="content-card mt-4" id="db-safety">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Filet de sécurité</p>
+            <h2 class="section-title">Copies de sécurité avant restauration</h2>
+            <p class="panel-text">Créées automatiquement avant chaque remplacement de base. Elles sont stockées sur le serveur, dans <code>backend/db_backups</code>.</p>
+          </div>
+        </div>
+        <div id="backupSafetyList" class="text-muted">Chargement…</div>
+      </section>
+
+      <details class="content-card mt-4" id="db-legacy">
+        <summary class="fw-semibold">Ancien format : fichier <code>.db</code> unique (dossiers seulement)</summary>
+        <div class="mt-3">
+      <section class="content-card mt-4" id="db-export-legacy">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Sauvegarde</p>
@@ -86,7 +166,7 @@
       </section>
 
       <!-- Diagnose -->
-      <section class="content-card mt-4" id="db-diagnose">
+      <section class="content-card mt-4" id="db-diagnose-legacy">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Vérification</p>
@@ -107,7 +187,7 @@
       </section>
 
       <!-- Import -->
-      <section class="content-card mt-4" id="db-import">
+      <section class="content-card mt-4" id="db-import-legacy">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Remplacement</p>
@@ -129,6 +209,8 @@
         </div>
         <div id="dbImportResult" class="mt-3 d-none"></div>
       </section>
+        </div>
+      </details>
     </div>
   </div>
 </main>
@@ -137,5 +219,6 @@
 <script src="js/ui.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/admin-db.js"></script>
+<script src="js/admin-backup.js"></script>
 </body>
 </html>
