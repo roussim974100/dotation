@@ -389,6 +389,14 @@ def persist_form(payload, allow_locked_update=False):
                 for item in items
             ],
         )
+        # Parc : alimente unites et journal (ne doit jamais empecher l'enregistrement du dossier).
+        try:
+            from models.units import sync_units_for_form
+            sync_units_for_form(connection, form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du parc impossible pour le dossier %s", form_id, exc_info=True)
+
         insert_audit_event(
             connection,
             dossier_id,

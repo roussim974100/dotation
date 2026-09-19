@@ -865,6 +865,11 @@ def delete_form(form_id):
                 row["title"],
                 json.loads(row["payload_json"] or "{}"),
             )
+        try:
+            from models.units import release_units_for_form
+            release_units_for_form(connection, form_id)  # l'objet detenu est libere, l'historique reste
+        except Exception:  # noqa: BLE001
+            pass
         deleted = connection.execute(
             "DELETE FROM dotation_forms WHERE id = ?",
             (form_id,),

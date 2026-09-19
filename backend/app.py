@@ -565,6 +565,11 @@ def init_db():
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
+        # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
+        from models.units import backfill_units, ensure_units_schema
+        ensure_units_schema(connection)
+        if connection.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0:
+            backfill_units(connection)
         # Migration auto depuis users.json vers users.db (voir init_users_db)
 
 
