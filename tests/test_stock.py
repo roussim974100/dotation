@@ -170,3 +170,22 @@ def test_holder_names_are_masked_for_masked_scope(db):
     sync_stock_for_form(db, "F1")
     holder = next(m for m in list_movements(db, "veste", mask=True) if m["form_id"] == "F1")["holder_label"]
     assert "DUPONT" not in holder and "Anne" not in holder
+
+
+def test_stock_routes_refuse_anonymous_and_unauthorised_users():
+    """Sans session : refus. Session d'un compte inconnu (aucun droit parc.manage) : refus, et rien n'est ecrit."""
+    from app import app
+
+    anonymous = app.test_client()
+    assert anonymous.get("/api/stock").status_code in (401, 403)
+    assert anonymous.get("/api/stock/veste/movements").status_code in (401, 403)
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user"] = "utilisateur_sans_droits_stock"
+        sess["csrf_token"] = "jeton-de-test"
+    headers = {"X-CSRF-Token": "jeton-de-test"}
+    body = {"kind": "receipt", "quantity": 5}
+    assert client.post("/api/stock/veste/movements", json=body, headers=headers).status_code in (401, 403)
+    assert client.put("/api/stock/veste/threshold", json={"threshold": 3}, headers=headers).status_code in (401, 403)
+    assert client.post("/api/stock/veste/movements", json=body).status_code == 403  # sans jeton CSRF

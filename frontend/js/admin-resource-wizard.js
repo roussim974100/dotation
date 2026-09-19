@@ -10,6 +10,9 @@ const WIZARD_TRACKING = [
   { mode: "none", title: "Sans suivi individuel", category: "materiel", requiresReturn: true,
     text: "On sait qu'une ressource a été remise, pas laquelle. Aucun historique par objet.",
     example: "Veste, chaussures de sécurité, jeu de clés" },
+  { mode: "quantity", title: "Un stock par quantité", category: "materiel", requiresReturn: true,
+    text: "On suit un nombre d'exemplaires en stock (par taille si besoin), sans identifiant individuel. Le stock baisse à chaque remise signée et remonte à chaque retour en bon état ; une alerte prévient quand il devient bas.",
+    example: "Vêtements par taille, gilets, cartes de visite, consommables" },
   { mode: "access", title: "Un accès numérique", category: "immateriel", requiresReturn: false,
     text: "Un compte ou un droit qu'on ouvre puis qu'on ferme, sans objet à rendre.",
     example: "VPN, messagerie, licence logicielle" }
@@ -27,6 +30,10 @@ const WIZARD_TEMPLATES = [
     fields: [{ label: "N° du badge", required: true, identifier: true }, { label: "Opérateur ou type" }, { label: "Date de fin de validité", type: "date" }] },
   { id: "vetement", mode: "none", label: "Vêtement / équipement", description: "Veste, chaussures, gilet…",
     fields: [{ label: "Taille" }] },
+  { id: "stock_vetement", mode: "quantity", label: "Vêtement en stock (par taille)", description: "Suit le stock de chaque taille : remises, retours, réceptions.",
+    fields: [{ label: "Quantité", type: "number", required: true }, { label: "Taille" }] },
+  { id: "stock_consommable", mode: "quantity", label: "Consommable en stock", description: "Cartes de visite, fournitures… : un simple nombre d'exemplaires.",
+    fields: [{ label: "Quantité", type: "number", required: true }] },
   { id: "cles", mode: "none", label: "Jeu de clés", description: "Liste des clés remises.",
     fields: [{ label: "Détail des clés", type: "textarea" }] },
   { id: "acces", mode: "access", label: "Accès numérique", description: "Compte, droit ou licence.",
@@ -44,6 +51,7 @@ const WIZARD_ISSUE_MESSAGES = {
   unit_needs_material: "Le suivi par objet est réservé au matériel.",
   several_identifiers: "Un seul champ peut identifier l'objet.",
   duplicate_field: "Deux champs portent le même nom.",
+  quantity_needs_material: "Le suivi par quantité est réservé au matériel.",
   resource_exists: "Une ressource avec ce code existe déjà."
 };
 
@@ -73,6 +81,9 @@ function wizardIssues(state) {
     if (!state.hasCondition) issues.push({ level: "warning", text: "Activez « état à la remise » : il alimente l'historique." });
     if (!state.requiresReturn) issues.push({ level: "warning", text: "Non restituable : l'historique ne verra jamais de restitution." });
   }
+  if (state.mode === "quantity" && !state.fields.some((field) => wizardSlug(field.label) === "quantite")) {
+    issues.push({ level: "warning", text: "Ajoutez un champ « Quantité » : sans lui, chaque remise compte pour 1 exemplaire." });
+  }
   const labels = state.fields.map((field) => wizardSlug(field.label));
   if (state.fields.some((field) => !field.label.trim())) issues.push({ level: "error", text: "Un champ n'a pas de nom." });
   if (new Set(labels).size !== labels.length) issues.push({ level: "error", text: "Deux champs portent le même nom." });
@@ -89,6 +100,7 @@ function wizardPreview(state) {
     </div>`).join("");
   const history = state.mode === "unit"
     ? (state.fields.some((field) => field.identifier) ? '<span class="status-chip status-chip--active">Historique de vie activé</span>' : '<span class="status-chip status-chip--cancelled">Historique impossible</span>')
+    : state.mode === "quantity" ? '<span class="status-chip status-chip--active">Stock suivi par quantité</span>'
     : (state.mode ? '<span class="status-chip status-chip--draft">Pas d\'historique par objet</span>' : "");
   const issues = wizardIssues(state);
   return `

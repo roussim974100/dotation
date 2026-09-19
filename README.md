@@ -130,6 +130,16 @@ Tout comme un voyage, le parcours professionnel d'un collaborateur comporte des 
 - PDF de restitution distinct du PDF d'attribution
 - Traçabilité complète du parcours
 
+### 🗃️ Parc matériel et stocks
+
+Chaque ressource a un **mode de suivi**, choisi dans l'assistant de création (Administration > Ressources) :
+
+- **Objet individuel** (ordinateur, badge, véhicule…) : historique de vie de chaque objet (attribué, restitué, dégradé, perdu, réformé, en réparation…), réservation dans un brouillon, transferts, import CSV du parc initial, indicateurs.
+- **Stock par quantité** (vêtements par taille, consommables) : le stock baisse à chaque remise signée, remonte à chaque retour en bon état et revient si le dossier est supprimé. Réception, ajustement d'inventaire (justifié) et perte se saisissent dans *Parc matériel > Stocks*, avec un **seuil d'alerte** par ressource.
+- **Sans suivi individuel** et **accès numérique** : pas d'historique par objet.
+
+La consultation est ouverte à qui voit les dossiers ; les actions de gestion demandent le droit `parc.manage`. Les noms des détenteurs sont masqués pour les groupes à portée « masquée » et anonymisés après la durée de conservation réglable (5 ans par défaut).
+
 ### 📊 Exports et rapports
 
 - Export PDF dossier et restitution

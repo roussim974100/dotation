@@ -58,6 +58,11 @@
     <div id="parcImportResult" class="mt-2 small"></div>
   </details>
 
+  <section class="content-card mb-4 d-none" id="parcStock" aria-label="Stocks par quantité">
+    <p class="panel-eyebrow">Stocks par quantité</p>
+    <div id="parcStockBody"></div>
+  </section>
+
   <section class="content-card mb-4">
     <div class="d-flex flex-wrap gap-2 mb-3" id="parcCounts" aria-label="Répartition par état"></div>
     <div class="row g-3 align-items-end">
@@ -100,9 +105,21 @@
   </div>
 </div>
 
+<div class="password-generator-modal d-none" id="stockModal" aria-hidden="true">
+  <div class="password-generator-modal__backdrop" data-stock-close="true"></div>
+  <div class="password-generator-modal__dialog wizard-dialog" role="dialog" aria-modal="true" aria-labelledby="stockModalTitle">
+    <div class="password-generator-modal__header">
+      <div><p class="panel-eyebrow">Stock</p><h2 class="section-title" id="stockModalTitle"></h2></div>
+      <button class="btn btn-outline-secondary btn-sm" type="button" data-stock-close="true">Fermer</button>
+    </div>
+    <div id="stockModalBody"></div>
+  </div>
+</div>
+
 <script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/parc.js"></script>
+<script src="js/parc-stock.js"></script>
 </body>
 </html>
