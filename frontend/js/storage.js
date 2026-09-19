@@ -1350,6 +1350,8 @@ async function setupRegularisationPanel(modal) {
   const resourcesWrap = document.getElementById("newRestitutionRegulResources");
   const errorEl = document.getElementById("newRestitutionRegulError");
   const submitBtn = document.getElementById("newRestitutionRegulSubmit");
+  // Les deux boutons d'envoi sont verrouilles ensemble : sinon un double envoi cree un doublon.
+  const setSubmitting = (busy) => regulPanel.querySelectorAll('button[type="submit"]').forEach((btn) => { btn.disabled = busy; });
 
   const showPanel = (name) => {
     pickPanel.classList.toggle("d-none", name !== "pick");
@@ -1408,7 +1410,7 @@ async function setupRegularisationPanel(modal) {
       return;
     }
     errorEl.classList.add("d-none");
-    submitBtn.disabled = true;
+    setSubmitting(true);
     try {
       const result = await requestJson("/api/forms/regularisation", {
         method: "POST",
@@ -1422,7 +1424,7 @@ async function setupRegularisationPanel(modal) {
         showToast(`Restitution créée : ${result.title}.`, "success");
         regulPanel.reset();
         resourcesWrap.querySelectorAll("input:checked").forEach((input) => { input.checked = false; });
-        submitBtn.disabled = false;
+        setSubmitting(false);
         document.getElementById("regul_nom")?.focus();
         void renderDraftList();
       } else {
@@ -1430,7 +1432,7 @@ async function setupRegularisationPanel(modal) {
       }
     } catch (error) {
       showError(error.message || "Impossible de créer la restitution.");
-      submitBtn.disabled = false;
+      setSubmitting(false);
     }
   };
 }

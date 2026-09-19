@@ -73,6 +73,7 @@ def validate_csrf():
 
 COMPRESSIBLE_TYPES = ("text/html", "application/json", "application/javascript", "text/css", "text/javascript")
 COMPRESS_MIN_BYTES = 1024
+COMPRESS_MAX_BYTES = 1024 * 1024  # au-dela (exports, sauvegardes), on ne charge pas la reponse en memoire
 
 
 @app.after_request
@@ -86,6 +87,11 @@ def compress_response(response):
         or "gzip" not in (request.headers.get("Accept-Encoding") or "").lower()
         or not any(t in (response.headers.get("Content-Type") or "").lower() for t in COMPRESSIBLE_TYPES)
     ):
+        return response
+    # Reponse en flux (taille inconnue) ou volumineuse : servie telle quelle.
+    if response.direct_passthrough and response.content_length is None:
+        return response
+    if (response.content_length or 0) > COMPRESS_MAX_BYTES:
         return response
     response.direct_passthrough = False
     data = response.get_data()

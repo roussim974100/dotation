@@ -845,7 +845,9 @@ document.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
   const target = event.target;
   if (target && (/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName) || target.isContentEditable)) return;
-  if (document.querySelector(".password-generator-modal:not(.d-none)")) return;
+  // Pas de raccourci si le focus est sur un controle (bouton, lien, menu) ou si un dialogue est ouvert.
+  if (target && target.closest && target.closest("button, a, summary, details[open], [role='dialog']")) return;
+  if (document.querySelector(".password-generator-modal:not(.d-none), .modal.show")) return;
   const shortcut = KEYBOARD_SHORTCUTS.find((item) => item.key === event.key.toLowerCase());
   if (!shortcut) return;
   event.preventDefault();
