@@ -13,13 +13,13 @@ Aucune faille **critique** trouvée. 1 faille majeure (contournement de la limit
 | C1 | Moyen | `brand_logo_url` non validée : le serveur télécharge cette URL (`urlopen`, accepte `file://`, `ftp://`…). Réservé aux admins. | Seuls `http(s)://` acceptés (`save_app_settings`). |
 | C2 | Moyen | Aucun `MAX_CONTENT_LENGTH` : upload géant lu sans plafond. | Plafond 100 Mo (`APP_MAX_UPLOAD_MB`). |
 | C3 | **Majeur** | La limite de tentatives de connexion et les `@rate_limit` utilisaient le **premier `X-Forwarded-For`**, fourni par le client : contournement trivial en changeant l'en-tête à chaque essai, même derrière nginx. | Clé = `request.remote_addr` (`get_rate_limit_key`, corrigée par ProxyFix). L'IP déclarée reste utilisée pour les journaux seulement. |
-| C4 | Moyen | `ProxyFix(x_for=1)` figé : si l'app est joignable sans proxy, IP falsifiable. | Nombre de proxys de confiance configurable : `APP_TRUSTED_PROXIES` (défaut 1, mettre 0 sans proxy). |
+| C4 | Moyen | `ProxyFix(x_for=1)` figé : si l'app est joignable sans proxy, IP falsifiable. | Confiance **automatique** (`backend/proxy.py`) : `X-Forwarded-*` n'est lu que si l'appelant direct est loopback/privé (reverse proxy local ou LAN) ; un accès direct depuis une IP publique l'ignore. Aucun réglage requis. Surcharge rare : `APP_TRUSTED_PROXIES=0` (jamais) ou `N` (forcer, ex. load balancer cloud à IP publique). |
 | C5 | Mineur | `update_user(**fields)` insère les noms de colonnes dans le SQL (non exploitable aujourd'hui, fragile). | Liste blanche `UPDATABLE_USER_COLUMNS`. |
 | C6 | Moyen | XSS stocké potentiel : `executive-dashboard.js` (nom, prénom, service, statut) et `app.js` (titre de dossier, libellé et clé des items de retrait) interpolés sans échappement. La CSP (`script-src` sans inline) limitait l'impact. | `escapeHtml` appliqué. |
 | C7 | Moyen | Les exports (Excel, UNC, PDF par lots) ne sont pas masqués : un groupe à portée `masked` avec `forms.export` contournait le masquage RGPD. Configurable par l'admin (groupes par défaut tous en `full`). | Export refusé (403) si portée `masked` (`can_export_unmasked`). |
 | C8 | Mineur | `pytest 9.0.2` : vulnérabilité connue PYSEC-2026-1845 (dépendance de test). | Passé en `9.0.3`. |
 
-Tests : `tests/test_security_hardening.py` (6 tests). Suite complète : 199 passés.
+Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 passés.
 
 ## Accepté / à surveiller
 
@@ -46,4 +46,5 @@ Tests : `tests/test_security_hardening.py` (6 tests). Suite complète : 199 pass
 - Échappement : scan **heuristique** des interpolations d'objets ; les cas de gabarits construits autrement (concaténations, `insertAdjacentHTML`) n'ont pas été relus un par un.
 - `data_scope` : vérifié sur formulaires, parc et exports ; pas sur `/api/admin/dashboard-stats` (protégé par `forms.view_all`, renvoie noms et prénoms des alertes) ni sur la recherche globale.
 - Contenu des journaux (données personnelles) et rotation.
+- Limite de la détection automatique : un client du **même réseau privé** que l'app, sans reverse proxy, peut encore forger `X-Forwarded-For` (exposition limitée au LAN). Un proxy à IP publique demande `APP_TRUSTED_PROXIES=1`.
 - Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions de `.app_secret_key` et `users.db`).

@@ -3,7 +3,7 @@ from flask.sessions import SecureCookieSessionInterface
 import gzip
 import os
 import secrets
-from werkzeug.middleware.proxy_fix import ProxyFix
+from proxy import AutoProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
 from database import get_db, get_users_db, ensure_column, ensure_users_schema
@@ -35,12 +35,9 @@ app.secret_key = get_app_secret_key()
 app.session_interface = _AutoSecureSessionInterface()
 # Plafond de taille des requetes (uploads CSV, logo, restauration de base) ; reglable via l'environnement.
 app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100")) * 1024 * 1024
-# Nombre de reverse proxies de confiance devant l'app (1 = nginx/Apache). Mettre 0 si l'app est
-# joignable directement : sinon X-Forwarded-For est falsifiable (contournement de la limitation de
-# connexion, fausses IP dans les journaux).
-_TRUSTED_PROXIES = max(0, int(os.environ.get("APP_TRUSTED_PROXIES", "1")))
-if _TRUSTED_PROXIES:
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_TRUSTED_PROXIES, x_proto=_TRUSTED_PROXIES, x_host=_TRUSTED_PROXIES)
+# X-Forwarded-* : confiance automatique selon l'appelant direct (voir proxy.py) ; fonctionne derriere
+# un reverse proxy comme en acces direct, sans reglage. APP_TRUSTED_PROXIES=0 pour tout desactiver.
+app.wsgi_app = AutoProxyFix(app.wsgi_app)
 
 # Valider les permissions au démarrage (dev uniquement)
 if os.environ.get("FLASK_ENV") == "development":

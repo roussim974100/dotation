@@ -66,3 +66,35 @@ def test_export_interdit_aux_groupes_a_portee_masquee(monkeypatch):
     assert forms_routes.can_export_unmasked() is True
     monkeypatch.setattr(forms_routes, "has_permission", lambda perm: False)
     assert forms_routes.can_export_unmasked() is False
+
+
+def _seen_by_app(remote_addr, forwarded_for, monkeypatch, setting=None):
+    from proxy import AutoProxyFix
+    if setting is None:
+        monkeypatch.delenv("APP_TRUSTED_PROXIES", raising=False)
+    else:
+        monkeypatch.setenv("APP_TRUSTED_PROXIES", setting)
+    captured = {}
+
+    def inner(environ, start_response):
+        captured["addr"] = environ.get("REMOTE_ADDR")
+        return []
+
+    AutoProxyFix(inner)({"REMOTE_ADDR": remote_addr, "HTTP_X_FORWARDED_FOR": forwarded_for}, lambda *a: None)
+    return captured["addr"]
+
+
+def test_proxy_auto_derriere_un_reverse_proxy_local(monkeypatch):
+    """Appelant direct prive/loopback = reverse proxy : on lit l'IP client ajoutee par le proxy (dernier element)."""
+    assert _seen_by_app("127.0.0.1", "6.6.6.6, 203.0.113.9", monkeypatch) == "203.0.113.9"
+    assert _seen_by_app("192.168.1.10", "203.0.113.9", monkeypatch) == "203.0.113.9"
+
+
+def test_proxy_auto_acces_direct_public_ignore_x_forwarded_for(monkeypatch):
+    """Appelant direct public = pas de proxy : l'en-tete forge est ignore."""
+    assert _seen_by_app("8.8.8.8", "1.2.3.4", monkeypatch) == "8.8.8.8"
+
+
+def test_proxy_surcharges_explicites(monkeypatch):
+    assert _seen_by_app("127.0.0.1", "203.0.113.9", monkeypatch, setting="0") == "127.0.0.1"
+    assert _seen_by_app("8.8.4.4", "203.0.113.9", monkeypatch, setting="1") == "203.0.113.9"
