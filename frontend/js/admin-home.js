@@ -110,6 +110,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         })
         .catch(() => {});
     }
+    if (session?.permissions?.includes("forms.read_list") || session?.permissions?.includes("*")) {
+      document.getElementById("adminParcCard")?.classList.remove("d-none");
+    }
     const canViewExecutiveDash = session?.permissions?.includes("forms.view_all") || session?.is_admin;
     if (canViewExecutiveDash) {
       document.getElementById("execDashCard")?.classList.remove("d-none");

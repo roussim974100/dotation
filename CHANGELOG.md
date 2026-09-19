@@ -14,6 +14,8 @@ Chantier « Assistant d'organisation » : configuration de démarrage rejouable,
 ### 🧭 Navigation cohérente, moins de clics
 - **Menu du compte identique sur toutes les pages**, généré par `ui.js` : Administration, Synthèse, Parc matériel et Base de données (selon les droits) puis Mon profil, Mode sombre, Changer le mot de passe, Aide générale, Déconnexion. Corrige les pages où « Administration » ou « Synthèse » manquaient (journal, corbeille, aide…).
 - **Navigation d'administration commune** (`admin-nav.js`) : menu latéral groupé (Utilisateurs, Organisation, Apparence, Exploitation) identique sur toutes les sous-pages, ajouté au journal et à la corbeille ; page courante marquée ; **fil d'Ariane** Accueil › Administration › Page ; l'assistant d'organisation est accessible en un clic. Passer d'une sous-page à une autre : 1 clic au lieu de 2 ou 3.
+- **Palette Ctrl+K étendue** : en plus des dossiers, on y trouve les **pages et actions** (Nouvelle attribution, Administration, Créer un compte, Ajouter une ressource, Assistant d'organisation, Sauvegarder maintenant, Restaurer une sauvegarde, Journal, Corbeille, Mon profil, Aide…), filtrées par droits, insensibles aux accents, avec des raccourcis dès l'ouverture. Ce sont de simples liens : aucune action sensible ne s'exécute depuis la palette. Toute tâche courante : 2 actions au clavier (Ctrl+K puis Entrée).
+- **Portail d'administration regroupé** en trois sections identiques au menu latéral (Comptes et droits, Votre organisation, Suivi et exploitation), avec l'assistant d'organisation, le Parc, la Base de données, le Journal, la Corbeille et la Synthèse en cartes.
 - Accessibilité : focus clavier visible, cibles de 44 px, onglets défilants sur mobile.
 
 ### 🔒 Sprint 1 : sécurité des réglages

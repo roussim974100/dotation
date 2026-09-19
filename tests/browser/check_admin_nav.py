@@ -52,6 +52,11 @@ if __name__ == "__main__":
         time.sleep(1.8)
         crumbs = driver.execute_script("return [...document.querySelectorAll('.admin-breadcrumb li')].map(li => li.textContent.trim())")
         check("portail admin : fil d'Ariane Accueil › Administration, sans menu latéral en plus", crumbs == ["Accueil", "Administration"] and not driver.find_elements("css selector", ".admin-nav"), str(crumbs))
+        titles = driver.execute_script("return [...document.querySelectorAll('main .content-card .section-title')].map(e => e.textContent.trim()).filter(t => !t.startsWith('Configuration')).slice(0, 3)")
+        check("portail : trois regroupements (Comptes et droits, Votre organisation, Suivi et exploitation)", titles == ["Comptes et droits", "Votre organisation", "Suivi et exploitation"], str(titles))
+        cards = driver.execute_script("return [...document.querySelectorAll('.admin-entry-card')].filter(a => a.offsetParent !== null).map(a => a.querySelector('.draft-title').textContent.trim())")
+        check("portail : l'assistant d'organisation est une carte permanente, ainsi que Base de données, Parc, Journal, Corbeille",
+              all(name in cards for name in ["Assistant d'organisation", "Base de données", "Parc matériel", "Journal", "Corbeille"]), str(cards))
         errors = [e for e in inst.console_errors(driver) if "favicon" not in e]
         check("aucune erreur JavaScript", not errors, str(errors)[:200])
     print(f"\n{sum(results)}/{len(results)} vérifications réussies")

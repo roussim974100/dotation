@@ -5212,3 +5212,14 @@ section.content-card[id^="db-"] {
     scroll-snap-align: start;
   }
 }
+
+
+.global-search__group {
+  padding: 0.5rem 0.9rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+  list-style: none;
+}
