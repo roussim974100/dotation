@@ -15,7 +15,7 @@ ROOT = Path(__file__).parent.parent
 @pytest.fixture(scope="module")
 def http(tmp_path_factory):
     data = tmp_path_factory.mktemp("aquai_http")
-    env = dict(os.environ, APP_DATA_DIR=str(data), APP_CUSTOM_BRANDING_DIR=str(data / "branding"), PYTHONIOENCODING="utf-8")
+    env = dict(os.environ, APP_UPDATE_CHECK="0", APP_DATA_DIR=str(data), APP_CUSTOM_BRANDING_DIR=str(data / "branding"), PYTHONIOENCODING="utf-8")
     result = subprocess.run([sys.executable, str(ROOT / "tests" / "_http_scenarios.py")], cwd=str(ROOT), env=env,
                             capture_output=True, text=True, encoding="utf-8", timeout=180)
     assert result.returncode == 0, (result.stderr or result.stdout)[-1500:]
@@ -77,3 +77,10 @@ def test_login_rate_limit_ignores_a_forged_forwarded_for_header(http):
 def test_a_fresh_install_gives_the_admin_group_the_parc_manage_right(http):
     """Regression : sur une installation neuve, l'administrateur doit pouvoir gerer le parc et les stocks des le depart."""
     assert http["admin_has_parc_manage"] is True
+
+
+def test_update_endpoints_report_status_and_refuse_the_web_update_by_default(http):
+    status_code, keys = http["update_status"]
+    assert status_code == 200 and {"current", "latest", "available", "can_update", "enabled", "progress"} <= set(keys)
+    assert http["update_check_disabled"] == [200, False]  # verification desactivee : aucune requete reseau
+    assert http["update_start_disabled"] == [403, "update_disabled"]

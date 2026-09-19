@@ -24,7 +24,8 @@ CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 
 class Instance:
-    def __init__(self, copy_db=None, port=5055, user="admin"):
+    def __init__(self, copy_db=None, port=5055, user="admin", env=None):
+        self.extra_env = env or {}
         self.copy_db = copy_db
         self.port = port
         self.user = user
@@ -40,7 +41,7 @@ class Instance:
             source.backup(target)  # copie coherente (WAL compris) ; la source n'est jamais modifiee
             target.close()
             source.close()
-        env = dict(os.environ, APP_DATA_DIR=self.dir, APP_CUSTOM_BRANDING_DIR=os.path.join(self.dir, "branding"), PYTHONIOENCODING="utf-8")
+        env = dict(os.environ, **self.extra_env, APP_DATA_DIR=self.dir, APP_CUSTOM_BRANDING_DIR=os.path.join(self.dir, "branding"), PYTHONIOENCODING="utf-8")
         code = f"import sys; sys.path.insert(0, r'{ROOT / 'backend'}'); import app; app.app.run(host='127.0.0.1', port={self.port}, debug=False, threaded=True)"
         self.log = open(os.path.join(self.dir, "server.log"), "w", encoding="utf-8")
         self.process = subprocess.Popen([sys.executable, "-c", code], cwd=str(ROOT), env=env, stdout=self.log, stderr=subprocess.STDOUT)
@@ -79,7 +80,7 @@ class Instance:
             "s = app.app.session_interface.get_signing_serializer(app.app);"
             "print(s.dumps({'user': %r, 'csrf_token': 'jeton-navigateur'}))" % (ROOT / "backend", self.user)
         )
-        env = dict(os.environ, APP_DATA_DIR=self.dir, APP_CUSTOM_BRANDING_DIR=os.path.join(self.dir, "branding"), PYTHONIOENCODING="utf-8")
+        env = dict(os.environ, **self.extra_env, APP_DATA_DIR=self.dir, APP_CUSTOM_BRANDING_DIR=os.path.join(self.dir, "branding"), PYTHONIOENCODING="utf-8")
         out = subprocess.run([sys.executable, "-c", env_code], cwd=str(ROOT), env=env, capture_output=True, text=True, encoding="utf-8")
         return out.stdout.strip().splitlines()[-1]
 

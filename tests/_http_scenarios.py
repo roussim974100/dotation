@@ -124,6 +124,14 @@ for i in range(13):
         break
 results["login_rate_limited_at_attempt"] = limited
 
+# Mise a jour : la verification reseau est coupee (APP_UPDATE_CHECK=0) ; la mise a jour web est desactivee par defaut.
+r = admin.get("/api/admin/update/status")
+body = r.get_json() or {}
+results["update_status"] = [r.status_code, sorted(body.keys())]
+results["update_check_disabled"] = [status(admin.post("/api/admin/update/check", json={}, headers=H)), (admin.post("/api/admin/update/check", json={}, headers=H).get_json() or {}).get("enabled")]
+r = admin.post("/api/admin/update/start", json={"password": "admin"}, headers=H)
+results["update_start_disabled"] = [r.status_code, (r.get_json() or {}).get("error")]
+
 from auth import build_user_context  # noqa: E402
 results["admin_has_parc_manage"] = "parc.manage" in build_user_context("admin")["permissions"]
 

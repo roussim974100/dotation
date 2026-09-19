@@ -46,6 +46,7 @@
 <!-- Portail d'entrée admin : synthèse et accès rapides vers les sous-pages. -->
 <main id="main" class="container py-4 py-lg-5">
   <div id="adminFlashNotice" class="alert alert-info d-none mb-4" role="alert"></div>
+  <div id="updateBanner" class="alert alert-info d-none mb-4" role="status" aria-live="polite"></div>
   <div class="admin-alerts d-grid gap-2 mb-3">
     <div id="backupHealthBanner" class="alert d-none d-flex align-items-center justify-content-between gap-3" role="status">
       <span id="backupHealthText"></span>
@@ -56,6 +57,8 @@
       <a class="btn btn-sm btn-primary" href="admin-comptes.html#admin-users-list">Valider les comptes</a>
     </div>
   </div>
+
+  <p id="updateInfo" class="small text-muted mb-3"></p>
 
   <section class="hero-panel admin-hero mb-4">
     <div>
@@ -212,10 +215,31 @@
 </main>
 
 <!-- Scripts du portail admin et du branding global. -->
+<div class="password-generator-modal d-none" id="updateModal" aria-hidden="true">
+  <div class="password-generator-modal__backdrop" data-update-cancel="true"></div>
+  <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">
+    <div class="password-generator-modal__header">
+      <div><p class="panel-eyebrow">Administration</p><h2 class="section-title" id="updateModalTitle">Mettre à jour l'application</h2></div>
+      <button class="btn btn-outline-secondary btn-sm" type="button" data-update-cancel="true">Fermer</button>
+    </div>
+    <p id="updateModalText" class="small"></p>
+    <div class="alert alert-danger small d-none" id="updateError" role="alert"></div>
+    <div class="mb-3">
+      <label class="form-label" for="updatePassword">Confirmez avec votre mot de passe</label>
+      <input class="form-control" id="updatePassword" type="password" autocomplete="current-password">
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+      <button class="btn btn-outline-secondary" type="button" data-update-cancel="true">Annuler</button>
+      <button class="btn btn-primary" type="button" id="updateConfirm" data-update-confirm="true">Lancer la mise à jour</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/admin-home.js"></script>
+<script src="js/admin-update.js"></script>
 </body>
 </html>
 
