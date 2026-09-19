@@ -505,8 +505,9 @@ Deux limites : un poste du **même réseau privé** que l'application, sans reve
 
 ```bash
 cd /opt/dotation
-sudo bash setup/update-debian.sh          # branche actuellement installée
-sudo bash setup/update-debian.sh main     # ou une branche précise
+sudo bash deploy.sh          # branche actuellement installée
+sudo bash deploy.sh main     # ou une branche précise (prod, preprod, dev…)
+sudo bash deploy.sh --force  # écrase des modifications locales de fichiers suivis par git
 ```
 
 Le script, dans l'ordre :
