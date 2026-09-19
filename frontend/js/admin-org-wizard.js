@@ -79,7 +79,7 @@ const ORG_WIZARD_BODIES = [
   (state) => `
     <p class="panel-text">Choisissez ce qui ressemble le plus à votre structure : cela pré-remplit des suggestions, que vous pourrez toutes modifier. « Autre » convient à toute organisation, en France ou à l'étranger.</p>
     <div class="row g-2 mb-3" role="radiogroup" aria-label="Type d'organisation">
-      ${Object.entries(state.catalog.contexts).map(([key, context]) => `
+      ${state.catalog.context_order.map((key) => [key, state.catalog.contexts[key]]).map(([key, context]) => `
         <div class="col-md-6"><label class="border rounded p-3 d-block h-100${state.context === key ? " border-primary bg-primary bg-opacity-10" : ""}">
           <input class="form-check-input me-2" type="radio" name="orgWzContext" value="${orgWzEsc(key)}" ${state.context === key ? "checked" : ""}>
           <strong>${orgWzEsc(context.label)}</strong><br><span class="small text-muted">${orgWzEsc(context.description)}</span></label></div>`).join("")}
@@ -104,7 +104,7 @@ const ORG_WIZARD_BODIES = [
     <div class="form-text mt-2">L'identifiant (a-z, 0-9, _ et -) ne change plus une fois utilisé ; le libellé ne peut pas contenir de virgule, deux-points ni point-virgule.</div>`,
   (state) => {
     const pack = state.catalog.contexts[state.context].resources;
-    const templates = Object.entries(state.catalog.templates);
+    const templates = state.catalog.template_order.map((id) => [id, state.catalog.templates[id]]);
     return `
     <p class="panel-text">Cochez les ressources que votre structure gère. Décocher masque une ressource des nouveaux dossiers ; elle reste réactivable, et celles déjà utilisées ne peuvent pas être masquées.</p>
     <button class="btn btn-outline-primary btn-sm mb-3" type="button" id="orgWzApplyPack">Appliquer les suggestions « ${orgWzEsc(state.catalog.contexts[state.context].label)} »</button>

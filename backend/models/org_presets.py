@@ -77,7 +77,9 @@ WIZARD_SETTING_KEYS = ("org_name", "org_context", "beneficiary_types", "dpo_emai
 def catalog_payload():
     """Catalogue destine au navigateur (les listes de codes sont deja des donnees pures)."""
     return {
+        "context_order": list(ORG_CONTEXTS),  # jsonify trie les cles : l'ordre d'affichage est donne a part
         "contexts": {key: {**value} for key, value in ORG_CONTEXTS.items()},
+        "template_order": list(RESOURCE_TEMPLATES),
         "templates": {key: {"label": v["label"], "description": v["description"], "mode": v["mode"], "category": v["category"]}
                       for key, v in RESOURCE_TEMPLATES.items()},
         "tracking_modes": ["unit", "none", "quantity", "access"],
