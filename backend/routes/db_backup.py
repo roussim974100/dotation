@@ -190,14 +190,15 @@ def backup_history():
     return jsonify({"history": backup_targets.read_history(30)})
 
 
-def _schedule_commands():
-    """Commandes a programmer sur le serveur (le planificateur du systeme lance `tick` toutes les 15 min)."""
+def _scheduler_paths():
+    """Chemins servant a composer les commandes du planificateur (la frequence vient des reglages saisis)."""
     script = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "backup_cli.py"))
-    log = os.path.join(backup.BACKUP_DIR, "backup_cron.log")
     return {
-        "linux": f'*/15 * * * * cd "{os.path.dirname(script)}" && "{sys.executable}" "{script}" tick >> "{log}" 2>&1',
-        "windows": f'schtasks /Create /SC MINUTE /MO 15 /TN "AQuai Sauvegarde" /TR "\\"{sys.executable}\\" \\"{script}\\" tick"',
-        "test": f'"{sys.executable}" "{script}" status',
+        "platform": "windows" if os.name == "nt" else "linux",
+        "python": sys.executable,
+        "script": script,
+        "workdir": os.path.dirname(script),
+        "log": os.path.join(backup.BACKUP_DIR, "backup_cron.log"),
     }
 
 
@@ -212,7 +213,7 @@ def _schedule_view():
         "password": {"env_var": config["password_source"].get("env_var", ""), "available": bool(password), "origin": origin},
         "next_run": backup_schedule.next_slot(config["schedule"], now).isoformat() if config["schedule"]["enabled"] else None,
         "health": backup_schedule.health(config, now),
-        "commands": _schedule_commands(),
+        "scheduler": _scheduler_paths(),
     }
 
 

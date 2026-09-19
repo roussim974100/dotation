@@ -239,14 +239,17 @@
           </div>
         </form>
         <div id="schedResult" class="mt-3 d-none"></div>
-        <details class="mt-4">
+        <details class="mt-4" id="schedulerHelp">
           <summary class="fw-semibold">Activer l'exécution automatique sur le serveur</summary>
-          <p class="small mt-2">Le déclenchement est assuré par le planificateur du système, qui lance ce script toutes les 15 minutes. Il décide seul s'il est temps de sauvegarder d'après les réglages ci-dessus : modifier l'heure ici ne demande jamais de changer le planificateur. À faire une seule fois :</p>
-          <p class="small mb-1"><strong>Linux</strong> (ajouter avec <code>crontab -e</code> pour l'utilisateur qui fait tourner l'application) :</p>
+          <p class="small mt-2" id="schedulerSummary"></p>
+          <div class="alert alert-warning small py-2 d-none" id="schedulerDirty" role="status">Les réglages ont changé : après avoir enregistré, reprogrammez la tâche du serveur avec les commandes ci-dessous (ou utilisez l'option « toutes les 15 minutes », qui n'a jamais besoin d'être reprogrammée).</div>
+          <div class="d-flex justify-content-between align-items-center"><p class="small mb-1"><strong>Linux</strong> : ajouter ces lignes avec <code>crontab -e</code> (utilisateur qui fait tourner l'application) <span class="text-muted" id="labelLinux"></span></p><button class="btn btn-sm btn-outline-secondary" type="button" data-copy-target="cmdLinux">Copier</button></div>
           <pre class="small p-2 border rounded" id="cmdLinux"></pre>
-          <p class="small mb-1"><strong>Windows</strong> (invite de commandes administrateur) :</p>
+          <div class="d-flex justify-content-between align-items-center"><p class="small mb-1"><strong>Windows</strong> : invite de commandes administrateur <span class="text-muted" id="labelWindows"></span></p><button class="btn btn-sm btn-outline-secondary" type="button" data-copy-target="cmdWindows">Copier</button></div>
           <pre class="small p-2 border rounded" id="cmdWindows"></pre>
-          <p class="small mb-1"><strong>Vérifier</strong> :</p>
+          <div class="d-flex justify-content-between align-items-center"><p class="small mb-1"><strong>Sans reprogrammation</strong> : une vérification toutes les 15 minutes (le script décide seul s'il est temps)</p><button class="btn btn-sm btn-outline-secondary" type="button" data-copy-target="cmdAlt">Copier</button></div>
+          <pre class="small p-2 border rounded" id="cmdAlt"></pre>
+          <p class="small mb-1"><strong>Vérifier</strong> l'état depuis le serveur :</p>
           <pre class="small p-2 border rounded" id="cmdTest"></pre>
         </details>
       </section>

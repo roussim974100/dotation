@@ -17,6 +17,88 @@ function scheduleEl(id) {
   return document.getElementById(id);
 }
 
+let schedulerPaths = null;
+let savedScheduleSignature = "";
+
+// Jours : numero ISO (1 = lundi) -> libelle, code cron (0 = dimanche) et code schtasks.
+const SCHEDULE_DAYS = {
+  1: { label: "lundi", cron: 1, win: "MON" }, 2: { label: "mardi", cron: 2, win: "TUE" },
+  3: { label: "mercredi", cron: 3, win: "WED" }, 4: { label: "jeudi", cron: 4, win: "THU" },
+  5: { label: "vendredi", cron: 5, win: "FRI" }, 6: { label: "samedi", cron: 6, win: "SAT" },
+  7: { label: "dimanche", cron: 0, win: "SUN" }
+};
+
+function scheduleSignature() {
+  return [scheduleEl("schedEnabled").checked, scheduleEl("schedFrequency").value, scheduleEl("schedWeekday").value, scheduleEl("schedTime").value].join("|");
+}
+
+// Chemins reels du serveur pour son propre systeme ; chemins modeles a adapter pour l'autre.
+const SCHEDULER_TEMPLATE_PATHS = {
+  linux: { python: "/usr/bin/python3", script: "/chemin/application/backend/backup_cli.py", workdir: "/chemin/application/backend", log: "/chemin/application/backend/db_backups/backup_cron.log" },
+  windows: { python: "C:\\chemin\\python.exe", script: "C:\\chemin\\application\\backend\\backup_cli.py", workdir: "C:\\chemin\\application\\backend", log: "C:\\chemin\\application\\backend\\db_backups\\backup_cron.log" }
+};
+
+function schedulerPathsFor(system) {
+  return schedulerPaths.platform === system ? schedulerPaths : SCHEDULER_TEMPLATE_PATHS[system];
+}
+
+// Compose les commandes du planificateur d'apres les reglages affiches (mises a jour en direct).
+function buildSchedulerCommands(settings) {
+  const [hour, minute] = settings.time.split(":").map(Number);
+  const weekly = settings.frequency === "weekly";
+  const day = SCHEDULE_DAYS[settings.weekday] || SCHEDULE_DAYS[1];
+  const time2 = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const when = weekly ? `chaque ${day.label} à ${time2}` : `chaque jour à ${time2}`;
+
+  const lin = schedulerPathsFor("linux");
+  const cronCommand = `cd "${lin.workdir}" && "${lin.python}" "${lin.script}" tick >> "${lin.log}" 2>&1`;
+  const win = schedulerPathsFor("windows");
+  const winTask = `/TR "\\"${win.python}\\" \\"${win.script}\\" tick"`;
+
+  return {
+    when,
+    linux: [
+      `# Sauvegarde ${when}`,
+      `${minute} ${hour} * * ${weekly ? day.cron : "*"} ${cronCommand}`,
+      `# Rattrapage si le serveur était éteint à l'heure prévue (2 min après le démarrage)`,
+      `@reboot sleep 120 && ${cronCommand}`
+    ].join("\n"),
+    windows: [
+      `schtasks /Create /F /TN "AQuai Sauvegarde" /SC ${weekly ? `WEEKLY /D ${day.win}` : "DAILY"} /ST ${time2} ${winTask}`,
+      `schtasks /Create /F /TN "AQuai Sauvegarde (rattrapage)" /SC ONSTART /DELAY 0002:00 ${winTask}`
+    ].join("\n"),
+    alt: [
+      `# Linux`,
+      `*/15 * * * * ${cronCommand}`,
+      `# Windows`,
+      `schtasks /Create /F /TN "AQuai Sauvegarde" /SC MINUTE /MO 15 ${winTask}`
+    ].join("\n"),
+    test: schedulerPaths.platform === "windows"
+      ? `"${win.python}" "${win.script}" status`
+      : `"${lin.python}" "${lin.script}" status`
+  };
+}
+
+function renderSchedulerCommands() {
+  if (!schedulerPaths || !scheduleEl("cmdLinux")) return;
+  const commands = buildSchedulerCommands({
+    frequency: scheduleEl("schedFrequency").value,
+    weekday: Number(scheduleEl("schedWeekday").value),
+    time: scheduleEl("schedTime").value || "02:00"
+  });
+  const serverIsWindows = schedulerPaths.platform === "windows";
+  scheduleEl("labelLinux").textContent = serverIsWindows ? "— chemins d'exemple à adapter : ce serveur tourne sous Windows" : "— chemins de ce serveur";
+  scheduleEl("labelWindows").textContent = serverIsWindows ? "— chemins de ce serveur" : "— chemins d'exemple à adapter : ce serveur tourne sous Linux";
+  scheduleEl("schedulerSummary").innerHTML = scheduleEl("schedEnabled").checked
+    ? `Sauvegarde <strong>${escapeHtml(commands.when)}</strong>. Le planificateur du système lance le script à cette heure ; le script vérifie les réglages, envoie la sauvegarde et purge les anciennes. À faire une seule fois :`
+    : "La sauvegarde automatique est <strong>désactivée</strong> : activez-la ci-dessus pour que ces commandes prennent effet. À faire une seule fois :";
+  scheduleEl("cmdLinux").textContent = commands.linux;
+  scheduleEl("cmdWindows").textContent = commands.windows;
+  scheduleEl("cmdAlt").textContent = commands.alt;
+  scheduleEl("cmdTest").textContent = commands.test;
+  scheduleEl("schedulerDirty").classList.toggle("d-none", scheduleSignature() === savedScheduleSignature);
+}
+
 function renderScheduleView(view) {
   scheduleEl("schedEnabled").checked = view.schedule.enabled;
   scheduleEl("schedFrequency").value = view.schedule.frequency;
@@ -39,9 +121,9 @@ function renderScheduleView(view) {
   health.className = `alert ${SCHEDULE_HEALTH_CLASSES[view.health.level] || "alert-info"}`;
   health.textContent = view.health.message + (view.next_run ? ` Prochaine échéance : ${new Date(view.next_run).toLocaleString("fr-FR")}.` : "");
 
-  scheduleEl("cmdLinux").textContent = view.commands.linux;
-  scheduleEl("cmdWindows").textContent = view.commands.windows;
-  scheduleEl("cmdTest").textContent = view.commands.test;
+  schedulerPaths = view.scheduler;
+  savedScheduleSignature = scheduleSignature();
+  renderSchedulerCommands();
 }
 
 async function loadScheduleView() {
@@ -88,14 +170,31 @@ document.addEventListener("DOMContentLoaded", () => {
   scheduleEl("schedFrequency").addEventListener("change", () => {
     scheduleEl("schedWeekdayWrap").classList.toggle("d-none", scheduleEl("schedFrequency").value !== "weekly");
   });
+  ["schedEnabled", "schedFrequency", "schedWeekday", "schedTime"].forEach((id) => {
+    scheduleEl(id).addEventListener("input", renderSchedulerCommands);
+    scheduleEl(id).addEventListener("change", renderSchedulerCommands);
+  });
+  document.querySelectorAll("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(scheduleEl(button.dataset.copyTarget).textContent);
+        button.textContent = "Copié";
+      } catch (error) {
+        button.textContent = "Sélectionnez et copiez";
+      }
+      window.setTimeout(() => { button.textContent = "Copier"; }, 2000);
+    });
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = scheduleEl("schedSaveBtn");
     button.disabled = true;
+    const timingChanged = savedScheduleSignature !== scheduleSignature();
     try {
       await saveSchedule();
-      showDbResult("schedResult", "ok", "Planification enregistrée.", "");
+      showDbResult("schedResult", "ok", "Planification enregistrée.",
+        timingChanged ? "Si la fréquence ou l'heure a changé, mettez à jour la tâche du serveur avec les commandes ci-dessous (section « Activer l'exécution automatique »)." : "");
     } catch (error) {
       showDbResult("schedResult", "error", error.message, "");
     } finally {
