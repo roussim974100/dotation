@@ -501,19 +501,23 @@ Deux limites : un poste du **même réseau privé** que l'application, sans reve
 
 ## Mise à jour en production
 
-### Méthode recommandée : le script de mise à jour
+### Méthode recommandée : les scripts de déploiement
 
-```bash
-cd /opt/dotation
-sudo bash deploy.sh          # branche actuellement installée
-sudo bash deploy.sh main     # ou une branche précise (prod, preprod, dev…)
-sudo bash deploy.sh --force  # écrase des modifications locales de fichiers suivis par git
-```
+Deux scripts, chacun **figé sur sa branche** (impossible de déployer la mauvaise par erreur) :
+
+| Serveur | Commande | Branche déployée |
+|---|---|---|
+| **Production** | `cd /opt/dotation && sudo bash deploy.sh` | `prod` |
+| **Préprod / version dev** | `cd /opt/dotation && sudo bash deploy-dev.sh` | `dev` |
+
+Option commune : `--force` écrase des modifications locales de fichiers suivis par git (sans elle, le script refuse et les liste).
+
+La logique est partagée dans `setup/deploy-common.sh` ; seuls la branche et le nom changent d'un script à l'autre.
 
 Le script, dans l'ordre :
 
 1. **sauvegarde** cohérente des bases dans `backend/db_backups/avant_maj_<date>/` ;
-2. `git pull` de la branche ;
+2. récupère le code de la branche du script (`origin/prod` ou `origin/dev`) ;
 3. installe les **dépendances Python dans le venv réellement utilisé par le service** (lu dans le fichier systemd, il n'a donc pas besoin de savoir si le venv est `/opt/dotation/venv` ou `/opt/dotation/backend/venv`) ;
 4. redémarre le service et **vérifie qu'il répond** ; sinon il affiche l'erreur et les commandes pour revenir en arrière.
 
