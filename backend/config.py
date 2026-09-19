@@ -4,12 +4,16 @@ import secrets
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 FRONTEND_ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
-CUSTOM_BRANDING_DIR = os.path.join(FRONTEND_ASSETS_DIR, "custom")
+# Dossier de donnees (bases, cle secrete) : par defaut celui du backend. APP_DATA_DIR permet d'isoler une instance
+# (tests d'integration avec une base temporaire) sans jamais toucher aux vraies bases.
+DATA_DIR = os.environ.get("APP_DATA_DIR") or BASE_DIR
+os.makedirs(DATA_DIR, exist_ok=True)
+CUSTOM_BRANDING_DIR = os.environ.get("APP_CUSTOM_BRANDING_DIR") or os.path.join(FRONTEND_ASSETS_DIR, "custom")
 A_QUAI_PDF_LOGO_PATH = os.path.join(FRONTEND_ASSETS_DIR, "a-quai-email-mark.png")
-DB_PATH = os.path.join(BASE_DIR, "dotation.db")
-DB_USERS_PATH = os.path.join(BASE_DIR, "users.db")
+DB_PATH = os.path.join(DATA_DIR, "dotation.db")
+DB_USERS_PATH = os.path.join(DATA_DIR, "users.db")
 AUTH_CONFIG_PATH = os.path.join(BASE_DIR, "users.json")
-APP_SECRET_PATH = os.path.join(BASE_DIR, ".app_secret_key")
+APP_SECRET_PATH = os.path.join(DATA_DIR, ".app_secret_key")
 CITY_LOGO_URL = os.environ.get("CITY_LOGO_URL", "")
 CITY_LOGO_PATH = os.environ.get("CITY_LOGO_PATH", os.path.join(FRONTEND_ASSETS_DIR, "city-logo.png"))
 

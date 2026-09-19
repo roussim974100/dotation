@@ -2,6 +2,8 @@ import json
 import os
 import urllib.request
 
+import environment
+
 from database import get_db
 from utils import utc_now, slugify_field_key
 from config import (
@@ -30,6 +32,8 @@ DEFAULT_APP_SETTINGS = {
     "beneficiary_types": "agent:Agent,elu:Élu(e)",
     "setup_completed": "0",
     "restitution_phase1_unlock_days": "1",
+    "timing_warning_days": "3",
+    "parc_retention_years": "5",
 }
 
 VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
@@ -231,6 +235,9 @@ def save_app_settings(connection, updates):
 
     if "brand_logo_mode" in sanitized and sanitized["brand_logo_mode"] not in {"default", "url", "file"}:
         sanitized["brand_logo_mode"] = DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    # Le serveur telecharge cette URL : n'accepter que http(s) (pas de file://, ftp://, etc.).
+    if sanitized.get("brand_logo_url") and not sanitized["brand_logo_url"].lower().startswith(("http://", "https://")):
+        sanitized["brand_logo_url"] = ""
     if "theme_id" in sanitized and sanitized["theme_id"] not in THEME_PRESETS:
         sanitized["theme_id"] = DEFAULT_APP_SETTINGS["theme_id"]
     if "dark_mode_policy" in sanitized and sanitized["dark_mode_policy"] not in {"disabled", "allowed", "forced"}:
@@ -319,6 +326,8 @@ def build_public_settings_payload(settings=None):
         "appName": "A quai",
         "dpoEmail": get_dpo_email(settings),
         "logoUrl": "/api/settings/logo",
+        "environment": environment.resolve_environment(),
+        "displayVersion": environment.display_version(),
         "logoMode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
         "themeId": theme_id,
         "themeLabel": THEME_PRESETS[theme_id]["label"],
@@ -335,6 +344,7 @@ def build_public_settings_payload(settings=None):
         "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
+        "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),
     }
 
 

@@ -10,8 +10,9 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="login-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <!-- Écran d'inscription des utilisateurs internes. -->
-<main class="login-layout">
+<main id="main" class="login-layout">
   <section class="login-brand-panel">
     <div class="login-brand-panel__content">
       <div class="app-brand app-brand--login">
@@ -46,6 +47,21 @@
             <button class="btn btn-outline-primary btn-sm" id="generateSignupPasswordBtn" type="button">Générer un mot de passe</button>
             <button class="btn btn-outline-secondary btn-sm" id="copySignupPasswordBtn" type="button">Copier le mot de passe</button>
           </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="signup_first_name">Prénom</label>
+            <input id="signup_first_name" class="form-control form-control-lg" name="first_name" autocomplete="given-name" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="signup_last_name">Nom</label>
+            <input id="signup_last_name" class="form-control form-control-lg" name="last_name" autocomplete="family-name" required>
+          </div>
+          <div class="form-text mt-0">Ces informations ne pourront plus être modifiées par vous une fois le compte activé.</div>
+        </div>
+        <div>
+          <label class="form-label" for="signup_email">Adresse e-mail <span class="text-muted">(facultatif)</span></label>
+          <input id="signup_email" class="form-control form-control-lg" type="email" name="email" autocomplete="email" placeholder="prenom.nom@collectivite.fr">
         </div>
         <div>
           <label class="form-label" for="signup_password_confirm">Confirmer le mot de passe</label>

@@ -1,0 +1,11 @@
+# Surveille la demande de mise a jour deposee par l'application (administration > « Mettre a jour »).
+# Modele : @DATA_DIR@ est remplace par setup/install-web-update.sh.
+[Unit]
+Description=Demande de mise a jour d'A Quai depuis le navigateur
+
+[Path]
+PathExists=@DATA_DIR@/update/request.json
+Unit=dotation-update.service
+
+[Install]
+WantedBy=multi-user.target

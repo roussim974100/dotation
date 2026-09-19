@@ -5,6 +5,7 @@ from utils import (
     slugify_field_key, generate_id,
     format_export_datetime, format_assignment_condition_label,
 )
+from models.settings import DEFAULT_APP_SETTINGS
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,12 @@ def normalize_resource_field_schema(raw_schema):
             "required": bool(field.get("required", False)),
             "options": [str(option).strip() for option in options if str(option or "").strip()],
             "suggest": bool(field.get("suggest", False)),
+            # Champ qui identifie l'objet (n° de serie...) : permet de re-selectionner un materiel restitue.
+            "identifier": bool(field.get("identifier", False)),
+            # Masque : le champ reste dans le schema (donc toujours resoluble en label pour
+            # les dossiers existants et les exports) mais disparait du formulaire de saisie.
+            # Alternative a la suppression reelle pour ne pas perdre les valeurs deja saisies.
+            "hidden": bool(field.get("hidden", False)),
         })
     return normalized
 
@@ -45,11 +52,62 @@ def summarize_dynamic_resource(resource):
     # Une ressource dynamique peut être décrite par plusieurs champs saisis
     # ou par un simple détail libre; on prépare ici un résumé stable.
     fields = resource.get("fields") or {}
-    if isinstance(fields, dict):
-        values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
-        if values:
-            return " - ".join(values)
+    if isinstance(fields, dict) and fields:
+        field_schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
+        if field_schema:
+            # Schéma connu : on restitue "Libellé : valeur" dans l'ordre du schéma pour que
+            # chaque valeur soit identifiable dans les PDF/Excel (au lieu d'un join anonyme).
+            # Comparaison insensible à la casse : normalize_resource_field_schema met la clé
+            # en minuscules (slugify_field_key), alors que certaines ressources historiques
+            # (ex. téléphone : numeroSerie) ont leurs valeurs enregistrées en camelCase -
+            # même repli que is_dynamic_resource_complete.
+            fields_lower = {str(key).lower(): value for key, value in fields.items()}
+            parts = []
+            matched_keys_lower = set()
+            for field in field_schema:
+                key_lower = field["key"].lower()
+                matched_keys_lower.add(key_lower)
+                raw_value = fields.get(field["key"])
+                if raw_value is None:
+                    raw_value = fields_lower.get(key_lower)
+                value = str(raw_value or "").strip()
+                if value:
+                    parts.append(f"{field['label']} : {value}")
+            # Valeurs présentes mais hors schéma courant (champ renommé/supprimé depuis) :
+            # on les restitue quand même brutes plutôt que de les faire disparaître.
+            for key, value in fields.items():
+                if str(key).lower() in matched_keys_lower:
+                    continue
+                value = str(value or "").strip()
+                if value:
+                    parts.append(value)
+            if parts:
+                return " - ".join(parts)
+        else:
+            values = [str(value).strip() for value in fields.values() if str(value or "").strip()]
+            if values:
+                return " - ".join(values)
     return str(resource.get("details") or "").strip()
+
+
+# Cles techniques de suivi a exclure du resume brut d'un item statique (non "fields").
+_ITEM_DETAIL_EXCLUDED_KEYS = {"selected", "conditionAttribution", "conditionNotes"}
+
+
+def summarize_resource_item_details(details):
+    # Resume les details bruts d'un item de dotation_items.details_json pour les exports
+    # (Excel, signature de restitution) : passe par summarize_dynamic_resource si la
+    # ressource a une structure "fields" (ressource dynamique admin), sinon reprend a plat
+    # les valeurs d'un item statique (ordinateur, telephone...) en excluant les cles de suivi.
+    if not isinstance(details, dict):
+        return ""
+    if details.get("fields"):
+        return summarize_dynamic_resource(details)
+    return " - ".join(
+        str(value).strip()
+        for key, value in details.items()
+        if key not in _ITEM_DETAIL_EXCLUDED_KEYS and str(value or "").strip()
+    )
 
 
 def uses_dynamic_resource_assignment_date(resource):
@@ -84,6 +142,10 @@ def is_dynamic_resource_complete(resource):
     field_values_lower = {k.lower(): v for k, v in field_values.items()}
     if field_schema:
         for field in field_schema:
+            if field.get("hidden"):
+                # Champ masque : plus de saisie possible depuis le formulaire, on ne peut
+                # donc plus exiger de valeur meme si le champ est marque obligatoire.
+                continue
             value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
             if field.get("required") and not value:
                 return False
@@ -113,6 +175,63 @@ def is_dynamic_resource_payload(resource):
     return any(key in resource for key in marker_keys)
 
 
+def count_resource_field_usage(connection, resource_code, field_key):
+    # Compte les dossiers ayant une valeur non vide sur field_key pour la ressource
+    # resource_code. Utilise pour avertir avant suppression reelle d'un champ dans
+    # l'admin (cf. masquage). Scanne payload_json (ressources dynamiques additionnelles
+    # d'un dossier) et dotation_items.details_json (vue a plat pour la restitution) : les
+    # deux portent la meme donnee en double, on deduplique par dossier.
+    # Le LIKE ne sert que de pre-filtre grossier ; le comptage reel se fait apres parsing
+    # JSON et comparaison exacte (insensible a la casse) de la cle, pas sur le texte brut.
+    if not resource_code or not field_key:
+        return 0
+    key_lower = field_key.lower()
+    affected_form_ids = set()
+
+    like_pattern = f'%"{resource_code}"%'
+    rows = connection.execute(
+        "SELECT id, payload_json FROM dotation_forms WHERE payload_json LIKE ?",
+        (like_pattern,),
+    ).fetchall()
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        resources_obj = payload.get("resources") or {}
+        additional = resources_obj.get("additional") or [] if isinstance(resources_obj, dict) else []
+        for resource in additional:
+            if not isinstance(resource, dict):
+                continue
+            if (resource.get("code") or resource.get("id")) != resource_code:
+                continue
+            fields = resource.get("fields") or {}
+            if not isinstance(fields, dict):
+                continue
+            value = next((v for k, v in fields.items() if str(k).lower() == key_lower), None)
+            if str(value or "").strip():
+                affected_form_ids.add(row["id"])
+                break
+
+    item_rows = connection.execute(
+        "SELECT form_id, details_json FROM dotation_items WHERE item_key = ?",
+        (resource_code,),
+    ).fetchall()
+    for row in item_rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        fields = details.get("fields") or {}
+        if not isinstance(fields, dict):
+            continue
+        value = next((v for k, v in fields.items() if str(k).lower() == key_lower), None)
+        if str(value or "").strip():
+            affected_form_ids.add(row["form_id"])
+
+    return len(affected_form_ids)
+
+
 # ---------------------------------------------------------------------------
 # Progression et validation des attributions
 # ---------------------------------------------------------------------------
@@ -122,7 +241,9 @@ def extract_items(payload):
     materiel = payload.get("materiel", {})
     immateriel = payload.get("immateriel", {})
     restitution = payload.get("restitution", {})
-    item_states = restitution.get("items", {})
+    item_states_raw = restitution.get("items", {})
+    # Gérer le cas où items serait une liste au lieu d'un dict
+    item_states = item_states_raw if isinstance(item_states_raw, dict) else {}
 
     items = [
         ("ordinateur", "materiel", "Ordinateur", materiel.get("ordinateur", {})),
@@ -175,7 +296,9 @@ def extract_items(payload):
     return extracted
 
 
-def summarize_assignment_progress(payload):
+def summarize_assignment_progress(payload, warning_days=None):
+    if warning_days is None:
+        warning_days = int(DEFAULT_APP_SETTINGS["timing_warning_days"])
     all_items = extract_items(payload)
     requested_items = [item for item in all_items if item.get("assigned")]
     total_requested = len(requested_items)
@@ -241,7 +364,7 @@ def summarize_assignment_progress(payload):
     elif days_until_start < 0:
         timing_status = "late"
         timing_label = "En retard"
-    elif days_until_start <= 3:
+    elif days_until_start <= warning_days:
         timing_status = "warning"
         timing_label = "En danger"
     else:
@@ -327,6 +450,8 @@ def collect_resource_validation_errors(payload):
         field_values_lower = {k.lower(): v for k, v in field_values.items()}
         if field_schema:
             for field in field_schema:
+                if field.get("hidden"):
+                    continue
                 value = str(field_values.get(field["key"]) or field_values_lower.get(field["key"].lower()) or "").strip()
                 if field.get("required") and not value:
                     errors.append(f"{resource.get('label') or 'Ressource'} : {field['label']} manquant")
