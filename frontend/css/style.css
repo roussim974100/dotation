@@ -4975,3 +4975,19 @@ main {
     height: 1.35rem;
   }
 }
+
+
+/* Entree de menu d'une fonctionnalite dediee (ex. Base de donnees) : separee visuellement. */
+.user-menu__item--feature {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.user-menu__item--feature[aria-current="page"] {
+  color: var(--brand);
+}
+
+form section.content-card[id^="db-"],
+section.content-card[id^="db-"] {
+  scroll-margin-top: 9rem;
+}

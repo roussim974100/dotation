@@ -16,7 +16,7 @@
     <div class="app-brand" data-home-link>
       <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
       <div>
-        <p class="app-kicker">Administration</p>
+        <p class="app-kicker">Données</p>
         <h1 class="app-title">Base de données</h1>
         <p class="app-subtitle">Exportez, diagnostiquez et importez la base de données.</p>
       </div>
@@ -68,7 +68,13 @@
       </section>
 
       <!-- Export -->
-      <section class="content-card mt-4">
+      <nav class="dashboard-nav mt-4" aria-label="Sections de la base de données">
+        <a class="dashboard-nav__link" href="#db-export">Exporter</a>
+        <a class="dashboard-nav__link" href="#db-diagnose">Diagnostiquer</a>
+        <a class="dashboard-nav__link" href="#db-import">Importer</a>
+      </nav>
+
+      <section class="content-card mt-4" id="db-export">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Sauvegarde</p>
@@ -80,7 +86,7 @@
       </section>
 
       <!-- Diagnose -->
-      <section class="content-card mt-4">
+      <section class="content-card mt-4" id="db-diagnose">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Vérification</p>
@@ -101,7 +107,7 @@
       </section>
 
       <!-- Import -->
-      <section class="content-card mt-4">
+      <section class="content-card mt-4" id="db-import">
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Remplacement</p>

@@ -617,6 +617,33 @@ function initUserMenu() {
   populateUserMenuIdentity();
 }
 
+// Entrees de menu reservees a un droit precis, distinctes de "Administration".
+// Ajouter une entree ici suffit : le menu est genere sur toutes les pages.
+const USER_MENU_FEATURE_LINKS = [
+  {
+    id: "dbLink",
+    label: "Base de données",
+    href: "admin-db.html",
+    isAllowed: (user) => Boolean(user.db_manage) || (user.permissions || []).includes("*") || (user.permissions || []).includes("db.manage")
+  }
+];
+
+function renderUserMenuFeatureLinks(user) {
+  const panel = document.querySelector("#userMenu .user-menu__panel");
+  if (!panel) return;
+  const anchor = panel.querySelector(".user-menu__sep");
+  USER_MENU_FEATURE_LINKS.forEach((link) => {
+    if (document.getElementById(link.id) || !link.isAllowed(user)) return;
+    const item = document.createElement("a");
+    item.id = link.id;
+    item.className = "user-menu__item user-menu__item--feature";
+    item.href = link.href;
+    item.textContent = link.label;
+    if (window.location.pathname.endsWith(link.href)) item.setAttribute("aria-current", "page");
+    panel.insertBefore(item, anchor);
+  });
+}
+
 async function populateUserMenuIdentity() {
   try {
     const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
@@ -631,6 +658,7 @@ async function populateUserMenuIdentity() {
     if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
     if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
 
+    renderUserMenuFeatureLinks(user);
     const permissions = user.permissions || [];
     if (permissions.includes("users.manage") || permissions.includes("*")) {
       document.getElementById("adminLink")?.classList.remove("d-none");
