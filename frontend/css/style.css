@@ -217,6 +217,18 @@ body.login-shell {
   border-color: color-mix(in srgb, #c87830 40%, var(--border));
 }
 
+.env-badge--preprod {
+  color: #4b2d7f;
+  background: #ece3fb;
+  border: 1px solid #c9b3ee;
+}
+
+[data-color-mode="dark"] .env-badge--preprod {
+  color: #c9aef2;
+  background: color-mix(in srgb, #5a3a99 25%, var(--surface));
+  border-color: color-mix(in srgb, #8a63d2 40%, var(--border));
+}
+
 .app-subtitle {
   max-width: 55rem;
   margin: 0.45rem 0 0;

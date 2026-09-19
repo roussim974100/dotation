@@ -1,7 +1,7 @@
 """Detection d'une nouvelle version et etat de la mise a jour depuis le navigateur.
 
 - La version installee est lue dans frontend/js/branding.js (APP_BUILD_VERSION), la meme que celle affichee a l'ecran.
-- La version disponible est lue dans le meme fichier sur la branche du canal (« -dev » -> dev, sinon prod) de GitHub.
+- La version disponible est lue dans le meme fichier sur la branche du canal (« -dev » -> dev, « -preprod » -> preprod, sinon prod) de GitHub.
   Le resultat est mis en cache dans <DATA_DIR>/update/check.json (partage entre les processus gunicorn, 6 h).
 - Aucun blocage : une verification automatique tourne dans un thread, un echec (reseau coupe, intranet sans sortie
   Internet) est silencieux. Desactivable : APP_UPDATE_CHECK=0. Adresse : APP_UPDATE_CHECK_URL.
@@ -43,8 +43,13 @@ def current_version():
 
 
 def channel_for(version):
-    """Canal de mise a jour : une version « -dev » suit la branche dev, toutes les autres suivent prod."""
-    return "dev" if "-dev" in (version or "") else "prod"
+    """Canal de mise a jour : « -dev » suit la branche dev, « -preprod » la branche preprod, toutes les autres prod."""
+    text = version or ""
+    if "-dev" in text:
+        return "dev"
+    if "-preprod" in text:
+        return "preprod"
+    return "prod"
 
 
 def parse_version(version):

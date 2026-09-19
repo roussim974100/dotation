@@ -30,8 +30,11 @@ function updEsc(value) {
 }
 async function updCsrf() { return (await (await fetch("/api/csrf-token", { credentials: "same-origin" })).json()).token; }
 
+// Script de déploiement de chaque canal (défini en objet : ajouter un canal = ajouter une entrée).
+const UPDATE_DEPLOY_SCRIPTS = { dev: "deploy-dev.sh", preprod: "deploy-preprod.sh", prod: "deploy.sh" };
+
 function updateCommandHint(state) {
-  return state.channel === "dev" ? "sudo bash deploy-dev.sh" : "sudo bash deploy.sh";
+  return `sudo bash ${UPDATE_DEPLOY_SCRIPTS[state.channel] || "deploy.sh"}`;
 }
 
 function updateDismissed(progress) {

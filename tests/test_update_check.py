@@ -31,6 +31,7 @@ def test_version_comparison_and_channel():
     assert not uc.is_newer("3.48.0", "3.48.0-dev") and not uc.is_newer("3.47.9", "3.48.0") and not uc.is_newer(None, "3.48.0")
     assert not uc.is_newer("n'importe quoi", "3.48.0")
     assert uc.channel_for("3.48.0-dev") == "dev" and uc.channel_for("3.18.5-prod") == "prod" and uc.channel_for("") == "prod"
+    assert uc.channel_for("3.49.0-preprod") == "preprod" and "/preprod/frontend/js/branding.js" in uc.source_url("3.49.0-preprod")
     assert "/dev/frontend/js/branding.js" in uc.source_url("3.48.0-dev") and "/prod/frontend/js/branding.js" in uc.source_url("3.18.5-prod")
 
 

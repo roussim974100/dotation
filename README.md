@@ -1,7 +1,7 @@
 # À Quai — Gestion des dotations matérielles
 
 > ⚠️ **Branche de développement (`dev`)** — version `3.49.0-dev`, non destinée à la production.
-> Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)) ou `sudo bash deploy-dev.sh` (préprod, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production). Installation initiale d'une version stable : branche [`main`](https://github.com/roussim974100/dotation/tree/main).
+> Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)), `sudo bash deploy-preprod.sh` (préproduction, branche `preprod`) ou `sudo bash deploy-dev.sh` (développement, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production). Installation initiale d'une version stable : branche [`main`](https://github.com/roussim974100/dotation/tree/main).
 > Nouveautés depuis la 3.18 : voir le [CHANGELOG](CHANGELOG.md). Pour contribuer : section [Développement local](#développement-local) en bas de page.
 
 **Version :** `3.49.0-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
@@ -507,12 +507,13 @@ Deux limites : un poste du **même réseau privé** que l'application, sans reve
 
 ### Méthode recommandée : les scripts de déploiement
 
-Deux scripts, chacun **figé sur sa branche** (impossible de déployer la mauvaise par erreur) :
+Trois scripts, chacun **figé sur sa branche** (impossible de déployer la mauvaise par erreur) :
 
 | Serveur | Commande | Branche déployée |
 |---|---|---|
 | **Production** | `cd /opt/dotation && sudo bash deploy.sh` | `prod` |
-| **Préprod / version dev** | `cd /opt/dotation && sudo bash deploy-dev.sh` | `dev` |
+| **Préproduction** | `cd /opt/dotation && sudo bash deploy-preprod.sh` | `preprod` |
+| **Développement** | `cd /opt/dotation && sudo bash deploy-dev.sh` | `dev` |
 
 Option commune : `--force` écrase des modifications locales de fichiers suivis par git (sans elle, le script refuse et les liste).
 
@@ -556,17 +557,22 @@ Si une dépendance manque après l'étape 2, l'application **démarre quand mêm
 
 ### Publier une nouvelle version (mainteneur)
 
+Les versions avancent d'un environnement à l'autre par **promotion** (`dev` → `preprod` → `prod`), faite **directement sur GitHub** par *Pull Request* :
+
 1. Développer et tester sur `dev` (`python -m pytest tests -q`).
-2. Déployer `dev` sur la **préprod** : `sudo bash deploy-dev.sh`, avec une **copie de la base de production** pour vérifier les migrations.
-3. Fusionner `dev` dans `prod`, puis passer la version en `-prod` (`APP_BUILD_VERSION` dans `frontend/js/branding.js`).
-4. Faire d'abord soi-même la mise à jour de sa propre production avec `sudo bash deploy.sh`.
-5. Communiquer aux clients : `cd /opt/dotation && sudo bash deploy.sh` (et, pour la toute première mise à jour depuis une ancienne version, la procédure ci-dessus).
+2. **Promouvoir dev vers preprod** : sur GitHub, *Pull requests* → *New pull request* → base `preprod` ← compare `dev` → *Create pull request* → *Merge pull request* (« Create a merge commit »).
+3. Déployer sur la **préproduction** : `sudo bash deploy-preprod.sh`, avec une **copie de la base de production** pour vérifier les migrations.
+4. Une fois validée : **promouvoir preprod vers prod** de la même façon (base `prod` ← compare `preprod`).
+5. Faire d'abord soi-même la mise à jour de sa propre production avec `sudo bash deploy.sh`.
+6. Communiquer aux clients : `cd /opt/dotation && sudo bash deploy.sh` (et, pour la toute première mise à jour depuis une ancienne version, la procédure ci-dessus).
+
+Les corrections faites directement sur `preprod` ou `prod` sont à reporter dans `dev`, faute de quoi une promotion ultérieure les écraserait.
 
 > Le dossier `backend/venv/` est suivi par git (héritage) : `deploy.sh` l'ignore dans son contrôle des modifications locales. Ne pas le retirer de git sans protéger les serveurs existants, un `git pull` supprimerait alors leur venv.
 
 ### Nouvelle version disponible et mise à jour depuis le navigateur
 
-**Bandeau « nouvelle version »** (activé par défaut) : dans *Administration*, l'application compare sa version à celle de la branche de son canal sur GitHub (`dev` pour une version `-dev`, `prod` sinon) et affiche « Nouvelle version X disponible » avec le lien vers les notes de version. La vérification est faite au plus toutes les 6 heures, sans jamais ralentir la page ; sans accès à Internet elle échoue en silence. Pour la couper : `APP_UPDATE_CHECK=0`.
+**Bandeau « nouvelle version »** (activé par défaut) : dans *Administration*, l'application compare sa version à celle de la branche de son canal sur GitHub (`dev` pour une version `-dev`, `preprod` pour `-preprod`, `prod` sinon) et affiche « Nouvelle version X disponible » avec le lien vers les notes de version. La vérification est faite au plus toutes les 6 heures, sans jamais ralentir la page ; sans accès à Internet elle échoue en silence. Pour la couper : `APP_UPDATE_CHECK=0`.
 
 **Bouton « Mettre à jour maintenant »** (facultatif, **désactivé par défaut**) : à activer une seule fois sur le serveur.
 

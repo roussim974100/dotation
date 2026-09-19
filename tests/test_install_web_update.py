@@ -71,6 +71,13 @@ def test_the_dev_branch_installs_the_dev_script(setup):
     assert "deploy-dev.sh --from-web" in (setup.units / "dotation-update.service").read_text(encoding="utf-8")
 
 
+def test_the_preprod_branch_installs_the_preprod_script(setup):
+    subprocess.run(["git", "-C", posix(setup.app), "checkout", "-q", "-b", "preprod"], check=True)
+    (setup.app / "deploy-preprod.sh").write_text("#!/bin/bash\n", encoding="utf-8")
+    assert setup.run("--yes").returncode == 0
+    assert "deploy-preprod.sh --from-web" in (setup.units / "dotation-update.service").read_text(encoding="utf-8")
+
+
 def test_without_confirmation_the_service_is_not_restarted(setup):
     result = subprocess.run([BASH, posix(ROOT / "setup" / "install-web-update.sh")], input="n\n", capture_output=True, text=True, encoding="utf-8",
                             env={**os.environ, "DEPLOY_TEST": "1", "APP_DIR": posix(setup.app), "INSTALL_UNIT_DIR": posix(setup.units),

@@ -8,7 +8,7 @@
 # Ce que ca fait :
 #   1. cree le dossier <donnees>/update, propriete de l'utilisateur du service (l'application y depose la demande) ;
 #   2. installe deux unites systemd : dotation-update.path (surveille la demande) et dotation-update.service (lance
-#      deploy.sh ou deploy-dev.sh selon la branche installee, en root, avec --from-web) ;
+#      deploy.sh, deploy-preprod.sh ou deploy-dev.sh selon la branche installee, en root, avec --from-web) ;
 #   3. ajoute APP_ALLOW_WEB_UPDATE=1 au service dotation (fichier .d/web-update.conf) et le redemarre.
 # L'application ne recoit AUCUN droit root : elle depose seulement un fichier ; c'est systemd qui agit.
 # Variables facultatives : APP_DIR (defaut : dossier parent de ce script), SERVICE (defaut : dotation).
@@ -71,7 +71,11 @@ APP_GROUP="${APP_GROUP:-$APP_USER}"
 DATA_DIR="$(sed -n 's/^Environment=.*APP_DATA_DIR=\([^" ]*\).*/\1/p' "$SERVICE_FILE" | head -1)"
 DATA_DIR="${DATA_DIR:-$APP_DIR/backend}"
 BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo prod)"
-if [ "$BRANCH" = "dev" ]; then DEPLOY_SCRIPT="deploy-dev.sh"; else DEPLOY_SCRIPT="deploy.sh"; fi
+case "$BRANCH" in
+    dev) DEPLOY_SCRIPT="deploy-dev.sh" ;;
+    preprod) DEPLOY_SCRIPT="deploy-preprod.sh" ;;
+    *) DEPLOY_SCRIPT="deploy.sh" ;;
+esac
 [ -f "$APP_DIR/$DEPLOY_SCRIPT" ] || fail "$APP_DIR/$DEPLOY_SCRIPT introuvable : mettez d'abord l'application a jour (git pull)"
 [ -f "$TEMPLATES/dotation-update.path" ] && [ -f "$TEMPLATES/dotation-update.service" ] || fail "modeles systemd introuvables dans $TEMPLATES"
 

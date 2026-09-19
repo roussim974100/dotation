@@ -703,13 +703,20 @@ function isPublicSignaturePage() {
 // Pastille d'environnement dans l'en-tete : reconnaitre en un coup d'oeil qu'on est
 // sur la branche dev (utile en preprod pour savoir ce qui a ete deploye). Injectee en
 // JS (pas dans le HTML) pour ne pas dupliquer le markup sur chaque page.
+// Pastille d'environnement selon le suffixe de la version : « -dev » -> DEV, « -preprod » -> PREPROD ; aucune en production.
+const ENV_BADGES = {
+  dev: { label: "DEV", title: "Cette instance tourne sur la branche de developpement (dev)" },
+  preprod: { label: "PREPROD", title: "Cette instance est la preproduction : version en validation avant la production" }
+};
+
 function applyEnvironmentBadge() {
   if (isPublicSignaturePage()) {
     document.getElementById("envBadge")?.remove();
     return;
   }
   const suffix = (APP_BUILD_VERSION.split("-")[1] || "").toLowerCase();
-  if (suffix !== "dev") {
+  const environment = ENV_BADGES[suffix];
+  if (!environment) {
     document.getElementById("envBadge")?.remove();
     return;
   }
@@ -721,11 +728,11 @@ function applyEnvironmentBadge() {
   if (!badge) {
     badge = document.createElement("span");
     badge.id = "envBadge";
-    badge.className = "env-badge env-badge--dev";
-    badge.title = "Cette instance tourne sur la branche de developpement (dev)";
     title.appendChild(badge);
   }
-  badge.textContent = "DEV";
+  badge.className = `env-badge env-badge--${suffix}`;
+  badge.title = environment.title;
+  badge.textContent = environment.label;
 }
 
 function applyBrandingContent(settings) {

@@ -39,6 +39,7 @@ Cumul des versions 3.19 à 3.49 depuis la 3.18.3.
 - **Nouvelle version disponible** : bandeau dans l'administration (vérification toutes les 6 h, silencieuse sans Internet, désactivable).
 - **Mise à jour depuis le navigateur** (facultative, désactivée par défaut) : l'application dépose une demande, une unité systemd lance le script en root (`setup/install-web-update.sh`) ; mot de passe exigé, journal d'audit, suivi de progression.
 - **Retour arrière automatique** du code et des bases si la nouvelle version ne répond pas ; verrou contre les lancements simultanés.
+- **Préproduction** : script `deploy-preprod.sh` (branche `preprod` figée), pastille **PREPROD** (version `-preprod`), et canal de mise à jour dédié.
 - `cryptography` est importée à la demande : sans elle, l'application démarre (seules les sauvegardes chiffrées sont indisponibles).
 - **Première mise à jour depuis une ancienne version : voir le README** (deux passages de `deploy.sh`, sauvegarde préalable).
 
