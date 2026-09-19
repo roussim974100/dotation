@@ -144,7 +144,7 @@ const DASHBOARD_COLUMNS = {
 // Colonnes visibles par vue, dans l'ordre d'affichage.
 const DASHBOARD_VIEW_COLUMNS = {
   active: ["checkbox", "dossier", "qualite", "avancement", "pilotage", "progression", "derniere_modification", "actions"],
-  restitutions_pending: ["dossier", "qualite", "avancement", "pilotage", "progression", "recuperation", "derniere_modification", "actions"],
+  restitutions_pending: ["checkbox", "dossier", "qualite", "avancement", "pilotage", "progression", "recuperation", "derniere_modification", "actions"],
   history_assignments: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
   history_restitutions: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
 };
@@ -880,8 +880,7 @@ function filterDraftsForCurrentView(drafts) {
     return applyDashboardFilters(drafts.filter((draft) => isOperationalRestitutionDraft(draft)));
   }
 
-  const operational = drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));
-  return applyDashboardFilters(operational);
+  return applyDashboardFilters(drafts.filter((draft) => isOperationalAssignmentDraft(draft)));
 }
 
 function hydrateServiceFilterOptions(drafts) {
@@ -1111,6 +1110,113 @@ function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
 }
 
+// Modale "Nouvelle restitution" : une restitution part toujours d'une attribution
+// active sans restitution en cours, on la choisit donc dans cette liste.
+async function openNewRestitutionModal() {
+  if (!(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.restitution"))) {
+    showToast("Votre profil ne permet pas de lancer une restitution.", "warning");
+    return;
+  }
+
+  let modal = document.getElementById("newRestitutionModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "newRestitutionModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="password-generator-modal__backdrop" data-new-restitution-close="true"></div>
+      <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="newRestitutionModalTitle">
+        <div class="password-generator-modal__header">
+          <div>
+            <p class="panel-eyebrow">Restitution</p>
+            <h2 class="section-title" id="newRestitutionModalTitle">Nouvelle restitution</h2>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-new-restitution-close="true">Fermer</button>
+        </div>
+        <div class="password-generator-modal__content">
+          <label class="form-label" for="newRestitutionSearch">Attribution concernée</label>
+          <input class="form-control mb-3" id="newRestitutionSearch" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
+          <div class="list-group" id="newRestitutionResults" role="list"></div>
+          <p class="form-text mb-0" id="newRestitutionHint"></p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const search = document.getElementById("newRestitutionSearch");
+  const results = document.getElementById("newRestitutionResults");
+  const hint = document.getElementById("newRestitutionHint");
+  const MAX_RESULTS = 50;
+
+  if (!currentDraftRows.length) {
+    try {
+      currentDraftRows = await listForms();
+    } catch (error) {
+      showToast("Impossible de charger la liste des attributions.", "error");
+      return;
+    }
+  }
+  const candidates = currentDraftRows.filter((draft) => isCompletedAssignmentDraft(draft));
+
+  const close = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => {
+    if (event.key === "Escape") {
+      close();
+    }
+  };
+
+  const renderResults = () => {
+    const query = normalizeText(search.value);
+    const matches = candidates.filter((draft) => {
+      if (!query) return true;
+      const haystack = normalizeText([
+        draft.title, draft.nom, draft.prenom, getDraftServiceValue(draft)
+      ].filter(Boolean).join(" "));
+      return haystack.includes(query);
+    });
+    const shown = matches.slice(0, MAX_RESULTS);
+    results.innerHTML = shown.map((draft) => `
+      <button class="list-group-item list-group-item-action" type="button" data-new-restitution-id="${escapeHtml(draft.id)}">
+        <span class="fw-semibold">${escapeHtml(draft.title || "Dossier")}</span>
+        <span class="d-block small text-muted">${escapeHtml(getDraftServiceValue(draft) || "")}</span>
+      </button>
+    `).join("");
+    if (candidates.length === 0) {
+      hint.textContent = "Aucune attribution active à restituer pour le moment.";
+    } else if (matches.length === 0) {
+      hint.textContent = "Aucune attribution ne correspond à cette recherche.";
+    } else if (matches.length > MAX_RESULTS) {
+      hint.textContent = `${matches.length} résultats, affinez la recherche pour voir les autres.`;
+    } else {
+      hint.textContent = `${matches.length} attribution${matches.length > 1 ? "s" : ""} active${matches.length > 1 ? "s" : ""}.`;
+    }
+  };
+
+  modal.querySelectorAll("[data-new-restitution-close]").forEach((btn) => {
+    btn.onclick = close;
+  });
+  results.onclick = (event) => {
+    const item = event.target.closest("[data-new-restitution-id]");
+    if (item) {
+      openRestitution(item.dataset.newRestitutionId);
+    }
+  };
+  search.oninput = renderResults;
+  search.value = "";
+  renderResults();
+
+  document.addEventListener("keydown", onKeydown);
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+  search.focus();
+}
+
 function renderLoadMoreButton(group, total, displayed, permissions) {
   const containerIds = { assignment: "assignmentLoadMoreWrap", restitution: "restitutionLoadMoreWrap", history: "historyLoadMoreWrap" };
   const containerId = containerIds[group];
@@ -1265,7 +1371,8 @@ async function renderDraftList() {
     bindStatusPreviews();
     bindTimingPreviews();
     bindDraftActionMenus();
-    bindSelectionActions(viewMode === "active" && canExport, viewMode === "active" && canDelete);
+    const selectable = viewMode === "active" || viewMode === "restitutions_pending";
+    bindSelectionActions(selectable && canExport, viewMode === "active" && canDelete);
     restoreDashboardSelection();
   } finally {
     dashboardRefreshInFlight = false;
@@ -2673,10 +2780,14 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("newFormBtn")?.classList.remove("d-none");
       document.getElementById("emptyStateNewFormBtn")?.classList.remove("d-none");
     }
+    if (user && (user.permissions.includes("forms.restitution") || user.permissions.includes("*"))) {
+      document.getElementById("newRestitutionBtn")?.classList.remove("d-none");
+    }
     renderDashboardSignatureLinkNotice();
   });
   document.getElementById("newFormBtn")?.addEventListener("click", newForm);
   document.getElementById("emptyStateNewFormBtn")?.addEventListener("click", newForm);
+  document.getElementById("newRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
     editDraft, openRestitution, exportDraftPdf, exportRestitutionPdf,

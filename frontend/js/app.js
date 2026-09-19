@@ -64,7 +64,7 @@ const DOSSIER_TYPE_LABELS = {
   arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
   mise_a_jour: "Mise à jour de ressources",
-  sortie: "Sortie / restitution"
+  sortie: "Sortie"
 };
 const DEFAULT_SERVICE_OPTIONS = [];
 let serviceOptions = [...DEFAULT_SERVICE_OPTIONS];
@@ -2200,7 +2200,14 @@ function populateForm(data, signaturePad) {
   form.dataset.lockedAt = data.meta.lockedAt || "";
   document.getElementById("nom").value = data.beneficiaire.nom || "";
     document.getElementById("prenom").value = data.beneficiaire.prenom || "";
-    document.getElementById("dossier_type").value = normalizeDossierType(data.dossier.type || "arrivee");
+    const loadedDossierType = normalizeDossierType(data.dossier.type || "arrivee");
+    const dossierTypeSelect = document.getElementById("dossier_type");
+    // "Sortie" n'est plus proposé à la création (les restitutions ont leur propre parcours),
+    // mais les dossiers existants de ce type doivent rester ouvrables sans changer de type.
+    if (loadedDossierType === "sortie" && !dossierTypeSelect.querySelector('option[value="sortie"]')) {
+      dossierTypeSelect.add(new Option(DOSSIER_TYPE_LABELS.sortie, "sortie"));
+    }
+    dossierTypeSelect.value = loadedDossierType;
     setServiceValue(data.beneficiaire.service || "");
     setServiceDestinationValue(data.dossier.serviceDestination || "");
   document.getElementById("fonction").value = data.beneficiaire.fonction || "";
