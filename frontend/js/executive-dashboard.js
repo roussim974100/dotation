@@ -422,7 +422,7 @@ function renderServicesTable(by_service) {
   if (!container || !by_service) return;
 
   const rows = by_service.slice(0, 20).map(s => `
-    <tr style="cursor:pointer" onclick="window.location.href='/index.html?service=${encodeURIComponent(s.service)}'">
+    <tr style="cursor:pointer" tabindex="0" data-service-link="${escapeHtml(encodeURIComponent(s.service))}">
       <td><strong>${escapeHtml(s.service)}</strong></td>
       <td>${s.count}</td>
     </tr>
@@ -441,6 +441,23 @@ function renderServicesTable(by_service) {
       </tbody>
     </table>
   `;
+
+  // Navigation par delegation : la CSP interdit les handlers inline (onclick=).
+  const goToService = (row) => {
+    window.location.href = `/index.html?service=${row.dataset.serviceLink}`;
+  };
+  container.onclick = (event) => {
+    const row = event.target.closest("[data-service-link]");
+    if (row) goToService(row);
+  };
+  container.onkeydown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const row = event.target.closest("[data-service-link]");
+    if (row) {
+      event.preventDefault();
+      goToService(row);
+    }
+  };
 }
 
 function showError(message) {

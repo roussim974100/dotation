@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
 
-from utils import utc_now, generate_id, bool_to_int
+from utils import utc_now, generate_id, bool_to_int, mask_text
 from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
@@ -231,8 +231,12 @@ def dashboard_stats():
         f"SELECT id, nom, prenom, service, status, updated_at FROM dotation_forms {alerte_where} ORDER BY updated_at",
         alerte_params_full,
     ).fetchall()
+    # Groupe a portee "masked" (RGPD) : noms et prenoms masques comme sur la liste des dossiers.
+    masked_scope = (current_user() or {}).get("data_scope") == "masked"
     alertes = [
-        {"id": row["id"], "nom": row["nom"] or "", "prenom": row["prenom"] or "",
+        {"id": row["id"],
+         "nom": mask_text(row["nom"] or "") if masked_scope else (row["nom"] or ""),
+         "prenom": mask_text(row["prenom"] or "") if masked_scope else (row["prenom"] or ""),
          "service": row["service"] or "—", "jours_blocage": _days_since(row["updated_at"]),
          "status": row["status"]}
         for row in alertes_rows

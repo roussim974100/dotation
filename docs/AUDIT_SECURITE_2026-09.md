@@ -27,7 +27,7 @@ Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 pass
 |---|---|---|---|
 | A3 | Mineur | CSP `img-src https:` et `style-src 'unsafe-inline'`. | Conservé : l'aperçu du logo en Admin > Personnalisation charge l'URL distante saisie par l'admin. L'exploiter suppose déjà une XSS. Piste : passer l'aperçu par `/api/settings/logo`. |
 | A4 | Mineur | Compteurs de limitation **en mémoire, par processus** : multipliés par le nombre de workers gunicorn, remis à zéro au redémarrage. | À stocker en base si plusieurs workers. |
-| A5 | Mineur | `executive-dashboard.js` ligne ~425 : `onclick=` inline sur les lignes de service. La CSP bloque les handlers inline, donc le clic sur une ligne est probablement sans effet (défaut fonctionnel, pas de faille). | À remplacer par une délégation d'événements. |
+| A5 | Mineur | Ligne cliquable de `executive-dashboard.js` : `onclick=` inline bloqué par la CSP. | **Corrigé** : délégation d’événements (clic et clavier). |
 
 ## Conforme
 
@@ -44,7 +44,7 @@ Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 pass
 ## Non couvert (prochain audit)
 
 - Échappement : scan **heuristique** des interpolations d'objets ; les cas de gabarits construits autrement (concaténations, `insertAdjacentHTML`) n'ont pas été relus un par un.
-- `data_scope` : vérifié sur formulaires, parc et exports ; pas sur `/api/admin/dashboard-stats` (protégé par `forms.view_all`, renvoie noms et prénoms des alertes) ni sur la recherche globale.
+- `data_scope` : vérifié sur formulaires, parc et exports ; pas sur `/api/admin/dashboard-stats` (protégé par `forms.view_all`, renvoie noms et prénoms des alertes) (corrigé : noms masqués pour les groupes à portée `masked`) ni sur la recherche globale.
 - Contenu des journaux (données personnelles) et rotation.
 - Limite de la détection automatique : un client du **même réseau privé** que l'app, sans reverse proxy, peut encore forger `X-Forwarded-For` (exposition limitée au LAN). Un proxy à IP publique demande `APP_TRUSTED_PROXIES=1`.
 - Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions de `.app_secret_key` et `users.db`).
