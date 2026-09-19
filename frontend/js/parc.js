@@ -67,6 +67,15 @@ function parcFieldLabel(code, key) {
   return (resource?.field_schema || []).find((field) => field.key === key)?.label || key;
 }
 function parcResourceLabel(code) { return parcResources.find((item) => item.code === code)?.label || code; }
+// Date d'un evenement de l'historique : « 18/09/2026 · 12:04 ». L'heure n'est affichee que si elle est connue (une date
+// saisie sans heure est enregistree a 00:00 : afficher « 00:00 » serait faux).
+function parcWhen(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "date inconnue";
+  const day = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const hasTime = /T\d{2}:\d{2}/.test(String(value)) && !/T00:00(:00(\.0+)?)?(Z|[+-]00:?00)?$/.test(String(value));
+  return hasTime ? `${day} · ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : day;
+}
 function parcChip(status) {
   const meta = PARC_STATUS[status] || { label: status, chip: "draft" };
   return `<span class="status-chip status-chip--${meta.chip}">${parcEsc(meta.label)}</span>`;
@@ -106,8 +115,8 @@ async function loadParc() {
 function parcTimeline(unit) {
   return `<ol class="list-unstyled mb-0">${unit.events.slice().reverse().map((event) => `
     <li class="border-start ps-3 pb-3 ms-1">
+      <div class="parc-when">${parcEsc(parcWhen(event.occurred_at))}</div>
       <strong>${parcEsc(PARC_EVENTS[event.event_type] || event.event_type)}</strong>
-      <span class="small text-muted"> · ${parcEsc(parcDate(event.occurred_at))}</span>
       ${event.anomaly ? `<span class="status-chip status-chip--cancelled ms-1" title="Incohérence détectée">⚠ ${parcEsc(PARC_ANOMALIES[event.anomaly] || event.anomaly)}</span>` : ""}
       ${event.holder_label ? `<div class="small">${parcEsc(event.holder_label)}</div>` : ""}
       ${event.notes ? `<div class="small text-muted">${parcEsc(event.notes)}</div>` : ""}

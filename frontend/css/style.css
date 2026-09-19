@@ -5129,3 +5129,29 @@ section.content-card[id^="db-"] {
     margin-bottom: 0.55rem;
   }
 }
+
+
+/* Historique de vie (fiche d'un objet) : la date de chaque action est en evidence. */
+.parc-when {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Mode sombre : le gris « atténué » de Bootstrap (libellés des fiches, notes, auteurs) était presque invisible sur fond foncé. */
+[data-color-mode="dark"] .text-muted,
+[data-color-mode="dark"] .text-body-secondary {
+  color: #b9c7d5 !important;
+}
+
+[data-color-mode="dark"] .parc-when {
+  color: #e6eef6;
+}
+
+/* Mode sombre : le texte d'aide des champs (placeholder) était quasiment invisible sur fond foncé. */
+[data-color-mode="dark"] .form-control::placeholder,
+[data-color-mode="dark"] textarea::placeholder,
+[data-color-mode="dark"] input::placeholder {
+  color: #9db0c2;
+  opacity: 1;
+}
