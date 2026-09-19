@@ -23,7 +23,7 @@ def db():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.executescript("""
-        CREATE TABLE dotation_forms (id TEXT PRIMARY KEY, status TEXT, nom TEXT, prenom TEXT, service TEXT,
+        CREATE TABLE dotation_forms (id TEXT PRIMARY KEY, status TEXT, dossier_type TEXT, nom TEXT, prenom TEXT, service TEXT,
             assigned_at TEXT, returned_at TEXT, updated_at TEXT);
         CREATE TABLE dotation_items (id INTEGER PRIMARY KEY AUTOINCREMENT, form_id TEXT, item_key TEXT, assigned INTEGER,
             returned_at TEXT, return_condition TEXT, details_json TEXT);
@@ -35,8 +35,9 @@ def db():
     return conn
 
 
-def add_form(db, form_id, status="active", assigned="2026-01-10", updated="2026-01-10", nom="DUPONT", prenom="Anne", service="DSI"):
-    db.execute("INSERT INTO dotation_forms VALUES (?,?,?,?,?,?,NULL,?)", (form_id, status, nom, prenom, service, assigned, updated))
+def add_form(db, form_id, status="active", assigned="2026-01-10", updated="2026-01-10", nom="DUPONT", prenom="Anne", service="DSI", dossier_type="arrivee"):
+    db.execute("INSERT INTO dotation_forms (id,status,dossier_type,nom,prenom,service,assigned_at,returned_at,updated_at) VALUES (?,?,?,?,?,?,?,NULL,?)",
+               (form_id, status, dossier_type, nom, prenom, service, assigned, updated))
 
 
 def add_item(db, form_id, serial, condition="pending", returned_at=None, code="ordinateur", flat=False):
@@ -97,10 +98,11 @@ def test_sync_is_idempotent(db):
     assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 1
 
 
-def test_draft_dossier_does_not_put_the_object_in_the_parc(db):
+def test_draft_dossier_reserves_the_object_without_assigning_it(db):
     add_form(db, "F1", status="draft"); add_item(db, "F1", "SN1")
-    assert sync_units_for_form(db, "F1") == 0
-    assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0
+    assert sync_units_for_form(db, "F1") == 1
+    assert unit(db)["status"] == "reserved" and unit(db)["holder_form_id"] == "F1"
+    assert events(db) == [("reserved", None)]
 
 
 def test_a_return_proves_the_assignment_even_if_the_dossier_status_is_not_effective(db):
@@ -353,3 +355,133 @@ def test_unit_fields_only_keep_the_resource_fields(db):
     db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,return_condition,details_json) VALUES ('F1','ordinateur',1,'pending',?)", (json.dumps(details),))
     sync_units_for_form(db, "F1")
     assert json.loads(unit(db)["fields_json"]) == {"numeroSerie": "SN1", "marque": "Lenovo"}
+
+
+# --- reservation, transferts, regularisation ------------------------------------------------
+
+from models.units import available_units_for_resource, find_holder_unit, release_stale_reservations
+
+
+def test_signing_the_draft_turns_the_reservation_into_an_assignment(db):
+    add_form(db, "F1", status="draft"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    db.execute("UPDATE dotation_forms SET status='active', assigned_at='2026-02-01T10:00:00+00:00', updated_at='2026-02-01T10:00:00+00:00'")
+    sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "assigned" and unit(db)["holder_form_id"] == "F1"
+    assert events(db) == [("reserved", None), ("assigned", None)]
+
+
+def test_two_drafts_on_the_same_object_are_reported_as_a_double_reservation(db):
+    add_form(db, "F1", status="draft", updated="2026-06-01T08:00:00+00:00"); add_item(db, "F1", "SN1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00", nom="MARTIN"); add_item(db, "F2", "SN1")
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    assert events(db) == [("reserved", None), ("reserved", "double_reservation")]
+
+
+def test_reserving_an_assigned_object_is_flagged_and_does_not_change_its_state(db):
+    add_form(db, "F1", assigned="2026-01-10"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00"); add_item(db, "F2", "SN1"); sync_units_for_form(db, "F2")
+    assert events(db)[-1] == ("reserved", "reserved_while_assigned") and unit(db)["status"] == "assigned"
+
+
+def test_removing_the_object_from_the_draft_releases_the_reservation(db):
+    add_form(db, "F1", status="draft"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    db.execute("DELETE FROM dotation_items WHERE form_id='F1'")
+    sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "in_stock" and unit(db)["holder_form_id"] is None
+    assert [e[0] for e in events(db)] == ["reserved", "reservation_released"]
+
+
+def test_cancelled_draft_releases_and_deleted_draft_releases(db):
+    add_form(db, "F1", status="draft"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    db.execute("UPDATE dotation_forms SET status='cancelled', updated_at='2026-07-01'")
+    sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "in_stock"
+    add_form(db, "F2", status="draft"); add_item(db, "F2", "SN2"); sync_units_for_form(db, "F2")
+    assert release_units_for_form(db, "F2") == 1 and unit(db, "SN2")["status"] == "in_stock"
+
+
+def test_stale_reservations_expire_after_30_days_of_inactivity(db):
+    from datetime import datetime, timezone
+    add_form(db, "F1", status="draft", updated="2026-05-01T08:00:00+00:00"); add_item(db, "F1", "SN1")
+    add_form(db, "F2", status="draft", updated="2026-06-25T08:00:00+00:00"); add_item(db, "F2", "SN2")
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    assert release_stale_reservations(db, 30, datetime(2026, 7, 1, tzinfo=timezone.utc)) == 1
+    assert unit(db, "SN1")["status"] == "in_stock" and unit(db, "SN2")["status"] == "reserved"
+    assert release_stale_reservations(db, 30, datetime(2026, 7, 1, tzinfo=timezone.utc)) == 0  # idempotent
+
+
+def test_transfer_changes_the_holder_without_a_return(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    detail = act(db, "SN1", "transfer", "Mobilité interne", holder_label="MARTIN Paul · RH")
+    assert detail["status"] == "assigned" and detail["holder_label"] == "MARTIN Paul · RH"
+    assert detail["events"][-1]["event_type"] == "transferred"
+    with pytest.raises(UnitActionError) as missing:
+        act(db, "SN1", "transfer")
+    assert missing.value.code == "holder_required"
+
+
+def test_regularisation_dossier_marks_the_origin(db):
+    add_form(db, "F1", status="partial_return", dossier_type="sortie"); add_item(db, "F1", "SN1", "conforme", "2026-03-01")
+    sync_units_for_form(db, "F1")
+    assert unit(db)["origin"] == "regularisation" and unit(db)["status"] == "in_stock"
+
+
+def test_available_units_exclude_reserved_and_assigned_objects(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1", "conforme", "2026-03-01"); add_item(db, "F1", "SN2", "degrade", "2026-03-02")
+    add_form(db, "F2", status="draft"); add_item(db, "F2", "SN3")
+    add_form(db, "F3"); add_item(db, "F3", "SN4")
+    for form in ("F1", "F2", "F3"):
+        sync_units_for_form(db, form)
+    assert [(u["identifier"], u["status"]) for u in available_units_for_resource(db, "ordinateur")] == [("SN2", "degraded"), ("SN1", "ok")]
+
+
+def test_holder_lookup_reports_assigned_and_reserved_objects_of_other_dossiers(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    add_form(db, "F2", status="draft", nom="MARTIN", service="RH"); add_item(db, "F2", "SN2"); sync_units_for_form(db, "F2")
+    assert find_holder_unit(db, "ordinateur", " sn1 ", "F9")["status"] == "assigned"
+    assert find_holder_unit(db, "ordinateur", "SN1", "F1") is None  # c'est ce dossier lui-meme
+    held = find_holder_unit(db, "ordinateur", "SN2", None)
+    assert held["status"] == "reserved" and held["service"] == "RH"
+    assert find_holder_unit(db, "ordinateur", "INCONNU", None) is None
+
+
+def test_deleting_one_of_two_reserving_drafts_keeps_the_object_reserved(db):
+    add_form(db, "F1", status="draft", updated="2026-06-01T08:00:00+00:00"); add_item(db, "F1", "SN1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00", nom="MARTIN"); add_item(db, "F2", "SN1")
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    assert release_units_for_form(db, "F2") == 1
+    assert unit(db)["status"] == "reserved" and unit(db)["holder_form_id"] == "F1"
+    assert release_units_for_form(db, "F1") == 1
+    assert unit(db)["status"] == "in_stock" and unit(db)["holder_form_id"] is None
+
+
+def test_removing_then_re_adding_the_object_in_a_draft_reserves_it_again(db):
+    add_form(db, "F1", status="draft"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    db.execute("DELETE FROM dotation_items WHERE form_id='F1'"); sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "in_stock"
+    add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "reserved"
+    assert [e[0] for e in events(db)] == ["reserved", "reservation_released", "reserved"]
+
+
+def test_repeated_saves_of_competing_drafts_do_not_spam_the_journal(db):
+    add_form(db, "F1", status="draft", updated="2026-06-01T08:00:00+00:00"); add_item(db, "F1", "SN1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00", nom="MARTIN"); add_item(db, "F2", "SN1")
+    for _ in range(3):
+        sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    assert [e[0] for e in events(db)] == ["reserved", "reserved"]
+
+
+def test_deleting_a_draft_that_only_reserved_never_touches_the_actual_holder(db):
+    add_form(db, "F1", assigned="2026-01-10"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00"); add_item(db, "F2", "SN1"); sync_units_for_form(db, "F2")
+    release_units_for_form(db, "F2")
+    assert unit(db)["status"] == "assigned" and unit(db)["holder_form_id"] == "F1"
+
+
+def test_a_degraded_object_keeps_its_condition_after_a_reservation_is_lifted(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1", "degrade", "2026-03-01"); sync_units_for_form(db, "F1")
+    add_form(db, "F2", status="draft", updated="2026-06-02T08:00:00+00:00"); add_item(db, "F2", "SN1"); sync_units_for_form(db, "F2")
+    assert unit(db)["status"] == "reserved"
+    release_units_for_form(db, "F2")
+    assert unit(db)["status"] == "degraded"

@@ -3,6 +3,7 @@
 
 const PARC_STATUS = {
   in_stock: { label: "En stock", chip: "active" },
+  reserved: { label: "Réservé", chip: "partial_assignment" },
   assigned: { label: "Attribué", chip: "awaiting_signature" },
   degraded: { label: "Dégradé", chip: "draft" },
   maintenance: { label: "En réparation", chip: "partial_assignment" },
@@ -14,14 +15,20 @@ const PARC_STATUS = {
 const PARC_EVENTS = {
   assigned: "Attribué", returned: "Restitué", returned_degraded: "Restitué dégradé", lost: "Perdu / non restitué",
   released: "Libéré", found: "Retrouvé", retired: "Réformé", repair_started: "Mis en réparation",
-  repair_done: "Réparation terminée", verified: "Vérifié", correction: "Identifiant corrigé", merged: "Fusion", note: "Note"
+  repair_done: "Réparation terminée", verified: "Vérifié", correction: "Identifiant corrigé", merged: "Fusion", note: "Note",
+  reserved: "Réservé (brouillon)", reservation_released: "Réservation levée", transferred: "Transféré"
 };
 
 const PARC_ANOMALIES = {
   double_attribution: "Attribué alors qu'il l'était déjà",
   assigned_while_lost: "Attribué alors qu'il était déclaré perdu",
   assigned_while_retired: "Attribué alors qu'il était réformé",
-  lost_without_assignment: "Perte sans attribution connue"
+  lost_without_assignment: "Perte sans attribution connue",
+  double_reservation: "Réservé par deux dossiers à la fois",
+  reserved_while_assigned: "Choisi dans un dossier alors qu'il est attribué",
+  reserved_while_lost: "Choisi dans un dossier alors qu'il est déclaré perdu",
+  reserved_while_retired: "Choisi dans un dossier alors qu'il est réformé",
+  reserved_while_maintenance: "Choisi dans un dossier alors qu'il est en réparation"
 };
 
 // Actions de gestion : etats de depart (miroir du serveur, qui reste l'autorite), motif obligatoire ou non.
@@ -32,6 +39,7 @@ const PARC_ACTIONS = [
   { action: "repair_done", label: "Réparation terminée", from: ["maintenance"], tone: "btn-outline-success" },
   { action: "verify", label: "Confirmer : disponible", from: ["unknown"], tone: "btn-outline-success" },
   { action: "retire", label: "Réformer", from: ["in_stock", "degraded", "lost", "unknown", "maintenance"], note: true, tone: "btn-outline-danger" },
+  { action: "transfer", label: "Transférer à un autre détenteur", from: ["assigned"], tone: "btn-outline-primary" },
   { action: "note", label: "Ajouter une note", from: null, note: true, tone: "btn-outline-secondary" }
 ];
 
@@ -39,7 +47,7 @@ const PARC_ERRORS = {
   invalid_state: "Cette action n'est pas possible dans l'état actuel.", note_required: "Précisez le motif.",
   identifier_exists: "Une autre unité porte déjà cet identifiant : utilisez la fusion.", identifier_required: "Indiquez le nouvel identifiant.",
   different_resource: "Les deux unités doivent appartenir à la même ressource.", same_unit: "Choisissez une autre unité.",
-  forbidden: "Vous n'avez pas le droit d'effectuer cette action."
+  holder_required: "Indiquez le nouveau détenteur.", forbidden: "Vous n'avez pas le droit d'effectuer cette action."
 };
 
 let parcResources = [];
@@ -114,6 +122,7 @@ function parcActionsHtml(unit) {
       <p class="panel-eyebrow">Gestion</p>
       <label class="form-label" for="parcNote">Motif ou note</label>
       <input class="form-control mb-2" id="parcNote" autocomplete="off" placeholder="Obligatoire pour perdu, réformé et note">
+      ${unit.status === "assigned" ? '<input class="form-control mb-2" id="parcHolder" autocomplete="off" placeholder="Nouveau détenteur (pour un transfert), ex. MARTIN Paul · RH">' : ""}
       <div class="d-flex flex-wrap gap-2 mb-3">${allowed.map((item) => `<button class="btn btn-sm ${item.tone}" type="button" data-parc-action="${item.action}">${parcEsc(item.label)}</button>`).join("")}</div>
       <details><summary class="small fw-semibold">Corriger l'identifiant ou fusionner un doublon</summary>
         <div class="row g-2 mt-1 align-items-end">
@@ -161,6 +170,7 @@ async function runParcAction(action) {
   const errorBox = parcEl("parcError");
   const payload = { action, notes: parcEl("parcNote").value.trim() };
   if (action === "correct") payload.new_identifier = parcEl("parcNewId").value.trim();
+  if (action === "transfer") payload.holder_label = parcEl("parcHolder")?.value.trim() || "";
   if (action === "merge") {
     const wanted = parcEl("parcMergeId").value.trim().toLowerCase();
     const response = await fetch(`/api/units?resource=${encodeURIComponent(parcCurrent.resource_code)}&q=${encodeURIComponent(wanted)}`, { credentials: "same-origin" });

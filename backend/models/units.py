@@ -16,9 +16,12 @@ from models.inventory import (
 from models.resource_rules import effective_tracking_mode
 from utils import generate_id, utc_now
 
-UNIT_STATUSES = ("in_stock", "assigned", "degraded", "maintenance", "lost", "retired", "unknown")
+UNIT_STATUSES = ("in_stock", "reserved", "assigned", "degraded", "maintenance", "lost", "retired", "unknown")
 EVENT_TYPES = ("assigned", "returned", "returned_degraded", "lost", "released", "note", "found", "retired",
-               "repair_started", "repair_done", "verified", "correction", "merged")
+               "repair_started", "repair_done", "verified", "correction", "merged", "reserved",
+               "reservation_released", "transferred")
+# Une reservation (objet choisi dans un dossier pas encore signe) expire apres cette duree sans activite du dossier.
+RESERVATION_DAYS = 30
 
 # Actions manuelles (droit parc.manage) : evenement produit, etats de depart autorises, motif obligatoire.
 MANUAL_ACTIONS = {
@@ -29,6 +32,8 @@ MANUAL_ACTIONS = {
     "repair_done": {"event": "repair_done", "from": {"maintenance"}, "note_required": False},
     "verify": {"event": "verified", "from": {"unknown"}, "note_required": False},
     "note": {"event": "note", "from": None, "note_required": True},
+    # Mobilite interne : l'objet change de detenteur sans etre restitue (le nouveau detenteur est obligatoire).
+    "transfer": {"event": "transferred", "from": {"assigned"}, "note_required": False, "holder_required": True},
 }
 
 
@@ -52,6 +57,16 @@ def next_status(current, event_type):
             return "assigned", "double_attribution"
         if current in ("lost", "retired"):
             return "assigned", "assigned_while_" + current
+        return "assigned", None  # y compris depuis « reserved » : la reservation devient attribution
+    if event_type == "reserved":
+        if current in (None, "in_stock", "degraded", "unknown"):
+            return "reserved", None
+        if current == "reserved":
+            return "reserved", "double_reservation"
+        return current, "reserved_while_" + current  # l'objet est deja pris : on signale, l'etat ne change pas
+    if event_type == "reservation_released":
+        return ("in_stock" if current == "reserved" else current or "in_stock"), None
+    if event_type == "transferred":
         return "assigned", None
     if event_type == "returned":
         return "in_stock", None
@@ -73,16 +88,36 @@ def next_status(current, event_type):
 
 
 def derive_state(events):
-    """Etat courant d'une unite a partir de ses evenements (tries par date puis ordre d'insertion)."""
-    status, holder = None, None
+    """Etat courant d'une unite a partir de ses evenements (tries par date puis ordre d'insertion).
+    Les reservations sont suivies par dossier et se superposent a l'etat de base : tant qu'un dossier au moins
+    reserve l'objet disponible, il apparait « reserve » ; lever la reservation d'un dossier ne libere pas l'objet
+    si un autre dossier le reserve encore."""
+    base, holder, reservations = None, None, {}
     for event in events:
-        status, _anomaly = next_status(status, event["event_type"])
-        if event["event_type"] == "assigned":
-            holder = {"form_id": event.get("form_id"), "label": event.get("holder_label")}
-        elif event["event_type"] in ("returned", "returned_degraded", "lost", "released", "retired", "found",
-                                     "repair_started", "repair_done", "verified"):
+        kind, form = event["event_type"], event.get("form_id")
+        if kind == "reserved":
+            reservations[form] = event.get("holder_label")
+            continue
+        if kind == "reservation_released":
+            reservations.pop(form, None)
+            continue
+        if kind in ("assigned", "released"):
+            reservations.pop(form, None)  # la reservation de ce dossier devient attribution, ou disparait avec lui
+        if kind == "released":
+            # Dossier supprime : n'affecte l'etat de base que s'il detenait l'objet (pas s'il ne faisait que le reserver).
+            if holder and holder.get("form_id") == form:
+                base, holder = "in_stock", None
+            continue
+        base, _anomaly = next_status(base, kind)
+        if kind in ("assigned", "transferred"):
+            holder = {"form_id": form or (holder or {}).get("form_id"), "label": event.get("holder_label")}
+        elif kind in ("returned", "returned_degraded", "lost", "retired", "found", "repair_started", "repair_done", "verified"):
             holder = None
-    return (status or "in_stock"), holder
+    status = base or "in_stock"
+    if reservations and status in ("in_stock", "degraded", "unknown"):
+        last_form = list(reservations)[-1]
+        return "reserved", {"form_id": last_form, "label": reservations[last_form]}
+    return status, holder
 
 
 # ---------------------------------------------------------------------------
@@ -224,10 +259,19 @@ def recompute_unit(connection, unit_id):
     )
 
 
+def _has_active_reservation(connection, unit_id, form_id):
+    """Ce dossier reserve-t-il deja cet objet ? (son dernier evenement sur l'unite est une reservation)"""
+    row = connection.execute(
+        "SELECT event_type FROM resource_unit_events WHERE unit_id = ? AND form_id = ? ORDER BY occurred_at DESC, seq DESC LIMIT 1",
+        (unit_id, form_id),
+    ).fetchone()
+    return bool(row and row["event_type"] == "reserved")
+
+
 def sync_units_for_form(connection, form_id, keys=None):
     """Met le parc a jour d'apres l'etat courant d'un dossier. Idempotent ; ne modifie jamais le dossier."""
     form = connection.execute(
-        "SELECT id, status, nom, prenom, service, assigned_at, returned_at, updated_at FROM dotation_forms WHERE id = ?", (form_id,)
+        "SELECT id, status, dossier_type, nom, prenom, service, assigned_at, returned_at, updated_at FROM dotation_forms WHERE id = ?", (form_id,)
     ).fetchone()
     if not form:
         return 0
@@ -257,11 +301,20 @@ def sync_units_for_form(connection, form_id, keys=None):
         condition = item["return_condition"] or "pending"
         event = ("returned" if condition in READY_CONDITIONS else "returned_degraded" if condition in DEGRADED_CONDITIONS
                  else "lost" if condition == "non_restitue" else None)
-        # Un objet n'entre dans le parc qu'a la signature du dossier, ou si une restitution prouve qu'il a ete
-        # attribue. Le choix dans un brouillon releve de la reservation (etape ulterieure), pas de l'etat reel.
+        # Dossier signe (ou restitution qui prouve l'attribution) : attribution effective. Brouillon : simple
+        # reservation de l'objet, qui evite qu'un autre dossier le choisisse en meme temps.
+        origin = "regularisation" if form["dossier_type"] == "sortie" else "dossier"
         if not effective and not event:
+            if form["status"] == "cancelled":
+                continue
+            unit_id, _created = _get_or_create_unit(connection, item["item_key"], raw, fields, origin)
+            touched.add(unit_id)
+            if not _has_active_reservation(connection, unit_id, form_id):
+                count = connection.execute("SELECT COUNT(*) FROM resource_unit_events WHERE unit_id = ? AND event_type = 'reserved' AND form_id = ?",
+                                           (unit_id, form_id)).fetchone()[0]
+                added += _record(connection, unit_id, "reserved", _when(form["updated_at"]), f"reserve:{form_id}:{count}", form_id, label, source="dossier")
             continue
-        unit_id, _created = _get_or_create_unit(connection, item["item_key"], raw, fields, "dossier")
+        unit_id, _created = _get_or_create_unit(connection, item["item_key"], raw, fields, origin)
         touched.add(unit_id)
         assigned_when = _when(form["assigned_at"] or form["updated_at"])
         added += _record(connection, unit_id, "assigned", assigned_when, f"assign:{form_id}", form_id, label, source="dossier")
@@ -276,19 +329,52 @@ def sync_units_for_form(connection, form_id, keys=None):
                 returned_when = assigned_when
             added += _record(connection, unit_id, event, returned_when, f"{event}:{form_id}", form_id, label,
                              condition=condition, notes=note, source="dossier")
+    # Reservations devenues sans objet : l'objet a ete retire du dossier (ou le dossier a ete annule).
+    for row in connection.execute("SELECT DISTINCT unit_id FROM resource_unit_events WHERE form_id = ?", (form_id,)).fetchall():
+        unit_id = row["unit_id"]
+        if _has_active_reservation(connection, unit_id, form_id) and (unit_id not in touched or form["status"] == "cancelled"):
+            added += _record(connection, unit_id, "reservation_released", _when(form["updated_at"]), f"unreserve:{form_id}:{form['updated_at']}",
+                             form_id, label, notes="Objet retiré du dossier" if form["status"] != "cancelled" else "Dossier annulé", source="dossier")
+            touched.add(unit_id)
     for unit_id in touched:
         recompute_unit(connection, unit_id)
     return added
 
 
+def release_stale_reservations(connection, days=RESERVATION_DAYS, now=None):
+    """Leve les reservations des dossiers sans activite depuis `days` jours (brouillon abandonne) ou disparus."""
+    from datetime import datetime, timedelta, timezone
+    limit = ((now or datetime.now(timezone.utc)) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    released = 0
+    for unit in connection.execute("SELECT id FROM resource_units WHERE status = 'reserved'").fetchall():
+        for form_id in {r["form_id"] for r in connection.execute(
+            "SELECT DISTINCT form_id FROM resource_unit_events WHERE unit_id = ? AND event_type = 'reserved'", (unit["id"],)).fetchall()}:
+            if not _has_active_reservation(connection, unit["id"], form_id):
+                continue
+            form = connection.execute("SELECT updated_at FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+            if form is None or (form["updated_at"] or "") < limit:
+                _record(connection, unit["id"], "reservation_released", utc_now(), f"expire:{form_id}:{limit[:10]}", form_id,
+                        notes=f"Réservation expirée (aucune activité depuis {days} jours)", source="auto")
+                released += 1
+        recompute_unit(connection, unit["id"])
+    return released
+
+
 def release_units_for_form(connection, form_id):
-    """Dossier supprime : l'objet qu'il detenait est libere (l'historique reste, avec la mention)."""
-    rows = connection.execute("SELECT id FROM resource_units WHERE holder_form_id = ?", (form_id,)).fetchall()
-    for row in rows:
-        _record(connection, row["id"], "released", utc_now(), f"release:{form_id}", form_id,
-                notes="Dossier supprimé : attribution annulée", source="dossier")
-        recompute_unit(connection, row["id"])
-    return len(rows)
+    """Dossier supprime : les objets qu'il detenait ou reservait sont liberes (l'historique reste, avec la mention).
+    Un objet reserve par un autre dossier reste reserve."""
+    count = 0
+    for row in connection.execute("SELECT DISTINCT unit_id FROM resource_unit_events WHERE form_id = ?", (form_id,)).fetchall():
+        unit = connection.execute("SELECT holder_form_id, status FROM resource_units WHERE id = ?", (row["unit_id"],)).fetchone()
+        if not unit:
+            continue
+        holds = unit["status"] == "assigned" and unit["holder_form_id"] == form_id
+        if holds or _has_active_reservation(connection, row["unit_id"], form_id):
+            if _record(connection, row["unit_id"], "released", utc_now(), f"release:{form_id}", form_id,
+                       notes="Dossier supprimé : attribution ou réservation annulée", source="dossier"):
+                recompute_unit(connection, row["unit_id"])
+                count += 1
+    return count
 
 
 def backfill_units(connection):
@@ -321,6 +407,7 @@ def backfill_units(connection):
             recompute_unit(connection, unit_id)
             connection.execute("UPDATE resource_units SET status = 'unknown' WHERE id = ?", (unit_id,))
             orphans += 1
+    release_stale_reservations(connection)
     return {"forms": forms, "orphan_units": orphans}
 
 
@@ -448,7 +535,10 @@ def apply_manual_action(connection, unit_id, action, notes="", actor=None, param
             raise UnitActionError("invalid_state", "Cette action n'est pas possible dans l'état actuel de l'unité.")
         if spec["note_required"] and not notes:
             raise UnitActionError("note_required", "Précisez le motif.")
-        _record(connection, unit_id, spec["event"], utc_now(), None, notes=notes or None, actor=actor, source="manual")
+        holder = str(params.get("holder_label") or "").strip()
+        if spec.get("holder_required") and not holder:
+            raise UnitActionError("holder_required", "Indiquez le nouveau détenteur.")
+        _record(connection, unit_id, spec["event"], utc_now(), None, holder_label=holder or None, notes=notes or None, actor=actor, source="manual")
     recompute_unit(connection, unit_id)
     return get_unit(connection, unit_id)
 
@@ -460,3 +550,38 @@ def count_units_by_status(connection, resource_code=None):
         params.append(resource_code)
     sql += " GROUP BY status"
     return {row["status"]: row["n"] for row in connection.execute(sql, params).fetchall()}
+
+
+def find_holder_unit(connection, resource_code, identifier, exclude_form_id=None):
+    """Objet deja pris (attribue ou reserve) par un AUTRE dossier : retourne {status, service, since} ou None."""
+    norm = normalize_identifier(identifier)
+    if not norm:
+        return None
+    row = connection.execute(
+        """SELECT u.id, u.status, u.holder_form_id, u.holder_label FROM resource_units u WHERE u.resource_code = ?
+           AND (u.identifier_norm = ? OR u.id IN (SELECT unit_id FROM resource_unit_aliases WHERE resource_code = ? AND identifier_norm = ?))""",
+        (resource_code, norm, resource_code, norm),
+    ).fetchone()
+    if not row or row["status"] not in ("assigned", "reserved"):
+        return None
+    if exclude_form_id and row["holder_form_id"] == exclude_form_id:
+        return None
+    since = connection.execute(
+        "SELECT MAX(occurred_at) FROM resource_unit_events WHERE unit_id = ? AND event_type IN ('assigned', 'reserved', 'transferred')", (row["id"],)
+    ).fetchone()[0]
+    label = row["holder_label"] or ""
+    return {"status": row["status"], "service": label.split("·", 1)[1].strip() if "·" in label else "", "since": since or ""}
+
+
+def available_units_for_resource(connection, resource_code):
+    """Objets reutilisables (en stock ou restitues degrades), les plus recemment rendus d'abord."""
+    rows = connection.execute(
+        """SELECT u.identifier, u.fields_json, u.status,
+                  (SELECT MAX(occurred_at) FROM resource_unit_events e WHERE e.unit_id = u.id AND e.event_type IN ('returned', 'returned_degraded', 'found', 'repair_done', 'verified')) AS returned_at
+           FROM resource_units u WHERE u.resource_code = ? AND u.status IN ('in_stock', 'degraded')""",
+        (resource_code,),
+    ).fetchall()
+    units = [{"identifier": r["identifier"], "fields": json.loads(r["fields_json"] or "{}"),
+              "status": "degraded" if r["status"] == "degraded" else "ok", "returned_at": r["returned_at"] or ""} for r in rows]
+    units.sort(key=lambda unit: (unit["returned_at"], unit["identifier"]), reverse=True)
+    return units

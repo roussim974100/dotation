@@ -5,7 +5,8 @@ from flask import Blueprint, jsonify, request
 
 from auth import has_permission, login_required
 from database import get_db
-from models.inventory import find_current_holder, list_available_units, list_holder_rows, resolve_identifier_key
+from models.inventory import resolve_identifier_key
+from models.units import available_units_for_resource, find_holder_unit
 
 bp = Blueprint("inventory", __name__)
 
@@ -27,8 +28,7 @@ def available_units(resource_id):
             schema = []
         # Reutilisation reservee au materiel (pas aux acces numeriques comme un compte VPN).
         identifier_key = resolve_identifier_key(schema) if row["category"] == "materiel" else None
-        field_keys = {f["key"] for f in schema if isinstance(f, dict) and f.get("key")}
-        items = list_available_units(connection, row["code"], identifier_key, field_keys) if identifier_key else []
+        items = available_units_for_resource(connection, row["code"]) if identifier_key else []
     return jsonify({"identifierKey": identifier_key, "items": items})
 
 
@@ -52,5 +52,5 @@ def current_holder(resource_id):
         identifier_key = resolve_identifier_key(schema)
         if not identifier_key:
             return jsonify({"holder": None})
-        holder = find_current_holder(list_holder_rows(connection, row["code"]), identifier_key, value, request.args.get("exclude") or None)
+        holder = find_holder_unit(connection, row["code"], value, request.args.get("exclude") or None)
     return jsonify({"holder": holder})

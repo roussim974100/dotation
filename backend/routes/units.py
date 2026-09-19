@@ -5,7 +5,7 @@ from auth import current_user, has_permission, login_required, permission_requir
 from config import FRONTEND_DIR
 from database import get_db
 from models.audit import insert_app_log
-from models.units import UnitActionError, apply_manual_action, count_units_by_status, get_unit, list_units
+from models.units import UnitActionError, apply_manual_action, count_units_by_status, get_unit, list_units, release_stale_reservations
 
 bp = Blueprint("units", __name__)
 
@@ -29,6 +29,7 @@ def units_list():
     if not has_permission("forms.read_list"):
         return jsonify({"error": "forbidden"}), 403
     with get_db() as connection:
+        release_stale_reservations(connection)  # requete legere : garde les reservations honnetes sans tache planifiee
         units = list_units(
             connection, request.args.get("resource") or None, (request.args.get("q") or "").strip(),
             request.args.get("status") or None, request.args.get("limit", 200), _masked(),
@@ -49,7 +50,7 @@ def unit_detail(unit_id):
     return jsonify(unit)
 
 
-_ACTION_STATUS = {"unknown_unit": 404, "invalid_state": 409, "identifier_exists": 409, "different_resource": 409}
+_ACTION_STATUS = {"holder_required": 400, "unknown_unit": 404, "invalid_state": 409, "identifier_exists": 409, "different_resource": 409}
 
 
 @bp.route("/api/units/<unit_id>/actions", methods=["POST"])
