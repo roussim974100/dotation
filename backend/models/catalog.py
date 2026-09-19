@@ -202,7 +202,7 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
         has_assignment_condition = False
     is_active = bool(payload.get("is_active", bool(existing.get("is_active", True))))
     tracking_mode = str(payload.get("tracking_mode") if payload.get("tracking_mode") is not None else existing.get("tracking_mode") or "").strip()
-    if tracking_mode not in {"", "unit", "none", "access"}:
+    if tracking_mode not in {"", "unit", "none", "access", "quantity"}:
         tracking_mode = ""
     return {
         "tracking_mode": tracking_mode,

@@ -574,6 +574,13 @@ def init_db():
         ensure_units_schema(connection)
         if connection.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0:
             backfill_units(connection)
+        # Stocks par quantite : table de mouvements ; alimentation depuis les dossiers signes (idempotente).
+        from models.stock import ensure_stock_schema, stock_resource_config, sync_stock_for_form
+        ensure_stock_schema(connection)
+        _stock_config = stock_resource_config(connection)
+        if _stock_config:
+            for _row in connection.execute("SELECT id FROM dotation_forms").fetchall():
+                sync_stock_for_form(connection, _row["id"], _stock_config)
         from models.settings import get_app_settings
         from models.units_extra import anonymize_old_holders
         anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))

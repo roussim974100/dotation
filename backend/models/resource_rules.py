@@ -3,14 +3,15 @@
 Un « mode de suivi » dit ce qu'on peut faire de la ressource :
   - unit   : suivi objet par objet (ordinateur, badge, telepeage...) -> exige un champ identifiant obligatoire ;
   - none   : ressource sans suivi individuel (veste, chaussures...) ;
-  - access : acces numerique (VPN, messagerie, licence).
+  - access : acces numerique (VPN, messagerie, licence) ;
+  - quantity : stock suivi par quantite, sans identifiant individuel (vetements par taille, consommables).
 Un mode vide ("") veut dire « automatique » (ressources anterieures a l'assistant) : il est deduit de la
 categorie et de la presence d'un champ identifiant, et les regles ne produisent alors que des avertissements.
 Fonctions pures, sans Flask ni base.
 """
 from models.inventory import resolve_identifier_key
 
-TRACKING_MODES = ("unit", "none", "access")
+TRACKING_MODES = ("unit", "none", "access", "quantity")
 
 
 def effective_tracking_mode(tracking_mode, category, schema):
@@ -58,6 +59,12 @@ def validate_resource(data):
             issues.append(_issue("warning", "unit_not_returnable", "Ressource non restituable : l'historique ne verra jamais de restitution."))
         if not data.get("has_assignment_condition"):
             issues.append(_issue("warning", "no_condition", "Activez « état à la remise » : il alimente l'historique (neuf, bon état…)."))
+    elif mode == "quantity":
+        if data.get("category") != "materiel":
+            issues.append(_issue(blocking, "quantity_needs_material", "Le suivi par quantité est réservé aux ressources de catégorie matériel."))
+        has_quantity = any(isinstance(f, dict) and (f.get("quantity") or f.get("key") in ("quantite", "quantity", "nombre")) for f in schema)
+        if not has_quantity:
+            issues.append(_issue("info", "no_quantity_field", "Sans champ « Quantité », chaque remise compte pour 1 unité."))
     elif mode == "none" and data.get("category") == "materiel" and data.get("requires_return", True):
         issues.append(_issue("info", "no_history", "Sans suivi individuel : on sait qu'une ressource a été remise, pas laquelle."))
 

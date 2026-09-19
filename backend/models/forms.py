@@ -396,6 +396,12 @@ def persist_form(payload, allow_locked_update=False):
         except Exception:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("Synchronisation du parc impossible pour le dossier %s", form_id, exc_info=True)
+        try:
+            from models.stock import sync_stock_for_form
+            sync_stock_for_form(connection, form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du stock impossible pour le dossier %s", form_id, exc_info=True)
 
         insert_audit_event(
             connection,

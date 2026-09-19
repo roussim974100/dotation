@@ -877,6 +877,11 @@ def delete_form(form_id):
             release_units_for_form(connection, form_id)  # l'objet detenu est libere, l'historique reste
         except Exception:  # noqa: BLE001
             pass
+        try:
+            from models.stock import release_stock_for_form
+            release_stock_for_form(connection, form_id)  # la remise est annulee, le stock revient
+        except Exception:  # noqa: BLE001
+            pass
         deleted = connection.execute(
             "DELETE FROM dotation_forms WHERE id = ?",
             (form_id,),
