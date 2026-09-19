@@ -89,3 +89,6 @@ backend/*.zip
 /.graphifyignore
 /.ignore
 /graphify-out/
+
+# Etat, journal et verrou de la mise a jour depuis le navigateur (generes par le serveur)
+/backend/update/
