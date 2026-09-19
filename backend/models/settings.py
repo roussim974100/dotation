@@ -233,6 +233,9 @@ def save_app_settings(connection, updates):
 
     if "brand_logo_mode" in sanitized and sanitized["brand_logo_mode"] not in {"default", "url", "file"}:
         sanitized["brand_logo_mode"] = DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    # Le serveur telecharge cette URL : n'accepter que http(s) (pas de file://, ftp://, etc.).
+    if sanitized.get("brand_logo_url") and not sanitized["brand_logo_url"].lower().startswith(("http://", "https://")):
+        sanitized["brand_logo_url"] = ""
     if "theme_id" in sanitized and sanitized["theme_id"] not in THEME_PRESETS:
         sanitized["theme_id"] = DEFAULT_APP_SETTINGS["theme_id"]
     if "dark_mode_policy" in sanitized and sanitized["dark_mode_policy"] not in {"disabled", "allowed", "forced"}:

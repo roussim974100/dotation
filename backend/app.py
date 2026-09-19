@@ -33,6 +33,8 @@ class _AutoSecureSessionInterface(SecureCookieSessionInterface):
 app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
 app.session_interface = _AutoSecureSessionInterface()
+# Plafond de taille des requetes (uploads CSV, logo, restauration de base) ; reglable via l'environnement.
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100")) * 1024 * 1024
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Valider les permissions au démarrage (dev uniquement)
