@@ -50,6 +50,10 @@ http://<IP_DE_VOTRE_SERVEUR>
 
 Remplacez `<IP_DE_VOTRE_SERVEUR>` par l'IP de votre machine (ex: `http://192.168.1.50`).
 
+> **Aucun port à ajouter.** L'installation place nginx (ou IIS sous Windows) sur le **port 80**, celui que le navigateur utilise par défaut : `http://192.168.1.50` suffit. N'essayez pas `http://<IP>:5000` : le service de l'application (gunicorn) n'écoute que **en local** sur le port 5000, par sécurité, et refusera la connexion depuis le réseau (`ERR_CONNECTION_REFUSED`). Derrière un reverse proxy HTTPS (Traefik, HAProxy…), utilisez l'adresse publique configurée, par exemple `https://aquai.exemple.fr`.
+>
+> Pour vérifier depuis le serveur lui-même que l'application tourne : `curl -sI http://127.0.0.1:5000/login | head -1` doit répondre `200`.
+
 ### Identifiants de connexion
 
 Utilisez ces identifiants pour votre première connexion :
