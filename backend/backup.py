@@ -18,10 +18,6 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-
 from config import BASE_DIR, DB_PATH, DB_USERS_PATH
 
 ARCHIVE_FORMAT = 1
@@ -131,7 +127,26 @@ def diagnose_sqlite(path, key):
 # Chiffrement
 # ---------------------------------------------------------------------------
 
+def _crypto():
+    """Importe `cryptography` a la demande. Le module n'est utile que pour les archives chiffrees : s'il manque
+    (mise a jour du code sans `pip install`), l'application demarre quand meme et seules les sauvegardes
+    chiffrees sont indisponibles, avec un message clair."""
+    try:
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+    except ImportError:
+        raise BackupError(
+            "crypto_unavailable",
+            "Le chiffrement des sauvegardes est indisponible : le module Python « cryptography » n'est pas installé. "
+            "Lancez la mise à jour complète (sudo bash deploy.sh) ou : <venv>/bin/pip install -r backend/requirements.txt, "
+            "puis redémarrez le service.",
+        ) from None
+    return InvalidTag, AESGCM, Scrypt
+
+
 def _derive_key(password, salt):
+    Scrypt = _crypto()[2]
     return Scrypt(salt=salt, length=32, n=SCRYPT_N, r=8, p=1).derive(password.encode("utf-8"))
 
 
@@ -139,6 +154,7 @@ def encrypt_bytes(data, password):
     salt = secrets.token_bytes(SALT_SIZE)
     nonce = secrets.token_bytes(NONCE_SIZE)
     header = ENCRYPTED_MAGIC + salt
+    AESGCM = _crypto()[1]
     return header + nonce + AESGCM(_derive_key(password, salt)).encrypt(nonce, data, header)
 
 
@@ -148,6 +164,7 @@ def decrypt_bytes(blob, password):
         raise BackupError("invalid_archive", "Archive tronquée ou illisible.")
     header = blob[:header_size]
     nonce = blob[header_size:header_size + NONCE_SIZE]
+    InvalidTag, AESGCM, _ = _crypto()
     try:
         return AESGCM(_derive_key(password, header[len(ENCRYPTED_MAGIC):])).decrypt(nonce, blob[header_size + NONCE_SIZE:], header)
     except InvalidTag:

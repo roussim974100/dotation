@@ -19,6 +19,7 @@ _ERROR_STATUS = {
     "import_failed": 500,
     "password_required": 422,
     "wrong_password": 422,
+    "crypto_unavailable": 503,
     "password_too_short": 400,
     "diagnose_failed": 422,
     "file_too_large": 413,

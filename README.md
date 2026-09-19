@@ -540,12 +540,32 @@ curl -sI http://127.0.0.1:5000/login | head -1                            # doit
 
 Ne jamais lancer `pip install` sans passer par le `pip` du venv (Debian répond `externally-managed-environment`) et ne jamais utiliser `--break-system-packages`.
 
+### Première mise à jour depuis une ancienne version (à lire)
+
+Les installations existantes ont l'**ancien** `deploy.sh`, qui récupère le code et redémarre **sans installer les dépendances et sans sauvegarder**. Comme c'est lui qui s'exécute lors de la première mise à jour, procéder ainsi :
+
+1. **Sauvegarder les bases** (une migration de schéma ne s'annule pas) : *Administration > Base de données > Exporter*, ou copier `backend/dotation.db` et `backend/users.db` service arrêté.
+2. Lancer la mise à jour habituelle : `sudo ./deploy.sh` (ancien script). Le nouveau code, dont le nouveau `deploy.sh`, est alors en place.
+3. **Relancer une seconde fois : `sudo bash deploy.sh`.** Ce passage, avec le nouveau script, installe les dépendances manquantes, sauvegarde, redémarre et **vérifie que l'application répond**.
+
+Si une dépendance manque après l'étape 2, l'application **démarre quand même** : seules les sauvegardes chiffrées sont indisponibles (message explicite dans l'administration) jusqu'à l'étape 3. À partir de là, `sudo bash deploy.sh` suffit pour toutes les mises à jour suivantes.
+
+### Publier une nouvelle version (mainteneur)
+
+1. Développer et tester sur `dev` (`python -m pytest tests -q`).
+2. Déployer `dev` sur la **préprod** : `sudo bash deploy-dev.sh`, avec une **copie de la base de production** pour vérifier les migrations.
+3. Fusionner `dev` dans `prod`, puis passer la version en `-prod` (`APP_BUILD_VERSION` dans `frontend/js/branding.js`).
+4. Faire d'abord soi-même la mise à jour de sa propre production avec `sudo bash deploy.sh`.
+5. Communiquer aux clients : `cd /opt/dotation && sudo bash deploy.sh` (et, pour la toute première mise à jour depuis une ancienne version, la procédure ci-dessus).
+
+> Le dossier `backend/venv/` est suivi par git (héritage) : `deploy.sh` l'ignore dans son contrôle des modifications locales. Ne pas le retirer de git sans protéger les serveurs existants, un `git pull` supprimerait alors leur venv.
+
 ### Dépannage après une mise à jour
 
 | Symptôme | Cause probable | Vérification / correctif |
 |---|---|---|
 | **502 Bad Gateway** (Traefik, nginx…) | Le service ne tourne pas : rien n'écoute sur le port de l'application | `systemctl status dotation` puis `journalctl -u dotation -n 40 --no-pager \| grep -v systemd` |
-| `ModuleNotFoundError: No module named '…'` | Dépendance non installée, ou installée dans un autre venv | `/chemin/du/venv/bin/pip install -r backend/requirements.txt` avec **le venv de la ligne `ExecStart`** |
+| `ModuleNotFoundError: No module named '…'` | Dépendance non installée, ou installée dans un autre venv (`cryptography` seule est facultative au démarrage) | `/chemin/du/venv/bin/pip install -r backend/requirements.txt` avec **le venv de la ligne `ExecStart`** |
 | `Start request repeated too quickly` | systemd a bloqué le service après 5 échecs | Corriger l'erreur, puis `systemctl reset-failed dotation && systemctl restart dotation` |
 | `error: externally-managed-environment` | `pip` du système utilisé au lieu de celui du venv | Utiliser le `pip` du venv (voir ci-dessus) |
 | `404 Not Found` sur une page récente (ex. `/parc.html`) | Le serveur tourne avec une ancienne version du code | Vérifier la branche déployée (`git -C /opt/dotation log -1`) et refaire la mise à jour |

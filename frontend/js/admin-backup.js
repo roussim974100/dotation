@@ -5,6 +5,7 @@ const BACKUP_ERROR_MESSAGES = {
   password_required: "Cette sauvegarde est protégée : saisissez son mot de passe.",
   wrong_password: "Mot de passe incorrect, ou archive altérée.",
   password_too_short: "Mot de passe trop court.",
+  crypto_unavailable: "Chiffrement indisponible : le module « cryptography » n'est pas installé sur le serveur. Lancez la mise à jour complète (sudo bash deploy.sh), puis redémarrez le service.",
   invalid_archive: "Ce fichier n'est pas une sauvegarde valide.",
   corrupted_archive: "Sauvegarde corrompue (empreinte invalide).",
   unsupported_format: "Format de sauvegarde non pris en charge.",

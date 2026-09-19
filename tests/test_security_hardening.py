@@ -98,3 +98,21 @@ def test_proxy_auto_acces_direct_public_ignore_x_forwarded_for(monkeypatch):
 def test_proxy_surcharges_explicites(monkeypatch):
     assert _seen_by_app("127.0.0.1", "203.0.113.9", monkeypatch, setting="0") == "127.0.0.1"
     assert _seen_by_app("8.8.4.4", "203.0.113.9", monkeypatch, setting="1") == "203.0.113.9"
+
+
+def test_application_demarre_meme_sans_le_module_cryptography():
+    """Mise a jour du code sans « pip install » : le service doit demarrer (seul le chiffrement des sauvegardes est
+    indisponible), au lieu de tomber avec un 502."""
+    import subprocess
+    script = (
+        "import sys; sys.modules['cryptography'] = None; sys.path.insert(0, 'backend');"
+        "import backup, routes.db_backup;"
+        "err = None\n"
+        "try:\n    backup.encrypt_bytes(b'x', 'motdepasse')\n"
+        "except backup.BackupError as e:\n    err = e.code\n"
+        "assert err == 'crypto_unavailable', err\n"
+        "blob, _ = (None, None)\n"
+        "print('OK')"
+    )
+    result = subprocess.run([sys.executable, "-c", script], cwd=str(Path(__file__).parent.parent), capture_output=True, text=True)
+    assert result.returncode == 0 and "OK" in result.stdout, result.stderr[-500:]
