@@ -621,6 +621,13 @@ function initUserMenu() {
 // Ajouter une entree ici suffit : le menu est genere sur toutes les pages.
 const USER_MENU_FEATURE_LINKS = [
   {
+    id: "parcLink",
+    label: "Parc matériel",
+    navHint: "Historique des objets",
+    href: "parc.html",
+    isAllowed: (user) => (user.permissions || []).includes("forms.read_list") || (user.permissions || []).includes("*")
+  },
+  {
     id: "dbLink",
     label: "Base de données",
     navHint: "Sauvegarde et restauration",

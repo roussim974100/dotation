@@ -11,8 +11,8 @@ if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
 from models.units import (
-    backfill_units, derive_state, ensure_units_schema, get_unit, list_units, next_status,
-    release_units_for_form, sync_units_for_form,
+    UnitActionError, apply_manual_action, backfill_units, count_units_by_status, derive_state, ensure_units_schema,
+    get_unit, list_units, next_status, release_units_for_form, sync_units_for_form,
 )
 
 SCHEMA = [{"key": "numeroSerie", "label": "N° de série", "required": True, "identifier": True}, {"key": "marque", "label": "Marque"}]
@@ -227,3 +227,129 @@ def test_reassignment_after_a_same_day_return_is_not_a_double_attribution(db):
     sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
     assert events(db) == [("assigned", None), ("returned", None), ("assigned", None)]
     assert unit(db)["holder_form_id"] == "F2"
+
+
+# --- actions manuelles ----------------------------------------------------------------------
+
+def uid(db, serial="SN1"):
+    return unit(db, serial)["id"]
+
+
+def act(db, serial, action, notes="", **params):
+    return apply_manual_action(db, uid(db, serial), action, notes, "gestionnaire", params)
+
+
+def test_new_transitions_for_manual_events():
+    assert next_status("lost", "found") == ("in_stock", None)
+    assert next_status("in_stock", "retired") == ("retired", None)
+    assert next_status("in_stock", "repair_started") == ("maintenance", None)
+    assert next_status("maintenance", "repair_done") == ("in_stock", None)
+    assert next_status("unknown", "verified") == ("in_stock", None)
+    assert next_status("assigned", "correction") == ("assigned", None)
+
+
+def test_lost_then_found_cycle(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1", "conforme", "2026-03-01"); sync_units_for_form(db, "F1")
+    assert act(db, "SN1", "lost", "Volé en réunion")["status"] == "lost"
+    assert act(db, "SN1", "found")["status"] == "in_stock"
+    detail = get_unit(db, uid(db))
+    assert [e["event_type"] for e in detail["events"]][-2:] == ["lost", "found"]
+    assert detail["events"][-2]["actor"] == "gestionnaire" and detail["events"][-2]["notes"] == "Volé en réunion"
+    assert all(e["anomaly"] is None for e in detail["events"][-2:])  # action volontaire : jamais une anomalie
+
+
+def test_actions_are_refused_from_the_wrong_state_or_without_reason(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")  # attribue
+    for action in ("found", "repair_start", "repair_done", "verify"):
+        with pytest.raises(UnitActionError) as error:
+            act(db, "SN1", action)
+        assert error.value.code == "invalid_state"
+    with pytest.raises(UnitActionError) as reason:
+        act(db, "SN1", "lost", "  ")
+    assert reason.value.code == "note_required"
+    with pytest.raises(UnitActionError) as unknown:
+        act(db, "SN1", "explose")
+    assert unknown.value.code == "invalid_action"
+    with pytest.raises(UnitActionError) as missing:
+        apply_manual_action(db, "inconnue", "note", "x")
+    assert missing.value.code == "unknown_unit"
+
+
+def test_repair_and_retirement_cycle(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1", "degrade", "2026-03-01"); sync_units_for_form(db, "F1")
+    assert act(db, "SN1", "repair_start")["status"] == "maintenance"
+    assert act(db, "SN1", "repair_done")["status"] == "in_stock"
+    assert act(db, "SN1", "retire", "Fin de vie")["status"] == "retired"
+    assert unit(db)["holder_form_id"] is None
+
+
+def test_orphan_unit_can_be_verified(db):
+    add_item(db, "GONE", "SN-O"); backfill_units(db)
+    assert unit(db, "SN-O")["status"] == "unknown"
+    assert act(db, "SN-O", "verify", "Contrôlé sur place")["status"] == "in_stock"
+
+
+def test_a_note_never_changes_the_state(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    assert act(db, "SN1", "note", "Écran rayé")["status"] == "assigned"
+
+
+def test_identifier_correction_keeps_history_and_future_syncs_land_on_the_same_unit(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); sync_units_for_form(db, "F1")
+    unit_id = uid(db)
+    detail = act(db, "SN1", "correct", new_identifier="SN-0001")
+    assert detail["identifier"] == "SN-0001" and detail["events"][-1]["event_type"] == "correction"
+    assert "SN1 → SN-0001" in detail["events"][-1]["notes"]
+    # Un dossier qui contient encore l'ancienne graphie retombe sur la meme unite (alias), sans doublon
+    add_form(db, "F2", assigned="2026-08-01"); add_item(db, "F2", "sn1", "conforme", "2026-08-02"); sync_units_for_form(db, "F2")
+    assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 1
+    assert db.execute("SELECT id FROM resource_units").fetchone()[0] == unit_id
+
+
+def test_identifier_correction_refuses_an_existing_identifier_and_empty_value(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); add_item(db, "F1", "SN2"); sync_units_for_form(db, "F1")
+    with pytest.raises(UnitActionError) as clash:
+        act(db, "SN1", "correct", new_identifier=" sn2 ")
+    assert clash.value.code == "identifier_exists"
+    with pytest.raises(UnitActionError) as empty:
+        act(db, "SN1", "correct", new_identifier="")
+    assert empty.value.code == "identifier_required"
+
+
+def test_merge_moves_history_and_identifier_to_the_target_without_duplicating_on_resync(db):
+    add_form(db, "F1", assigned="2026-01-10"); add_item(db, "F1", "SN1", "conforme", "2026-02-01")
+    add_form(db, "F2", assigned="2026-03-10"); add_item(db, "F2", "SN-1")  # meme objet mal saisi
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 2
+    target = act(db, "SN1", "merge", target_unit_id=uid(db, "SN-1"))
+    assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 1
+    assert [e["event_type"] for e in target["events"]] == ["assigned", "returned", "assigned", "merged"]
+    assert target["status"] == "assigned"
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")  # nouvelle synchronisation : aucun doublon
+    assert len(get_unit(db, uid(db, "SN-1"))["events"]) == 4
+
+
+def test_merge_is_refused_across_resources_or_with_itself(db):
+    db.execute("INSERT INTO resource_catalog VALUES ('telephone','materiel','unit',?)", (json.dumps(SCHEMA),))
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); add_item(db, "F1", "SN1", code="telephone"); sync_units_for_form(db, "F1")
+    other = db.execute("SELECT id FROM resource_units WHERE resource_code='telephone'").fetchone()[0]
+    with pytest.raises(UnitActionError) as cross:
+        act(db, "SN1", "merge", target_unit_id=other)
+    assert cross.value.code == "different_resource"
+    with pytest.raises(UnitActionError) as same:
+        act(db, "SN1", "merge", target_unit_id=uid(db, "SN1"))
+    assert same.value.code == "same_unit"
+
+
+def test_counts_by_status(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN1"); add_item(db, "F1", "SN2", "conforme", "2026-03-01"); sync_units_for_form(db, "F1")
+    assert count_units_by_status(db) == {"assigned": 1, "in_stock": 1}
+    assert count_units_by_status(db, "telephone") == {}
+
+
+def test_unit_fields_only_keep_the_resource_fields(db):
+    add_form(db, "F1")
+    details = {"numeroSerie": "SN1", "marque": "Lenovo", "assignedAt": "2025-11-15T09:00:00+00:00", "conditionAttribution": "neuf", "selected": True}
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,return_condition,details_json) VALUES ('F1','ordinateur',1,'pending',?)", (json.dumps(details),))
+    sync_units_for_form(db, "F1")
+    assert json.loads(unit(db)["fields_json"]) == {"numeroSerie": "SN1", "marque": "Lenovo"}

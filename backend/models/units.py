@@ -16,8 +16,27 @@ from models.inventory import (
 from models.resource_rules import effective_tracking_mode
 from utils import generate_id, utc_now
 
-UNIT_STATUSES = ("in_stock", "assigned", "degraded", "lost", "retired", "unknown")
-EVENT_TYPES = ("assigned", "returned", "returned_degraded", "lost", "released", "note")
+UNIT_STATUSES = ("in_stock", "assigned", "degraded", "maintenance", "lost", "retired", "unknown")
+EVENT_TYPES = ("assigned", "returned", "returned_degraded", "lost", "released", "note", "found", "retired",
+               "repair_started", "repair_done", "verified", "correction", "merged")
+
+# Actions manuelles (droit parc.manage) : evenement produit, etats de depart autorises, motif obligatoire.
+MANUAL_ACTIONS = {
+    "lost": {"event": "lost", "from": {"in_stock", "assigned", "degraded", "maintenance", "unknown"}, "note_required": True},
+    "found": {"event": "found", "from": {"lost"}, "note_required": False},
+    "retire": {"event": "retired", "from": {"in_stock", "degraded", "lost", "unknown", "maintenance"}, "note_required": True},
+    "repair_start": {"event": "repair_started", "from": {"in_stock", "degraded"}, "note_required": False},
+    "repair_done": {"event": "repair_done", "from": {"maintenance"}, "note_required": False},
+    "verify": {"event": "verified", "from": {"unknown"}, "note_required": False},
+    "note": {"event": "note", "from": None, "note_required": True},
+}
+
+
+class UnitActionError(Exception):
+    def __init__(self, code, message=""):
+        super().__init__(message or code)
+        self.code = code
+        self.message = message or code
 # Une attribution n'est effective qu'une fois le dossier signe (les brouillons relevent de la reservation, etape 4).
 EFFECTIVE_ASSIGNMENT_STATUSES = {"active", "partial_return", "returned"}
 
@@ -42,8 +61,14 @@ def next_status(current, event_type):
         return "lost", None if current == "assigned" else "lost_without_assignment"
     if event_type == "released":
         return "in_stock", None
-    if event_type == "note":
+    if event_type in ("note", "correction", "merged"):
         return current or "in_stock", None
+    if event_type in ("found", "repair_done", "verified"):
+        return "in_stock", None
+    if event_type == "retired":
+        return "retired", None
+    if event_type == "repair_started":
+        return "maintenance", None
     raise ValueError(f"Evenement inconnu : {event_type}")
 
 
@@ -54,7 +79,8 @@ def derive_state(events):
         status, _anomaly = next_status(status, event["event_type"])
         if event["event_type"] == "assigned":
             holder = {"form_id": event.get("form_id"), "label": event.get("holder_label")}
-        elif event["event_type"] in ("returned", "returned_degraded", "lost", "released"):
+        elif event["event_type"] in ("returned", "returned_degraded", "lost", "released", "retired", "found",
+                                     "repair_started", "repair_done", "verified"):
             holder = None
     return (status or "in_stock"), holder
 
@@ -96,6 +122,12 @@ def ensure_units_schema(connection):
             created_at TEXT NOT NULL,
             FOREIGN KEY (unit_id) REFERENCES resource_units (id)
         );
+        CREATE TABLE IF NOT EXISTS resource_unit_aliases (
+            resource_code TEXT NOT NULL,
+            identifier_norm TEXT NOT NULL,
+            unit_id TEXT NOT NULL,
+            PRIMARY KEY (resource_code, identifier_norm)
+        );
         CREATE INDEX IF NOT EXISTS idx_unit_events_unit ON resource_unit_events (unit_id, occurred_at, seq);
         CREATE INDEX IF NOT EXISTS idx_units_resource ON resource_units (resource_code, status);
         """
@@ -107,7 +139,8 @@ def ensure_units_schema(connection):
 # ---------------------------------------------------------------------------
 
 def unit_identifier_keys(connection):
-    """{code de ressource: cle du champ identifiant} pour les ressources suivies par objet."""
+    """{code de ressource: {"identifier": cle du champ identifiant, "fields": cles des champs de la ressource}} pour les
+    ressources suivies par objet."""
     keys = {}
     for row in connection.execute("SELECT code, category, tracking_mode, field_schema_json FROM resource_catalog").fetchall():
         try:
@@ -117,7 +150,7 @@ def unit_identifier_keys(connection):
         if effective_tracking_mode(row["tracking_mode"], row["category"], schema) == "unit":
             key = resolve_identifier_key(schema)
             if key:
-                keys[row["code"]] = key
+                keys[row["code"]] = {"identifier": key, "fields": {f["key"] for f in schema if isinstance(f, dict) and f.get("key")}}
     return keys
 
 
@@ -139,6 +172,11 @@ def _get_or_create_unit(connection, code, raw_identifier, fields, origin, status
     ).fetchone()
     now = utc_now()
     clean = {k: v for k, v in fields.items() if isinstance(v, (str, int, float)) and str(v).strip() != ""}
+    if not row:
+        alias = connection.execute(
+            "SELECT unit_id FROM resource_unit_aliases WHERE resource_code = ? AND identifier_norm = ?", (code, norm)
+        ).fetchone()
+        row = {"id": alias["unit_id"]} if alias else None
     if row:
         connection.execute("UPDATE resource_units SET fields_json = ?, updated_at = ? WHERE id = ?", (json.dumps(clean, ensure_ascii=False), now, row["id"]))
         return row["id"], False
@@ -164,6 +202,8 @@ def _record(connection, unit_id, event_type, occurred_at, dedupe_key, form_id=No
     ).fetchall()]
     previous = derive_state(before)[0] if before else None
     _new_status, anomaly = next_status(previous, event_type)
+    if source == "manual":
+        anomaly = None  # une action volontaire d'un gestionnaire n'est pas une incoherence de donnees
     connection.execute(
         """INSERT INTO resource_unit_events
            (unit_id, event_type, occurred_at, form_id, holder_label, condition, notes, anomaly, actor, source, dedupe_key, created_at)
@@ -201,14 +241,16 @@ def sync_units_for_form(connection, form_id, keys=None):
         "SELECT item_key, returned_at, return_condition, details_json FROM dotation_items WHERE form_id = ? AND assigned = 1", (form_id,)
     ).fetchall()
     for item in items:
-        identifier_key = keys.get(item["item_key"])
-        if not identifier_key:
+        config = keys.get(item["item_key"])
+        if not config:
             continue
+        identifier_key = config["identifier"]
         try:
             details = json.loads(item["details_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        fields = _fields_of(details)
+        # Seuls les champs definis par la ressource : les anciens dossiers melangent des donnees internes.
+        fields = {k: v for k, v in _fields_of(details).items() if k in config["fields"]}
         raw = fields.get(identifier_key)
         if not normalize_identifier(raw):
             continue
@@ -262,11 +304,12 @@ def backfill_units(connection):
     for item in connection.execute(
         "SELECT item_key, details_json FROM dotation_items WHERE assigned = 1 AND form_id NOT IN (SELECT id FROM dotation_forms)"
     ).fetchall():
-        identifier_key = keys.get(item["item_key"])
-        if not identifier_key:
+        config = keys.get(item["item_key"])
+        if not config:
             continue
+        identifier_key = config["identifier"]
         try:
-            fields = _fields_of(json.loads(item["details_json"] or "{}"))
+            fields = {k: v for k, v in _fields_of(json.loads(item["details_json"] or "{}")).items() if k in config["fields"]}
         except (TypeError, ValueError):
             continue
         raw = fields.get(identifier_key)
@@ -324,3 +367,96 @@ def get_unit(connection, unit_id, mask=False):
             event["holder_label"] = "—" if event["holder_label"] else None
     unit["events"] = events
     return unit
+
+
+# ---------------------------------------------------------------------------
+# Actions manuelles (droit parc.manage)
+# ---------------------------------------------------------------------------
+
+def _require_unit(connection, unit_id):
+    row = connection.execute("SELECT * FROM resource_units WHERE id = ?", (unit_id,)).fetchone()
+    if not row:
+        raise UnitActionError("unknown_unit", "Unité introuvable.")
+    return row
+
+
+def correct_identifier(connection, unit_id, new_identifier, actor=None):
+    unit = _require_unit(connection, unit_id)
+    identifier = str(new_identifier or "").strip()
+    norm = normalize_identifier(identifier)
+    if not norm:
+        raise UnitActionError("identifier_required", "Le nouvel identifiant est obligatoire.")
+    if norm == unit["identifier_norm"] and identifier == unit["identifier"]:
+        raise UnitActionError("no_change", "L'identifiant est déjà celui-ci.")
+    clash = connection.execute(
+        "SELECT id FROM resource_units WHERE resource_code = ? AND identifier_norm = ? AND id != ?",
+        (unit["resource_code"], norm, unit_id),
+    ).fetchone()
+    if clash:
+        raise UnitActionError("identifier_exists", "Une autre unité porte déjà cet identifiant : utilisez la fusion.")
+    # L'ancienne graphie reste un alias : un dossier qui la contient encore retombera sur cette unite.
+    connection.execute(
+        "INSERT OR REPLACE INTO resource_unit_aliases (resource_code, identifier_norm, unit_id) VALUES (?,?,?)",
+        (unit["resource_code"], unit["identifier_norm"], unit_id),
+    )
+    connection.execute(
+        "UPDATE resource_units SET identifier = ?, identifier_norm = ?, updated_at = ? WHERE id = ?", (identifier, norm, utc_now(), unit_id)
+    )
+    _record(connection, unit_id, "correction", utc_now(), None, notes=f"Identifiant corrigé : {unit['identifier']} → {identifier}",
+            actor=actor, source="manual")
+
+
+def merge_units(connection, source_id, target_id, actor=None):
+    """Fusionne `source` dans `target` (meme ressource) : ses evenements et son identifiant passent a la cible."""
+    if source_id == target_id:
+        raise UnitActionError("same_unit", "Choisissez une autre unité.")
+    source, target = _require_unit(connection, source_id), _require_unit(connection, target_id)
+    if source["resource_code"] != target["resource_code"]:
+        raise UnitActionError("different_resource", "Les deux unités doivent appartenir à la même ressource.")
+    for event in connection.execute("SELECT seq, dedupe_key FROM resource_unit_events WHERE unit_id = ?", (source_id,)).fetchall():
+        key = event["dedupe_key"]
+        new_key = f"{target_id}:{key[len(source_id) + 1:]}" if key and key.startswith(source_id + ":") else key
+        if new_key and connection.execute("SELECT 1 FROM resource_unit_events WHERE dedupe_key = ?", (new_key,)).fetchone():
+            connection.execute("DELETE FROM resource_unit_events WHERE seq = ?", (event["seq"],))  # deja present dans la cible
+        else:
+            connection.execute("UPDATE resource_unit_events SET unit_id = ?, dedupe_key = ? WHERE seq = ?", (target_id, new_key, event["seq"]))
+    connection.execute("UPDATE resource_unit_aliases SET unit_id = ? WHERE unit_id = ?", (target_id, source_id))
+    connection.execute(
+        "INSERT OR REPLACE INTO resource_unit_aliases (resource_code, identifier_norm, unit_id) VALUES (?,?,?)",
+        (source["resource_code"], source["identifier_norm"], target_id),
+    )
+    connection.execute("DELETE FROM resource_units WHERE id = ?", (source_id,))
+    _record(connection, target_id, "merged", utc_now(), None, notes=f"Fusion de l'unité « {source['identifier']} »", actor=actor, source="manual")
+    recompute_unit(connection, target_id)
+
+
+def apply_manual_action(connection, unit_id, action, notes="", actor=None, params=None):
+    """Applique une action de gestion du parc et retourne l'unite a jour. Les evenements ne sont jamais modifies."""
+    params = params or {}
+    unit = _require_unit(connection, unit_id)
+    notes = str(notes or "").strip()
+    if action == "correct":
+        correct_identifier(connection, unit_id, params.get("new_identifier"), actor)
+    elif action == "merge":
+        merge_units(connection, unit_id, params.get("target_unit_id"), actor)
+        return get_unit(connection, params.get("target_unit_id"))
+    else:
+        spec = MANUAL_ACTIONS.get(action)
+        if not spec:
+            raise UnitActionError("invalid_action", "Action inconnue.")
+        if spec["from"] is not None and unit["status"] not in spec["from"]:
+            raise UnitActionError("invalid_state", "Cette action n'est pas possible dans l'état actuel de l'unité.")
+        if spec["note_required"] and not notes:
+            raise UnitActionError("note_required", "Précisez le motif.")
+        _record(connection, unit_id, spec["event"], utc_now(), None, notes=notes or None, actor=actor, source="manual")
+    recompute_unit(connection, unit_id)
+    return get_unit(connection, unit_id)
+
+
+def count_units_by_status(connection, resource_code=None):
+    sql, params = "SELECT status, COUNT(*) AS n FROM resource_units", []
+    if resource_code:
+        sql += " WHERE resource_code = ?"
+        params.append(resource_code)
+    sql += " GROUP BY status"
+    return {row["status"]: row["n"] for row in connection.execute(sql, params).fetchall()}
