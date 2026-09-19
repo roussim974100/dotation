@@ -48,3 +48,33 @@ graphify-out/obsidian/
 
 # Claude Code local screenshots
 .claude/*.png
+
+# --- Fichiers locaux : non publies sur GitHub (ils restent sur le poste de travail) ---
+# Donnees et sauvegardes
+/backend/.backups/
+/backend/*.7z
+/backend/*.zip
+*.sqlite
+/test_deploy/
+# Notes internes, rapports et anciennes livraisons
+/.rapports/
+/.lessons.md
+/version/
+/scripts/
+/announcement-aquai.eml
+/lock_check_*.json
+/debug-mdp.sh
+/debug-mdp.sh.deprecated
+/NEXT_STEPS.md
+/INSTALLATION_IMPROVEMENTS.md
+/LIVRAISON.md
+/TEST_PLAN_DEBIAN_FIXES.md
+/TEST_PLAN_WINDOWS_FIXES.md
+/RECETTE_FONCTIONNELLE.md
+/wikijs.md
+# Outillage personnel (assistant de code, graphes generes)
+/.claude/
+/.mcp.json
+/.graphifyignore
+/.ignore
+/graphify-out/
