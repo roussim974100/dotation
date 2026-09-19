@@ -54,3 +54,8 @@ graphify-out/obsidian/
 backend/backup_config.json
 backend/.backup_password
 backend/db_backups/
+
+# Archives et copies de bases (ne jamais commiter : donnees personnelles)
+*.7z
+backend/*.zip
+*.sqlite
