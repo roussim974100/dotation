@@ -66,6 +66,8 @@ def normalize_reference_row(row):
         data["field_schema"] = json.loads(data.get("field_schema_json") or "[]")
     except (TypeError, json.JSONDecodeError):
         data["field_schema"] = []
+    from models.inventory import resolve_identifier_key
+    data["identifier_key"] = resolve_identifier_key(data["field_schema"]) if data.get("category") == "materiel" else None
     data["requires_return"] = bool(data.get("requires_return"))
     data["has_assignment_date"] = bool(data.get("has_assignment_date", True))
     data["has_assignment_condition"] = bool(data.get("has_assignment_condition", False))

@@ -317,6 +317,110 @@ function bindSignatureProtectionHandlers() {
   }
 }
 
+// Reprend un materiel restitue : la liste vient de /api/catalog/available/<ressource> (unites dont la derniere
+// ligne est restituee) et le choix remplit tous les champs de la ressource, sans ressaisie.
+async function openReuseResourceModal(resourceId) {
+  if (document.getElementById("dotationForm")?.dataset.lockedAt) {
+    showToast("Fiche verrouillée : elle ne peut plus être modifiée.", "warning");
+    return;
+  }
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(resourceId));
+  if (!resource) return;
+  let data;
+  try {
+    data = await requestJson(`/api/catalog/available/${encodeURIComponent(resourceId)}`);
+  } catch (error) {
+    showToast("Impossible de charger le matériel disponible.", "error");
+    return;
+  }
+
+  let modal = document.getElementById("reuseResourceModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "reuseResourceModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="password-generator-modal__backdrop" data-reuse-close="true"></div>
+      <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reuseResourceTitle">
+        <div class="password-generator-modal__header">
+          <div><p class="panel-eyebrow">Matériel restitué</p><h2 class="section-title" id="reuseResourceTitle"></h2></div>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-reuse-close="true">Fermer</button>
+        </div>
+        <div class="password-generator-modal__content">
+          <input class="form-control" id="reuseResourceSearch" type="search" placeholder="Rechercher (n° de série, marque, modèle…)" autocomplete="off">
+          <div class="list-group" id="reuseResourceList" role="list"></div>
+          <p class="form-text mb-0" id="reuseResourceHint"></p>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.querySelector("#reuseResourceTitle").textContent = resource.label;
+  const search = modal.querySelector("#reuseResourceSearch");
+  const list = modal.querySelector("#reuseResourceList");
+  const hint = modal.querySelector("#reuseResourceHint");
+  const schema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+  const labelOf = (key) => schema.find((field) => field.key === key)?.label || key;
+  const summary = (item) => Object.entries(item.fields)
+    .filter(([key]) => key !== data.identifierKey)
+    .map(([, value]) => String(value)).join(" · ");
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const close = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+
+  const render = () => {
+    const query = normalize(search.value);
+    const items = data.items.filter((item) => !query || normalize(`${item.identifier} ${summary(item)}`).includes(query));
+    list.innerHTML = items.map((item, index) => `
+      <button class="list-group-item list-group-item-action" type="button" data-reuse-index="${data.items.indexOf(item)}">
+        <span class="fw-semibold">${escapeHtml(labelOf(data.identifierKey))} : ${escapeHtml(item.identifier)}</span>
+        ${item.status === "degraded" ? '<span class="status-chip status-chip--draft ms-2">Restitué dégradé</span>' : ""}
+        <span class="d-block small text-muted">${escapeHtml(summary(item))}${item.returned_at ? ` · restitué le ${escapeHtml(new Date(item.returned_at).toLocaleDateString("fr-FR"))}` : ""}</span>
+      </button>`).join("");
+    hint.textContent = !data.items.length
+      ? "Aucun matériel restitué disponible pour cette ressource : il se remplit au fil des restitutions."
+      : (items.length ? `${items.length} matériel(s) disponible(s).` : "Aucun résultat pour cette recherche.");
+  };
+
+  list.onclick = (event) => {
+    const button = event.target.closest("[data-reuse-index]");
+    if (!button) return;
+    const item = data.items[Number(button.dataset.reuseIndex)];
+    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+    if (checkbox && !checkbox.checked) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    schema.forEach((field) => {
+      const input = document.getElementById(`dynamic_resource_${resource.id}_${field.key}`);
+      if (!input) return;
+      input.value = item.fields[field.key] ?? "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    close();
+    showToast(`« ${item.identifier} » repris : vérifiez l'état à la remise et la date d'attribution.`, item.status === "degraded" ? "warning" : "success");
+  };
+  modal.querySelectorAll("[data-reuse-close]").forEach((button) => { button.onclick = close; });
+  search.oninput = render;
+  search.value = "";
+  render();
+  document.addEventListener("keydown", onKeydown);
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+  search.focus();
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reuse-resource]");
+  if (button) void openReuseResourceModal(button.dataset.reuseResource);
+});
+
 function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
   const placeholder = field.placeholder || field.label;
@@ -820,6 +924,7 @@ async function loadDynamicResourceReferences() {
         </div>
         ${descriptionMarkup}
         <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none equipment-item__body">
+          ${resource.identifier_key ? `<div class="mb-2"><button type="button" class="btn btn-sm btn-outline-primary" data-reuse-resource="${escapeAttribute(resource.id)}">Reprendre un matériel déjà restitué</button></div>` : ""}
           ${fieldsMarkup}
           ${trackingMarkup}
         </div>

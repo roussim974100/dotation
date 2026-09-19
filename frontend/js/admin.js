@@ -487,7 +487,7 @@ function createResourceFieldRow(field = {}) {
   // formulaire de dossier, alternative a la suppression reelle pour ne pas perdre les
   // valeurs deja saisies.
   return `
-    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}">
+    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
@@ -638,6 +638,9 @@ function collectResourceFieldSchema(containerId = "resourceFieldRows") {
       placeholder: "",
       required: Boolean(row.querySelector(".resource-field-required")?.checked),
       hidden: row.dataset.fieldHidden === "true",
+      // Indicateurs sans controle dans l'editeur : on les reporte tels quels pour ne pas les perdre.
+      suggest: row.dataset.fieldSuggest === "true",
+      identifier: row.dataset.fieldIdentifier === "true",
       options
     };
   }).filter((field) => field.label && field.key);

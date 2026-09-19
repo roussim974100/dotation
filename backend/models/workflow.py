@@ -34,6 +34,8 @@ def normalize_resource_field_schema(raw_schema):
             "required": bool(field.get("required", False)),
             "options": [str(option).strip() for option in options if str(option or "").strip()],
             "suggest": bool(field.get("suggest", False)),
+            # Champ qui identifie l'objet (n° de serie...) : permet de re-selectionner un materiel restitue.
+            "identifier": bool(field.get("identifier", False)),
             # Masque : le champ reste dans le schema (donc toujours resoluble en label pour
             # les dossiers existants et les exports) mais disparait du formulaire de saisie.
             # Alternative a la suppression reelle pour ne pas perdre les valeurs deja saisies.
