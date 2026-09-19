@@ -909,7 +909,7 @@ function formatDossierTypeLabel(dossierType) {
     arrivee: "Nouvelle arrivée",
     changement_service: "Changement de service",
     mise_a_jour: "Mise à jour de ressources",
-    sortie: "Sortie / restitution"
+    sortie: "Sortie (régularisation)"
   };
   const legacyMap = {
     nouvel_agent: "arrivee",
@@ -1134,12 +1134,26 @@ async function openNewRestitutionModal() {
           </div>
           <button class="btn btn-outline-secondary btn-sm" type="button" data-new-restitution-close="true">Fermer</button>
         </div>
-        <div class="password-generator-modal__content">
+        <div class="password-generator-modal__content" id="newRestitutionPickPanel">
           <label class="form-label" for="newRestitutionSearch">Attribution concernée</label>
           <input class="form-control mb-3" id="newRestitutionSearch" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
           <div class="list-group" id="newRestitutionResults" role="list"></div>
-          <p class="form-text mb-0" id="newRestitutionHint"></p>
+          <p class="form-text mb-2" id="newRestitutionHint"></p>
+          <button class="btn btn-link px-0" type="button" id="newRestitutionNoAssignmentBtn">La personne n'a pas d'attribution enregistrée ?</button>
         </div>
+        <form class="password-generator-modal__content d-none" id="newRestitutionRegulPanel" novalidate>
+          <p class="form-text">Régularisation : le dossier est créé directement en restitution en cours, sans attribution.</p>
+          <div id="newRestitutionRegulFields"></div>
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6">Ressources à récupérer</legend>
+            <div id="newRestitutionRegulResources" class="regul-resources"></div>
+          </fieldset>
+          <p class="text-danger small d-none" id="newRestitutionRegulError" role="alert"></p>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" id="newRestitutionRegulBack">Retour</button>
+            <button class="btn btn-primary" type="submit" id="newRestitutionRegulSubmit">Créer la restitution</button>
+          </div>
+        </form>
       </div>
     `;
     document.body.appendChild(modal);
@@ -1210,11 +1224,104 @@ async function openNewRestitutionModal() {
   search.oninput = renderResults;
   search.value = "";
   renderResults();
+  setupRegularisationPanel(modal);
 
   document.addEventListener("keydown", onKeydown);
   modal.classList.remove("d-none");
   modal.setAttribute("aria-hidden", "false");
   search.focus();
+}
+
+// Champs du formulaire de régularisation, définis en objet (cf. feedback "objet plutôt que HTML en dur").
+const REGULARISATION_FIELDS = [
+  { key: "nom", label: "Nom", type: "text", required: true, autocomplete: "family-name" },
+  { key: "prenom", label: "Prénom", type: "text", required: true, autocomplete: "given-name" },
+  { key: "qualite", label: "Qualité", type: "select", options: [["agent", "Agent"], ["elu", "Élu(e)"]] },
+  { key: "service", label: "Service", type: "select", options: [] }
+];
+
+function buildRegularisationFieldHtml(field) {
+  const id = `regul_${field.key}`;
+  const control = field.type === "select"
+    ? `<select class="form-select" id="${id}">${field.options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}</select>`
+    : `<input class="form-control" id="${id}" type="text"${field.required ? " required" : ""}${field.autocomplete ? ` autocomplete="${field.autocomplete}"` : ""}>`;
+  return `<div class="mb-3"><label class="form-label" for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>${control}</div>`;
+}
+
+async function setupRegularisationPanel(modal) {
+  const pickPanel = document.getElementById("newRestitutionPickPanel");
+  const regulPanel = document.getElementById("newRestitutionRegulPanel");
+  const fieldsWrap = document.getElementById("newRestitutionRegulFields");
+  const resourcesWrap = document.getElementById("newRestitutionRegulResources");
+  const errorEl = document.getElementById("newRestitutionRegulError");
+  const submitBtn = document.getElementById("newRestitutionRegulSubmit");
+
+  const showPanel = (name) => {
+    pickPanel.classList.toggle("d-none", name !== "pick");
+    regulPanel.classList.toggle("d-none", name !== "regul");
+    (name === "pick" ? document.getElementById("newRestitutionSearch") : document.getElementById("regul_nom"))?.focus();
+  };
+  showPanel("pick");
+  errorEl.classList.add("d-none");
+
+  let services = [];
+  let resources = [];
+  try {
+    [services, resources] = await Promise.all([
+      requestJson("/api/reference/services"),
+      requestJson("/api/reference/resources")
+    ]);
+  } catch (error) {
+    services = [];
+    resources = [];
+  }
+  const fields = REGULARISATION_FIELDS.map((field) => field.key === "service"
+    ? { ...field, options: [["", "Non renseigné"], ...services.map((svc) => [svc.label, svc.label])] }
+    : field);
+  fieldsWrap.innerHTML = fields.map(buildRegularisationFieldHtml).join("");
+  const returnable = resources.filter((res) => res.category === "materiel" && res.requires_return);
+  resourcesWrap.innerHTML = returnable.length
+    ? returnable.map((res) => `
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="regul_res_${res.id}" value="${res.id}">
+          <label class="form-check-label" for="regul_res_${res.id}">${escapeHtml(res.label)}</label>
+        </div>`).join("")
+    : `<p class="form-text mb-0">Aucune ressource à restituer n'est définie dans le catalogue.</p>`;
+
+  document.getElementById("newRestitutionNoAssignmentBtn").onclick = () => showPanel("regul");
+  document.getElementById("newRestitutionRegulBack").onclick = () => showPanel("pick");
+  regulPanel.onsubmit = async (event) => {
+    event.preventDefault();
+    const value = (key) => document.getElementById(`regul_${key}`)?.value.trim() || "";
+    const resourceIds = [...resourcesWrap.querySelectorAll("input:checked")].map((input) => input.value);
+    const showError = (message) => {
+      errorEl.textContent = message;
+      errorEl.classList.remove("d-none");
+    };
+    if (!value("nom") || !value("prenom")) {
+      showError("Le nom et le prénom sont obligatoires.");
+      return;
+    }
+    if (resourceIds.length === 0) {
+      showError("Sélectionnez au moins une ressource à récupérer.");
+      return;
+    }
+    errorEl.classList.add("d-none");
+    submitBtn.disabled = true;
+    try {
+      const result = await requestJson("/api/forms/regularisation", {
+        method: "POST",
+        body: JSON.stringify({
+          nom: value("nom"), prenom: value("prenom"), qualite: value("qualite"),
+          service: value("service"), resourceIds
+        })
+      });
+      openRestitution(result.form_id);
+    } catch (error) {
+      showError(error.message || "Impossible de créer la restitution.");
+      submitBtn.disabled = false;
+    }
+  };
 }
 
 function renderLoadMoreButton(group, total, displayed, permissions) {

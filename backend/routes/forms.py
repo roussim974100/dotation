@@ -12,7 +12,7 @@ from utils import (
     format_beneficiary_label, format_restitution_state_label,
     dossier_type_label, slugify_filename, AppError,
 )
-from database import get_db
+from database import get_db, normalize_reference_row
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
@@ -559,6 +559,67 @@ def quick_draft():
         "beneficiaire": {"nom": nom, "prenom": prenom, "service": service, "qualite": qualite},
         "resources": {"additional": []},
         "meta": {"status": "draft"},
+    }
+    try:
+        form_data = persist_form(payload)
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+    return jsonify({"form_id": form_data["summary"]["id"], "title": form_data["summary"]["title"]}), 201
+
+
+@bp.route("/api/forms/regularisation", methods=["POST"])
+@login_required
+@rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
+def create_regularisation_restitution():
+    """Crée un dossier de restitution pour une personne qui n'a jamais eu d'attribution
+    saisie (départ avant enregistrement). Le dossier naît directement en restitution
+    en cours, avec les ressources à récupérer sélectionnées dans le catalogue."""
+    if not (has_permission("forms.create") and has_permission("forms.restitution")):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    nom = (data.get("nom") or "").strip()
+    prenom = (data.get("prenom") or "").strip()
+    if not nom or not prenom:
+        return jsonify({"error": "nom_prenom_required"}), 400
+    qualite = "elu" if data.get("qualite") == "elu" else "agent"
+    service = (data.get("service") or "").strip() or None
+    raw_ids = data.get("resourceIds")
+    resource_ids = [r for r in raw_ids if isinstance(r, str) and r] if isinstance(raw_ids, list) else []
+    if not resource_ids:
+        return jsonify({"error": "resources_required"}), 400
+
+    with get_db() as connection:
+        placeholders = ",".join("?" for _ in resource_ids)
+        rows = connection.execute(
+            f"SELECT * FROM resource_catalog WHERE is_active = 1 AND id IN ({placeholders})",
+            resource_ids,
+        ).fetchall()
+    references = [normalize_reference_row(row) for row in rows]
+    references = [r for r in references if r["category"] == "materiel" and r["requires_return"]]
+    if not references:
+        return jsonify({"error": "resources_required"}), 400
+
+    note = "Régularisation : aucune attribution enregistrée avant le départ."
+    payload = {
+        "dossier": {"type": "sortie", "objet": note, "regularisation": True},
+        "beneficiaire": {
+            "nom": nom, "prenom": prenom, "service": service, "qualite": qualite,
+            "mandat": (data.get("mandat") or "").strip() if qualite == "elu" else "",
+        },
+        "resources": {"additional": [
+            {
+                "id": r["id"], "code": r["code"], "label": r["label"],
+                "description": r.get("description") or "", "category": r["category"],
+                "issuerService": r.get("issuer_service"), "triggerKey": r.get("trigger_key") or "",
+                "requiresReturn": True, "displayOrder": r["display_order"],
+                "selected": True, "fieldSchema": r["field_schema"], "fields": {},
+                "details": "Non renseigné (régularisation)",
+            }
+            for r in references
+        ]},
+        "restitution": {"notes": note, "pendingFinalization": True, "items": {}},
+        "workflow": {"status": "partial_return"},
+        "meta": {},
     }
     try:
         form_data = persist_form(payload)
