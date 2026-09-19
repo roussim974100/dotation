@@ -86,6 +86,7 @@ const DASHBOARD_COLUMNS = {
   },
   qualite: {
     label: "Qualité",
+    secondary: true, // masquee sur ecran etroit (l'info reste dans l'apercu rapide)
     sortField: "qualite",
     render: (ctx) => `<td data-label="Qualité">${escapeHtml(formatQualiteLabel(ctx.draft))}</td>`
   },
@@ -123,6 +124,7 @@ const DASHBOARD_COLUMNS = {
   },
   derniere_modification: {
     label: "Dernière modification",
+    secondary: true,
     sortField: "date",
     render: (ctx) => `<td data-label="Dernière modification">${escapeHtml(formatDate(ctx.draft.updatedAt))}</td>`
   },
@@ -186,7 +188,8 @@ function renderDashboardTableHead(containerId) {
     if (col.headHtml) {
       return `<th class="${col.headClass || ""}">${col.headHtml()}</th>`;
     }
-    const classAttr = col.headClass ? ` class="${col.headClass}"` : "";
+    const headClasses = [col.headClass, col.secondary ? "dash-col--secondary" : ""].filter(Boolean).join(" ");
+    const classAttr = headClasses ? ` class="${headClasses}"` : "";
     const sortAttr = col.sortField ? ` data-sort-field="${col.sortField}"` : "";
     return `<th${sortAttr}${classAttr}>${escapeHtml(col.label || "")}</th>`;
   }).join("");
@@ -603,13 +606,20 @@ function buildRestitutionsPendingRow(draft, permissions) {
     draft, permissions, progress, progressPercent, title, dossierTypeLabel, recoveryBadge,
     startAtLabel: "", timingOffsetLabel: ""
   };
-  const cells = getDashboardViewColumns().map((key) => DASHBOARD_COLUMNS[key]?.render(ctx) || "").join("");
+  const cells = getDashboardViewColumns().map((key) => renderDashboardCell(key, ctx)).join("");
 
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
       ${cells}
     </tr>
   `;
+}
+
+// Rendu d'une cellule ; une colonne « secondary » recoit la classe qui la masque sur ecran etroit.
+function renderDashboardCell(key, ctx) {
+  const column = DASHBOARD_COLUMNS[key];
+  const html = column?.render(ctx) || "";
+  return column?.secondary ? html.replace(/<td/, '<td class="dash-col--secondary"') : html;
 }
 
 function buildDashboardRow(draft, permissions) {
@@ -639,7 +649,7 @@ function buildDashboardRow(draft, permissions) {
     draft, permissions, progress, progressPercent, title, dossierTypeLabel, startAtLabel, timingOffsetLabel,
     recoveryBadge: ""
   };
-  const cells = getDashboardViewColumns().map((key) => DASHBOARD_COLUMNS[key]?.render(ctx) || "").join("");
+  const cells = getDashboardViewColumns().map((key) => renderDashboardCell(key, ctx)).join("");
 
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">

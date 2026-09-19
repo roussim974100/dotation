@@ -5015,3 +5015,117 @@ section.content-card[id^="db-"] {
   top: 0;
   background: var(--surface-alt, #f8fafc);
 }
+
+
+/* Tableau de bord : jamais de defilement horizontal.
+   - le bloc parent peut retrecir (sinon il impose la largeur minimale du tableau et la PAGE defile) ;
+   - en-tetes, pastilles et boutons peuvent passer a la ligne ;
+   - entre 1024 et 1199 px, marges resserrees et colonnes « secondaires » masquees (voir DASHBOARD_COLUMNS, storage.js) ;
+   - sous 1024 px, la presentation en cartes prend le relais (mobile : sous 768 px, regles existantes). */
+.dashboard-group {
+  min-width: 0;
+}
+
+.draft-table th[data-sort-field] {
+  white-space: normal;
+}
+
+.draft-table .status-chip {
+  white-space: normal;
+}
+
+.draft-table .draft-actions,
+.draft-table .draft-actions__primary {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.draft-table .draft-actions .btn {
+  white-space: normal;
+}
+
+.draft-table .draft-actions-cell {
+  min-width: 0;
+}
+
+.draft-table .resource-progress {
+  min-width: 100px;
+}
+
+/* 1024-1199 px : marges resserrees et colonnes « secondaires » masquees. */
+@media (min-width: 1024px) and (max-width: 1199.98px) {
+  .draft-table > :not(caption) > * > * {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .draft-table th {
+    letter-spacing: 0.03em;
+  }
+
+  .draft-table .dash-col--secondary {
+    display: none;
+  }
+}
+
+/* 768-1023 px : la zone du tableau est trop etroite pour 6 colonnes, la presentation en cartes (celle du mobile)
+   s'applique aux tableaux du tableau de bord uniquement. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .dashboard-group .table-responsive {
+    overflow-x: visible;
+  }
+
+  .dashboard-group .draft-table,
+  .dashboard-group .draft-table tbody,
+  .dashboard-group .draft-table tr,
+  .dashboard-group .draft-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard-group .draft-table thead {
+    display: none;
+  }
+
+  .dashboard-group .draft-table tbody {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .dashboard-group .draft-row {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-alt);
+    box-shadow: 0 10px 24px rgba(15, 55, 84, 0.06);
+  }
+
+  .dashboard-group .draft-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .dashboard-group .draft-table td + td {
+    margin-top: 0.8rem;
+  }
+
+  .dashboard-group .draft-check-col {
+    width: auto;
+    text-align: left;
+  }
+
+  .dashboard-group .draft-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.28rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .dashboard-group .draft-actions-cell::before {
+    margin-bottom: 0.55rem;
+  }
+}
