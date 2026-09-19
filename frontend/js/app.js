@@ -191,7 +191,7 @@ function addProgressIndicator(fieldId) {
   const badge = document.createElement("span");
   badge.className = "progress-required-badge";
   badge.dataset.progressRequiredBadge = "true";
-  badge.textContent = "À renseigner";
+  badge.textContent = "Requis";
   label.appendChild(badge);
 }
 
@@ -2198,6 +2198,7 @@ function populateForm(data, signaturePad) {
 
   form.dataset.draftId = data.meta.id || "";
   form.dataset.lockedAt = data.meta.lockedAt || "";
+  void renderLockedDossierActions(data.workflow?.status);
   document.getElementById("nom").value = data.beneficiaire.nom || "";
     document.getElementById("prenom").value = data.beneficiaire.prenom || "";
     const loadedDossierType = normalizeDossierType(data.dossier.type || "arrivee");
@@ -2626,12 +2627,119 @@ function setSaveButtonLoading(loading) {
   }
 }
 
+function setUnsavedIndicator(isDirty) {
+  document.getElementById("unsavedBadge")?.classList.toggle("d-none", !isDirty);
+}
+
 function markFormDirty() {
   formDirty = true;
+  setUnsavedIndicator(true);
 }
 
 function markFormClean() {
   formDirty = false;
+  setUnsavedIndicator(false);
+}
+
+// Sommaire des sections (chips collants) et sections repliables : construits depuis le DOM,
+// donc valables aussi pour les sections de ressources generees dynamiquement.
+function shortSectionLabel(title) {
+  const label = title.replace(/^Ressources remises par le service\s+/i, "");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function refreshFormSections() {
+  const form = document.getElementById("dotationForm");
+  if (!form) return;
+  const sections = [...form.querySelectorAll("section.content-card")]
+    .filter((section) => section.querySelector(".section-title") && section.offsetParent !== null);
+
+  let toc = document.getElementById("formToc");
+  if (!toc) {
+    toc = document.createElement("nav");
+    toc.id = "formToc";
+    toc.className = "dashboard-nav form-toc no-print";
+    toc.setAttribute("aria-label", "Sections du dossier");
+    form.prepend(toc);
+    toc.addEventListener("click", (event) => {
+      const link = event.target.closest("a[data-toc-target]");
+      if (!link) return;
+      event.preventDefault();
+      document.getElementById(link.dataset.tocTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  sections.forEach((section, index) => {
+    section.id = section.id || `form-section-${index}`;
+    const heading = section.querySelector(".section-heading");
+    if (heading && !heading.dataset.collapsibleInit && section.id !== "section-personne" && section.id !== "section-validation") {
+      heading.dataset.collapsibleInit = "true";
+      heading.classList.add("section-heading--collapsible");
+      heading.setAttribute("role", "button");
+      heading.setAttribute("tabindex", "0");
+      heading.setAttribute("aria-expanded", "true");
+      const toggle = () => {
+        const collapsed = section.classList.toggle("is-collapsed");
+        heading.setAttribute("aria-expanded", String(!collapsed));
+      };
+      heading.addEventListener("click", toggle);
+      heading.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+    }
+    if (heading) {
+      const count = section.querySelectorAll('input[type="checkbox"]:checked').length;
+      let badge = heading.querySelector("[data-section-count]");
+      if (count && !badge) {
+        badge = document.createElement("span");
+        badge.className = "section-count";
+        badge.dataset.sectionCount = "true";
+        heading.appendChild(badge);
+      }
+      if (badge) {
+        badge.textContent = count ? `${count} sélectionnée${count > 1 ? "s" : ""}` : "";
+        badge.classList.toggle("d-none", !count);
+      }
+    }
+  });
+  toc.innerHTML = sections.map((section) =>
+    `<a class="dashboard-nav__link" href="#${section.id}" data-toc-target="${section.id}">${escapeHtml(shortSectionLabel(section.querySelector(".section-title").textContent.trim()))}</a>`
+  ).join("");
+}
+
+let refreshFormSectionsTimer = null;
+function scheduleRefreshFormSections() {
+  window.clearTimeout(refreshFormSectionsTimer);
+  refreshFormSectionsTimer = window.setTimeout(refreshFormSections, 250);
+}
+
+// Dossier signe : les actions de suite (PDF, e-mail, restitution) sont proposees dans la barre du bas.
+async function renderLockedDossierActions(workflowStatus) {
+  const form = document.getElementById("dotationForm");
+  const bar = document.querySelector(".action-bar__buttons");
+  const id = form?.dataset.draftId;
+  if (!bar || !id) return;
+  bar.querySelectorAll("[data-locked-action]").forEach((btn) => btn.remove());
+  if (!form.dataset.lockedAt) return;
+  const user = await getSessionInfo();
+  const can = (permission) => user?.permissions?.includes("*") || user?.permissions?.includes(permission);
+  const actions = [
+    can("forms.export") && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
+    can("forms.export") && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
+    can("forms.restitution") && workflowStatus === "active" && { label: "Restituer", tone: "btn-primary", run: () => openRestitution(id) }
+  ].filter(Boolean);
+  const anchor = document.getElementById("saveDraftBtn");
+  actions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `btn ${action.tone}`;
+    btn.dataset.lockedAction = "true";
+    btn.textContent = action.label;
+    btn.addEventListener("click", action.run);
+    bar.insertBefore(btn, anchor);
+  });
 }
 
 function closeSaveProgress() {
@@ -2990,6 +3098,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation des blocs métier", "Préparation du formulaire...");
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();
+    document.getElementById("dotationForm")?.addEventListener("change", scheduleRefreshFormSections);
+    window.setTimeout(refreshFormSections, 1200);
+    window.setTimeout(refreshFormSections, 3000);
     initConditionalBlocks();
     initQualite();
     bindProgressIndicatorRefresh();

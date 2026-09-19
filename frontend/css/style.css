@@ -1210,6 +1210,66 @@ body.login-shell {
   backdrop-filter: blur(12px);
 }
 
+/* Barre d'action collee en bas d'ecran : "Enregistrer" reste accessible sur un long formulaire. */
+form > .action-bar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 90;
+}
+
+.dashboard-nav.form-toc {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.form-toc .dashboard-nav__link {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+form section.content-card {
+  scroll-margin-top: 9rem;
+}
+
+.section-heading--collapsible {
+  cursor: pointer;
+}
+
+.section-heading--collapsible::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.content-card.is-collapsed > :not(.section-heading) {
+  display: none;
+}
+
+.content-card.is-collapsed .section-heading--collapsible::after {
+  content: "▸";
+}
+
+.section-count {
+  margin-left: 0.75rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(15, 55, 84, 0.1);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-pill--warning {
+  background: #fff4d6;
+  color: #7a4b00;
+}
+
+[data-color-mode="dark"] .status-pill--warning {
+  background: #4a3a12;
+  color: #f5d27a;
+}
+
 .action-bar__hint {
   color: var(--muted);
   font-size: 0.95rem;
