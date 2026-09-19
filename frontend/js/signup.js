@@ -14,6 +14,7 @@ function applySignupError() {
   const messages = {
     missing_fields: "Tous les champs sont obligatoires.",
     invalid_email: "L'adresse e-mail n'est pas valide.",
+    invalid_name: "Le nom et le prénom ne doivent contenir que des lettres, espaces, apostrophes ou tirets.",
     invalid_username: "L'identifiant doit contenir entre 3 et 64 caractères et n'utiliser que des lettres, chiffres, points, tirets ou underscores.",
     user_exists: "Cet identifiant existe deja.",
     password_mismatch: "La confirmation du mot de passe ne correspond pas.",

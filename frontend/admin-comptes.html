@@ -103,6 +103,17 @@
               <input class="form-control" id="modalAdminPassword" type="password" placeholder="Nouveau mot de passe">
               <div class="form-text">Si renseigné: 12 caractères min, majuscule, minuscule, chiffre, caractère spécial.</div>
             </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="modalAdminFirstName">Prénom</label>
+                <input class="form-control" id="modalAdminFirstName" type="text" autocomplete="off">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modalAdminLastName">Nom</label>
+                <input class="form-control" id="modalAdminLastName" type="text" autocomplete="off">
+              </div>
+              <div class="form-text mt-0">Seul un administrateur peut modifier ces champs une fois renseignés.</div>
+            </div>
             <div class="mb-3">
               <label class="form-label" for="modalAdminEmail">Adresse e-mail (optionnel)</label>
               <input class="form-control" id="modalAdminEmail" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
@@ -188,6 +199,14 @@
               <input class="form-check-input" type="checkbox" id="admin_active" checked>
               <span class="form-check-label">Compte actif</span>
             </label>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="admin_first_name">Prénom</label>
+            <input class="form-control" id="admin_first_name" type="text" autocomplete="off">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="admin_last_name">Nom</label>
+            <input class="form-control" id="admin_last_name" type="text" autocomplete="off">
           </div>
           <div class="col-md-4">
             <label class="form-label" for="admin_email">Adresse e-mail (optionnel)</label>

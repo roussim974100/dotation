@@ -668,7 +668,20 @@ async function populateUserMenuIdentity() {
     const nameEl = document.getElementById("userMenuName");
     const roleEl = document.getElementById("userMenuRole");
     const btnEl = document.getElementById("userMenuBtn");
-    if (nameEl) nameEl.textContent = user.username || "";
+    const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    if (nameEl) nameEl.textContent = fullName || user.username || "";
+    // Entree "Mon compte" : profil (e-mail, mot de passe), identite en lecture seule.
+    const panel = document.querySelector("#userMenu .user-menu__panel");
+    if (panel && !document.getElementById("accountLink")) {
+      const account = document.createElement("a");
+      account.id = "accountLink";
+      account.className = "user-menu__item";
+      account.href = "account.html";
+      account.textContent = "Mon profil";
+      if (window.location.pathname.endsWith("account.html")) account.setAttribute("aria-current", "page");
+      const anchor = panel.querySelector(".user-menu__header");
+      panel.insertBefore(account, anchor ? anchor.nextSibling : panel.firstChild);
+    }
     if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
     if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
 

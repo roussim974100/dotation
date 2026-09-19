@@ -165,6 +165,8 @@ def init_users_db():
                 service TEXT,
                 db_manage INTEGER NOT NULL DEFAULT 0,
                 email TEXT NOT NULL DEFAULT '',
+                first_name TEXT NOT NULL DEFAULT '',
+                last_name TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );

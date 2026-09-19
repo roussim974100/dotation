@@ -14,6 +14,7 @@ from auth import (
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
+from account_rules import normalize_person_name
 from models.audit import insert_app_log, read_login_attempt_context
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings, build_public_settings_payload
 import re
@@ -102,9 +103,15 @@ def signup():
         password = request.form.get("password") or ""
         password_confirm = request.form.get("password_confirm") or ""
         email, email_error = normalize_email(request.form.get("email"))
+        first_name, first_error = normalize_person_name(request.form.get("first_name"))
+        last_name, last_error = normalize_person_name(request.form.get("last_name"))
 
         if email_error:
             return redirect("/signup?error=invalid_email")
+        if first_error or last_error:
+            return redirect("/signup?error=invalid_name")
+        if not first_name or not last_name:
+            return redirect("/signup?error=missing_fields")
         if not username or not password or not password_confirm:
             return redirect("/signup?error=missing_fields")
         if not is_valid_username(username):
@@ -121,8 +128,8 @@ def signup():
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         with get_users_db() as connection:
             connection.execute(
-                "INSERT INTO users (username, password_hash, is_active, status, email, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-                (username, password_hash, 1, "pending", email, now, now)
+                "INSERT INTO users (username, password_hash, is_active, status, email, first_name, last_name, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (username, password_hash, 1, "pending", email, first_name, last_name, now, now)
             )
             connection.execute(
                 "INSERT INTO user_groups (username, group_key) VALUES (?,?)",

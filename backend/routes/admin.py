@@ -29,6 +29,7 @@ from models.settings import (
     get_brand_logo_public_url, get_dpo_email,
     build_public_settings_payload, resolve_theme_id, resolve_dark_mode,
 )
+from account_rules import normalize_person_name
 from models.catalog import normalize_resource_catalog_payload
 from models.workflow import count_resource_field_usage
 from models.forms import persist_form
@@ -700,6 +701,8 @@ def admin_users():
             "status": user.get("status", "active"),
             "service": user.get("service") or "",
             "email": user.get("email") or "",
+            "first_name": user.get("first_name") or "",
+            "last_name": user.get("last_name") or "",
             "db_manage": bool(user.get("db_manage", False)),
         }
         for user in users
@@ -841,7 +844,7 @@ def restore_trash_item(trash_id):
             is_active = bool(payload.get("is_active", True))
             status = payload.get("status", "active")
             db_manage = bool(payload.get("db_manage", False))
-            if not create_user(username, password_hash, groups, service, is_active, status, db_manage, payload.get("email") or ""):
+            if not create_user(username, password_hash, groups, service, is_active, status, db_manage, payload.get("email") or "", payload.get("first_name") or "", payload.get("last_name") or ""):
                 return jsonify({"error": "failed_to_restore_user"}), 500
             form_data = {"restored": True}
         else:
@@ -1359,7 +1362,12 @@ def create_admin_user():
     if email_error:
         return jsonify({"error": email_error}), 400
 
-    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email):
+    first_name, first_error = normalize_person_name(payload.get("first_name"))
+    last_name, last_error = normalize_person_name(payload.get("last_name"))
+    if first_error or last_error:
+        return jsonify({"error": "invalid_name"}), 400
+
+    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email, first_name, last_name):
         return jsonify({"error": "failed_to_create_user"}), 500
 
     with get_db() as connection:
@@ -1411,6 +1419,14 @@ def update_admin_user(username):
         if email_error:
             return jsonify({"error": email_error}), 400
         update_fields["email"] = email
+
+    # Nom et prenom : seul un administrateur peut les modifier une fois renseignes.
+    for name_key in ("first_name", "last_name"):
+        if name_key in payload:
+            name_value, name_error = normalize_person_name(payload[name_key])
+            if name_error:
+                return jsonify({"error": name_error}), 400
+            update_fields[name_key] = name_value
 
     password_changed = False
     if payload.get("password"):

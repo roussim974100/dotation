@@ -52,9 +52,10 @@ def ensure_users_schema():
     car une ancienne archive remet le schema d'origine (sans colonne email)."""
     with get_users_db() as connection:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(users)")}
-        if columns and "email" not in columns:
-            connection.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
-            connection.commit()
+        for column in ("email", "first_name", "last_name"):
+            if columns and column not in columns:
+                connection.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        connection.commit()
 
 
 def normalize_reference_row(row):

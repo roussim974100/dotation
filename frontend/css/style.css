@@ -4996,3 +4996,9 @@ section.content-card[id^="db-"] {
 .admin-alerts:not(:has(.alert:not(.d-none))) {
   display: none !important;
 }
+
+/* Champs en lecture seule (identifiant, nom et prenom verrouilles) : visibles comme non modifiables. */
+.form-control[readonly] {
+  background-color: color-mix(in srgb, var(--border) 35%, var(--surface));
+  cursor: not-allowed;
+}

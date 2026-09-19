@@ -84,15 +84,15 @@ def normalize_email(value):
     return email, None
 
 
-def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False, email=""):
+def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False, email="", first_name="", last_name=""):
     """Crée un nouvel utilisateur. Affecte le premier utilisateur au groupe admin automatiquement."""
     try:
         from utils import utc_now
         with get_users_db() as conn:
             now = utc_now()
             conn.execute(
-                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, email, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                (username, password_hash, int(is_active), status, service, int(db_manage), email or "", now, now)
+                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, email, first_name, last_name, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (username, password_hash, int(is_active), status, service, int(db_manage), email or "", first_name or "", last_name or "", now, now)
             )
             # Si c'est le premier utilisateur ET qu'il n'a pas de groupe, l'affecter au groupe admin
             user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -280,6 +280,9 @@ def build_user_context(username):
         "is_admin": "admin" in groups or "*" in permissions,
         "service": (user.get("service") or "") if user else "",
         "db_manage": bool(user.get("db_manage", False)) if user else False,
+        "first_name": (user.get("first_name") or "") if user else "",
+        "last_name": (user.get("last_name") or "") if user else "",
+        "email": (user.get("email") or "") if user else "",
     }
 
 
