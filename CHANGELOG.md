@@ -1,8 +1,8 @@
 # Historique des versions — À Quai
 
-## [3.48.0-dev] - 2026-09-19 (version de développement, non publiée en production)
+## [3.49.0-dev] - 2026-09-19 (version de développement, non publiée en production)
 
-Cumul des versions 3.19 à 3.48 depuis la 3.18.3.
+Cumul des versions 3.19 à 3.49 depuis la 3.18.3.
 
 ### 🗃️ Parc matériel et stocks
 - **Assistant de création de ressource** en 5 étapes (mode de suivi, modèle, identité, champs, récapitulatif avec aperçu en direct) et écran « Qualité du catalogue ».

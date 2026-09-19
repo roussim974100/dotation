@@ -1,10 +1,10 @@
 # À Quai — Gestion des dotations matérielles
 
-> ⚠️ **Branche de développement (`dev`)** — version `3.48.0-dev`, non destinée à la production.
+> ⚠️ **Branche de développement (`dev`)** — version `3.49.0-dev`, non destinée à la production.
 > Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)) ou `sudo bash deploy-dev.sh` (préprod, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production). Installation initiale d'une version stable : branche [`main`](https://github.com/roussim974100/dotation/tree/main).
 > Nouveautés depuis la 3.18 : voir le [CHANGELOG](CHANGELOG.md). Pour contribuer : section [Développement local](#développement-local) en bas de page.
 
-**Version :** `3.48.0-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Version :** `3.49.0-dev` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
 **Statut :** Développement 🛠️ | **Dernière MAJ :** 19 septembre 2026
 
 ---
