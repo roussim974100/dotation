@@ -4991,3 +4991,8 @@ form section.content-card[id^="db-"],
 section.content-card[id^="db-"] {
   scroll-margin-top: 9rem;
 }
+
+/* Bandeaux d'alerte de l'accueil admin : aucun espace reserve quand ils sont tous masques. */
+.admin-alerts:not(:has(.alert:not(.d-none))) {
+  display: none !important;
+}

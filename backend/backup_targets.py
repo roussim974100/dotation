@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     "schedule": {"enabled": False, "frequency": "daily", "time": "02:00", "weekday": 1},
     "retention": {"keep_days": 30, "keep_min": 5},
     "password_source": {"env_var": "AQUAI_BACKUP_PASSWORD", "file": ""},
+    "allow_unencrypted": False,
 }
 
 
@@ -191,7 +192,7 @@ def append_history(entry):
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def read_history(limit=30):
+def read_history(limit=30, include_runs=False):
     try:
         with open(HISTORY_PATH, "r", encoding="utf-8") as handle:
             lines = handle.readlines()
@@ -200,9 +201,12 @@ def read_history(limit=30):
     entries = []
     for line in reversed(lines):
         try:
-            entries.append(json.loads(line))
+            entry = json.loads(line)
         except ValueError:
             continue
+        if entry.get("kind") == "run" and not include_runs:
+            continue
+        entries.append(entry)
         if len(entries) >= limit:
             break
     return entries

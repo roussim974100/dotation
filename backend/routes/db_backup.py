@@ -1,9 +1,12 @@
 """Routes de sauvegarde / restauration multi-bases (archive unique, chiffrement optionnel)."""
 import os
+import sys
+from datetime import datetime
 
 from flask import Blueprint, jsonify, make_response, request
 
 import backup
+import backup_schedule
 import backup_targets
 from auth import login_required, permission_required, rate_limit, current_user
 from database import get_db
@@ -25,6 +28,7 @@ _ERROR_STATUS = {
     "write_failed": 502,
     "verify_failed": 502,
     "already_exists": 409,
+    "already_running": 409,
 }
 
 
@@ -184,3 +188,78 @@ def backup_destination_send(dest_id):
 @permission_required("db.manage")
 def backup_history():
     return jsonify({"history": backup_targets.read_history(30)})
+
+
+def _schedule_commands():
+    """Commandes a programmer sur le serveur (le planificateur du systeme lance `tick` toutes les 15 min)."""
+    script = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "backup_cli.py"))
+    log = os.path.join(backup.BACKUP_DIR, "backup_cron.log")
+    return {
+        "linux": f'*/15 * * * * cd "{os.path.dirname(script)}" && "{sys.executable}" "{script}" tick >> "{log}" 2>&1',
+        "windows": f'schtasks /Create /SC MINUTE /MO 15 /TN "AQuai Sauvegarde" /TR "\\"{sys.executable}\\" \\"{script}\\" tick"',
+        "test": f'"{sys.executable}" "{script}" status',
+    }
+
+
+def _schedule_view():
+    config = backup_targets.load_config()
+    password, origin = backup_schedule.read_password(config)
+    now = datetime.now()
+    return {
+        "schedule": config["schedule"],
+        "retention": config["retention"],
+        "allow_unencrypted": config["allow_unencrypted"],
+        "password": {"env_var": config["password_source"].get("env_var", ""), "available": bool(password), "origin": origin},
+        "next_run": backup_schedule.next_slot(config["schedule"], now).isoformat() if config["schedule"]["enabled"] else None,
+        "health": backup_schedule.health(config, now),
+        "commands": _schedule_commands(),
+    }
+
+
+@bp.route("/api/admin/backup/schedule", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def backup_schedule_get():
+    return jsonify(_schedule_view())
+
+
+@bp.route("/api/admin/backup/schedule", methods=["PUT"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=20, window_seconds=60, scope="backup_schedule")
+def backup_schedule_save():
+    payload = request.get_json(silent=True) or {}
+    try:
+        config = backup_schedule.validate_settings(payload, backup_targets.load_config())
+        if payload.get("password"):
+            backup_schedule.write_password_file(payload["password"])
+        elif payload.get("clear_password"):
+            backup_schedule.clear_password_file()
+        backup_targets.save_config(config)
+    except (backup_schedule.ScheduleError, backup.BackupError) as error:
+        return _error_response(error)
+    _log("backup_schedule_saved", "Planification des sauvegardes modifiée", {
+        "enabled": config["schedule"]["enabled"], "frequency": config["schedule"]["frequency"],
+        "password_changed": bool(payload.get("password")), "password_cleared": bool(payload.get("clear_password")),
+    })
+    return jsonify(_schedule_view())
+
+
+@bp.route("/api/admin/backup/run-now", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=5, window_seconds=600, scope="backup_run_now")
+def backup_run_now():
+    try:
+        summary = backup_schedule.run_scheduled(trigger="manual")
+    except backup_schedule.ScheduleError as error:
+        return _error_response(error)
+    _log("backup_run_now", "Sauvegarde lancée avec la configuration planifiée", {"ok": summary["ok"], "sent": summary["sent"], "failed": summary["failed"]})
+    return jsonify(summary)
+
+
+@bp.route("/api/admin/backup/status", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def backup_status():
+    return jsonify(backup_schedule.health(backup_targets.load_config()))

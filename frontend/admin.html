@@ -46,6 +46,16 @@
 <!-- Portail d'entrée admin : synthèse et accès rapides vers les sous-pages. -->
 <main id="main" class="container py-4 py-lg-5">
   <div id="adminFlashNotice" class="alert alert-info d-none mb-4" role="alert"></div>
+  <div class="admin-alerts d-grid gap-2 mb-3">
+    <div id="backupHealthBanner" class="alert d-none d-flex align-items-center justify-content-between gap-3" role="status">
+      <span id="backupHealthText"></span>
+      <a class="btn btn-sm btn-primary" href="admin-db.html#db-schedule">Voir la sauvegarde</a>
+    </div>
+    <div id="pendingAccountsBanner" class="alert alert-warning d-none d-flex align-items-center justify-content-between gap-3" role="status">
+      <span id="pendingAccountsText"></span>
+      <a class="btn btn-sm btn-primary" href="admin-comptes.html#admin-users-list">Valider les comptes</a>
+    </div>
+  </div>
 
   <section class="hero-panel admin-hero mb-4">
     <div>
@@ -54,10 +64,6 @@
         <h2 class="panel-title">Pilotage de l'administration</h2>
       </div>
       <p class="panel-text">Le portail admin centralise les indicateurs utiles et distribue vers des sous-pages spécialisées. Chaque espace est centré sur une mission unique pour réduire la charge visuelle et rendre les actions plus rapides.</p>
-    </div>
-    <div id="pendingAccountsBanner" class="alert alert-warning d-none w-100 d-flex align-items-center justify-content-between gap-3" role="status">
-      <span id="pendingAccountsText"></span>
-      <a class="btn btn-sm btn-primary" href="admin-comptes.html#admin-users-list">Valider les comptes</a>
     </div>
     <div class="admin-stats">
       <div class="stat-card">

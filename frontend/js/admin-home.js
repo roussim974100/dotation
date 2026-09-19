@@ -96,9 +96,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (pendingText) pendingText.textContent = `${pendingTotal} compte${pendingTotal > 1 ? "s" : ""} en attente de validation.`;
     setMetric("adminServicesCount", services.filter((service) => service.is_active).length);
     setMetric("adminResourcesCount", resources.filter((resource) => resource.is_active).length);
-    const canManageDb = session?.db_manage || session?.permissions?.includes("*");
+    const canManageDb = session?.db_manage || session?.permissions?.includes("*") || session?.permissions?.includes("db.manage");
     if (canManageDb) {
       document.getElementById("adminDbCard")?.classList.remove("d-none");
+      // Alerte visible des l'accueil admin si la sauvegarde automatique est en defaut.
+      fetch("/api/admin/backup/status", { credentials: "same-origin", cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((state) => {
+          const banner = document.getElementById("backupHealthBanner");
+          if (!banner || !state || !["warning", "error"].includes(state.level)) return;
+          banner.className = `alert ${state.level === "error" ? "alert-danger" : "alert-warning"} w-100 d-flex align-items-center justify-content-between gap-3`;
+          document.getElementById("backupHealthText").textContent = state.message;
+        })
+        .catch(() => {});
     }
     const canViewExecutiveDash = session?.permissions?.includes("forms.view_all") || session?.is_admin;
     if (canViewExecutiveDash) {

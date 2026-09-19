@@ -231,6 +231,7 @@ async function runDestinationAction(action, id) {
   } else if (action === "send") {
     const options = await askSendOptions(dest.label);
     if (!options) return;
+    if (!options.password && !(await askConfirm("Envoyer sans mot de passe ? L'archive contiendra les comptes et toutes les données personnelles en clair sur le partage.", { confirmLabel: "Envoyer sans protection", confirmClass: "btn-danger" }))) return;
     showDbResult("destResult", "info", "Envoi en cours…", "");
     const response = await backupRequest(`/api/admin/backup/destinations/${encodeURIComponent(id)}/send`, {
       method: "POST",

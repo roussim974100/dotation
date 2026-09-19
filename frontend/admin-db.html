@@ -72,6 +72,7 @@
         <a class="dashboard-nav__link" href="#db-export">Exporter</a>
         <a class="dashboard-nav__link" href="#db-restore">Restaurer</a>
         <a class="dashboard-nav__link" href="#db-destinations">Destinations</a>
+        <a class="dashboard-nav__link" href="#db-schedule">Planification</a>
         <a class="dashboard-nav__link" href="#db-safety">Copies de sécurité</a>
         <a class="dashboard-nav__link" href="#db-legacy">Ancien format</a>
       </nav>
@@ -175,6 +176,81 @@
         <div id="backupHistoryList" class="text-muted small">Chargement…</div>
       </section>
 
+      <section class="content-card mt-4" id="db-schedule">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Automatisation</p>
+            <h2 class="section-title">Sauvegarde automatique</h2>
+            <p class="panel-text">Envoie chaque jour ou chaque semaine une sauvegarde chiffrée vers les destinations actives, puis supprime les plus anciennes.</p>
+          </div>
+        </div>
+        <div id="scheduleHealth" class="alert alert-info d-none" role="status"></div>
+        <form id="scheduleForm" class="row g-3" novalidate>
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="schedEnabled">
+              <label class="form-check-label" for="schedEnabled">Activer la sauvegarde automatique</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="schedFrequency">Fréquence</label>
+            <select class="form-select" id="schedFrequency"><option value="daily">Tous les jours</option><option value="weekly">Toutes les semaines</option></select>
+          </div>
+          <div class="col-md-3 d-none" id="schedWeekdayWrap">
+            <label class="form-label" for="schedWeekday">Jour</label>
+            <select class="form-select" id="schedWeekday"><option value="1">Lundi</option><option value="2">Mardi</option><option value="3">Mercredi</option><option value="4">Jeudi</option><option value="5">Vendredi</option><option value="6">Samedi</option><option value="7">Dimanche</option></select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="schedTime">Heure</label>
+            <input class="form-control" id="schedTime" type="time" value="02:00">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="schedKeepDays">Conserver (jours)</label>
+            <input class="form-control" id="schedKeepDays" type="number" min="1" max="3650" value="30">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="schedKeepMin">Toujours garder</label>
+            <input class="form-control" id="schedKeepMin" type="number" min="1" max="1000" value="5">
+          </div>
+          <div class="col-12 form-text mt-0">Au-delà de la durée, seules les archives excédant le minimum conservé sont supprimées. Seuls les fichiers <code>aquai_sauvegarde_*</code> sont touchés.</div>
+          <div class="col-12"><hr class="my-1"></div>
+          <div class="col-md-5">
+            <label class="form-label" for="schedPassword">Mot de passe de chiffrement</label>
+            <input class="form-control" id="schedPassword" type="password" autocomplete="new-password" placeholder="Laisser vide pour ne pas le modifier">
+            <div class="form-text" id="schedPasswordState">…</div>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-outline-danger" id="schedPasswordClear" type="button">Effacer le mot de passe</button>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="schedEnvVar">Variable d'environnement (optionnel)</label>
+            <input class="form-control" id="schedEnvVar" type="text" autocomplete="off" placeholder="AQUAI_BACKUP_PASSWORD">
+            <div class="form-text">Prioritaire sur le mot de passe enregistré ci-dessus.</div>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="schedAllowUnencrypted">
+              <label class="form-check-label" for="schedAllowUnencrypted">Autoriser les sauvegardes automatiques <strong>non chiffrées</strong> si aucun mot de passe n'est défini (déconseillé)</label>
+            </div>
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" id="schedSaveBtn" type="submit">Enregistrer</button>
+            <button class="btn btn-outline-secondary" id="schedRunNowBtn" type="button">Lancer une sauvegarde maintenant</button>
+          </div>
+        </form>
+        <div id="schedResult" class="mt-3 d-none"></div>
+        <details class="mt-4">
+          <summary class="fw-semibold">Activer l'exécution automatique sur le serveur</summary>
+          <p class="small mt-2">Le déclenchement est assuré par le planificateur du système, qui lance ce script toutes les 15 minutes. Il décide seul s'il est temps de sauvegarder d'après les réglages ci-dessus : modifier l'heure ici ne demande jamais de changer le planificateur. À faire une seule fois :</p>
+          <p class="small mb-1"><strong>Linux</strong> (ajouter avec <code>crontab -e</code> pour l'utilisateur qui fait tourner l'application) :</p>
+          <pre class="small p-2 border rounded" id="cmdLinux"></pre>
+          <p class="small mb-1"><strong>Windows</strong> (invite de commandes administrateur) :</p>
+          <pre class="small p-2 border rounded" id="cmdWindows"></pre>
+          <p class="small mb-1"><strong>Vérifier</strong> :</p>
+          <pre class="small p-2 border rounded" id="cmdTest"></pre>
+        </details>
+      </section>
+
       <section class="content-card mt-4" id="db-safety">
         <div class="section-heading">
           <div>
@@ -256,5 +332,6 @@
 <script src="js/admin-db.js"></script>
 <script src="js/admin-backup.js"></script>
 <script src="js/admin-backup-targets.js"></script>
+<script src="js/admin-backup-schedule.js"></script>
 </body>
 </html>
