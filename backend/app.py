@@ -574,6 +574,8 @@ def init_db():
         ensure_units_schema(connection)
         if connection.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0:
             backfill_units(connection)
+        from models.units import resync_all_units_once
+        resync_all_units_once(connection)  # objets saisis avec d'anciens noms de champs (une seule fois)
         # Stocks par quantite : table de mouvements ; alimentation depuis les dossiers signes (idempotente).
         from models.stock import ensure_stock_schema, stock_resource_config, sync_stock_for_form
         ensure_stock_schema(connection)

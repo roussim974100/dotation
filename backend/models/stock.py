@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 
 from models.resource_rules import effective_tracking_mode
-from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of
+from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields
 from models.units import EFFECTIVE_ASSIGNMENT_STATUSES, _holder_label, _when
 from utils import mask_text, utc_now
 
@@ -138,7 +138,7 @@ def sync_stock_for_form(connection, form_id, config=None):
             details = json.loads(item["details_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        fields = {k: v for k, v in _fields_of(details).items() if k in resource["fields"]}
+        fields = align_fields(_fields_of(details), resource["fields"])
         quantity = _as_quantity(fields.get(resource["quantity"])) if resource["quantity"] else 1
         variant = str(fields.get(resource["variant"]) or "").strip() if resource["variant"] else ""
         when = _when(form["assigned_at"] or form["updated_at"])
@@ -205,7 +205,7 @@ def reserved_by_variant(connection, config, now=None):
             details = json.loads(row["details_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        fields = {k: v for k, v in _fields_of(details).items() if k in resource["fields"]}
+        fields = align_fields(_fields_of(details), resource["fields"])
         quantity = _as_quantity(fields.get(resource["quantity"])) if resource["quantity"] else 1
         variant = str(fields.get(resource["variant"]) or "").strip() if resource["variant"] else ""
         reserved[(row["item_key"], variant)] = reserved.get((row["item_key"], variant), 0) + quantity

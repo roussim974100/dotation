@@ -11,7 +11,7 @@ Les transitions (next_status) sont pures : elles ne bloquent jamais un evenement
 import json
 
 from models.inventory import (
-    DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, normalize_identifier, resolve_identifier_key,
+    DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields, normalize_identifier, resolve_identifier_key,
 )
 from models.resource_rules import effective_tracking_mode
 from utils import generate_id, utc_now
@@ -294,7 +294,7 @@ def sync_units_for_form(connection, form_id, keys=None):
         except (TypeError, ValueError):
             continue
         # Seuls les champs definis par la ressource : les anciens dossiers melangent des donnees internes.
-        fields = {k: v for k, v in _fields_of(details).items() if k in config["fields"]}
+        fields = align_fields(_fields_of(details), config["fields"])
         raw = fields.get(identifier_key)
         if not normalize_identifier(raw):
             continue
@@ -377,6 +377,27 @@ def release_units_for_form(connection, form_id):
     return count
 
 
+RESYNC_MARKER = "field_alignment_v1"
+
+
+def resync_all_units_once(connection):
+    """Rejoue la synchronisation de TOUS les dossiers une seule fois apres l'ajout de la correspondance des noms de
+    champs (numeroSerie <-> numero_de_serie) : des objets saisis avec l'ancien nom n'avaient jamais ete pris en compte.
+    Idempotent (deduplication des evenements) ; le marqueur evite de le refaire a chaque demarrage. Retourne le nombre
+    de dossiers rejoues (0 si deja fait)."""
+    connection.execute("CREATE TABLE IF NOT EXISTS parc_meta (key TEXT PRIMARY KEY, value TEXT)")
+    if connection.execute("SELECT 1 FROM parc_meta WHERE key = ?", (RESYNC_MARKER,)).fetchone():
+        return 0
+    keys = unit_identifier_keys(connection)
+    count = 0
+    if keys:
+        for row in connection.execute("SELECT id FROM dotation_forms").fetchall():
+            sync_units_for_form(connection, row["id"], keys)
+            count += 1
+    connection.execute("INSERT OR REPLACE INTO parc_meta (key, value) VALUES (?, ?)", (RESYNC_MARKER, utc_now()))
+    return count
+
+
 def backfill_units(connection):
     """Reconstitue le parc depuis l'historique existant. Idempotent. Les lignes de dossiers supprimes donnent des
     unites « a verifier » (statut reel inconnu) tant qu'un administrateur ne les a pas confirmees."""
@@ -395,7 +416,7 @@ def backfill_units(connection):
             continue
         identifier_key = config["identifier"]
         try:
-            fields = {k: v for k, v in _fields_of(json.loads(item["details_json"] or "{}")).items() if k in config["fields"]}
+            fields = align_fields(_fields_of(json.loads(item["details_json"] or "{}")), config["fields"])
         except (TypeError, ValueError):
             continue
         raw = fields.get(identifier_key)

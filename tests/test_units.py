@@ -597,3 +597,60 @@ def test_probable_duplicates_are_grouped_within_the_same_resource(db):
     groups = find_duplicate_candidates(db)
     assert len(groups) == 1 and groups[0]["resource_code"] == "badge" and groups[0]["key"] == "40"
     assert sorted(u["identifier"] for u in groups[0]["units"]) == ["40", "Badge 40"]
+
+
+# --- anciens noms de champs (numeroSerie) face au catalogue actuel (numero_de_serie) ---------------------------
+
+def test_canonical_key_ignores_case_style_and_small_words():
+    from models.inventory import canonical_key
+    assert canonical_key("numeroSerie") == canonical_key("numero_de_serie") == canonical_key("Numero de serie") == "numeroserie"
+    assert canonical_key("nomPoste") == canonical_key("nom_du_poste") == "nomposte"
+    assert canonical_key("marque") != canonical_key("modele")
+
+
+def test_align_fields_maps_legacy_names_to_the_catalog_and_keeps_known_ones():
+    from models.inventory import align_fields
+    fields = align_fields({"marque": "Lenovo", "numeroSerie": "SN9", "selected": True}, ["marque", "modele", "numero_de_serie"])
+    assert fields == {"marque": "Lenovo", "numero_de_serie": "SN9"}  # « selected » n'est pas un champ du catalogue : ecarte
+    # un nom deja present dans le catalogue n'est jamais ecrase par un alias
+    assert align_fields({"numero_de_serie": "A", "numeroSerie": "B"}, ["numero_de_serie"]) == {"numero_de_serie": "A"}
+
+
+def test_an_object_typed_with_a_legacy_field_name_reaches_the_parc(db):
+    """Regression : un ecran restitue « degrade » saisi sous « numeroSerie » n'apparaissait pas dans le parc."""
+    db.execute("INSERT INTO resource_catalog VALUES ('ecran','Écran','materiel','',?)", (json.dumps(
+        [{"key": "marque", "label": "Marque"}, {"key": "numero_de_serie", "label": "Numero de serie", "required": True}]),))
+    add_form(db, "F9", status="returned")
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES ('F9','ecran',1,'2026-09-19','degrade',?)",
+               (json.dumps({"marque": "llyama", "numeroSerie": "1215240131726"}),))
+    sync_units_for_form(db, "F9")
+    row = db.execute("SELECT identifier, status, fields_json FROM resource_units WHERE resource_code = 'ecran'").fetchone()
+    assert row["identifier"] == "1215240131726" and row["status"] == "degraded"
+    assert json.loads(row["fields_json"])["marque"] == "llyama"
+
+
+def test_incomplete_lines_ignore_objects_whose_identifier_uses_a_legacy_name(db):
+    from models.units_extra import find_incomplete_lines
+    db.execute("INSERT INTO resource_catalog VALUES ('ecran','Écran','materiel','',?)", (json.dumps(
+        [{"key": "numero_de_serie", "label": "Numero de serie", "required": True}]),))
+    add_form(db, "OLD")
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES ('OLD','ecran',1,NULL,'pending',?)",
+               (json.dumps({"numeroSerie": "SN-OLD"}),))
+    assert find_incomplete_lines(db) == []  # l'identifiant existe : ce n'est pas une ligne « sans identifiant »
+
+
+def test_the_one_time_resync_recovers_old_objects_and_runs_only_once(db):
+    from models.units import resync_all_units_once
+    db.execute("INSERT INTO resource_catalog VALUES ('ecran','Écran','materiel','',?)", (json.dumps(
+        [{"key": "numero_de_serie", "label": "Numero de serie", "required": True}]),))
+    add_form(db, "OLD")
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES ('OLD','ecran',1,NULL,'pending',?)",
+               (json.dumps({"numeroSerie": "SN-OLD"}),))
+    assert db.execute("SELECT COUNT(*) FROM resource_units WHERE resource_code = 'ecran'").fetchone()[0] == 0
+    assert resync_all_units_once(db) >= 1
+    assert unit_of(db, "SN-OLD") is not None
+    assert resync_all_units_once(db) == 0  # marqueur : jamais rejoue
+
+
+def unit_of(db, serial):
+    return db.execute("SELECT * FROM resource_units WHERE identifier_norm = ?", (serial.lower(),)).fetchone()

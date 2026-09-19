@@ -6,6 +6,8 @@ celui de sa DERNIERE ligne dans dotation_items (une reattribution posterieure la
 Fonctions pures (aucune dependance Flask), la requete SQL est isolee dans list_available_units.
 """
 import json
+import re
+import unicodedata
 
 PREFERRED_IDENTIFIER_KEYS = ("numeroSerie", "numeroserie", "numero_de_serie", "immatriculation", "numero", "identifiant")
 READY_CONDITIONS = {"conforme", "bon", "returned"}
@@ -24,6 +26,36 @@ def resolve_identifier_key(schema):
         if key in present:
             return key
     return None
+
+
+_KEY_STOPWORDS = {"de", "du", "des", "la", "le", "les", "d", "l"}
+
+
+def canonical_key(key):
+    """Forme comparable d'un nom de champ, insensible a l'ecriture : « numeroSerie », « numero_de_serie » et
+    « Numero de serie » donnent tous « numeroserie » ; « nomPoste » et « nom_du_poste » donnent « nomposte »."""
+    text = unicodedata.normalize("NFD", str(key or "")).encode("ascii", "ignore").decode()
+    words = re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", text)
+    return "".join(w.lower() for w in words if w.lower() not in _KEY_STOPWORDS)
+
+
+def align_fields(fields, schema_keys):
+    """Renvoie les champs d'une ligne de dossier sous les noms du CATALOGUE actuel. Les anciens dossiers ont ete
+    saisis avec d'autres noms de champs (numeroSerie) que ceux du catalogue (numero_de_serie) : sans cette
+    correspondance, l'identifiant serait ignore. Un nom deja present dans le catalogue est garde tel quel."""
+    schema_keys = set(schema_keys)
+    by_canonical = {}
+    for key in schema_keys:
+        by_canonical.setdefault(canonical_key(key), []).append(key)
+    aligned = {}
+    for key, value in (fields or {}).items():
+        if key in schema_keys:
+            aligned[key] = value
+            continue
+        candidates = by_canonical.get(canonical_key(key), [])
+        if len(candidates) == 1 and candidates[0] not in fields:
+            aligned.setdefault(candidates[0], value)
+    return aligned
 
 
 def normalize_identifier(value):

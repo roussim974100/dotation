@@ -8,7 +8,7 @@ import json
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
-from models.inventory import normalize_identifier, resolve_identifier_key
+from models.inventory import align_fields, normalize_identifier, resolve_identifier_key
 from models.resource_rules import effective_tracking_mode
 from models.units import _get_or_create_unit, _record, recompute_unit
 from utils import utc_now
@@ -248,7 +248,7 @@ def find_incomplete_lines(connection, mask=False, limit=500):
             details = json.loads(row["details_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        fields = {k: v for k, v in _fields_of(details).items() if k in config["fields"]}
+        fields = align_fields(_fields_of(details), config["fields"])
         if normalize_identifier(fields.get(config["identifier"])):
             continue
         result.append({
