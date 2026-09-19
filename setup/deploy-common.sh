@@ -58,8 +58,12 @@ PY
 echo "  -> $SAVE_DIR"
 
 say "2/4 Récupération du code"
-if [ "$FORCE" -eq 0 ] && [ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]; then
-    git -C "$APP_DIR" status --short --untracked-files=no
+# On ignore le venv et les .pyc dans le contrôle : le venv est suivi par git et Python modifie ses .pyc en
+# permanence, ce qui ne représente pas une modification locale de l'application.
+DIRTY="$(git -C "$APP_DIR" status --porcelain --untracked-files=no -- . ':!backend/venv' ':!venv' ':!*.pyc')"
+if [ "$FORCE" -eq 0 ] && [ -n "$DIRTY" ]; then
+    printf '%s
+' "$DIRTY"
     fail "des fichiers suivis par git ont été modifiés localement (liste ci-dessus). Les conserver puis relancer, ou écraser avec : sudo bash $DEPLOY_SCRIPT --force"
 fi
 git -C "$APP_DIR" fetch origin "$BRANCH"
