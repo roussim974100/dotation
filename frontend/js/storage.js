@@ -81,9 +81,7 @@ const DASHBOARD_COLUMNS = {
           <span class="draft-title">${escapeHtml(ctx.title)}</span>
           ${(ctx.draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${ctx.draft.data.unc_acces.length} chemin${ctx.draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
         </div>
-        <div class="draft-meta">${escapeHtml(ctx.dossierTypeLabel)}</div>
-        <div class="draft-meta">${escapeHtml(ctx.draft.nom || ctx.draft.data?.beneficiaire?.nom || "")} ${escapeHtml(ctx.draft.prenom || ctx.draft.data?.beneficiaire?.prenom || "")}</div>
-        ${ctx.startAtLabel ? `<div class="draft-meta">${ctx.startAtLabel}</div>` : ""}
+        <div class="draft-meta">${escapeHtml(ctx.dossierTypeLabel)}${ctx.startAtLabel ? ` · ${ctx.startAtLabel}` : ""}</div>
       </td>`
   },
   qualite: {
@@ -202,7 +200,64 @@ function hasActiveFilters() {
   );
 }
 
+// Filtres du tableau de bord : controle DOM, cle de dashboardFilters et evenement de remise a zero.
+const DASHBOARD_FILTER_CONTROLS = [
+  { key: "search", id: "searchInput", label: "Recherche", event: "input" },
+  { key: "status", id: "statusFilter", label: "Avancement", event: "change" },
+  { key: "timing", id: "timingFilter", label: "Pilotage", event: "change" },
+  { key: "qualite", id: "qualiteFilter", label: "Qualité", event: "change" },
+  { key: "service", id: "serviceFilter", label: "Service", event: "change" }
+];
+
+function renderFilterChips() {
+  const host = document.getElementById("filterChips");
+  if (!host) return;
+  host.innerHTML = DASHBOARD_FILTER_CONTROLS
+    .filter((control) => dashboardFilters[control.key] && document.getElementById(control.id))
+    .map((control) => {
+      const el = document.getElementById(control.id);
+      const text = el.tagName === "SELECT" ? el.selectedOptions[0]?.textContent || dashboardFilters[control.key] : dashboardFilters[control.key];
+      return `<button class="filter-chip" type="button" data-clear-filter="${control.id}" aria-label="Retirer le filtre ${escapeHtml(control.label)}">${escapeHtml(control.label)} : ${escapeHtml(text)} <span aria-hidden="true">✕</span></button>`;
+    }).join("");
+}
+
+function initFilterToolbar() {
+  const toolbar = document.querySelector(".filter-toolbar");
+  const actions = toolbar?.querySelector(".filter-toolbar__actions");
+  const grid = toolbar?.querySelector(".filter-toolbar__grid");
+  if (!toolbar || !actions || !grid || document.getElementById("toggleFiltersBtn")) return;
+
+  grid.id = grid.id || "filterToolbarGrid";
+  toolbar.classList.add("is-collapsed");
+
+  const toggle = document.createElement("button");
+  toggle.id = "toggleFiltersBtn";
+  toggle.type = "button";
+  toggle.className = "btn btn-outline-secondary btn-sm";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", grid.id);
+  toggle.textContent = "Filtres";
+  toggle.addEventListener("click", () => {
+    const collapsed = toolbar.classList.toggle("is-collapsed");
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+  });
+  actions.prepend(toggle);
+
+  const chips = document.createElement("div");
+  chips.id = "filterChips";
+  chips.className = "filter-chips";
+  toolbar.appendChild(chips);
+  chips.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-clear-filter]");
+    const el = chip && document.getElementById(chip.dataset.clearFilter);
+    if (!el) return;
+    el.value = "";
+    el.dispatchEvent(new Event(el.tagName === "INPUT" ? "input" : "change", { bubbles: true }));
+  });
+}
+
 function updateFilterBadge() {
+  renderFilterChips();
   const badge = document.getElementById("filterActiveBadge");
   if (!badge) return;
   const count = [
@@ -2645,6 +2700,7 @@ function bindDashboardFilters() {
   }
 
   bindSortableHeaders();
+  initFilterToolbar();
 
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();

@@ -638,6 +638,56 @@ body.login-shell {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+/* Filtres replies par defaut : seule la recherche reste visible, avec le bouton "Filtres". */
+.filter-toolbar.is-collapsed {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.filter-toolbar.is-collapsed .filter-toolbar__grid > div:not(.filter-toolbar__search) {
+  display: none;
+}
+
+.filter-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.filter-chips:empty {
+  display: none;
+}
+
+.filter-chip {
+  padding: 0.15rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text, inherit);
+  font-size: 0.82rem;
+}
+
+.filter-chip:hover,
+.filter-chip:focus-visible {
+  border-color: var(--brand, #0f5c8a);
+}
+
+[data-color-mode="dark"] .filter-chip {
+  background: var(--surface);
+}
+
+.dashboard-toolbar__info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.timing-chip,
+.status-chip {
+  white-space: nowrap;
+}
+
 .filter-toolbar__actions {
   display: flex;
   gap: 0.75rem;
@@ -1614,6 +1664,12 @@ body.login-shell {
 
 .draft-actions__menu-panel .btn {
   width: 100%;
+}
+
+@media (min-width: 992px) {
+  .draft-actions__primary {
+    flex-wrap: nowrap;
+  }
 }
 
 /* Volet flottant sur grand ecran : ne deforme pas la hauteur de la ligne. */
