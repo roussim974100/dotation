@@ -65,3 +65,14 @@ def test_texte_trop_long_refuse():
     connection = _connection()
     with pytest.raises(SettingsValidationError):
         save_app_settings(connection, {"org_name": "x" * 201})
+
+
+def test_un_type_utilise_par_des_dossiers_ne_peut_pas_disparaitre():
+    connection = _connection()
+    connection.execute("CREATE TABLE dotation_forms (id TEXT, beneficiary_type TEXT)")
+    connection.execute("INSERT INTO dotation_forms VALUES ('1', 'elu'), ('2', 'elu'), ('3', 'agent')")
+    with pytest.raises(SettingsValidationError, match="elu"):
+        save_app_settings(connection, {"beneficiary_types": "agent:Agent"})
+    # Le libelle peut changer, l'identifiant reste : autorise.
+    save_app_settings(connection, {"beneficiary_types": "agent:Employé,elu:Élu local,member:Membre"})
+    assert get_app_settings(connection)["beneficiary_types"] == "agent:Employé,elu:Élu local,member:Membre"

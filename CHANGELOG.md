@@ -2,7 +2,16 @@
 
 ## [3.50.0] - 2026-09-19
 
-Chantier « Assistant d'organisation » (wizard de démarrage rejouable, adapté à toute structure, y compris hors France) — **sprint 1 : sécurité des réglages**.
+Chantier « Assistant d'organisation » : configuration de démarrage rejouable, adaptée à toute structure (y compris hors France : libellés dans toutes les langues, type « Autre / sur mesure », toutes les suggestions modifiables).
+
+### 🧭 Assistant d'organisation (Administration > Personnalisation)
+- **5 étapes** : type d'organisation, bénéficiaires, ressources à activer, réglages de départ, récapitulatif avec **aperçu exact** de ce qui sera modifié et confirmation.
+- **Suggestions par type d'organisation** (collectivité, administration, entreprise, association, autre) : types de bénéficiaires, ressources recommandées, conservation. Ressources supplémentaires par modèle (vêtement, stock, accès…) ou **sur mesure**.
+- **Ajout seulement** : rien de ce qui est utilisé n'est supprimé ni renommé ; une ressource déjà utilisée ne peut pas être masquée ; un type de bénéficiaire porté par des dossiers ne peut pas disparaître (seul son libellé change) ; une ressource équivalente existante n'est jamais recréée ; rejouer l'assistant sans rien changer ne fait rien.
+- **Sécurité** : le serveur calcule le plan (`plan_org_wizard`) et n'applique que le plan aperçu (empreinte vérifiée) ; copie de sécurité de la base avant application ; une seule transaction ; entrée au journal d'audit ; droit `users.manage`, limitation de fréquence. API : `GET /api/admin/org-presets`, `POST /api/admin/org-wizard/preview` et `/apply`.
+- **Checklist de démarrage** sur le portail admin (avancement calculé sur l'état réel : nom, assistant passé, ressources, DPO, sauvegarde automatique, support, domaines e-mail) ; l'installation initiale débouche sur l'assistant.
+
+### 🔒 Sprint 1 : sécurité des réglages
 
 ### 🔒 Sécurité et robustesse des réglages
 - Une mise à jour **partielle** des réglages n'efface plus les champs non envoyés (une valeur absente est conservée ; une chaîne vide vide bien le réglage). Les durées (restitution, alerte, conservation) ne se remettent plus à leur défaut quand elles sont absentes.

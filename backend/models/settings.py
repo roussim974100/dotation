@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sqlite3
 import urllib.request
 
 import environment
@@ -37,7 +38,7 @@ DEFAULT_APP_SETTINGS = {
     "parc_retention_years": "5",
 }
 
-VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
+VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association", "other"}
 
 
 def _parse_beneficiary_types(raw):
@@ -236,7 +237,7 @@ MAX_TEXT_LENGTH = 200
 
 def normalize_beneficiary_types(raw):
     """Valide « valeur:Libelle,valeur:Libelle » et le renvoie sous forme canonique. La valeur est un identifiant (a-z, 0-9,
-    _ et -), le libelle est libre (toutes langues) hors , : ; < > & " \ qui casseraient le format ou l'affichage.
+    _ et -), le libelle est libre (toutes langues) hors la virgule, les deux-points, le point-virgule, < > & guillemets et antislash, qui casseraient le format ou l'affichage.
     Leve SettingsValidationError plutot que de retomber silencieusement sur agent/elu."""
     entries, seen = [], set()
     for part in str(raw or "").split(","):
@@ -251,7 +252,7 @@ def normalize_beneficiary_types(raw):
             )
         if not label or len(label) > 60 or any(ch in _FORBIDDEN_LABEL_CHARS or ord(ch) < 32 for ch in label):
             raise SettingsValidationError(
-                f"Libellé invalide pour « {value} » : 60 caractères max, sans virgule, deux-points, point-virgule, < > & \" ni \."
+                f"Libellé invalide pour « {value} » : 60 caractères max, sans virgule, deux-points, point-virgule, < > &, guillemets ni antislash."
             )
         if value in seen:
             raise SettingsValidationError(f"Le type « {value} » est défini deux fois.")
@@ -260,6 +261,22 @@ def normalize_beneficiary_types(raw):
     if not entries:
         raise SettingsValidationError("Indiquez au moins un type de bénéficiaire.")
     return ",".join(entries)
+
+
+def _refuse_removing_used_beneficiary_types(connection, new_types):
+    """Un type deja porte par des dossiers ne peut pas disparaitre (seul son libelle peut changer)."""
+    try:
+        rows = connection.execute(
+            "SELECT beneficiary_type, COUNT(*) AS n FROM dotation_forms WHERE beneficiary_type IS NOT NULL AND beneficiary_type != '' GROUP BY beneficiary_type"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return  # base sans dossiers (tests, installation neuve)
+    kept = {entry.split(":", 1)[0] for entry in new_types.split(",")}
+    for row in rows:
+        if row[0] not in kept:
+            raise SettingsValidationError(
+                f"Le type « {row[0]} » est utilisé par {row[1]} dossier(s) : conservez-le (vous pouvez seulement changer son libellé)."
+            )
 
 
 def save_app_settings(connection, updates):
@@ -278,6 +295,7 @@ def save_app_settings(connection, updates):
             raise SettingsValidationError(f"« {key} » est trop long ({MAX_TEXT_LENGTH} caractères max).")
     if "beneficiary_types" in sanitized:
         sanitized["beneficiary_types"] = normalize_beneficiary_types(sanitized["beneficiary_types"])
+        _refuse_removing_used_beneficiary_types(connection, sanitized["beneficiary_types"])
 
     if "brand_logo_mode" in sanitized and sanitized["brand_logo_mode"] not in {"default", "url", "file"}:
         sanitized["brand_logo_mode"] = DEFAULT_APP_SETTINGS["brand_logo_mode"]
