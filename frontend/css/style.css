@@ -1988,6 +1988,22 @@ button.export-menu__item {
   transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
 }
 
+.dashboard-nav__count {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: 0.35rem;
+  padding: 0 0.45em;
+  border-radius: 999px;
+  background: rgba(15, 55, 84, 0.1);
+  font-size: 0.78em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dashboard-nav__link.is-active .dashboard-nav__count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .dashboard-nav__link:hover,
 .dashboard-nav__link:focus-visible {
   background: rgba(219, 234, 243, 0.8);

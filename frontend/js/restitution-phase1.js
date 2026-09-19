@@ -86,15 +86,15 @@ async function initPhase1Page() {
     loader?.classList.remove("is-hidden");
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    if (!id) { alert("Aucune fiche sélectionnée."); window.location.href = "index.html"; return; }
+    if (!id) { alert("Aucune fiche sélectionnée."); window.location.href = "restitutions-pending.html"; return; }
 
     const result = await requestJson(`/api/forms/${encodeURIComponent(id)}`);
-    if (!result?.data) { alert("Fiche introuvable."); window.location.href = "index.html"; return; }
+    if (!result?.data) { alert("Fiche introuvable."); window.location.href = "restitutions-pending.html"; return; }
 
     const status = result.summary?.status || result.data?.workflow?.status;
     if (!["active", "partial_return", "awaiting_signature", "returned"].includes(status)) {
       alert("Ce dossier n'est pas en phase de restitution.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 

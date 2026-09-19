@@ -149,6 +149,28 @@ const DASHBOARD_VIEW_COLUMNS = {
   history_restitutions: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
 };
 
+// Onglets de navigation des 4 tableaux de bord : une seule definition (libelle, page, regle de
+// comptage) au lieu de 4 copies de <nav> en dur. Le compteur applique le meme predicat que la vue.
+const DASHBOARD_NAV = [
+  { view: "active", label: "Attributions en cours", href: "index.html", count: (d) => isOperationalAssignmentDraft(d) },
+  { view: "history_assignments", label: "Attributions finalisées", href: "assignments-completed.html", count: (d) => isCompletedAssignmentDraft(d) },
+  { view: "restitutions_pending", label: "Restitutions en cours", href: "restitutions-pending.html", count: (d) => isOperationalRestitutionDraft(d) },
+  { view: "history_restitutions", label: "Restitutions finalisées", href: "restitutions-completed.html", count: (d) => isCompletedRestitutionDraft(d) }
+];
+
+function renderDashboardNav(drafts) {
+  const nav = document.getElementById("dashboardNav");
+  if (!nav) {
+    return;
+  }
+  const current = getDashboardViewMode();
+  nav.innerHTML = DASHBOARD_NAV.map((tab) => {
+    const isActive = tab.view === current;
+    const count = Array.isArray(drafts) ? drafts.filter(tab.count).length : null;
+    return `<a class="dashboard-nav__link${isActive ? " is-active" : ""}" href="${tab.href}"${isActive ? ' aria-current="page"' : ""}>${escapeHtml(tab.label)}${count === null ? "" : ` <span class="dashboard-nav__count">${count}</span>`}</a>`;
+  }).join("");
+}
+
 function getDashboardViewColumns() {
   return DASHBOARD_VIEW_COLUMNS[getDashboardViewMode()] || DASHBOARD_VIEW_COLUMNS.active;
 }
@@ -1393,6 +1415,7 @@ async function renderDraftList() {
     persistPendingDashboardUpdates();
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
+    renderDashboardNav(sortedDrafts);
     const filteredDrafts = filterDraftsForCurrentView(sortedDrafts);
     const assignmentDrafts = filteredDrafts.filter((draft) => isOperationalAssignmentDraft(draft));
     const restitutionDrafts = filteredDrafts.filter((draft) => isOperationalRestitutionDraft(draft));
@@ -2933,6 +2956,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   renderDashboardTableHead("draftTableHead");
+  renderDashboardNav(null);
   bindDashboardFilters();
   void renderDraftList();
   startDashboardAutoRefresh();

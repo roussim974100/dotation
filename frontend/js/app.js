@@ -2910,7 +2910,11 @@ window.addEventListener("unhandledrejection", (event) => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-back-to-index]").forEach((btn) => {
-    btn.addEventListener("click", () => { window.location.href = "index.html"; });
+    // Un dossier signé (verrouillé) vit dans "Attributions finalisées", les autres dans "Attributions en cours".
+    btn.addEventListener("click", () => {
+      const locked = Boolean(document.getElementById("dotationForm")?.dataset.lockedAt);
+      window.location.href = locked ? "assignments-completed.html" : "index.html";
+    });
   });
 
   if (!form) {

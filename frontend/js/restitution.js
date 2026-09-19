@@ -615,21 +615,21 @@ async function initRestitutionPage() {
     const id = params.get("id");
     if (!id) {
       alert("Aucune fiche selectionnee.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 
     const result = await getDraftById(id);
     if (!result?.data) {
       alert("Fiche introuvable.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 
     const currentStatus = result.summary?.status || result.data?.workflow?.status;
     if (!["active", "partial_return", "awaiting_signature", "returned"].includes(currentStatus)) {
       alert("La restitution n'est disponible que pour les dossiers avec materiel a restituer ou deja restitue.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
     const readOnlyMode = currentStatus === "returned";
@@ -794,7 +794,7 @@ async function initRestitutionPage() {
           showConfirm: true,
           confirmLabel: "OK"
         });
-        window.location.href = "index.html";
+        window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();
         await showRestitutionInfoDialog(
@@ -846,7 +846,7 @@ async function initRestitutionPage() {
           showConfirm: true,
           confirmLabel: "OK"
         });
-        window.location.href = "index.html";
+        window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();
         await showRestitutionInfoDialog(
@@ -863,7 +863,7 @@ async function initRestitutionPage() {
     console.error("Erreur lors du chargement de la restitution", error);
     hideRestitutionLoader();
     alert("Impossible de charger la restitution.");
-    window.location.href = "index.html";
+    window.location.href = "restitutions-pending.html";
   }
 }
 

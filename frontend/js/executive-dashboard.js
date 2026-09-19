@@ -144,7 +144,7 @@ async function loadStats() {
     const data = await response.json();
     allData = data;
 
-    renderKpis(data.kpis);
+    renderKpis(data.kpis, data.period);
     renderCharts(data);
     renderAlertes(data.alertes, data.kpis.alerte_seuil);
     renderServicesTable(data.by_service);
@@ -154,8 +154,17 @@ async function loadStats() {
   }
 }
 
-function renderKpis(kpis) {
+function renderKpis(kpis, period) {
   const byId = (id) => document.getElementById(id);
+  // Total et actifs suivent la periode choisie ; taux de restitution et alertes portent sur tous les dossiers.
+  const periodLabel = (period?.label || "période").toLowerCase();
+  const scopes = {
+    kpiTotalScope: `créés · ${periodLabel}`,
+    kpiActifsScope: `créés · ${periodLabel}`,
+    kpiRestitutionScope: "tous dossiers",
+    kpiAlertesScope: `brouillons > ${kpis.alerte_seuil || 30} j · tous dossiers`
+  };
+  Object.entries(scopes).forEach(([id, text]) => { if (byId(id)) byId(id).textContent = text; });
   if (byId("kpiTotal")) byId("kpiTotal").textContent = kpis.total || 0;
   if (byId("kpiActifs")) byId("kpiActifs").textContent = kpis.actifs || 0;
   if (byId("kpiRestitution")) byId("kpiRestitution").textContent = `${kpis.taux_restitution || 0}%`;
