@@ -218,12 +218,10 @@ async function loadParcStats() {
     const s = await response.json();
     const cards = [
       ["Objets suivis", s.units], ["En stock", s.by_status.in_stock || 0], ["Attribués", s.by_status.assigned || 0],
-      ["Durée moyenne de détention", s.avg_hold_days === null ? "—" : `${s.avg_hold_days} j`],
-      ["Rendus dégradés", s.damage_rate === null ? "—" : `${s.damage_rate} %`],
-      [`Détenus depuis plus de ${s.long_hold_days} j`, s.long_held], ["À vérifier", s.to_verify], ["Incohérences", s.anomalies]
+      ["Objets dégradés", s.by_status.degraded || 0], ["À vérifier", s.to_verify], ["Incohérences", s.anomalies]
     ];
     parcEl("parcStatsBody").innerHTML = cards.map(([label, value]) => `
-      <div class="col-6 col-md-3"><div class="stat-card"><span class="stat-card__label">${parcEsc(label)}</span><strong class="stat-card__value">${parcEsc(value)}</strong></div></div>`).join("");
+      <div class="col-6 col-md-4"><div class="stat-card"><span class="stat-card__label">${parcEsc(label)}</span><strong class="stat-card__value">${parcEsc(value)}</strong></div></div>`).join("");
   } catch (error) {
     parcEl("parcStatsBody").innerHTML = '<p class="text-muted mb-0">Indicateurs indisponibles.</p>';
   }

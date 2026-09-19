@@ -1,5 +1,11 @@
 # Historique des versions — À Quai
 
+## [3.49.1] - 2026-09-19
+
+### 🗃️ Parc matériel
+- Indicateurs simplifiés : « Objets dégradés » (nombre d'objets actuellement dégradés) remplace le pourcentage de restitutions dégradées, souvent trompeur sur un petit parc ; retrait de la durée moyenne de détention et des détentions de plus d'un an ; six cartes sur deux lignes de trois.
+- Formulaire de dossier : rappel sous le champ identifiant — pour renuméroter un objet suivi, passer d'abord par Parc → Corriger l'identifiant afin d'éviter un doublon.
+
 ## [3.49.0] - 2026-09-19
 
 Cumul des versions 3.19 à 3.49 depuis la 3.18.3.

@@ -521,6 +521,7 @@ function buildDynamicFieldInput(resource, field) {
     <div>
       <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
       <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}">
+      ${field.identifier ? "<div class=\"form-text\">Pour renuméroter un objet déjà suivi, utilisez d'abord Parc → Corriger l'identifiant : sinon un doublon est créé.</div>" : ""}
     </div>
   `;
 }
