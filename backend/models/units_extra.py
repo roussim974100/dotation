@@ -198,3 +198,85 @@ def compute_indicators(connection, resource_code=None, long_hold_days=365, now=N
         "anomalies": anomalies,
         "to_verify": status_counts.get("unknown", 0),
     }
+
+
+# ---------------------------------------------------------------------------
+# Donnees a verifier : lignes sans identifiant, doublons probables
+# ---------------------------------------------------------------------------
+
+# Mots qui n'identifient rien dans « Badge 40 », « N° 40 », « carte 40 » : seul le numero compte.
+_LABEL_WORDS = {"badge", "n", "no", "num", "numero", "nr", "carte", "tag", "telepeage", "ref", "reference"}
+
+
+def duplicate_key(identifier):
+    """Cle de rapprochement de deux identifiants qui designent probablement le meme objet :
+    « Badge 40 », « N° 40 » et « 40 » -> « 40 » ; « 019 » et « 19 » -> « 19 » ; sinon les caracteres alphanumeriques."""
+    import re
+    tokens = re.findall(r"[a-z0-9]+", _plain(identifier))
+    words = [t for t in tokens if not t.isdigit()]
+    numbers = [t for t in tokens if t.isdigit()]
+    if len(numbers) == 1 and all(w in _LABEL_WORDS for w in words):
+        return numbers[0].lstrip("0") or "0"
+    return "".join(tokens)
+
+
+def _mask_holder(label, mask):
+    if not mask or not label:
+        return label
+    from utils import mask_text
+    return " ".join(mask_text(part) for part in str(label).split(" "))
+
+
+def find_incomplete_lines(connection, mask=False, limit=500):
+    """Lignes attribuees sur une ressource suivie par objet MAIS sans identifiant : elles n'apparaissent pas dans le parc.
+    Un dossier annule est ignore. Retourne [{form_id, resource_code, resource_label, holder_label, status, updated_at}]."""
+    from models.inventory import _fields_of
+    from models.units import _holder_label, unit_identifier_keys
+    keys = unit_identifier_keys(connection)
+    labels = {r["code"]: r["label"] for r in connection.execute("SELECT code, label FROM resource_catalog").fetchall()}
+    result = []
+    rows = connection.execute(
+        "SELECT i.form_id, i.item_key, i.details_json, f.status, f.nom, f.prenom, f.service, f.updated_at"
+        " FROM dotation_items i JOIN dotation_forms f ON f.id = i.form_id"
+        " WHERE i.assigned = 1 AND f.status != 'cancelled' ORDER BY f.updated_at DESC"
+    ).fetchall()
+    for row in rows:
+        config = keys.get(row["item_key"])
+        if not config:
+            continue
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        fields = {k: v for k, v in _fields_of(details).items() if k in config["fields"]}
+        if normalize_identifier(fields.get(config["identifier"])):
+            continue
+        result.append({
+            "form_id": row["form_id"], "resource_code": row["item_key"], "resource_label": labels.get(row["item_key"], row["item_key"]),
+            "holder_label": _mask_holder(_holder_label(row), mask), "status": row["status"], "updated_at": row["updated_at"],
+        })
+        if len(result) >= limit:
+            break
+    return result
+
+
+def find_duplicate_candidates(connection, mask=False):
+    """Groupes d'unites d'une meme ressource dont les identifiants se ressemblent (voir duplicate_key). Ne fusionne rien :
+    c'est une aide a la decision, la fusion reste une action manuelle (parc.manage)."""
+    groups = {}
+    for unit in connection.execute(
+        "SELECT id, resource_code, identifier, status, holder_label FROM resource_units ORDER BY resource_code, identifier"
+    ).fetchall():
+        key = duplicate_key(unit["identifier"])
+        if key:
+            groups.setdefault((unit["resource_code"], key), []).append(unit)
+    labels = {r["code"]: r["label"] for r in connection.execute("SELECT code, label FROM resource_catalog").fetchall()}
+    result = []
+    for (code, key), units in sorted(groups.items()):
+        if len(units) < 2:
+            continue
+        result.append({
+            "resource_code": code, "resource_label": labels.get(code, code), "key": key,
+            "units": [{"id": u["id"], "identifier": u["identifier"], "status": u["status"], "holder_label": _mask_holder(u["holder_label"], mask)} for u in units],
+        })
+    return result

@@ -291,4 +291,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && parcCurrent) closeParcModal(); });
   loadParc();
   if (typeof initParcStock === "function") initParcStock(); // stocks par quantité (parc-stock.js)
+  if (typeof initParcCheck === "function") initParcCheck(); // à vérifier (parc-check.js)
 });

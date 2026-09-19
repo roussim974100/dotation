@@ -46,6 +46,11 @@
     <div class="row g-3" id="parcStatsBody"></div>
   </section>
 
+  <details class="content-card mb-4 d-none" id="parcCheck" open>
+    <summary class="fw-semibold">À vérifier <span class="badge text-bg-warning" id="parcCheckCount">0</span></summary>
+    <div id="parcCheckBody"></div>
+  </details>
+
   <details class="content-card mb-4 d-none" id="parcImport">
     <summary class="fw-semibold">Importer un parc initial (CSV)</summary>
     <p class="small mt-2">Colonnes : <code>ressource</code>, <code>identifiant</code>, <code>etat</code> (en stock, dégradé, perdu, réformé — facultatif) et, si besoin, une colonne par champ (marque, modèle…). Les objets déjà connus sont ignorés. Une analyse à blanc s'exécute d'abord.</p>
@@ -132,5 +137,6 @@
 <script src="js/global-search.js"></script>
 <script src="js/parc.js"></script>
 <script src="js/parc-stock.js"></script>
+<script src="js/parc-check.js"></script>
 </body>
 </html>

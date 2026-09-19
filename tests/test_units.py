@@ -559,3 +559,41 @@ def test_indicators(db):
     assert stats["avg_hold_days"] == 15.0 and stats["damage_rate"] == 50.0
     assert stats["long_held"] == 1 and stats["assignments_per_unit"] == 1.0 and stats["anomalies"] == 0
     assert compute_indicators(db, "telephone")["units"] == 0
+
+
+# --- donnees a verifier -----------------------------------------------------------------------
+
+def test_duplicate_key_groups_labelled_numbers_and_leading_zeros():
+    from models.units_extra import duplicate_key
+    assert duplicate_key("Badge 40") == duplicate_key("40") == duplicate_key("N° 40") == duplicate_key("badge 040") == "40"
+    assert duplicate_key("019") == duplicate_key("19") == "19"
+    assert duplicate_key("SN-8CC2502L41") == "sn8cc2502l41" and duplicate_key("SN-8CC2502L41") != duplicate_key("SN-8CC2502L42")
+    assert duplicate_key("Badge A40") != duplicate_key("40")  # une lettre dans le numero : ce n'est plus le meme identifiant
+
+
+def test_lines_without_identifier_are_listed_and_cancelled_forms_ignored(db):
+    from models.units_extra import find_incomplete_lines
+    add_form(db, "OK")
+    add_item(db, "OK", "SN-OK")
+    add_form(db, "SANS")
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES ('SANS','ordinateur',1,NULL,'pending',?)",
+               (json.dumps({"selected": True, "fields": {"marque": "Lenovo"}}),))
+    add_form(db, "ANNULE", status="cancelled")
+    db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES ('ANNULE','ordinateur',1,NULL,'pending','{}')")
+    lines = find_incomplete_lines(db)
+    assert [l["form_id"] for l in lines] == ["SANS"] and lines[0]["resource_label"] == "Ordinateur"
+    masked = find_incomplete_lines(db, mask=True)[0]["holder_label"]
+    assert "DUPONT" not in masked
+
+
+def test_probable_duplicates_are_grouped_within_the_same_resource(db):
+    from models.units_extra import find_duplicate_candidates
+    db.execute("INSERT INTO resource_catalog VALUES ('badge','Badge','materiel','unit',?)", (json.dumps([{"key": "numero", "label": "N°", "required": True, "identifier": True}]),))
+    for form, ident in (("A", "Badge 40"), ("B", "40"), ("C", "41")):
+        add_form(db, form)
+        db.execute("INSERT INTO dotation_items (form_id,item_key,assigned,returned_at,return_condition,details_json) VALUES (?, 'badge',1,NULL,'pending',?)",
+                   (form, json.dumps({"selected": True, "fields": {"numero": ident}})))
+        sync_units_for_form(db, form)
+    groups = find_duplicate_candidates(db)
+    assert len(groups) == 1 and groups[0]["resource_code"] == "badge" and groups[0]["key"] == "40"
+    assert sorted(u["identifier"] for u in groups[0]["units"]) == ["40", "Badge 40"]

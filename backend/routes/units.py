@@ -9,7 +9,9 @@ import time
 
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings
 from models.units import UnitActionError, apply_manual_action, count_units_by_status, get_unit, list_units, release_stale_reservations
-from models.units_extra import DEFAULT_RETENTION_YEARS, anonymize_old_holders, compute_indicators, import_units
+from models.units_extra import (
+    DEFAULT_RETENTION_YEARS, anonymize_old_holders, compute_indicators, find_duplicate_candidates, find_incomplete_lines, import_units,
+)
 
 bp = Blueprint("units", __name__)
 
@@ -124,3 +126,16 @@ def units_import():
             insert_app_log(connection, "admin", "units_imported", "Import du parc", None, None,
                            {"created": report["created"], "skipped": report["skipped"], "errors": len(report["errors"])}, actor=actor)
     return jsonify(report)
+
+
+@bp.route("/api/units/to-check", methods=["GET"])
+@login_required
+def units_to_check():
+    """Donnees a verifier : lignes attribuees sans identifiant (absentes du parc) et doublons probables d'identifiants."""
+    if not has_permission("forms.read_list"):
+        return jsonify({"error": "forbidden"}), 403
+    with get_db() as connection:
+        return jsonify({
+            "incomplete": find_incomplete_lines(connection, _masked()),
+            "duplicates": find_duplicate_candidates(connection, _masked()),
+        })
