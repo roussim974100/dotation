@@ -200,6 +200,66 @@ async function runParcAction(action) {
   showToast("Action enregistrée.", "success");
 }
 
+// Indicateurs (suivent le filtre de ressource)
+async function loadParcStats() {
+  const resource = parcEl("parcResource").value;
+  try {
+    const response = await fetch(`/api/units/stats${resource ? `?resource=${encodeURIComponent(resource)}` : ""}`, { credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) throw new Error();
+    const s = await response.json();
+    const cards = [
+      ["Objets suivis", s.units], ["En stock", s.by_status.in_stock || 0], ["Attribués", s.by_status.assigned || 0],
+      ["Durée moyenne de détention", s.avg_hold_days === null ? "—" : `${s.avg_hold_days} j`],
+      ["Rendus dégradés", s.damage_rate === null ? "—" : `${s.damage_rate} %`],
+      [`Détenus depuis plus de ${s.long_hold_days} j`, s.long_held], ["À vérifier", s.to_verify], ["Incohérences", s.anomalies]
+    ];
+    parcEl("parcStatsBody").innerHTML = cards.map(([label, value]) => `
+      <div class="col-6 col-md-3"><div class="stat-card"><span class="stat-card__label">${parcEsc(label)}</span><strong class="stat-card__value">${parcEsc(value)}</strong></div></div>`).join("");
+  } catch (error) {
+    parcEl("parcStatsBody").innerHTML = '<p class="text-muted mb-0">Indicateurs indisponibles.</p>';
+  }
+}
+
+function initParcImport() {
+  const panel = parcEl("parcImport");
+  if (!panel || !parcCanManage) return;
+  panel.classList.remove("d-none");
+  const result = parcEl("parcImportResult");
+  const run = parcEl("parcImportRun");
+  const send = async (dryRun) => {
+    const file = parcEl("parcImportFile").files[0];
+    if (!file) { result.innerHTML = '<span class="text-danger">Choisissez un fichier CSV.</span>'; return null; }
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("dry_run", dryRun ? "1" : "0");
+    const response = await fetch("/api/units/import", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": await parcCsrf() }, body: fd });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { result.innerHTML = `<span class="text-danger">${parcEsc(data.message || `Erreur ${response.status}`)}</span>`; return null; }
+    return data;
+  };
+  const show = (report) => {
+    result.innerHTML = `<strong>${report.dry_run ? "Analyse" : "Import terminé"}</strong> : ${report.rows} ligne(s), ${report.created} ${report.dry_run ? "à créer" : "créée(s)"}, ${report.skipped} déjà connue(s), ${report.errors.length} erreur(s).
+      ${report.errors.length ? `<ul class="text-danger mb-0">${report.errors.slice(0, 15).map((e) => `<li>Ligne ${e.line} : ${parcEsc(e.message)}</li>`).join("")}</ul>` : ""}`;
+  };
+  parcEl("parcImportCheck").addEventListener("click", async () => {
+    const report = await send(true);
+    if (report) { show(report); run.disabled = report.created === 0; }
+  });
+  run.addEventListener("click", async () => {
+    if (!(await askConfirm("Importer ces objets dans le parc ? Les lignes en erreur sont ignorées.", { confirmLabel: "Importer" }))) return;
+    const report = await send(false);
+    if (report) { show(report); run.disabled = true; loadParc(); loadParcStats(); }
+  });
+  parcEl("parcImportTemplate").addEventListener("click", () => {
+    const blob = new Blob(["\ufeffressource;identifiant;etat;marque;modele\nOrdinateur;SN-EXEMPLE-001;en stock;Lenovo;ThinkPad X1\n"], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "modele_import_parc.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (!parcEl("parcBody")) return;
   const [session, references] = await Promise.all([
@@ -214,6 +274,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     .map(([status, meta]) => `<option value="${status}">${parcEsc(meta.label)}</option>`).join("");
 
   ["parcResource", "parcStatus"].forEach((id) => parcEl(id).addEventListener("change", loadParc));
+  parcEl("parcResource").addEventListener("change", loadParcStats);
+  initParcImport();
+  loadParcStats();
   let timer = null;
   parcEl("parcSearch").addEventListener("input", () => { window.clearTimeout(timer); timer = window.setTimeout(loadParc, 250); });
   document.addEventListener("click", (event) => {

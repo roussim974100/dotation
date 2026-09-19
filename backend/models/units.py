@@ -237,8 +237,8 @@ def _record(connection, unit_id, event_type, occurred_at, dedupe_key, form_id=No
     ).fetchall()]
     previous = derive_state(before)[0] if before else None
     _new_status, anomaly = next_status(previous, event_type)
-    if source == "manual":
-        anomaly = None  # une action volontaire d'un gestionnaire n'est pas une incoherence de donnees
+    if source in ("manual", "import"):
+        anomaly = None  # une action volontaire d'un gestionnaire (ou un import de parc) n'est pas une incoherence de donnees
     connection.execute(
         """INSERT INTO resource_unit_events
            (unit_id, event_type, occurred_at, form_id, holder_label, condition, notes, anomaly, actor, source, dedupe_key, created_at)

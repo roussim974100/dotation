@@ -570,6 +570,9 @@ def init_db():
         ensure_units_schema(connection)
         if connection.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0:
             backfill_units(connection)
+        from models.settings import get_app_settings
+        from models.units_extra import anonymize_old_holders
+        anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))
         # Migration auto depuis users.json vers users.db (voir init_users_db)
 
 

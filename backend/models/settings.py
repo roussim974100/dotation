@@ -31,6 +31,7 @@ DEFAULT_APP_SETTINGS = {
     "setup_completed": "0",
     "restitution_phase1_unlock_days": "1",
     "timing_warning_days": "3",
+    "parc_retention_years": "5",
 }
 
 VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}

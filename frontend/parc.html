@@ -42,6 +42,22 @@
 </header>
 
 <main id="main" class="container py-4 py-lg-5">
+  <section class="content-card mb-4" id="parcStats" aria-label="Indicateurs du parc">
+    <div class="row g-3" id="parcStatsBody"></div>
+  </section>
+
+  <details class="content-card mb-4 d-none" id="parcImport">
+    <summary class="fw-semibold">Importer un parc initial (CSV)</summary>
+    <p class="small mt-2">Colonnes : <code>ressource</code>, <code>identifiant</code>, <code>etat</code> (en stock, dégradé, perdu, réformé — facultatif) et, si besoin, une colonne par champ (marque, modèle…). Les objets déjà connus sont ignorés. Une analyse à blanc s'exécute d'abord.</p>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6"><label class="form-label" for="parcImportFile">Fichier CSV</label><input class="form-control" id="parcImportFile" type="file" accept=".csv,text/csv"></div>
+      <div class="col-md-3"><button class="btn btn-outline-secondary w-100" id="parcImportCheck" type="button">Analyser</button></div>
+      <div class="col-md-3"><button class="btn btn-primary w-100" id="parcImportRun" type="button" disabled>Importer</button></div>
+    </div>
+    <button class="btn btn-link btn-sm px-0" id="parcImportTemplate" type="button">Télécharger un modèle</button>
+    <div id="parcImportResult" class="mt-2 small"></div>
+  </details>
+
   <section class="content-card mb-4">
     <div class="d-flex flex-wrap gap-2 mb-3" id="parcCounts" aria-label="Répartition par état"></div>
     <div class="row g-3 align-items-end">

@@ -27,10 +27,10 @@ def db():
             assigned_at TEXT, returned_at TEXT, updated_at TEXT);
         CREATE TABLE dotation_items (id INTEGER PRIMARY KEY AUTOINCREMENT, form_id TEXT, item_key TEXT, assigned INTEGER,
             returned_at TEXT, return_condition TEXT, details_json TEXT);
-        CREATE TABLE resource_catalog (code TEXT, category TEXT, tracking_mode TEXT, field_schema_json TEXT);
+        CREATE TABLE resource_catalog (code TEXT, label TEXT, category TEXT, tracking_mode TEXT, field_schema_json TEXT);
     """)
-    conn.execute("INSERT INTO resource_catalog VALUES ('ordinateur','materiel','unit',?)", (json.dumps(SCHEMA),))
-    conn.execute("INSERT INTO resource_catalog VALUES ('veste','materiel','none','[]')")
+    conn.execute("INSERT INTO resource_catalog VALUES ('ordinateur','Ordinateur','materiel','unit',?)", (json.dumps(SCHEMA),))
+    conn.execute("INSERT INTO resource_catalog VALUES ('veste','Veste','materiel','none','[]')")
     ensure_units_schema(conn)
     return conn
 
@@ -332,7 +332,7 @@ def test_merge_moves_history_and_identifier_to_the_target_without_duplicating_on
 
 
 def test_merge_is_refused_across_resources_or_with_itself(db):
-    db.execute("INSERT INTO resource_catalog VALUES ('telephone','materiel','unit',?)", (json.dumps(SCHEMA),))
+    db.execute("INSERT INTO resource_catalog VALUES ('telephone','Téléphone','materiel','unit',?)", (json.dumps(SCHEMA),))
     add_form(db, "F1"); add_item(db, "F1", "SN1"); add_item(db, "F1", "SN1", code="telephone"); sync_units_for_form(db, "F1")
     other = db.execute("SELECT id FROM resource_units WHERE resource_code='telephone'").fetchone()[0]
     with pytest.raises(UnitActionError) as cross:
@@ -485,3 +485,77 @@ def test_a_degraded_object_keeps_its_condition_after_a_reservation_is_lifted(db)
     assert unit(db)["status"] == "reserved"
     release_units_for_form(db, "F2")
     assert unit(db)["status"] == "degraded"
+
+
+# --- etape 5 : RGPD, import CSV, indicateurs ------------------------------------------------
+
+from datetime import datetime, timezone
+
+from models.units_extra import ANONYMIZED_LABEL, anonymize_old_holders, compute_indicators, import_units
+
+
+def test_old_holders_are_anonymized_but_events_and_current_holders_are_kept(db):
+    add_form(db, "F1", assigned="2018-01-10T10:00:00+00:00", updated="2018-03-01"); add_item(db, "F1", "SN1", "conforme", "2018-03-01")
+    add_form(db, "F2", assigned="2026-01-10T10:00:00+00:00", updated="2026-01-10", nom="MARTIN"); add_item(db, "F2", "SN2")
+    sync_units_for_form(db, "F1"); sync_units_for_form(db, "F2")
+    changed = anonymize_old_holders(db, 5, datetime(2026, 9, 19, tzinfo=timezone.utc))
+    assert changed == 2  # les deux evenements de F1 (attribution et retour)
+    detail = get_unit(db, unit(db)["id"])
+    assert [e["event_type"] for e in detail["events"]] == ["assigned", "returned"]
+    assert all(e["holder_label"] == ANONYMIZED_LABEL for e in detail["events"])
+    assert get_unit(db, unit(db, "SN2")["id"])["events"][0]["holder_label"] == "MARTIN Anne · DSI"  # recent
+    assert anonymize_old_holders(db, 5, datetime(2026, 9, 19, tzinfo=timezone.utc)) == 0  # idempotent
+
+
+def test_a_currently_held_object_is_never_anonymized_even_if_old(db):
+    add_form(db, "F1", assigned="2018-01-10T10:00:00+00:00", updated="2018-01-10"); add_item(db, "F1", "SN1")
+    sync_units_for_form(db, "F1")
+    assert anonymize_old_holders(db, 5, datetime(2026, 9, 19, tzinfo=timezone.utc)) == 0
+    assert unit(db)["holder_label"] == "DUPONT Anne · DSI"
+
+
+CSV = ("Ressource;Identifiant;Etat;Marque\n"
+       "Ordinateur;SN-A1;en stock;Lenovo\n"
+       "ordinateur;SN-A2;Dégradé;Dell\n"
+       "Ordinateur;SN-A1;en stock;Doublon\n"
+       "Ordinateur;;en stock;Vide\n"
+       "Imprimante;SN-Z;en stock;X\n"
+       "Ordinateur;SN-A3;cassé;X\n")
+
+
+def test_csv_import_dry_run_reports_without_writing(db):
+    db.execute("UPDATE resource_catalog SET code='ordinateur' WHERE code='ordinateur'")
+    db.execute("INSERT INTO resource_catalog VALUES ('imprimante','Imprimante','materiel','none','[]')")
+    report = import_units(db, CSV, "gestionnaire", dry_run=True)
+    assert (report["rows"], report["created"]) == (6, 2) and len(report["errors"]) == 4
+    assert {e["line"] for e in report["errors"]} == {4, 5, 6, 7}
+    assert db.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0
+
+
+def test_csv_import_creates_units_with_the_requested_state_and_skips_existing_ones(db):
+    add_form(db, "F1"); add_item(db, "F1", "SN-A2"); sync_units_for_form(db, "F1")  # SN-A2 existe deja
+    report = import_units(db, CSV.replace("SN-A3;cassé", "SN-A3;perdu"), "gestionnaire", dry_run=False)
+    assert report["created"] == 2 and report["skipped"] == 1  # SN-A1 et SN-A3 ; SN-A2 deja connu
+    assert unit(db, "SN-A1")["status"] == "in_stock" and json.loads(unit(db, "SN-A1")["fields_json"]) == {"numeroSerie": "SN-A1", "marque": "Lenovo"}
+    assert unit(db, "SN-A3")["status"] == "lost" and unit(db, "SN-A3")["origin"] == "import"
+    assert all(e[1] is None for e in events(db, "SN-A3"))  # un import n'est pas une anomalie
+    assert import_units(db, CSV.replace("SN-A3;cassé", "SN-A3;perdu"), "g", dry_run=False)["created"] == 0  # idempotent
+
+
+def test_csv_import_reads_comma_separated_files_and_field_labels(db):
+    text = "ressource,N° de série,statut\nOrdinateur,SN-B1,réformé\n"
+    assert import_units(db, text, "g", dry_run=False)["created"] == 1
+    assert unit(db, "SN-B1")["status"] == "retired"
+
+
+def test_indicators(db):
+    add_form(db, "F1", assigned="2026-01-01T00:00:00+00:00"); add_item(db, "F1", "SN1", "conforme", "2026-01-11")
+    add_form(db, "F2", assigned="2026-02-01T00:00:00+00:00"); add_item(db, "F2", "SN2", "degrade", "2026-02-21")
+    add_form(db, "F3", assigned="2024-01-01T00:00:00+00:00"); add_item(db, "F3", "SN3")  # detenu depuis > 1 an
+    for form in ("F1", "F2", "F3"):
+        sync_units_for_form(db, form)
+    stats = compute_indicators(db, now=datetime(2026, 9, 19, tzinfo=timezone.utc))
+    assert stats["units"] == 3 and stats["by_status"] == {"in_stock": 1, "degraded": 1, "assigned": 1}
+    assert stats["avg_hold_days"] == 15.0 and stats["damage_rate"] == 50.0
+    assert stats["long_held"] == 1 and stats["assignments_per_unit"] == 1.0 and stats["anomalies"] == 0
+    assert compute_indicators(db, "telephone")["units"] == 0
