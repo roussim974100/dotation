@@ -623,12 +623,26 @@ const USER_MENU_FEATURE_LINKS = [
   {
     id: "dbLink",
     label: "Base de données",
+    navHint: "Sauvegarde et restauration",
     href: "admin-db.html",
     isAllowed: (user) => Boolean(user.db_manage) || (user.permissions || []).includes("*") || (user.permissions || []).includes("db.manage")
   }
 ];
 
 function renderUserMenuFeatureLinks(user) {
+  // Meme entree dans la navigation laterale des pages d'administration.
+  document.querySelectorAll(".admin-nav").forEach((nav) => {
+    USER_MENU_FEATURE_LINKS.forEach((link) => {
+      if (nav.querySelector(`[href="${link.href}"]`) || !link.isAllowed(user)) return;
+      const item = document.createElement("a");
+      item.className = "admin-nav__link";
+      item.href = link.href;
+      item.dataset.featureNav = link.id;
+      item.innerHTML = `<span>${link.label}</span><small>${link.navHint || ""}</small>`;
+      if (window.location.pathname.endsWith(link.href)) item.setAttribute("aria-current", "page");
+      nav.appendChild(item);
+    });
+  });
   const panel = document.querySelector("#userMenu .user-menu__panel");
   if (!panel) return;
   const anchor = panel.querySelector(".user-menu__sep");

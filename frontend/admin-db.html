@@ -54,7 +54,7 @@
         <a class="admin-nav__link" href="admin-ressources.html"><span>Ressources</span><small>Référentiel</small></a>
         <a class="admin-nav__link" href="logs.html"><span>Journal</span><small>Traçabilité</small></a>
         <a class="admin-nav__link" href="admin-personnalisation.html"><span>Personnalisation</span><small>Logo et thèmes</small></a>
-        <a class="admin-nav__link is-active" href="admin-db.html"><span>Base de données</span><small>Export / Import</small></a>
+        <a class="admin-nav__link is-active" href="admin-db.html"><span>Base de données</span><small>Sauvegarde et restauration</small></a>
       </nav>
     </aside>
 
@@ -71,6 +71,7 @@
       <nav class="dashboard-nav mt-4" aria-label="Sections de la base de données">
         <a class="dashboard-nav__link" href="#db-export">Exporter</a>
         <a class="dashboard-nav__link" href="#db-restore">Restaurer</a>
+        <a class="dashboard-nav__link" href="#db-destinations">Destinations</a>
         <a class="dashboard-nav__link" href="#db-safety">Copies de sécurité</a>
         <a class="dashboard-nav__link" href="#db-legacy">Ancien format</a>
       </nav>
@@ -138,6 +139,40 @@
           <button class="btn btn-danger" id="backupRestoreBtn" type="button">Restaurer la sélection</button>
         </div>
         <div id="backupRestoreResult" class="mt-3 d-none"></div>
+      </section>
+
+      <section class="content-card mt-4" id="db-destinations">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Envoi</p>
+            <h2 class="section-title">Destinations de sauvegarde</h2>
+            <p class="panel-text">Envoyez une sauvegarde vers un partage réseau (SMB, NFS) ou un dossier. Le partage doit être <strong>monté sur le serveur</strong> : l'application ne stocke aucun identifiant de partage.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="destAddBtn" type="button">+ Nouvelle destination</button>
+          </div>
+        </div>
+        <form class="row g-3 mb-4 d-none" id="destForm" novalidate>
+          <div id="destFormFields" class="row g-3"></div>
+          <div class="col-12 form-text">
+            Linux : montez le partage (fstab, cifs ou nfs) puis indiquez son point de montage, par exemple <code>/mnt/sauvegardes</code>.
+            Windows : chemin UNC, par exemple <code>\\serveur\partage\aquai</code>. Le dossier doit être en dehors de l'application.
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" id="destSaveBtn" type="submit">Enregistrer</button>
+            <button class="btn btn-outline-secondary" id="destCancelBtn" type="button">Annuler</button>
+          </div>
+          <div class="col-12"><div id="destFormError" class="text-danger small d-none" role="alert"></div></div>
+        </form>
+        <div class="table-responsive">
+          <table class="table align-middle draft-table">
+            <thead><tr><th>Destination</th><th>Type</th><th>Chemin</th><th>Dernier envoi</th><th class="text-end">Actions</th></tr></thead>
+            <tbody id="destTableBody"></tbody>
+          </table>
+        </div>
+        <div id="destResult" class="mt-3 d-none"></div>
+        <h3 class="section-title fs-6 mt-4">Historique des envois</h3>
+        <div id="backupHistoryList" class="text-muted small">Chargement…</div>
       </section>
 
       <section class="content-card mt-4" id="db-safety">
@@ -220,5 +255,6 @@
 <script src="js/global-search.js"></script>
 <script src="js/admin-db.js"></script>
 <script src="js/admin-backup.js"></script>
+<script src="js/admin-backup-targets.js"></script>
 </body>
 </html>

@@ -1,0 +1,2 @@
+{"ts": "2026-09-19T08:28:12.853720+00:00", "trigger": "manual", "destination_id": "dest_39040c4e", "destination": "Partage test", "filename": "aquai_sauvegarde_20260919_082812.aqbak", "size": 530664, "encrypted": true, "ok": true, "duration_ms": 196}
+{"ts": "2026-09-19T08:28:55.349659+00:00", "trigger": "manual", "destination_id": "dest_39040c4e", "destination": "Partage test", "filename": "aquai_sauvegarde_20260919_082855.zip", "size": 530936, "encrypted": false, "ok": true, "duration_ms": 116}

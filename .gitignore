@@ -51,3 +51,4 @@ graphify-out/obsidian/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+backend/backup_config.json
