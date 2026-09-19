@@ -84,3 +84,17 @@ def test_update_endpoints_report_status_and_refuse_the_web_update_by_default(htt
     assert status_code == 200 and {"current", "latest", "available", "can_update", "enabled", "progress"} <= set(keys)
     assert http["update_check_disabled"] == [200, False]  # verification desactivee : aucune requete reseau
     assert http["update_start_disabled"] == [403, "update_disabled"]
+
+
+def test_partial_settings_update_keeps_existing_values(http):
+    assert http["partial_put_keeps"] == ["Organisation Test", "aide@test.fr"]
+
+
+def test_invalid_beneficiary_type_is_refused(http):
+    assert http["bad_beneficiary_status"] == 400
+
+
+def test_setup_cannot_be_replayed_without_confirmation(http):
+    assert http["setup_first_run"] == 200 or http["setup_first_run"] == 409  # une base neuve peut deja etre configuree
+    assert http["setup_rerun_locked"] == 409 and http["setup_rerun_org_name"] != "Pirate"
+    assert http["setup_rerun_confirmed"] == 200

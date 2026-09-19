@@ -25,7 +25,7 @@ from auth import (
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
     DEFAULT_APP_SETTINGS, THEME_PRESETS,
-    get_app_settings, save_app_settings,
+    get_app_settings, save_app_settings, SettingsValidationError,
     get_brand_logo_public_url, get_dpo_email,
     build_public_settings_payload, resolve_theme_id, resolve_dark_mode,
 )
@@ -388,40 +388,53 @@ def admin_settings_route():
 @rate_limit(max_requests=20, window_seconds=60, scope="admin_settings_put")
 def update_admin_settings_route():
     payload = request.get_json(silent=True) or {}
-    with get_db() as connection:
-        save_app_settings(connection, {
-            "org_name": payload.get("org_name"),
-            "dpo_email": payload.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"],
-            "email_domains": payload.get("email_domains"),
-            "brand_logo_mode": payload.get("brand_logo_mode"),
-            "brand_logo_url": payload.get("brand_logo_url"),
-            "theme_id": payload.get("theme_id"),
-            "dark_mode_policy": payload.get("dark_mode_policy"),
-            "org_context": payload.get("org_context"),
-            "beneficiary_types": payload.get("beneficiary_types"),
-            "support_name": payload.get("support_name"),
-            "support_email": payload.get("support_email"),
-            "support_role": payload.get("support_role"),
-            "restitution_phase1_unlock_days": str(int(payload.get("restitution_phase1_unlock_days") or 1)),
-            "timing_warning_days": str(int(payload.get("timing_warning_days") or 3)),
-            "parc_retention_years": str(max(1, min(30, int(payload.get("parc_retention_years") or 5)))),
-        })
-        insert_app_log(
-            connection,
-            "admin",
-            "settings_updated",
-            "Parametres de personnalisation mis a jour",
-            "settings",
-            "branding",
-            {
+
+    def optional_int(key, low, high):
+        """Entier borne, ou None si le champ n'est pas fourni (le reglage existant est alors conserve)."""
+        if payload.get(key) in (None, ""):
+            return None
+        try:
+            return str(max(low, min(high, int(payload.get(key)))))
+        except (TypeError, ValueError):
+            raise SettingsValidationError(f"« {key} » doit être un nombre entier.")
+
+    try:
+        with get_db() as connection:
+            save_app_settings(connection, {
                 "org_name": payload.get("org_name"),
                 "dpo_email": payload.get("dpo_email"),
+                "email_domains": payload.get("email_domains"),
                 "brand_logo_mode": payload.get("brand_logo_mode"),
+                "brand_logo_url": payload.get("brand_logo_url"),
                 "theme_id": payload.get("theme_id"),
                 "dark_mode_policy": payload.get("dark_mode_policy"),
-            },
-            actor=current_actor(),
-        )
+                "org_context": payload.get("org_context"),
+                "beneficiary_types": payload.get("beneficiary_types"),
+                "support_name": payload.get("support_name"),
+                "support_email": payload.get("support_email"),
+                "support_role": payload.get("support_role"),
+                "restitution_phase1_unlock_days": optional_int("restitution_phase1_unlock_days", 0, 365),
+                "timing_warning_days": optional_int("timing_warning_days", 0, 365),
+                "parc_retention_years": optional_int("parc_retention_years", 1, 30),
+            })
+            insert_app_log(
+                connection,
+                "admin",
+                "settings_updated",
+                "Parametres de personnalisation mis a jour",
+                "settings",
+                "branding",
+                {
+                    "org_name": payload.get("org_name"),
+                    "dpo_email": payload.get("dpo_email"),
+                    "brand_logo_mode": payload.get("brand_logo_mode"),
+                    "theme_id": payload.get("theme_id"),
+                    "dark_mode_policy": payload.get("dark_mode_policy"),
+                },
+                actor=current_actor(),
+            )
+    except SettingsValidationError as error:
+        return jsonify({"error": str(error)}), 400
     return jsonify(build_public_settings_payload())
 
 
@@ -448,6 +461,9 @@ def setup_status_route():
 @rate_limit(max_requests=5, window_seconds=600, scope="setup_complete")
 def setup_complete_route():
     payload = request.get_json(silent=True) or {}
+    if get_app_settings().get("setup_completed", "0") == "1" and payload.get("confirm_reconfigure") is not True:
+        # L'installation ne se rejoue pas par megarde : une reconfiguration exige une confirmation explicite (tracee).
+        return jsonify({"error": "L'installation est déjà terminée : utilisez Administration > Personnalisation."}), 409
     updates = {
         "org_name": payload.get("org_name"),
         "dpo_email": payload.get("dpo_email"),
@@ -458,18 +474,22 @@ def setup_complete_route():
         "support_role": payload.get("support_role"),
         "setup_completed": "1",
     }
-    with get_db() as connection:
-        save_app_settings(connection, updates)
-        insert_app_log(
-            connection,
-            "admin",
-            "setup_completed",
-            "Configuration initiale complétée via le wizard",
-            "settings",
-            "setup",
-            {"org_name": payload.get("org_name"), "org_context": payload.get("org_context")},
-            actor=current_actor(),
-        )
+    try:
+        with get_db() as connection:
+            save_app_settings(connection, updates)
+            insert_app_log(
+                connection,
+                "admin",
+                "setup_completed",
+                "Configuration initiale complétée via le wizard",
+                "settings",
+                "setup",
+                {"org_name": payload.get("org_name"), "org_context": payload.get("org_context"),
+                 "reconfigured": payload.get("confirm_reconfigure") is True},
+                actor=current_actor(),
+            )
+    except SettingsValidationError as error:
+        return jsonify({"error": str(error)}), 400
     return jsonify(build_public_settings_payload())
 
 

@@ -1,5 +1,15 @@
 # Historique des versions — À Quai
 
+## [3.50.0] - 2026-09-19
+
+Chantier « Assistant d'organisation » (wizard de démarrage rejouable, adapté à toute structure, y compris hors France) — **sprint 1 : sécurité des réglages**.
+
+### 🔒 Sécurité et robustesse des réglages
+- Une mise à jour **partielle** des réglages n'efface plus les champs non envoyés (une valeur absente est conservée ; une chaîne vide vide bien le réglage). Les durées (restitution, alerte, conservation) ne se remettent plus à leur défaut quand elles sont absentes.
+- **Types de bénéficiaires validés** côté serveur : identifiant `a-z 0-9 _ -`, libellé libre dans toutes les langues sauf la virgule, les deux-points, le point-virgule, `<`, `>`, `&`, les guillemets et l'antislash, doublons refusés, plus de retour silencieux sur Agent/Élu ; erreur 400 explicite.
+- Textes de réglages limités à 200 caractères.
+- L'**installation ne se rejoue plus** par mégarde : une fois terminée, `/api/setup/complete` répond 409 sauf confirmation explicite (`confirm_reconfigure`), tracée au journal.
+
 ## [3.49.1] - 2026-09-19
 
 ### 🗃️ Parc matériel

@@ -114,6 +114,24 @@ admin.put("/api/admin/settings", json={"brand_logo_url": "file:///etc/passwd"}, 
 saved = admin.get("/api/admin/settings").get_json() or {}
 results["logo_url_file_scheme_stored"] = saved.get("brand_logo_url", saved.get("settings", {}).get("brand_logo_url") if isinstance(saved.get("settings"), dict) else None)
 
+# Reglages : une mise a jour partielle ne vide rien, un type de beneficiaire invalide est refuse (400), le setup ne se rejoue pas.
+admin.put("/api/admin/settings", json={"org_name": "Organisation Test", "support_email": "aide@test.fr"}, headers=H)
+admin.put("/api/admin/settings", json={"theme_id": "foret"}, headers=H)
+kept = admin.get("/api/admin/settings").get_json() or {}
+kept = kept.get("raw") or {}
+results["partial_put_keeps"] = [kept.get("org_name"), kept.get("support_email")]
+r = admin.put("/api/admin/settings", json={"beneficiary_types": "agent:A,B"}, headers=H)
+results["bad_beneficiary_status"] = status(r)
+r = admin.post("/api/setup/complete", json={"org_name": "X", "org_context": "association", "beneficiary_types": "membre:Membre"}, headers=H)
+results["setup_first_run"] = status(r)
+r = admin.post("/api/setup/complete", json={"org_name": "Pirate", "org_context": "association", "beneficiary_types": "membre:Membre"}, headers=H)
+results["setup_rerun_locked"] = status(r)
+after = admin.get("/api/admin/settings").get_json() or {}
+after = after.get("raw") or {}
+results["setup_rerun_org_name"] = after.get("org_name")
+r = admin.post("/api/setup/complete", json={"org_name": "Reconfiguree", "org_context": "association", "beneficiary_types": "membre:Membre", "confirm_reconfigure": True}, headers=H)
+results["setup_rerun_confirmed"] = status(r)
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):
