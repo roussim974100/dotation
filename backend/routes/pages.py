@@ -377,16 +377,12 @@ def public_logo_route():
         absolute_path = os.path.join(FRONTEND_ASSETS_DIR, relative_path) if relative_path else ""
         if relative_path and os.path.exists(absolute_path):
             response = send_from_directory(FRONTEND_ASSETS_DIR, relative_path)
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
             return response
 
     if os.path.exists(CITY_LOGO_PATH):
         response = send_from_directory(FRONTEND_ASSETS_DIR, os.path.basename(CITY_LOGO_PATH))
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
         return response
 
     if logo_mode == "url":
@@ -395,9 +391,7 @@ def public_logo_route():
             return redirect(remote_url, code=302)
 
     response = send_from_directory(FRONTEND_ASSETS_DIR, "app-icon.svg")
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
     return response
 
 

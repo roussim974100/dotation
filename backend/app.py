@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, session
 from flask.sessions import SecureCookieSessionInterface
+import gzip
 import os
 import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -68,6 +69,37 @@ def validate_csrf():
     expected = session.get("csrf_token", "")
     if not expected or not token or not secrets.compare_digest(token, expected):
         return jsonify({"error": "csrf_invalid"}), 403
+
+
+COMPRESSIBLE_TYPES = ("text/html", "application/json", "application/javascript", "text/css", "text/javascript")
+COMPRESS_MIN_BYTES = 1024
+
+
+@app.after_request
+def compress_response(response):
+    """Compression gzip (bibliotheque standard) des reponses texte : la liste des dossiers
+    passe d'environ 340 Ko a une trentaine de Ko. Enregistre avant disable_frontend_cache, donc
+    executee apres lui (Flask inverse l'ordre des after_request) et voit les en-tetes finaux."""
+    if (
+        response.status_code != 200
+        or response.headers.get("Content-Encoding")
+        or "gzip" not in (request.headers.get("Accept-Encoding") or "").lower()
+        or not any(t in (response.headers.get("Content-Type") or "").lower() for t in COMPRESSIBLE_TYPES)
+    ):
+        return response
+    response.direct_passthrough = False
+    data = response.get_data()
+    if len(data) < COMPRESS_MIN_BYTES:
+        return response
+    compressed = gzip.compress(data, compresslevel=6)
+    response.set_data(compressed)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(compressed))
+    response.headers.add("Vary", "Accept-Encoding")
+    etag = response.headers.get("ETag")
+    if etag and not etag.startswith("W/"):
+        response.headers["ETag"] = f"W/{etag}"
+    return response
 
 
 @app.after_request

@@ -250,16 +250,20 @@ def list_forms():
             "SELECT COALESCE(MAX(updated_at),''), COUNT(*) FROM dotation_forms" + where_clause,
             params,
         ).fetchone()
-        etag = hashlib.md5(f"{fingerprint[0]}:{fingerprint[1]}".encode()).hexdigest()
+        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
+        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage et de la date du jour
+        # (statuts En retard / En danger) : sans eux, un 304 servirait des donnees perimees.
+        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}"
+        etag = hashlib.md5(etag_source.encode()).hexdigest()
 
-        if request.headers.get("If-None-Match") == etag:
+        # La compression gzip transforme l'ETag en validateur faible (W/...) : on compare la valeur nue.
+        if (request.headers.get("If-None-Match") or "").removeprefix("W/").strip('"') == etag:
             return "", 304
 
         rows = connection.execute(
             "SELECT * FROM dotation_forms" + where_clause + " ORDER BY updated_at DESC",
             params,
         ).fetchall()
-        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
 
     resp = jsonify([row_to_summary(row, warning_days) for row in rows])
     resp.headers["ETag"] = etag

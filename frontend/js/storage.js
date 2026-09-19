@@ -1081,11 +1081,18 @@ async function getSessionInfo() {
   return sessionInfo;
 }
 
-let listFormsEtag = null;
+// ETag de la liste : persiste avec le cache local, pour que changer d'onglet (autre page du tableau de bord)
+// obtienne un 304 immediat au lieu de retelecharger toute la liste. Le serveur y inclut l'utilisateur,
+// le seuil de pilotage et la date du jour.
+const LIST_ETAG_KEY = "dotationDraftsEtag";
+let listFormsEtag = (() => {
+  try { return localStorage.getItem(LIST_ETAG_KEY); } catch (error) { return null; }
+})();
 async function listForms() {
   try {
     const fetchHeaders = {};
-    if (listFormsEtag) {
+    // Sans cache local exploitable, un 304 renverrait une liste vide : on redemande alors la liste complete.
+    if (listFormsEtag && getCachedDrafts().length > 0) {
       fetchHeaders["If-None-Match"] = listFormsEtag;
     }
     const response = await fetch(API_BASE, {
@@ -1099,6 +1106,7 @@ async function listForms() {
     const etag = response.headers.get("ETag");
     if (etag) {
       listFormsEtag = etag;
+      try { localStorage.setItem(LIST_ETAG_KEY, etag); } catch (error) { /* stockage indisponible : sans effet */ }
     }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
