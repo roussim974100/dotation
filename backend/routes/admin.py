@@ -20,7 +20,7 @@ from auth import (
     get_user_record, password_complexity_error, is_valid_username,
     current_user, rate_limit,
     list_all_users, list_all_groups, update_group,
-    create_user, update_user, delete_user,
+    create_user, update_user, delete_user, normalize_email,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
@@ -699,6 +699,7 @@ def admin_users():
             "is_active": user.get("is_active", True),
             "status": user.get("status", "active"),
             "service": user.get("service") or "",
+            "email": user.get("email") or "",
             "db_manage": bool(user.get("db_manage", False)),
         }
         for user in users
@@ -840,7 +841,7 @@ def restore_trash_item(trash_id):
             is_active = bool(payload.get("is_active", True))
             status = payload.get("status", "active")
             db_manage = bool(payload.get("db_manage", False))
-            if not create_user(username, password_hash, groups, service, is_active, status, db_manage):
+            if not create_user(username, password_hash, groups, service, is_active, status, db_manage, payload.get("email") or ""):
                 return jsonify({"error": "failed_to_restore_user"}), 500
             form_data = {"restored": True}
         else:
@@ -1354,8 +1355,11 @@ def create_admin_user():
     status = "active" if is_active else "disabled"
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     db_manage = bool(payload.get("db_manage", False))
+    email, email_error = normalize_email(payload.get("email"))
+    if email_error:
+        return jsonify({"error": email_error}), 400
 
-    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage):
+    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email):
         return jsonify({"error": "failed_to_create_user"}), 500
 
     with get_db() as connection:
@@ -1401,6 +1405,12 @@ def update_admin_user(username):
 
     if "db_manage" in payload:
         update_fields["db_manage"] = int(bool(payload["db_manage"]))
+
+    if "email" in payload:
+        email, email_error = normalize_email(payload["email"])
+        if email_error:
+            return jsonify({"error": email_error}), 400
+        update_fields["email"] = email
 
     password_changed = False
     if payload.get("password"):

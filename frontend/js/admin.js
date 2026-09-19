@@ -390,6 +390,7 @@ function resetUserForm() {
   byId("admin_password").placeholder = "Mot de passe temporaire";
   byId("admin_active").checked = true;
   if (byId("admin_service")) byId("admin_service").value = "";
+  if (byId("admin_email")) byId("admin_email").value = "";
   if (byId("admin_db_manage")) byId("admin_db_manage").checked = false;
   setSelectedGroups([]);
 }
@@ -405,6 +406,7 @@ function populateUserForm(username) {
   byId("modalAdminPassword").value = "";
   byId("modalAdminActive").checked = user.status !== "disabled";
   if (byId("modalAdminService")) byId("modalAdminService").value = user.service || "";
+  if (byId("modalAdminEmail")) byId("modalAdminEmail").value = user.email || "";
   if (byId("modalAdminDbManage")) byId("modalAdminDbManage").checked = Boolean(user.db_manage);
   setSelectedGroupsInModal(user.groups || []);
 
@@ -446,6 +448,7 @@ async function saveUserFromModal() {
   }
 
   const service = byId("modalAdminService")?.value.trim() || "";
+  const email = byId("modalAdminEmail")?.value.trim() || "";
   const dbManage = Boolean(byId("modalAdminDbManage")?.checked);
 
   try {
@@ -454,7 +457,7 @@ async function saveUserFromModal() {
       body: JSON.stringify({
         groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password, service, db_manage: dbManage
+        password, service, email, db_manage: dbManage
       })
     });
     showToast("Compte mis à jour.");
@@ -844,7 +847,7 @@ function renderUserTable() {
     const rowMenu = renderAdminRowMenu(menuItems, { label: "Supprimer", attrs: `data-admin-action="deleteUser" data-username="${username}"` });
     return `
       <tr>
-        <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
+        <td data-label="Utilisateur">${escapeHtml(user.username)}${user.email ? `<div class="draft-meta">${escapeHtml(user.email)}</div>` : ""}</td>
         <td data-label="Groupes">${escapeHtml((user.groups || []).join(", ") || "-")}</td>
         <td data-label="Service">${escapeHtml(user.service || "—")}</td>
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
@@ -884,6 +887,7 @@ async function saveUser() {
   }
 
   const service = byId("admin_service")?.value.trim() || "";
+  const email = byId("admin_email")?.value.trim() || "";
   const dbManage = Boolean(byId("admin_db_manage")?.checked);
   if (!editingUsername) {
     await adminRequest("/api/admin/users", {
@@ -891,7 +895,7 @@ async function saveUser() {
       body: JSON.stringify({
         username, password, groups: selectedGroups,
         is_active: isActive, status: isActive ? "active" : "disabled",
-        service, db_manage: dbManage
+        service, email, db_manage: dbManage
       })
     });
   } else {
@@ -900,7 +904,7 @@ async function saveUser() {
       body: JSON.stringify({
         groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password, service, db_manage: dbManage
+        password, service, email, db_manage: dbManage
       })
     });
   }

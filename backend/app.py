@@ -6,7 +6,7 @@ import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
-from database import get_db, get_users_db, ensure_column
+from database import get_db, get_users_db, ensure_column, ensure_users_schema
 from models.dossier import migrate_forms_to_dossiers
 from utils import utc_now
 import json
@@ -153,6 +153,7 @@ def disable_frontend_cache(response):
     return response
 
 def init_users_db():
+    ensure_users_schema()  # ajoute les colonnes recentes (email) a une base existante
     with get_users_db() as connection:
         connection.executescript(
             """
@@ -163,6 +164,7 @@ def init_users_db():
                 status TEXT NOT NULL DEFAULT 'active',
                 service TEXT,
                 db_manage INTEGER NOT NULL DEFAULT 0,
+                email TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );

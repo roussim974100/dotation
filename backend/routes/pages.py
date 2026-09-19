@@ -11,7 +11,7 @@ from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, extract_first_forwarded_ip, check_user,
-    current_user,
+    current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
 from models.audit import insert_app_log, read_login_attempt_context
@@ -101,7 +101,10 @@ def signup():
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         password_confirm = request.form.get("password_confirm") or ""
+        email, email_error = normalize_email(request.form.get("email"))
 
+        if email_error:
+            return redirect("/signup?error=invalid_email")
         if not username or not password or not password_confirm:
             return redirect("/signup?error=missing_fields")
         if not is_valid_username(username):
@@ -118,8 +121,8 @@ def signup():
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         with get_users_db() as connection:
             connection.execute(
-                "INSERT INTO users (username, password_hash, is_active, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-                (username, password_hash, 1, "pending", now, now)
+                "INSERT INTO users (username, password_hash, is_active, status, email, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+                (username, password_hash, 1, "pending", email, now, now)
             )
             connection.execute(
                 "INSERT INTO user_groups (username, group_key) VALUES (?,?)",

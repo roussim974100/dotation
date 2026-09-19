@@ -104,6 +104,11 @@
               <div class="form-text">Si renseigné: 12 caractères min, majuscule, minuscule, chiffre, caractère spécial.</div>
             </div>
             <div class="mb-3">
+              <label class="form-label" for="modalAdminEmail">Adresse e-mail (optionnel)</label>
+              <input class="form-control" id="modalAdminEmail" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
+              <div class="form-text">Servira aux futurs envois automatiques (demandes d'attribution de ressources).</div>
+            </div>
+            <div class="mb-3">
               <label class="form-label" for="modalAdminService">Service (optionnel)</label>
               <select class="form-select" id="modalAdminService">
                 <option value="">— Aucun service —</option>
@@ -183,6 +188,10 @@
               <input class="form-check-input" type="checkbox" id="admin_active" checked>
               <span class="form-check-label">Compte actif</span>
             </label>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="admin_email">Adresse e-mail (optionnel)</label>
+            <input class="form-control" id="admin_email" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
           </div>
           <div class="col-md-4">
             <label class="form-label" for="admin_service">Service (optionnel)</label>

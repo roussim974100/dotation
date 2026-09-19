@@ -9,7 +9,7 @@ import backup
 import backup_schedule
 import backup_targets
 from auth import login_required, permission_required, rate_limit, current_user
-from database import get_db
+from database import get_db, ensure_users_schema
 from models.audit import insert_app_log
 
 bp = Blueprint("db_backup", __name__)
@@ -129,6 +129,8 @@ def backup_import():
         return _error_response(error)
     except OSError as error:
         return jsonify({"error": "import_failed", "message": f"Échec du remplacement : {error}"}), 500
+    if "users" in result["restored"]:
+        ensure_users_schema()  # une ancienne archive remet l'ancien schema des comptes
     _log("backup_imported", "Import sauvegarde", {"restored": result["restored"], "safety_copies": result["safety_copies"]})
     return jsonify({"imported": True, "restored": result["restored"], "safety_copies": result["safety_copies"], "report": result["report"]})
 

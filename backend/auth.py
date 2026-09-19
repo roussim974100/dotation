@@ -71,15 +71,28 @@ def update_group(key, permissions):
         return False
 
 
-def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False):
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def normalize_email(value):
+    """Adresse e-mail d'un compte : facultative. Retourne (adresse nettoyee, erreur) ; erreur = None si valide."""
+    email = str(value or "").strip().lower()
+    if not email:
+        return "", None
+    if len(email) > 254 or not _EMAIL_RE.match(email):
+        return email, "invalid_email"
+    return email, None
+
+
+def create_user(username, password_hash, groups, service="", is_active=True, status="active", db_manage=False, email=""):
     """Crée un nouvel utilisateur. Affecte le premier utilisateur au groupe admin automatiquement."""
     try:
         from utils import utc_now
         with get_users_db() as conn:
             now = utc_now()
             conn.execute(
-                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                (username, password_hash, int(is_active), status, service, int(db_manage), now, now)
+                "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, email, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (username, password_hash, int(is_active), status, service, int(db_manage), email or "", now, now)
             )
             # Si c'est le premier utilisateur ET qu'il n'a pas de groupe, l'affecter au groupe admin
             user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
