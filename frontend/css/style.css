@@ -4954,3 +4954,24 @@ main {
   justify-content: flex-end;
   align-items: center;
 }
+
+
+/* Ecrans tactiles : cibles d'au moins 44 px (boutons de ligne, menus, filtres). */
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm,
+  .dashboard-nav__link,
+  .user-menu__item,
+  .draft-actions__menu summary,
+  .filter-chip,
+  .form-select,
+  .form-control {
+    min-height: 44px;
+  }
+
+  .draft-select,
+  .form-check-input {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+}

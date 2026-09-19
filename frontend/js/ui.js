@@ -814,3 +814,40 @@ function renderRestitutionSteps({ current, id, name, phase1Validated }) {
     </nav>
     <ol class="restitution-steps__list" aria-label="Étapes de la restitution">${steps}</ol>`;
 }
+
+
+// Raccourcis clavier des pages de liste : "/" recherche, "n" nouveau dossier, "?" aide.
+// Ignores dans un champ de saisie ou avec un modificateur (pour ne pas gener Ctrl+K ni la saisie).
+const KEYBOARD_SHORTCUTS = [
+  { key: "/", label: "Rechercher", run: () => document.getElementById("searchInput")?.focus() },
+  {
+    key: "n",
+    label: "Nouveau dossier",
+    run: () => {
+      const button = ["newFormBtn", "newRestitutionBtn"]
+        .map((id) => document.getElementById(id))
+        .find((el) => el && !el.classList.contains("d-none"));
+      button?.click();
+    }
+  },
+  {
+    key: "?",
+    label: "Afficher les raccourcis",
+    run: () => {
+      if (typeof showToast === "function") {
+        showToast(KEYBOARD_SHORTCUTS.map((item) => `${item.key.toUpperCase()} : ${item.label}`).join(" · ") + " · Ctrl+K : Recherche globale", "info");
+      }
+    }
+  }
+];
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+  const target = event.target;
+  if (target && (/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName) || target.isContentEditable)) return;
+  if (document.querySelector(".password-generator-modal:not(.d-none)")) return;
+  const shortcut = KEYBOARD_SHORTCUTS.find((item) => item.key === event.key.toLowerCase());
+  if (!shortcut) return;
+  event.preventDefault();
+  shortcut.run();
+});

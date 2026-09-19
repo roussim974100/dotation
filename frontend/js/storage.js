@@ -3009,12 +3009,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (user && (user.permissions.includes("forms.restitution") || user.permissions.includes("*"))) {
       document.getElementById("newRestitutionBtn")?.classList.remove("d-none");
+      document.getElementById("emptyStateNewRestitutionBtn")?.classList.remove("d-none");
     }
     renderDashboardSignatureLinkNotice();
   });
   document.getElementById("newFormBtn")?.addEventListener("click", newForm);
   document.getElementById("emptyStateNewFormBtn")?.addEventListener("click", newForm);
   document.getElementById("newRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
+  document.getElementById("emptyStateNewRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
     editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
