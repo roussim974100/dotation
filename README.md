@@ -501,17 +501,52 @@ Deux limites : un poste du **même réseau privé** que l'application, sans reve
 
 ## Mise à jour en production
 
-### Depuis la branche main (production)
+### Méthode recommandée : le script de mise à jour
+
+```bash
+cd /opt/dotation
+sudo bash setup/update-debian.sh          # branche actuellement installée
+sudo bash setup/update-debian.sh main     # ou une branche précise
+```
+
+Le script, dans l'ordre :
+
+1. **sauvegarde** cohérente des bases dans `backend/db_backups/avant_maj_<date>/` ;
+2. `git pull` de la branche ;
+3. installe les **dépendances Python dans le venv réellement utilisé par le service** (lu dans le fichier systemd, il n'a donc pas besoin de savoir si le venv est `/opt/dotation/venv` ou `/opt/dotation/backend/venv`) ;
+4. redémarre le service et **vérifie qu'il répond** ; sinon il affiche l'erreur et les commandes pour revenir en arrière.
+
+Les bases sont préservées : les tables existantes ne sont jamais supprimées, seules les manquantes sont créées au démarrage.
+
+> **Règle d'or : après chaque `git pull`, toujours réinstaller les dépendances.** Une nouvelle version peut en ajouter (par exemple `cryptography` pour le chiffrement des sauvegardes) ; sans elles, le service ne démarre pas et le reverse proxy répond « 502 Bad Gateway ». Le script s'en charge.
+
+### Méthode manuelle
 
 ```bash
 cd /opt/dotation
 git pull origin main
-source venv/bin/activate
-pip install -r backend/requirements.txt
+# Le venv est celui du service : voir la ligne ExecStart de /etc/systemd/system/dotation.service
+grep ExecStart /etc/systemd/system/dotation.service
+/opt/dotation/backend/venv/bin/pip install -r backend/requirements.txt   # adapter au chemin lu ci-dessus
+systemctl reset-failed dotation
 systemctl restart dotation
+curl -sI http://127.0.0.1:5000/login | head -1                            # doit répondre 200
 ```
 
-**Les bases de données sont préservées** — les tables existantes ne sont jamais supprimées, seules les manquantes sont créées.
+Ne jamais lancer `pip install` sans passer par le `pip` du venv (Debian répond `externally-managed-environment`) et ne jamais utiliser `--break-system-packages`.
+
+### Dépannage après une mise à jour
+
+| Symptôme | Cause probable | Vérification / correctif |
+|---|---|---|
+| **502 Bad Gateway** (Traefik, nginx…) | Le service ne tourne pas : rien n'écoute sur le port de l'application | `systemctl status dotation` puis `journalctl -u dotation -n 40 --no-pager \| grep -v systemd` |
+| `ModuleNotFoundError: No module named '…'` | Dépendance non installée, ou installée dans un autre venv | `/chemin/du/venv/bin/pip install -r backend/requirements.txt` avec **le venv de la ligne `ExecStart`** |
+| `Start request repeated too quickly` | systemd a bloqué le service après 5 échecs | Corriger l'erreur, puis `systemctl reset-failed dotation && systemctl restart dotation` |
+| `error: externally-managed-environment` | `pip` du système utilisé au lieu de celui du venv | Utiliser le `pip` du venv (voir ci-dessus) |
+| `404 Not Found` sur une page récente (ex. `/parc.html`) | Le serveur tourne avec une ancienne version du code | Vérifier la branche déployée (`git -C /opt/dotation log -1`) et refaire la mise à jour |
+| Base corrompue après remplacement d'un `.db` | Anciens fichiers `-wal` / `-shm` laissés à côté | Arrêter le service, supprimer `*.db-wal` et `*.db-shm`, puis copier la base |
+
+Pour revenir en arrière : arrêter le service, recopier les fichiers de `backend/db_backups/avant_maj_<date>/`, supprimer les `-wal` / `-shm`, revenir au commit précédent (`git checkout <commit>`) et redémarrer.
 
 ---
 
