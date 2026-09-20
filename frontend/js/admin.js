@@ -218,29 +218,100 @@ function renderGroups() {
   }
 
   if (cards) {
-    cards.innerHTML = Object.entries(groups).map(([key, group]) => {
-      const isAdmin = (group.permissions || []).includes("*");
-      const hasUnc = (group.permissions || []).includes("unc.view_all");
-      const uncToggle = isAdmin
-        ? `<span class="status-chip status-chip--active mt-2">Accès UNC complet (admin)</span>`
-        : `<div class="form-check form-switch mt-2">
-             <input class="form-check-input" type="checkbox" role="switch" id="unc_${escapeHtml(key)}" ${hasUnc ? "checked" : ""}
-               data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
-             <label class="form-check-label" for="unc_${escapeHtml(key)}">Accès UNC complet</label>
-           </div>`;
-      return `
-        <div class="equipment-item">
-          <div class="draft-title">${escapeHtml(group.label)}</div>
-          <div class="draft-meta">${escapeHtml(group.description || "")}</div>
-          <div class="mt-2"><span class="status-chip status-chip--${group.data_scope === "masked" ? "draft" : "active"}">${escapeHtml(group.data_scope)}</span></div>
-          <ul class="print-list mt-3">
-            ${(group.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("")}
-          </ul>
-          ${uncToggle}
-        </div>
-      `;
-    }).join("");
+    cards.innerHTML = Object.entries(groups).map(([key, group]) => groupCardHtml(key, group)).join("");
   }
+  renderGroupMatrix();
+}
+
+// ─── Droits expliqués simplement ───────────────────────────────────────────────────────────────────────────────────────────
+// Un droit = une chose qu'une personne a le droit de faire. Les textes sont écrits pour être compris sans connaître le vocabulaire
+// technique : phrases courtes, mots de tous les jours. L'ordre est celui du tableau « Qui peut faire quoi ? ».
+const PERMISSION_INFO = [
+  { key: "forms.read_list", label: "Voir la liste des dossiers" },
+  { key: "forms.read_detail", label: "Ouvrir un dossier pour le lire" },
+  { key: "forms.create", label: "Créer un nouveau dossier" },
+  { key: "forms.edit", label: "Modifier un dossier" },
+  { key: "forms.restitution", label: "Faire un retour de matériel (restitution)" },
+  { key: "forms.export", label: "Télécharger des listes et des PDF" },
+  { key: "forms.delete", label: "Mettre un dossier à la corbeille" },
+  { key: "forms.view_all", label: "Voir les dossiers de tous les services (sinon : seulement ceux de son service)" },
+  { key: "unc.view_all", label: "Voir tous les accès réseau demandés (dossiers partagés)" },
+  { key: "parc.manage", label: "Gérer le parc : déclarer un objet perdu ou réformé, recevoir du stock" },
+  { key: "users.manage", label: "Créer les comptes et régler l'application" },
+  { key: "db.manage", label: "Sauvegarder et restaurer les données" }
+];
+
+const GROUP_SUMMARIES = {
+  lecture: "Peut regarder les dossiers, sans rien changer. Comme un visiteur qui a le droit de lire.",
+  user: "Peut voir les dossiers de tous les services et en créer de nouveaux, mais pas les modifier.",
+  redaction: "Peut créer et modifier des dossiers, et faire les retours de matériel. Ne peut pas les supprimer.",
+  gestion: "Comme « Rédaction », et peut aussi mettre un dossier à la corbeille et voir ceux de tous les services.",
+  direction: "Comme « Gestion », et voit en plus tous les accès réseau. Pensé pour la direction générale, les RH et l'encadrement.",
+  administration: "Comme « Gestion », et peut aussi créer les comptes et régler l'application. Ne gère pas les sauvegardes.",
+  admin: "Peut tout faire : les comptes, les réglages, les sauvegardes et le parc. À donner à très peu de personnes."
+};
+
+const DATA_SCOPE_INFO = {
+  full: "Voit les noms et toutes les informations des dossiers.",
+  masked: "Les noms sont cachés (par exemple « D*** ») et les téléchargements sont interdits."
+};
+
+function groupCan(group, permissionKey) {
+  const list = group.permissions || [];
+  return list.includes("*") || list.includes(permissionKey);
+}
+
+function groupCardHtml(key, group) {
+  const isAdmin = (group.permissions || []).includes("*");
+  const hasUnc = (group.permissions || []).includes("unc.view_all");
+  const uncToggle = isAdmin
+    ? `<span class="status-chip status-chip--active mt-2">Voit tous les accès réseau (administrateur)</span>`
+    : `<div class="form-check form-switch mt-2">
+         <input class="form-check-input" type="checkbox" role="switch" id="unc_${escapeHtml(key)}" ${hasUnc ? "checked" : ""}
+           data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
+         <label class="form-check-label" for="unc_${escapeHtml(key)}">Peut voir tous les accès réseau demandés</label>
+       </div>`;
+  const can = PERMISSION_INFO.filter((info) => groupCan(group, info.key));
+  const cannot = PERMISSION_INFO.filter((info) => !groupCan(group, info.key));
+  const known = new Set(PERMISSION_INFO.map((info) => info.key));
+  const others = (group.permissions || []).filter((permission) => permission !== "*" && !known.has(permission));
+  const summary = GROUP_SUMMARIES[key] || group.description || "";
+  return `
+    <div class="equipment-item">
+      <div class="draft-title">${escapeHtml(group.label)}</div>
+      <div class="draft-meta">${escapeHtml(summary)}</div>
+      <p class="small fw-semibold mt-3 mb-1">Ce groupe peut :</p>
+      <ul class="small list-unstyled mb-2">
+        ${isAdmin ? "<li>✔ Tout faire</li>" : can.map((info) => `<li>✔ ${escapeHtml(info.label)}</li>`).join("") || "<li>Rien pour l'instant.</li>"}
+        ${others.map((permission) => `<li>✔ Un droit particulier (${escapeHtml(permission)})</li>`).join("")}
+      </ul>
+      ${cannot.length && !isAdmin ? `<details class="small mb-2"><summary>Ce qu'il ne peut pas faire</summary>
+        <ul class="list-unstyled mt-1 mb-0">${cannot.map((info) => `<li>✖ ${escapeHtml(info.label)}</li>`).join("")}</ul></details>` : ""}
+      <p class="small text-muted mb-1">${escapeHtml(DATA_SCOPE_INFO[group.data_scope] || DATA_SCOPE_INFO.full)}</p>
+      ${uncToggle}
+    </div>
+  `;
+}
+
+function renderGroupMatrix() {
+  const host = byId("groupMatrix");
+  if (!host) return;
+  const entries = Object.entries(groups);
+  if (!entries.length) {
+    host.innerHTML = "";
+    return;
+  }
+  const head = entries.map(([, group]) => `<th scope="col" class="text-center">${escapeHtml(group.label)}</th>`).join("");
+  const rows = PERMISSION_INFO.map((info) => `
+    <tr><th scope="row" class="fw-normal">${escapeHtml(info.label)}</th>
+      ${entries.map(([, group]) => groupCan(group, info.key)
+        ? '<td class="text-center text-success" aria-label="Oui">✔</td>'
+        : '<td class="text-center text-muted" aria-label="Non">–</td>').join("")}</tr>`).join("");
+  host.innerHTML = `
+    <h3 class="h5 mt-4">Qui peut faire quoi ?</h3>
+    <p class="panel-text">✔ veut dire « a le droit », – veut dire « n'a pas le droit ».</p>
+    <div class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th scope="col">Ce que l'on peut faire</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function getSelectedGroups() {

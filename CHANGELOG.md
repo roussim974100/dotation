@@ -18,6 +18,7 @@ Chantier « Assistant d'organisation » : configuration de démarrage rejouable,
 - **Portail d'administration regroupé** en trois sections identiques au menu latéral (Comptes et droits, Votre organisation, Suivi et exploitation), avec l'assistant d'organisation, le Parc, la Base de données, le Journal, la Corbeille et la Synthèse en cartes.
 - **Personnalisation** : le bouton « Enregistrer la personnalisation », qui enregistre toute la page, n'est plus au milieu (sous la section Contact) mais dans une barre fixée en bas, toujours visible.
 - **Mode sombre** : correction du menu latéral d'administration (titres blancs sur fond clair, illisibles) et du fil d'Ariane ; la liste de la palette Ctrl+K n'est plus écrasée par les filtres.
+- **Comptes et droits en français simple** : chaque groupe est expliqué en une phrase, avec la liste de ce qu'il peut faire et de ce qu'il ne peut pas faire (fini les noms techniques comme `forms.read_list`) ; nouveau tableau « Qui peut faire quoi ? » qui compare tous les groupes ; formulaires reformulés (mot de passe, sauvegardes, accès réseau).
 - Accessibilité : focus clavier visible, cibles de 44 px, onglets défilants sur mobile.
 
 ### 🔒 Sprint 1 : sécurité des réglages

@@ -53,7 +53,7 @@
         <a class="admin-nav__link" href="admin.html"><span>Accueil admin</span><small>Vue d'ensemble</small></a>
         <a class="admin-nav__link" href="#admin-users-create"><span>Nouveau compte</span><small>Créer ou modifier</small></a>
         <a class="admin-nav__link" href="#admin-users-list"><span>Utilisateurs existants</span><small>Actions de gestion</small></a>
-        <a class="admin-nav__link" href="#admin-groups"><span>Groupes disponibles</span><small>Permissions et rôles</small></a>
+        <a class="admin-nav__link" href="#admin-groups"><span>Les groupes</span><small>Qui a le droit de quoi</small></a>
         <a class="admin-nav__link" href="admin-services.html"><span>Services</span><small>Catalogue</small></a>
         <a class="admin-nav__link" href="admin-ressources.html"><span>Ressources</span><small>Référentiel</small></a>
         <a class="admin-nav__link" href="admin-personnalisation.html"><span>Personnalisation</span><small>Logo et thèmes</small></a>
@@ -67,7 +67,7 @@
           <div class="panel-title-wrap">
             <h2 class="panel-title">Gestion des comptes</h2>
           </div>
-          <p class="panel-text">Créez un compte, ajustez ses groupes, validez les demandes en attente et désactivez les accès sans quitter cette page.</p>
+          <p class="panel-text">Ici, vous créez les comptes des personnes qui utilisent l'application, et vous choisissez ce que chacune a le droit de faire. Vous pouvez aussi accepter les demandes en attente et couper un accès.</p>
         </div>
         <div class="admin-stats">
           <div class="stat-card">
@@ -101,7 +101,7 @@
             <div class="mb-3">
               <label class="form-label" for="modalAdminPassword">Mot de passe (laisser vide pour ne pas changer)</label>
               <input class="form-control" id="modalAdminPassword" type="password" placeholder="Nouveau mot de passe">
-              <div class="form-text">Si renseigné: 12 caractères min, majuscule, minuscule, chiffre, caractère spécial.</div>
+              <div class="form-text">Si vous en écrivez un : au moins 12 caractères, avec une majuscule, une minuscule, un chiffre et un symbole (par exemple ! ou #).</div>
             </div>
             <div class="row g-3 mb-3">
               <div class="col-md-6">
@@ -112,12 +112,12 @@
                 <label class="form-label" for="modalAdminLastName">Nom</label>
                 <input class="form-control" id="modalAdminLastName" type="text" autocomplete="off">
               </div>
-              <div class="form-text mt-0">Seul un administrateur peut modifier ces champs une fois renseignés.</div>
+              <div class="form-text mt-0">Une fois remplis, seul un administrateur peut les changer.</div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="modalAdminEmail">Adresse e-mail (optionnel)</label>
               <input class="form-control" id="modalAdminEmail" type="email" autocomplete="off" placeholder="prenom.nom@collectivite.fr">
-              <div class="form-text">Servira aux futurs envois automatiques (demandes d'attribution de ressources).</div>
+              <div class="form-text">Servira plus tard à envoyer des messages automatiques à cette personne.</div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="modalAdminService">Service (optionnel)</label>
@@ -134,11 +134,11 @@
             <div class="mb-3">
               <label class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" id="modalAdminDbManage">
-                <span class="form-check-label">Gestion base de données</span>
+                <span class="form-check-label">Peut gérer les sauvegardes</span>
               </label>
             </div>
             <div class="mb-3">
-              <label class="form-label">Groupe</label>
+              <label class="form-label">Groupe : ce que la personne a le droit de faire</label>
               <div id="modalGroupSelector" class="choice-group"></div>
             </div>
           </div>
@@ -155,7 +155,7 @@
           <div>
             <p class="panel-eyebrow">Comptes</p>
             <h2 class="section-title">Utilisateurs existants</h2>
-            <p class="panel-text">Retrouvez ici les comptes déjà présents et leurs actions de gestion.</p>
+            <p class="panel-text">Voici toutes les personnes qui ont un compte. Vous pouvez modifier un compte ou le désactiver.</p>
           </div>
         </div>
         <div class="table-responsive">
@@ -163,7 +163,7 @@
             <thead>
               <tr>
                 <th data-sort-field="username">Utilisateur</th>
-                <th>Groupes</th>
+                <th>Groupe</th>
                 <th data-sort-field="service">Service</th>
                 <th data-sort-field="status">État</th>
                 <th class="text-end">Actions</th>
@@ -179,7 +179,7 @@
           <div>
             <p class="panel-eyebrow">Comptes</p>
             <h2 class="section-title" id="userFormTitle">Nouveau compte</h2>
-            <p class="panel-text">Créez un compte ou ajustez ses droits sans quitter cette zone.</p>
+            <p class="panel-text">Remplissez le formulaire pour donner un accès à une nouvelle personne. Elle pourra ensuite se connecter avec son identifiant et son mot de passe.</p>
           </div>
         </div>
         <div id="userEditNotice" class="alert alert-info d-none" role="alert"></div>
@@ -191,7 +191,7 @@
           <div class="col-md-4">
             <label class="form-label" for="admin_password">Mot de passe</label>
             <input class="form-control" id="admin_password" type="password" placeholder="Mot de passe temporaire">
-            <div class="form-text">12 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.</div>
+            <div class="form-text">Il faut au moins 12 caractères, avec une majuscule, une minuscule, un chiffre et un symbole (par exemple ! ou #).</div>
             <button class="btn btn-outline-primary btn-sm mt-2" id="generateAdminPasswordBtn" type="button">Générer un mot de passe</button>
           </div>
           <div class="col-md-4 d-flex align-items-end">
@@ -217,20 +217,21 @@
             <select class="form-select" id="admin_service">
               <option value="">— Aucun service —</option>
             </select>
-            <div class="form-text">Restreint les suggestions UNC aux dossiers de ce service.</div>
+            <div class="form-text">Sert à ne proposer, pour les accès réseau (dossiers partagés), que ceux de son service.</div>
           </div>
           <div class="col-md-4 d-flex align-items-end pb-1">
             <div>
               <label class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" id="admin_db_manage">
-                <span class="form-check-label">Gestion base de données</span>
+                <span class="form-check-label">Peut gérer les sauvegardes</span>
               </label>
-              <div class="form-text mt-1">Export, diagnostic et import de la base.</div>
+              <div class="form-text mt-1">Peut sauvegarder, restaurer et importer toutes les données de l'application. À réserver aux personnes de confiance.</div>
             </div>
           </div>
           <div class="col-12">
-            <label class="form-label">Groupe</label>
+            <label class="form-label">Groupe : ce que la personne a le droit de faire</label>
             <div id="groupSelector" class="choice-group"></div>
+            <div class="form-text">Chaque personne est dans un seul groupe. Choisissez le plus petit qui suffit : moins on a de droits, moins il y a de risques d'erreur. Le tableau « Qui peut faire quoi ? » en bas de page explique chaque groupe.</div>
           </div>
           <div class="col-12">
             <div class="header-actions">
@@ -245,11 +246,12 @@
         <div class="section-heading">
           <div>
             <p class="panel-eyebrow">Droits</p>
-            <h2 class="section-title">Groupes disponibles</h2>
-            <p class="panel-text">Référence rapide des groupes et de leurs permissions.</p>
+            <h2 class="section-title">Les groupes : qui a le droit de quoi ?</h2>
+            <p class="panel-text">Un groupe est une liste de choses qu'une personne a le droit de faire dans l'application. Chaque compte est placé dans un groupe. Plus bas, un tableau montre les groupes côte à côte.</p>
           </div>
         </div>
         <div id="groupCards" class="equipment-grid equipment-grid--compact"></div>
+        <div id="groupMatrix"></div>
       </section>
     </div>
   </div>
