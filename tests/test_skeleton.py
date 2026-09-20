@@ -22,7 +22,7 @@ def test_squelette_reconstruit_ressources_volumes_et_anomalies_puis_demarre(tmp_
     pack_path.write_text(json.dumps(PACK), encoding="utf-8")
     out = tmp_path / "squelette"
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    result = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_skeleton.py"), str(pack_path), str(out)], cwd=str(ROOT), env=env,
+    result = subprocess.run([sys.executable, str(ROOT / "tools" / "build_skeleton.py"), str(pack_path), str(out)], cwd=str(ROOT), env=env,
                             capture_output=True, text=True, encoding="utf-8", timeout=180)
     assert result.returncode == 0, result.stderr[-1000:]
 
