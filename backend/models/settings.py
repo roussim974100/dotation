@@ -1,6 +1,10 @@
 import json
 import os
+import re
+import sqlite3
 import urllib.request
+
+import environment
 
 from database import get_db
 from utils import utc_now, slugify_field_key
@@ -30,9 +34,11 @@ DEFAULT_APP_SETTINGS = {
     "beneficiary_types": "agent:Agent,elu:Élu(e)",
     "setup_completed": "0",
     "restitution_phase1_unlock_days": "1",
+    "timing_warning_days": "3",
+    "parc_retention_years": "5",
 }
 
-VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association"}
+VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_company", "association", "other"}
 
 
 def _parse_beneficiary_types(raw):
@@ -220,17 +226,82 @@ def get_app_settings(connection=None):
             connection.close()
 
 
+class SettingsValidationError(ValueError):
+    """Valeur de reglage refusee (libelle invalide, trop long...). Le message est destine a l'administrateur."""
+
+
+_BENEFICIARY_VALUE_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
+_FORBIDDEN_LABEL_CHARS = set(",:;<>&\"\\")
+MAX_TEXT_LENGTH = 200
+
+
+def normalize_beneficiary_types(raw):
+    """Valide « valeur:Libelle,valeur:Libelle » et le renvoie sous forme canonique. La valeur est un identifiant (a-z, 0-9,
+    _ et -), le libelle est libre (toutes langues) hors la virgule, les deux-points, le point-virgule, < > & guillemets et antislash, qui casseraient le format ou l'affichage.
+    Leve SettingsValidationError plutot que de retomber silencieusement sur agent/elu."""
+    entries, seen = [], set()
+    for part in str(raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        value, sep, label = part.partition(":")
+        value, label = value.strip(), label.strip()
+        if not sep or not _BENEFICIARY_VALUE_RE.match(value):
+            raise SettingsValidationError(
+                f"Type de bénéficiaire invalide « {part[:40]} » : l'identifiant ne peut contenir que a-z, 0-9, _ et - (40 max)."
+            )
+        if not label or len(label) > 60 or any(ch in _FORBIDDEN_LABEL_CHARS or ord(ch) < 32 for ch in label):
+            raise SettingsValidationError(
+                f"Libellé invalide pour « {value} » : 60 caractères max, sans virgule, deux-points, point-virgule, < > &, guillemets ni antislash."
+            )
+        if value in seen:
+            raise SettingsValidationError(f"Le type « {value} » est défini deux fois.")
+        seen.add(value)
+        entries.append(f"{value}:{label}")
+    if not entries:
+        raise SettingsValidationError("Indiquez au moins un type de bénéficiaire.")
+    return ",".join(entries)
+
+
+def _refuse_removing_used_beneficiary_types(connection, new_types):
+    """Un type deja porte par des dossiers ne peut pas disparaitre (seul son libelle peut changer)."""
+    try:
+        rows = connection.execute(
+            "SELECT beneficiary_type, COUNT(*) AS n FROM dotation_forms WHERE beneficiary_type IS NOT NULL AND beneficiary_type != '' GROUP BY beneficiary_type"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return  # base sans dossiers (tests, installation neuve)
+    kept = {entry.split(":", 1)[0] for entry in new_types.split(",")}
+    for row in rows:
+        if row[0] not in kept:
+            raise SettingsValidationError(
+                f"Le type « {row[0]} » est utilisé par {row[1]} dossier(s) : conservez-le (vous pouvez seulement changer son libellé)."
+            )
+
+
 def save_app_settings(connection, updates):
+    """Enregistre les reglages fournis. Une valeur None signifie « non fournie » : le reglage existant est CONSERVE
+    (une mise a jour partielle n'efface plus rien) ; pour vider un reglage, envoyer une chaine vide."""
     now = utc_now()
     sanitized = {}
     for key in DEFAULT_APP_SETTINGS.keys():
         if key not in updates:
             continue
         value = updates.get(key)
-        sanitized[key] = "" if value is None else str(value).strip()
+        if value is None:
+            continue
+        sanitized[key] = str(value).strip()
+        if len(sanitized[key]) > MAX_TEXT_LENGTH and key not in ("beneficiary_types", "email_domains", "brand_logo_url"):
+            raise SettingsValidationError(f"« {key} » est trop long ({MAX_TEXT_LENGTH} caractères max).")
+    if "beneficiary_types" in sanitized:
+        sanitized["beneficiary_types"] = normalize_beneficiary_types(sanitized["beneficiary_types"])
+        _refuse_removing_used_beneficiary_types(connection, sanitized["beneficiary_types"])
 
     if "brand_logo_mode" in sanitized and sanitized["brand_logo_mode"] not in {"default", "url", "file"}:
         sanitized["brand_logo_mode"] = DEFAULT_APP_SETTINGS["brand_logo_mode"]
+    # Le serveur telecharge cette URL : n'accepter que http(s) (pas de file://, ftp://, etc.).
+    if sanitized.get("brand_logo_url") and not sanitized["brand_logo_url"].lower().startswith(("http://", "https://")):
+        sanitized["brand_logo_url"] = ""
     if "theme_id" in sanitized and sanitized["theme_id"] not in THEME_PRESETS:
         sanitized["theme_id"] = DEFAULT_APP_SETTINGS["theme_id"]
     if "dark_mode_policy" in sanitized and sanitized["dark_mode_policy"] not in {"disabled", "allowed", "forced"}:
@@ -319,6 +390,8 @@ def build_public_settings_payload(settings=None):
         "appName": "A quai",
         "dpoEmail": get_dpo_email(settings),
         "logoUrl": "/api/settings/logo",
+        "environment": environment.resolve_environment(),
+        "displayVersion": environment.display_version(),
         "logoMode": settings.get("brand_logo_mode") or DEFAULT_APP_SETTINGS["brand_logo_mode"],
         "themeId": theme_id,
         "themeLabel": THEME_PRESETS[theme_id]["label"],
@@ -335,6 +408,7 @@ def build_public_settings_payload(settings=None):
         "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
+        "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),
     }
 
 

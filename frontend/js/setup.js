@@ -202,7 +202,7 @@
       try {
         sessionStorage.setItem("adminFlashNotice", "Configuration initiale enregistrée avec succès.");
       } catch (_) {}
-      window.location.href = "admin.html";
+      window.location.href = "admin-personnalisation.html?wizard=1";  // suite : assistant complet (ressources, réglages)
     } catch (err) {
       showAlert(`Impossible d'enregistrer la configuration : ${err.message}`);
       btn.disabled = false;

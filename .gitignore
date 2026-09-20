@@ -32,6 +32,34 @@ login-*.png
 chromedriver/
 backend/.prod/
 
+# graphify outputs (large generated artefacts) - keep GRAPH_REPORT.md only
+graphify-out/cache/
+graphify-out/graph.html
+graphify-out/graph.json
+graphify-out/graph.svg
+graphify-out/graph.graphml
+graphify-out/cypher.txt
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/obsidian/
+
+# graphify temporary working files (root)
+.graphify_*
+
+# Claude Code local screenshots
+.claude/*.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+backend/backup_config.json
+backend/.backup_password
+backend/db_backups/
+
+# Archives et copies de bases (ne jamais commiter : donnees personnelles)
+*.7z
+backend/*.zip
+*.sqlite
+
 # --- Fichiers locaux : non publies sur GitHub (ils restent sur le poste de travail) ---
 # Donnees et sauvegardes
 /backend/.backups/
@@ -61,3 +89,8 @@ backend/.prod/
 /.graphifyignore
 /.ignore
 /graphify-out/
+
+# Etat, journal et verrou de la mise a jour depuis le navigateur (generes par le serveur)
+/backend/update/
+# Environnement de ce serveur (dev, preprod, prod), ecrit par deploy*.sh
+/backend/environment

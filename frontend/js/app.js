@@ -4,50 +4,59 @@ const resumeHint = document.getElementById("resumeHint");
 const pageLoader = document.getElementById("pageLoader");
 let formDirty = false;
 
-// Capture des logs pour debug
+// Capture des logs pour debug - desactivee par defaut.
+// N'envoie de logs au backend qu'en developpement (localhost) ou si l'URL
+// contient ?debug=1. En production, ce bloc est inerte pour ne pas exfiltrer
+// de donnees personnelles via les /api/debug/logs.
+const DEBUG_LOGS_ENABLED = (function () {
+  try {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    if (new URLSearchParams(window.location.search).has('debug')) return true;
+  } catch (_) { /* ignore */ }
+  return false;
+})();
+
 let consoleLogs = [];
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
 
-console.log = function(...args) {
-  originalLog.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
-};
+if (DEBUG_LOGS_ENABLED) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
 
-console.error = function(...args) {
-  originalError.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
-};
+  console.log = function (...args) {
+    originalLog.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'log', msg: msg, time: new Date().toISOString() });
+  };
 
-console.warn = function(...args) {
-  originalWarn.apply(console, args);
-  const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-  consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
-};
+  console.error = function (...args) {
+    originalError.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'error', msg: msg, time: new Date().toISOString() });
+  };
+
+  console.warn = function (...args) {
+    originalWarn.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    consoleLogs.push({ level: 'warn', msg: msg, time: new Date().toISOString() });
+  };
+}
 
 async function sendConsoleLogs() {
-  if (!consoleLogs.length) return;
+  if (!DEBUG_LOGS_ENABLED || !consoleLogs.length) return;
   try {
-    originalLog("[DEBUG] Sending " + consoleLogs.length + " logs to server");
-    const response = await fetch('/api/debug/logs', {
+    await fetch('/api/debug/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logs: consoleLogs })
     });
-    const data = await response.json();
-    originalLog("[DEBUG] Logs sent successfully: " + data.file);
     consoleLogs = [];
-  } catch (e) {
-    originalError('Failed to send logs:', e);
-  }
+  } catch (_) { /* silencieux */ }
 }
 
-// Envoyer les logs quand on quitte la page
 window.addEventListener('beforeunload', () => {
-  if (consoleLogs.length) {
+  if (DEBUG_LOGS_ENABLED && consoleLogs.length) {
     navigator.sendBeacon('/api/debug/logs', JSON.stringify({ logs: consoleLogs }));
   }
 });
@@ -55,7 +64,7 @@ const DOSSIER_TYPE_LABELS = {
   arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
   mise_a_jour: "Mise à jour de ressources",
-  sortie: "Sortie / restitution"
+  sortie: "Sortie"
 };
 const DEFAULT_SERVICE_OPTIONS = [];
 let serviceOptions = [...DEFAULT_SERVICE_OPTIONS];
@@ -182,7 +191,7 @@ function addProgressIndicator(fieldId) {
   const badge = document.createElement("span");
   badge.className = "progress-required-badge";
   badge.dataset.progressRequiredBadge = "true";
-  badge.textContent = "À renseigner";
+  badge.textContent = "Requis";
   label.appendChild(badge);
 }
 
@@ -263,7 +272,10 @@ function bindProgressIndicatorRefresh() {
   if (!form || form.dataset.boundProgressIndicators) {
     return;
   }
-  const refresh = () => refreshProgressIndicators();
+  const refresh = () => {
+    refreshProgressIndicators();
+    updateCurrentPayload();  // CRITICAL FIX #6: Sync payload on form input/change
+  };
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.dataset.boundProgressIndicators = "true";
@@ -304,6 +316,138 @@ function bindSignatureProtectionHandlers() {
     });
   }
 }
+
+// Reprend un materiel restitue : la liste vient de /api/catalog/available/<ressource> (unites dont la derniere
+// ligne est restituee) et le choix remplit tous les champs de la ressource, sans ressaisie.
+async function openReuseResourceModal(resourceId) {
+  if (document.getElementById("dotationForm")?.dataset.lockedAt) {
+    showToast("Fiche verrouillée : elle ne peut plus être modifiée.", "warning");
+    return;
+  }
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(resourceId));
+  if (!resource) return;
+  let data;
+  try {
+    data = await requestJson(`/api/catalog/available/${encodeURIComponent(resourceId)}`);
+  } catch (error) {
+    showToast("Impossible de charger le matériel disponible.", "error");
+    return;
+  }
+
+  let modal = document.getElementById("reuseResourceModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "reuseResourceModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="password-generator-modal__backdrop" data-reuse-close="true"></div>
+      <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reuseResourceTitle">
+        <div class="password-generator-modal__header">
+          <div><p class="panel-eyebrow">Matériel restitué</p><h2 class="section-title" id="reuseResourceTitle"></h2></div>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-reuse-close="true">Fermer</button>
+        </div>
+        <div class="password-generator-modal__content">
+          <input class="form-control" id="reuseResourceSearch" type="search" placeholder="Rechercher (n° de série, marque, modèle…)" autocomplete="off">
+          <div class="list-group" id="reuseResourceList" role="list"></div>
+          <p class="form-text mb-0" id="reuseResourceHint"></p>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.querySelector("#reuseResourceTitle").textContent = resource.label;
+  const search = modal.querySelector("#reuseResourceSearch");
+  const list = modal.querySelector("#reuseResourceList");
+  const hint = modal.querySelector("#reuseResourceHint");
+  const schema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+  const labelOf = (key) => schema.find((field) => field.key === key)?.label || key;
+  const summary = (item) => Object.entries(item.fields)
+    .filter(([key]) => key !== data.identifierKey)
+    .map(([, value]) => String(value)).join(" · ");
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const close = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+
+  const render = () => {
+    const query = normalize(search.value);
+    const items = data.items.filter((item) => !query || normalize(`${item.identifier} ${summary(item)}`).includes(query));
+    list.innerHTML = items.map((item, index) => `
+      <button class="list-group-item list-group-item-action" type="button" data-reuse-index="${data.items.indexOf(item)}">
+        <span class="fw-semibold">${escapeHtml(labelOf(data.identifierKey))} : ${escapeHtml(item.identifier)}</span>
+        ${item.status === "degraded" ? '<span class="status-chip status-chip--draft ms-2">Restitué dégradé</span>' : ""}
+        <span class="d-block small text-muted">${escapeHtml(summary(item))}${item.returned_at ? ` · restitué le ${escapeHtml(new Date(item.returned_at).toLocaleDateString("fr-FR"))}` : ""}</span>
+      </button>`).join("");
+    hint.textContent = !data.items.length
+      ? "Aucun matériel restitué disponible pour cette ressource : il se remplit au fil des restitutions."
+      : (items.length ? `${items.length} matériel(s) disponible(s).` : "Aucun résultat pour cette recherche.");
+  };
+
+  list.onclick = (event) => {
+    const button = event.target.closest("[data-reuse-index]");
+    if (!button) return;
+    const item = data.items[Number(button.dataset.reuseIndex)];
+    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+    if (checkbox && !checkbox.checked) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    schema.forEach((field) => {
+      const input = document.getElementById(`dynamic_resource_${resource.id}_${field.key}`);
+      if (!input) return;
+      input.value = item.fields[field.key] ?? "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    close();
+    showToast(`« ${item.identifier} » repris : vérifiez l'état à la remise et la date d'attribution.`, item.status === "degraded" ? "warning" : "success");
+  };
+  modal.querySelectorAll("[data-reuse-close]").forEach((button) => { button.onclick = close; });
+  search.oninput = render;
+  search.value = "";
+  render();
+  document.addEventListener("keydown", onKeydown);
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+  search.focus();
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reuse-resource]");
+  if (button) void openReuseResourceModal(button.dataset.reuseResource);
+});
+
+// Avertissement (non bloquant) quand le n° de serie / badge saisi est deja attribue dans un autre dossier.
+document.addEventListener("change", async (event) => {
+  const input = event.target.closest?.(".dynamic-resource-field");
+  if (!input) return;
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(input.dataset.resourceId));
+  if (!resource || !resource.identifier_key || input.dataset.fieldKey !== resource.identifier_key) return;
+  let warning = input.parentElement.querySelector(".resource-duplicate-warning");
+  if (!warning) {
+    warning = document.createElement("div");
+    warning.className = "form-text text-warning resource-duplicate-warning";
+    warning.setAttribute("role", "status");
+    input.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "";
+  const value = input.value.trim();
+  if (!value) return;
+  try {
+    const exclude = document.getElementById("dotationForm")?.dataset.draftId || "";
+    const data = await requestJson(`/api/catalog/holder/${encodeURIComponent(resource.id)}?value=${encodeURIComponent(value)}&exclude=${encodeURIComponent(exclude)}`);
+    if (data.holder) {
+      const since = data.holder.since ? ` depuis le ${new Date(data.holder.since).toLocaleDateString("fr-FR")}` : "";
+      warning.textContent = `Attention : « ${value} » est déjà attribué dans un autre dossier${data.holder.service ? ` (service ${data.holder.service})` : ""}${since}. Vérifiez qu'il a bien été restitué.`;
+    }
+  } catch (error) {
+    // Controle de confort : une erreur reseau ne doit pas gener la saisie.
+  }
+});
 
 function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
@@ -377,6 +521,7 @@ function buildDynamicFieldInput(resource, field) {
     <div>
       <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
       <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}">
+      ${field.identifier ? "<div class=\"form-text\">Pour renuméroter un objet déjà suivi, utilisez d'abord Parc → Corriger l'identifiant : sinon un doublon est créé.</div>" : ""}
     </div>
   `;
 }
@@ -434,23 +579,10 @@ function buildDynamicResourceTrackingFields(resource) {
       </div>
     `);
   }
-  const sharedBlock = resource.category !== "immateriel"
-    ? `<div class="shared-resource-block" id="shared_block_${escapeAttribute(resource.id)}">
-        <label class="shared-toggle">
-          <input type="checkbox" class="shared-resource-toggle" id="shared_toggle_${escapeAttribute(resource.id)}" data-resource-id="${escapeAttribute(resource.id)}">
-          <span>Matériel mutualisé</span>
-        </label>
-        <div id="shared_panel_${escapeAttribute(resource.id)}" class="shared-panel d-none">
-          <ul class="shared-members-list" id="shared_members_${escapeAttribute(resource.id)}"></ul>
-          <button type="button" class="btn btn-xs btn-outline-primary mt-1 shared-add-btn" data-resource-id="${escapeAttribute(resource.id)}">+ Ajouter un co-utilisateur</button>
-        </div>
-       </div>`
-    : "";
-
-  if (!inputBlocks.length && !sharedBlock) {
+  if (!inputBlocks.length) {
     return "";
   }
-  return (inputBlocks.length ? `<div class="subgrid">${inputBlocks.join("")}</div>` : "") + sharedBlock;
+  return `<div class="subgrid">${inputBlocks.join("")}</div>`;
 }
 
 function syncDynamicResourceCard(resourceId) {
@@ -471,192 +603,19 @@ function bindDynamicResourceToggles() {
       return;
     }
     if (!checkbox.dataset.boundDynamicToggle) {
-      checkbox.addEventListener("change", () => syncDynamicResourceCard(resource.id));
+      checkbox.addEventListener("change", () => {
+        syncDynamicResourceCard(resource.id);
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundDynamicToggle = "true";
     }
     syncDynamicResourceCard(resource.id);
   });
-  bindSharedResourceToggles();
   initDynamicListFields();
   initDynamicEmailDomainFields();
 }
 
-// ---------------------------------------------------------------------------
-// Matériel mutualisé — état en mémoire et rendu inline
-// ---------------------------------------------------------------------------
-
-const _sharedState = new Map(); // resourceId → { enabled: bool, poolId: string|null, members: [{formId, nom, prenom, service, auto}] }
 let retraitsSignaturePad = null; // Global reference to retraits signature pad
-
-function _getShared(resourceId) {
-  if (!_sharedState.has(resourceId)) _sharedState.set(resourceId, { enabled: false, poolId: null, members: [] });
-  return _sharedState.get(resourceId);
-}
-
-function bindSharedResourceToggles() {
-  document.querySelectorAll(".shared-resource-toggle").forEach((toggle) => {
-    if (toggle.dataset.bound) return;
-    toggle.addEventListener("change", () => {
-      const rid = toggle.dataset.resourceId;
-      _getShared(rid).enabled = toggle.checked;
-      document.getElementById(`shared_panel_${rid}`)?.classList.toggle("d-none", !toggle.checked);
-    });
-    toggle.dataset.bound = "true";
-  });
-  document.querySelectorAll(".shared-add-btn").forEach((btn) => {
-    if (btn.dataset.bound) return;
-    btn.addEventListener("click", () => openSharedMemberModal(btn.dataset.resourceId));
-    btn.dataset.bound = "true";
-  });
-}
-
-function renderSharedMembers(resourceId) {
-  const list = document.getElementById(`shared_members_${resourceId}`);
-  if (!list) return;
-  const state = _getShared(resourceId);
-  const hasMembers = state.members.length > 0;
-
-  list.innerHTML = state.members.map((m, idx) => `
-    <li class="shared-member-row">
-      <span class="shared-member-name">${escapeHtml(m.prenom || "")} ${escapeHtml(m.nom || "")}</span>
-      ${m.service ? `<span class="shared-member-service">${escapeHtml(m.service)}</span>` : ""}
-      ${m.auto ? `<span class="shared-member-badge">Brouillon créé</span>` : ""}
-      ${m.formId ? `<a class="shared-member-link" href="form.html?id=${escapeAttribute(m.formId)}" target="_blank">Voir</a>` : ""}
-    </li>`).join("") || `<li class="text-muted small py-1">Aucun co-utilisateur — décochez pour arrêter la mutualisation</li>`;
-
-  list.querySelectorAll(".shared-member-remove").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      _getShared(btn.dataset.resourceId).members.splice(Number(btn.dataset.index), 1);
-      renderSharedMembers(btn.dataset.resourceId);
-    });
-  });
-
-  // Bloquer le toggle tant qu'il y a des membres.
-  // data-members-locked permet à applyLockState de ne pas écraser cet état.
-  const toggle = document.getElementById(`shared_toggle_${resourceId}`);
-  if (toggle) {
-    toggle.disabled = hasMembers;
-    toggle.dataset.membersLocked = hasMembers ? "true" : "";
-    toggle.title = hasMembers
-      ? "Retirez d'abord tous les co-utilisateurs pour arrêter la mutualisation"
-      : "";
-  }
-}
-
-function openSharedMemberModal(resourceId) {
-  const modal = document.getElementById("sharedMemberModal");
-  if (!modal) return;
-  modal.dataset.resourceId = resourceId;
-  document.getElementById("sharedModalFormId").value = "";
-  document.getElementById("sharedModalFormSearch").value = "";
-  document.getElementById("sharedModalFormResults").classList.add("d-none");
-  document.getElementById("sharedModalFormChosen").classList.add("d-none");
-  document.getElementById("sharedModalNom").value = "";
-  document.getElementById("sharedModalPrenom").value = "";
-  document.getElementById("sharedModalService").value = "";
-  document.getElementById("sharedModalError").classList.add("d-none");
-  bootstrap.Modal.getOrCreateInstance(modal).show();
-}
-
-async function saveSharedMember() {
-  const modal = document.getElementById("sharedMemberModal");
-  const resourceId = modal?.dataset.resourceId;
-  if (!resourceId) return;
-  const errorEl = document.getElementById("sharedModalError");
-  errorEl.classList.add("d-none");
-
-  const existingFormId = document.getElementById("sharedModalFormId").value.trim();
-  const nom = document.getElementById("sharedModalNom").value.trim();
-  const prenom = document.getElementById("sharedModalPrenom").value.trim();
-  const service = document.getElementById("sharedModalService").value.trim();
-
-  if (!existingFormId && (!nom || !prenom)) {
-    errorEl.textContent = "Sélectionnez un dossier ou renseignez nom et prénom.";
-    errorEl.classList.remove("d-none");
-    return;
-  }
-
-  const state = _getShared(resourceId);
-
-  if (existingFormId) {
-    // Utiliser le dossier existant sélectionné
-    const chosenText = document.getElementById("sharedModalFormChosen").textContent || "";
-    const parts = chosenText.split(" ");
-    const member = { formId: existingFormId, nom: parts.slice(1).join(" ") || "?", prenom: parts[0] || "?", service: service || "", auto: false };
-    state.members.push(member);
-    bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
-    return;
-  }
-
-  // Créer un brouillon automatique
-  const btn = document.getElementById("sharedModalSaveBtn");
-  btn.disabled = true;
-  btn.textContent = "Création…";
-  try {
-    const csrf = await getCsrfToken();
-    const r = await fetch("/api/forms/quick-draft", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
-      body: JSON.stringify({ nom, prenom, service }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "Erreur serveur");
-    state.members.push({ formId: data.form_id, nom, prenom, service, auto: true });
-    bootstrap.Modal.getInstance(modal)?.hide();
-    renderSharedMembers(resourceId);
-  } catch (e) {
-    errorEl.textContent = `Erreur : ${e.message}`;
-    errorEl.classList.remove("d-none");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Ajouter";
-  }
-}
-
-function initSharedMemberModal() {
-  document.getElementById("sharedModalSaveBtn")?.addEventListener("click", saveSharedMember);
-  bindSharedFormSearch();
-}
-
-function bindSharedFormSearch() {
-  const input = document.getElementById("sharedModalFormSearch");
-  const resultsEl = document.getElementById("sharedModalFormResults");
-  const hiddenEl = document.getElementById("sharedModalFormId");
-  const chosenEl = document.getElementById("sharedModalFormChosen");
-  if (!input) return;
-  let deb = null;
-  input.addEventListener("input", () => {
-    clearTimeout(deb);
-    hiddenEl.value = "";
-    chosenEl.classList.add("d-none");
-    const q = input.value.trim();
-    if (q.length < 2) { resultsEl.classList.add("d-none"); return; }
-    deb = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/forms?search=${encodeURIComponent(q)}`, { credentials: "same-origin" });
-        const rows = (await r.json()).slice(0, 8);
-        if (!rows.length) { resultsEl.innerHTML = `<div class="pool-form-result pool-form-result--empty">Aucun dossier</div>`; resultsEl.classList.remove("d-none"); return; }
-        resultsEl.innerHTML = rows.map((f) =>
-          `<div class="pool-form-result" data-id="${escapeAttribute(f.id)}" data-prenom="${escapeAttribute(f.prenom)}" data-nom="${escapeAttribute(f.nom)}">
-            <strong>${escapeHtml(f.prenom)} ${escapeHtml(f.nom)}</strong>
-            ${f.service ? ` — <span class="text-muted">${escapeHtml(f.service)}</span>` : ""}
-          </div>`).join("");
-        resultsEl.classList.remove("d-none");
-        resultsEl.querySelectorAll(".pool-form-result[data-id]").forEach((row) => {
-          row.addEventListener("click", () => {
-            hiddenEl.value = row.dataset.id;
-            input.value = "";
-            resultsEl.classList.add("d-none");
-            chosenEl.textContent = `${row.dataset.prenom} ${row.dataset.nom}`;
-            chosenEl.classList.remove("d-none");
-          });
-        });
-      } catch { resultsEl.classList.add("d-none"); }
-    }, 280);
-  });
-}
 
 function initDynamicListFields() {
   document.querySelectorAll(".dynamic-resource-list-add").forEach((button) => {
@@ -962,8 +921,16 @@ async function loadDynamicResourceReferences() {
 
   const buildResourceCard = (resource) => {
     const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+    const visibleFieldSchema = fieldSchema.filter((field) => !field.hidden);
+    // Champs masques (cf admin Ressources) : rendus en input hidden pour que leur valeur
+    // deja saisie survive au prochain enregistrement (getDynamicResourceFieldValue les lit
+    // normalement), sans les proposer a la saisie.
+    const hiddenFieldsMarkup = fieldSchema
+      .filter((field) => field.hidden)
+      .map((field) => `<input type="hidden" class="dynamic-resource-field" id="dynamic_resource_${escapeAttribute(resource.id)}_${escapeAttribute(field.key)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}">`)
+      .join("");
     const fieldsMarkup = fieldSchema.length
-      ? `<div class="subgrid">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
+      ? `${visibleFieldSchema.length ? `<div class="subgrid">${visibleFieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>` : ""}${hiddenFieldsMarkup}`
       : `
         <div class="mt-3">
           <label class="form-label" for="dynamic_resource_details_${escapeAttribute(resource.id)}">Précision / Détails</label>
@@ -986,6 +953,7 @@ async function loadDynamicResourceReferences() {
         </div>
         ${descriptionMarkup}
         <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none equipment-item__body">
+          ${resource.identifier_key ? `<div class="mb-2"><button type="button" class="btn btn-sm btn-outline-primary" data-reuse-resource="${escapeAttribute(resource.id)}">Reprendre un matériel déjà restitué</button></div>` : ""}
           ${fieldsMarkup}
           ${trackingMarkup}
         </div>
@@ -1100,21 +1068,16 @@ function getAdditionalResourcesData() {
         .filter(([, value]) => value)
     ),
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
-    shared: _getShared(resource.id).enabled,
-    poolId: _getShared(resource.id).poolId || null,
-    sharedWith: _getShared(resource.id).members,
+
     ...getDynamicResourceAssignmentData(resource.id)
   })).map((resource) => ({
     ...resource,
     details: resource.details || summarizeDynamicResource(resource)
-  })).filter((resource) => (
-    resource.selected
-    || resource.details
-    || Object.keys(resource.fields).length
-    || resource.assignedAt
-    || resource.conditionAttribution
-    || resource.conditionNotes
-  ));
+  })).filter((resource) => {
+    const hasContent = resource.details || Object.keys(resource.fields).length || resource.assignedAt || resource.conditionAttribution || resource.conditionNotes;
+    // Inclure si sélectionnée, ou si elle a du contenu (pour permettre la suppression au serveur)
+    return resource.selected || hasContent;
+  });
 }
 
 function populateAdditionalResources(data = {}) {
@@ -1122,42 +1085,9 @@ function populateAdditionalResources(data = {}) {
   const isLocked = Boolean(data.meta?.lockedAt);
 
   resources.forEach((resource) => {
-    // Pour les ressources mutualisées avec items disponibles
-    if (resource.shared && Array.isArray(resource.availableItems)) {
-      // Créer des cases à cocher pour chaque item disponible
-      resource.availableItems.forEach((item) => {
-        const itemCheckboxId = `pool_item_${item.id}`;
-        let itemCheckbox = document.getElementById(itemCheckboxId);
-        if (!itemCheckbox) {
-          // Créer le checkbox s'il n'existe pas
-          const container = document.getElementById(`dynamic_resource_fields_wrap_${resource.id}`);
-          if (container) {
-            const label = document.createElement("label");
-            label.className = "equipment-toggle pool-item-toggle";
-            label.innerHTML = `<input type="checkbox" id="${itemCheckboxId}" data-pool-item-id="${item.id}" data-resource-id="${resource.id}"><span>${escapeHtml(item.label)}</span>`;
-            container.prepend(label);
-            itemCheckbox = document.getElementById(itemCheckboxId);
-            // Appliquer le verrou immédiatement si le dossier est finalisé
-            if (itemCheckbox && isLocked) {
-              itemCheckbox.disabled = true;
-            }
-          }
-        }
-        // Cocher si l'item était précédemment sélectionné
-        if (itemCheckbox) {
-          itemCheckbox.checked = Boolean(item.selected);
-        }
-      });
-      // Marquer le resource comme sélectionné si des items sont disponibles
-      const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
-      if (checkbox && resource.availableItems.length > 0) {
-        checkbox.checked = true;
-      }
-    }
-
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
     const details = document.getElementById(`dynamic_resource_details_${resource.id}`);
-    if (checkbox && !resource.shared) {
+    if (checkbox) {
       checkbox.checked = Boolean(resource.selected);
     }
     if (details) {
@@ -1246,20 +1176,6 @@ function populateAdditionalResources(data = {}) {
         }
       }
     });
-
-    // Restaurer l'état mutualisé (symétrique : tous les membres voient le même toggle)
-    if (resource.shared) {
-      const toggle = document.getElementById(`shared_toggle_${resource.id}`);
-      if (toggle) {
-        toggle.checked = true;
-        document.getElementById(`shared_panel_${resource.id}`)?.classList.remove("d-none");
-      }
-      const state = _getShared(resource.id);
-      state.enabled = true;
-      state.poolId = resource.poolId || null;
-      state.members = Array.isArray(resource.sharedWith) ? resource.sharedWith : [];
-      renderSharedMembers(resource.id);
-    }
   });
   bindDynamicResourceToggles();
   refreshProgressIndicators();
@@ -1442,10 +1358,6 @@ function applyLockState(locked) {
       element.disabled = false;
       return;
     }
-    // Ne pas réactiver un toggle mutualisé bloqué par la présence de membres
-    if (!locked && element.dataset.membersLocked === "true") {
-      return;
-    }
 
     // Désactiver l'élément de formulaire
     element.disabled = locked;
@@ -1544,7 +1456,10 @@ function initConditionalBlocks() {
       toggleField(checkbox.dataset.target, checkbox.checked);
     };
     if (!checkbox.dataset.boundToggle) {
-      checkbox.addEventListener("change", sync);
+      checkbox.addEventListener("change", () => {
+        sync();
+        updateCurrentPayload();  // Sync window.currentPayload on checkbox change
+      });
       checkbox.dataset.boundToggle = "true";
     }
     sync();
@@ -1864,7 +1779,7 @@ function initRetraitsSection() {
       resultsDiv.innerHTML = forms
         .map(
           (f) =>
-            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${f.id}">${f.title}</button>`
+            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${escapeHtml(f.id)}">${escapeHtml(f.title)}</button>`
         )
         .join("");
       resultsDiv.classList.toggle("d-none", forms.length === 0);
@@ -1989,8 +1904,8 @@ function initRetraitsSection() {
         <div class="card">
           <div class="card-body">
             <div class="form-check mb-2">
-              <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}">
-              <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+              <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}">
+              <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
             </div>
             <div class="row g-2">
               <div class="col-md-6">
@@ -2142,16 +2057,56 @@ function migrateLegacyResourcesToAdditional(data) {
 }
 
 function buildEquipmentSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
-  // (les ressources anciennes ne sont pas dans le nouveau système resources.additional)
-  const savedData = JSON.parse(JSON.stringify(window._savedMaterielData || {}));
-  return savedData;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedMaterielData || {};
 }
 
 function buildIntangibleSelectionMap() {
-  // Préserver les données existantes du formulaire pour backward compatibility
-  const savedData = JSON.parse(JSON.stringify(window._savedImmaterielData || {}));
-  return savedData;
+  // CRITICAL FIX #3: Les checkboxes legacy n'existent plus dans le formulaire moderne
+  // Les ressources legacy sont migrées dans resources.additional via migrateLegacyResourcesToAdditional()
+  // Retourner les données sauvegardées telles quelles sans chercher de checkboxes qui n'existent pas
+  // Le backend supprimera les données legacy après sauvegarde (voir fix du backend)
+  return window._savedImmaterielData || {};
+}
+
+function updateCurrentPayload() {
+  // CRITICAL FIX #5: Mettre à jour window.currentPayload depuis le formulaire actuel
+  // Cette fonction synchronise l'état réel du DOM avec window.currentPayload
+  if (!window.currentPayload) {
+    console.warn("⚠️ updateCurrentPayload: window.currentPayload n'existe pas");
+    return;
+  }
+
+  // Mettre à jour les champs simples
+  window.currentPayload.beneficiaire = {
+    ...window.currentPayload.beneficiaire,
+    nom: document.getElementById("nom")?.value || "",
+    prenom: document.getElementById("prenom")?.value || "",
+    fonction: document.getElementById("fonction")?.value || "",
+    mandat: document.getElementById("mandat")?.value || "",
+    service: window._currentService || "",
+    qualite: document.querySelector('input[name="qualite"]:checked')?.value || ""
+  };
+
+  window.currentPayload.dossier = {
+    ...window.currentPayload.dossier,
+    type: document.getElementById("dossier_type")?.value || "arrivee",
+    serviceDestination: window._currentServiceDestination || ""
+  };
+
+  window.currentPayload.validation = {
+    ...window.currentPayload.validation,
+    rgpdAccepted: document.getElementById("rgpdCheck")?.checked || false
+  };
+
+  // Mettre à jour les sélections de ressources matérielles/immatérielles
+  window.currentPayload.materiel = buildEquipmentSelectionMap();
+  window.currentPayload.immateriel = buildIntangibleSelectionMap();
+
+  console.log("✅ window.currentPayload synchronized", window.currentPayload);
 }
 
 function collectRequestedResourcesFromFormData(formData) {
@@ -2298,36 +2253,6 @@ function populateUncAcces(entries = []) {
   entries.forEach(e => list.appendChild(createUncRow(e)));
 }
 
-function buildSelectedItems() {
-  // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
-  const selectedItems = {};
-
-  // Collecter les items de pool sélectionnés
-  document.querySelectorAll('input[data-pool-item-id]:checked').forEach((checkbox) => {
-    const itemId = checkbox.dataset.poolItemId;
-    if (itemId) {
-      if (!selectedItems.poolItems) {
-        selectedItems.poolItems = [];
-      }
-      selectedItems.poolItems.push(itemId);
-    }
-  });
-
-  // Collecter les ressources dynamiques sélectionnées
-  const additionalResources = getAdditionalResourcesData();
-  additionalResources.forEach((resource) => {
-    if (resource.selected && !resource.shared) {
-      const key = resource.triggerKey || String(resource.id);
-      if (!selectedItems[key]) {
-        selectedItems[key] = [];
-      }
-      selectedItems[key].push(resource.id);
-    }
-  });
-
-  return selectedItems;
-}
-
 function getFormData(signaturePad) {
   // Produit le payload métier complet qui sera envoyé à l'API.
   const now = new Date().toISOString();
@@ -2384,7 +2309,6 @@ function getFormData(signaturePad) {
     resources: {
       additional: getAdditionalResourcesData()
     },
-    selectedItems: buildSelectedItems(),
     unc_acces: getUncAccesData(),
     unc_ref_ad: getUncRefAd(),
     restitution: currentRestitutionData,
@@ -2408,9 +2332,17 @@ function populateForm(data, signaturePad) {
 
   form.dataset.draftId = data.meta.id || "";
   form.dataset.lockedAt = data.meta.lockedAt || "";
+  void renderLockedDossierActions(data.workflow?.status);
   document.getElementById("nom").value = data.beneficiaire.nom || "";
     document.getElementById("prenom").value = data.beneficiaire.prenom || "";
-    document.getElementById("dossier_type").value = normalizeDossierType(data.dossier.type || "arrivee");
+    const loadedDossierType = normalizeDossierType(data.dossier.type || "arrivee");
+    const dossierTypeSelect = document.getElementById("dossier_type");
+    // "Sortie" n'est plus proposé à la création (les restitutions ont leur propre parcours),
+    // mais les dossiers existants de ce type doivent rester ouvrables sans changer de type.
+    if (loadedDossierType === "sortie" && !dossierTypeSelect.querySelector('option[value="sortie"]')) {
+      dossierTypeSelect.add(new Option(DOSSIER_TYPE_LABELS.sortie, "sortie"));
+    }
+    dossierTypeSelect.value = loadedDossierType;
     setServiceValue(data.beneficiaire.service || "");
     setServiceDestinationValue(data.dossier.serviceDestination || "");
   document.getElementById("fonction").value = data.beneficiaire.fonction || "";
@@ -2455,13 +2387,13 @@ function populateForm(data, signaturePad) {
             <div class="card">
               <div class="card-body">
                 <div class="form-check mb-2">
-                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
-                  <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
+                  <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
                 </div>
                 <div class="row g-2">
                   <div class="col-md-6">
                     <label class="form-label small text-muted">État</label>
-                    <select class="form-select form-select-sm retrait-etat" data-item-key="${item.item_key}">
+                    <select class="form-select form-select-sm retrait-etat" data-item-key="${escapeHtml(item.item_key)}">
                       <option value="Bon" ${retraitsData.items?.[item.item_key]?.etat === "Bon" ? "selected" : ""}>Bon</option>
                       <option value="Dégâts" ${retraitsData.items?.[item.item_key]?.etat === "Dégâts" ? "selected" : ""}>Dégâts</option>
                       <option value="Autre" ${retraitsData.items?.[item.item_key]?.etat === "Autre" ? "selected" : ""}>Autre</option>
@@ -2469,7 +2401,7 @@ function populateForm(data, signaturePad) {
                   </div>
                   <div class="col-md-6">
                     <label class="form-label small text-muted">Notes</label>
-                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${item.item_key}" placeholder="Observations…" value="${retraitsData.items?.[item.item_key]?.notes || ""}">
+                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${escapeHtml(item.item_key)}" placeholder="Observations…" value="${escapeHtml(retraitsData.items?.[item.item_key]?.notes || "")}">
                   </div>
                 </div>
               </div>
@@ -2566,6 +2498,23 @@ function populateForm(data, signaturePad) {
 
   // Envoyer les logs au serveur après un délai
   setTimeout(sendConsoleLogs, 500);
+
+  // CRITICAL FIX #1: Créer window.currentPayload avec le contenu complet au chargement
+  window.currentPayload = {
+    meta: data.meta || {},
+    beneficiaire: data.beneficiaire || {},
+    dossier: data.dossier || {},
+    workflow: data.workflow || {},
+    validation: data.validation || {},
+    resources: data.resources || { additional: [] },
+    restitution: data.restitution || {},
+    materiel: data.materiel || {},
+    immateriel: data.immateriel || {},
+    retraits: data.retraits || {},
+    unc_acces: data.unc_acces || [],
+    unc_ref_ad: data.unc_ref_ad || ""
+  };
+  console.log("✅ window.currentPayload initialized", window.currentPayload);
 }
 
 function formatStatusLabel(status) {
@@ -2698,12 +2647,37 @@ async function createSignatureLink(options = {}) {
   }
 }
 
+// "Nouvelle attribution pour cette personne" : reprend l'identite d'un dossier existant, rien d'autre.
+async function prefillIdentityFromForm(sourceId) {
+  try {
+    const result = await requestJson(`/api/forms/${encodeURIComponent(sourceId)}`);
+    const person = result?.data?.beneficiaire || {};
+    ["nom", "prenom", "fonction", "mandat"].forEach((key) => {
+      const el = document.getElementById(key);
+      if (el && person[key]) el.value = person[key];
+    });
+    const radio = person.qualite && document.querySelector(`input[name="qualite"][value="${person.qualite}"]`);
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (person.service) setServiceValue(person.service);
+    showToast("Identité reprise du dossier précédent.", "info");
+  } catch (error) {
+    showToast("Impossible de reprendre l'identité du dossier précédent.", "warning");
+  }
+}
+
 async function loadDraftFromUrl(signaturePad) {
   // Ouvre une fiche existante si l'URL contient id=...
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
 
   if (!id) {
+    const prefillFrom = params.get("prefillFrom");
+    if (prefillFrom) {
+      await prefillIdentityFromForm(prefillFrom);
+    }
     form.dataset.draftId = "";
     form.dataset.lockedAt = "";
     form.dataset.workflowStatus = "draft";
@@ -2812,12 +2786,119 @@ function setSaveButtonLoading(loading) {
   }
 }
 
+function setUnsavedIndicator(isDirty) {
+  document.getElementById("unsavedBadge")?.classList.toggle("d-none", !isDirty);
+}
+
 function markFormDirty() {
   formDirty = true;
+  setUnsavedIndicator(true);
 }
 
 function markFormClean() {
   formDirty = false;
+  setUnsavedIndicator(false);
+}
+
+// Sommaire des sections (chips collants) et sections repliables : construits depuis le DOM,
+// donc valables aussi pour les sections de ressources generees dynamiquement.
+function shortSectionLabel(title) {
+  const label = title.replace(/^Ressources remises par le service\s+/i, "");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function refreshFormSections() {
+  const form = document.getElementById("dotationForm");
+  if (!form) return;
+  const sections = [...form.querySelectorAll("section.content-card")]
+    .filter((section) => section.querySelector(".section-title") && section.offsetParent !== null);
+
+  let toc = document.getElementById("formToc");
+  if (!toc) {
+    toc = document.createElement("nav");
+    toc.id = "formToc";
+    toc.className = "dashboard-nav form-toc no-print";
+    toc.setAttribute("aria-label", "Sections du dossier");
+    form.prepend(toc);
+    toc.addEventListener("click", (event) => {
+      const link = event.target.closest("a[data-toc-target]");
+      if (!link) return;
+      event.preventDefault();
+      document.getElementById(link.dataset.tocTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  sections.forEach((section, index) => {
+    section.id = section.id || `form-section-${index}`;
+    const heading = section.querySelector(".section-heading");
+    if (heading && !heading.dataset.collapsibleInit && section.id !== "section-personne" && section.id !== "section-validation") {
+      heading.dataset.collapsibleInit = "true";
+      heading.classList.add("section-heading--collapsible");
+      heading.setAttribute("role", "button");
+      heading.setAttribute("tabindex", "0");
+      heading.setAttribute("aria-expanded", "true");
+      const toggle = () => {
+        const collapsed = section.classList.toggle("is-collapsed");
+        heading.setAttribute("aria-expanded", String(!collapsed));
+      };
+      heading.addEventListener("click", toggle);
+      heading.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+    }
+    if (heading) {
+      const count = section.querySelectorAll('input[type="checkbox"]:checked').length;
+      let badge = heading.querySelector("[data-section-count]");
+      if (count && !badge) {
+        badge = document.createElement("span");
+        badge.className = "section-count";
+        badge.dataset.sectionCount = "true";
+        heading.appendChild(badge);
+      }
+      if (badge) {
+        badge.textContent = count ? `${count} sélectionnée${count > 1 ? "s" : ""}` : "";
+        badge.classList.toggle("d-none", !count);
+      }
+    }
+  });
+  toc.innerHTML = sections.map((section) =>
+    `<a class="dashboard-nav__link" href="#${section.id}" data-toc-target="${section.id}">${escapeHtml(shortSectionLabel(section.querySelector(".section-title").textContent.trim()))}</a>`
+  ).join("");
+}
+
+let refreshFormSectionsTimer = null;
+function scheduleRefreshFormSections() {
+  window.clearTimeout(refreshFormSectionsTimer);
+  refreshFormSectionsTimer = window.setTimeout(refreshFormSections, 250);
+}
+
+// Dossier signe : les actions de suite (PDF, e-mail, restitution) sont proposees dans la barre du bas.
+async function renderLockedDossierActions(workflowStatus) {
+  const form = document.getElementById("dotationForm");
+  const bar = document.querySelector(".action-bar__buttons");
+  const id = form?.dataset.draftId;
+  if (!bar || !id) return;
+  bar.querySelectorAll("[data-locked-action]").forEach((btn) => btn.remove());
+  if (!form.dataset.lockedAt) return;
+  const user = await getSessionInfo();
+  const can = (permission) => user?.permissions?.includes("*") || user?.permissions?.includes(permission);
+  const actions = [
+    can("forms.export") && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
+    can("forms.export") && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
+    can("forms.restitution") && workflowStatus === "active" && { label: "Restituer", tone: "btn-primary", run: () => openRestitution(id) }
+  ].filter(Boolean);
+  const anchor = document.getElementById("saveDraftBtn");
+  actions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `btn ${action.tone}`;
+    btn.dataset.lockedAction = "true";
+    btn.textContent = action.label;
+    btn.addEventListener("click", action.run);
+    bar.insertBefore(btn, anchor);
+  });
 }
 
 function closeSaveProgress() {
@@ -2980,6 +3061,7 @@ async function saveDraft(signaturePad) {
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || "";
+    form.dataset.workflowStatus = result.summary.status;  // CRITICAL FIX #4: Syncer le workflow status post-save
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
 
     updateSaveProgress({
@@ -3095,7 +3177,11 @@ window.addEventListener("unhandledrejection", (event) => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-back-to-index]").forEach((btn) => {
-    btn.addEventListener("click", () => { window.location.href = "index.html"; });
+    // Un dossier signé (verrouillé) vit dans "Attributions finalisées", les autres dans "Attributions en cours".
+    btn.addEventListener("click", () => {
+      const locked = Boolean(document.getElementById("dotationForm")?.dataset.lockedAt);
+      window.location.href = locked ? "assignments-completed.html" : "index.html";
+    });
   });
 
   if (!form) {
@@ -3120,7 +3206,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Chargement des suggestions de champs (marque, modèle, etc.) — non bloquant
     void loadFieldSuggestions();
-    initSharedMemberModal();
     initRetraitsSection();
 
     fetch("/api/settings/public").then(r => r.ok ? r.json() : {}).then(s => {
@@ -3172,6 +3257,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation des blocs métier", "Préparation du formulaire...");
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();
+    document.getElementById("dotationForm")?.addEventListener("change", scheduleRefreshFormSections);
+    window.setTimeout(refreshFormSections, 1200);
+    window.setTimeout(refreshFormSections, 3000);
     initConditionalBlocks();
     initQualite();
     bindProgressIndicatorRefresh();
@@ -3264,3 +3352,4 @@ function normalizeDossierType(value) {
 
 // Module principal de la fiche d'attribution :
 // collecte métier, validation locale et sérialisation du payload.
+
