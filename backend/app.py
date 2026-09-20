@@ -591,14 +591,7 @@ def init_db():
                     sync_stock_for_form(connection, _row["id"], _stock_config)
                 except Exception as _exc:  # noqa: BLE001 - un dossier atypique ne doit jamais empecher le demarrage
                     print(f"[stock] dossier {_row['id']} ignore au demarrage : {_exc}")
-        try:
-            from models.health import database_health
-            from models.audit import insert_app_log
-            _health = database_health(connection)
-            if _health["status"] != "ok":
-                insert_app_log(connection, "system", "database_health", "Contrôle de santé au démarrage : " + " ".join(_health["problems"]), details=_health)
-        except Exception as _exc:  # le controle ne doit jamais empecher le demarrage
-            print(f"[sante] controle impossible : {_exc}")
+        # (le controle de sante n'est plus lance ici : trop couteux sur une grosse base, il tourne en arriere-plan apres le demarrage)
         from models.settings import get_app_settings
         from models.units_extra import anonymize_old_holders
         anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))

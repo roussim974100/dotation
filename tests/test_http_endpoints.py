@@ -187,7 +187,7 @@ def test_resource_used_by_dossiers_cannot_be_deleted(http):
 
 def test_database_health_report(http):
     assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
-    assert http["health_report_has_schema_version"] == 3
+    assert http["health_report_has_schema_version"] == 4
     assert http["health_report_status_known"] is True
 
 
@@ -195,11 +195,11 @@ def test_db_export_then_import_keeps_data_and_schema(http):
     assert http["db_export_is_sqlite"] is True
     assert http["db_import_status"] == 200
     assert http["db_import_keeps_forms"] is True
-    assert http["db_import_health"] == ["ok", 3]
+    assert http["db_import_health"] == ["ok", 4]
 
 
 def test_importing_an_older_database_upgrades_its_schema_immediately(http):
-    assert http["old_db_import"] == [200, 3, True]
+    assert http["old_db_import"] == [200, 4, True]
 
 
 def test_configured_beneficiary_types_and_status_labels_are_served(http):

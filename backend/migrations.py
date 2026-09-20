@@ -80,10 +80,34 @@ def _m_field_roles(connection):
             connection.execute("UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?", (json.dumps(schema, ensure_ascii=False), row["id"]))
 
 
+INDEXES = (
+    ("idx_dotation_items_form_key", "dotation_items", "form_id, item_key"),
+    ("idx_dotation_forms_status_updated", "dotation_forms", "status, updated_at"),
+    ("idx_dotation_forms_dossier", "dotation_forms", "dossier_id"),
+    ("idx_dotation_forms_source", "dotation_forms", "source_form_id"),
+    ("idx_stock_movements_resource", "resource_stock_movements", "resource_code, variant"),
+    ("idx_stock_movements_form", "resource_stock_movements", "form_id"),
+    ("idx_units_resource", "resource_units", "resource_code"),
+    ("idx_units_holder_form", "resource_units", "holder_form_id"),
+    ("idx_app_logs_created", "app_logs", "created_at"),
+)
+
+
+def _m_indexes(connection):
+    """Index manquants sur les colonnes de jointure et de tri (sans eux, les listes, la sante et les restitutions ralentissent au
+    carre avec le nombre de dossiers). Additif et idempotent ; un index dont la table ou la colonne n'existe pas est ignore."""
+    for name, table, columns in INDEXES:
+        try:
+            connection.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+        except sqlite3.OperationalError:
+            continue
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
     (3, "roles_de_champs", _m_field_roles),
+    (4, "index_de_performance", _m_indexes),
 ]
 
 
@@ -159,10 +183,21 @@ def run_pending_migrations(connection):
         _safety_copy(connection, pending[0][0])
     applied = []
     for version, name, function in pending:
-        function(connection)
-        connection.execute("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)", (version, name, datetime.now(timezone.utc).isoformat()))
+        connection.execute("SAVEPOINT migration")
+        try:
+            function(connection)
+            connection.execute("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)", (version, name, datetime.now(timezone.utc).isoformat()))
+            connection.execute("RELEASE SAVEPOINT migration")
+        except Exception as error:  # noqa: BLE001 - une migration en echec ne doit jamais empecher l'application de demarrer
+            connection.execute("ROLLBACK TO SAVEPOINT migration")
+            connection.execute("RELEASE SAVEPOINT migration")
+            import logging
+            logging.getLogger(__name__).error("Migration %s (%s) en echec, annulee (elle sera retentee au prochain demarrage) : %s", version, name, error)
+            print(f"[migration] {version} ({name}) annulee : {error}")
+            break  # les suivantes dependent de l'ordre : on s'arrete la
         applied.append(version)
-    connection.execute(f"PRAGMA user_version = {max(m[0] for m in MIGRATIONS)}")
+    if applied:
+        connection.execute(f"PRAGMA user_version = {max(applied)}")
     return applied
 
 

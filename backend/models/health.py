@@ -8,6 +8,9 @@ from models.field_health import scan_orphan_fields
 def drifted_form_ids(connection):
     """Dossiers dont une ressource porte des valeurs que la copie a plat (dotation_items.details_json) n'a pas."""
     drifted = []
+    items = {}
+    for item in connection.execute("SELECT form_id, item_key, details_json FROM dotation_items").fetchall():
+        items.setdefault((item["form_id"], item["item_key"]), item["details_json"])
     for row in connection.execute("SELECT id, payload_json FROM dotation_forms").fetchall():
         try:
             additional = ((json.loads(row["payload_json"] or "{}").get("resources") or {}).get("additional")) or []
@@ -17,11 +20,11 @@ def drifted_form_ids(connection):
             fields = entry.get("fields") if isinstance(entry, dict) else None
             if not isinstance(fields, dict) or not any(str(v or "").strip() for v in fields.values()):
                 continue
-            item = connection.execute("SELECT details_json FROM dotation_items WHERE form_id = ? AND item_key = ?", (row["id"], entry.get("code"))).fetchone()
-            if not item:
+            key = (row["id"], entry.get("code"))
+            if key not in items:
                 continue
             try:
-                details = json.loads(item["details_json"] or "{}")
+                details = json.loads(items[key] or "{}")
                 # deux formats : details["fields"] (actuel) ou champs a plat dans details (ancien)
                 copied = details.get("fields") if isinstance(details.get("fields"), dict) and details.get("fields") else details
             except (TypeError, ValueError):

@@ -1,5 +1,23 @@
 # Historique des versions — À Quai
 
+## [3.60.0] - 2026-09-20
+
+Performance mesurée et sûreté des mises à jour / restaurations (`tools/load_test.py` : base synthétique de 3 000 dossiers).
+
+### ⚡ Performance (mesurée)
+- **Démarrage : 38 s → 1 s** et **contrôle de santé : 22 s → 0,3 s** sur 3 000 dossiers. Causes : une requête par ressource sur une table sans index (comparaison écart dossier / copie à plat) et un contrôle de santé synchrone au démarrage (désormais en arrière-plan uniquement).
+- **Migration 4 : index de performance** sur les colonnes de jointure et de tri (éléments de dossier, statut/date des dossiers, mouvements de stock, parc, journal). Additive et idempotente.
+- Limite connue, mesurée : l'affichage de la liste de tous les dossiers demande environ 1,7 ms par dossier (5 s pour 3 000, 6 Mo) ; sans effet à l'échelle d'usage habituelle (quelques dizaines à quelques centaines).
+
+### 🛡️ Mises à jour et restaurations
+- **Une migration en échec est annulée proprement** (point de sauvegarde SQLite : aucune modification partielle), consignée, retentée au démarrage suivant ; l'application démarre quand même et les migrations suivantes ne sont pas tentées.
+- **Restauration tout-ou-rien** : si le remplacement d'une base échoue, celles déjà remplacées retrouvent leur état d'avant.
+- **Restauration refusée** pour une base d'une version plus récente de l'application, ou une base de comptes vide (personne ne pourrait se connecter).
+- **Déploiement** : les fichiers de base que le script root fait apparaître (journaux, copies) gardent le propriétaire du service ; attente de santé portée à 60 essais avec délai maximal par requête ; sauvegarde de `dotation.db` obligatoire avant toute modification.
+
+### 🧪 Tests
+- Migration en échec, index, restauration tout-ou-rien, refus de restauration, batterie de charge reproductible.
+
 ## [3.59.0] - 2026-09-20
 
 Ressources personnalisées saines quel que soit leur schéma (pré-mortem du 20/09).

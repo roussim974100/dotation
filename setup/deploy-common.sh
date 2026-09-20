@@ -109,6 +109,19 @@ echo "Déploiement de la branche $BRANCH (version actuelle : $FROM_VERSION, comm
 echo "Venv du service : $VENV_BIN | port : $PORT | données : $DATA_DIR"
 echo "=========================================="
 
+# Le script tourne en root : tout fichier de base qu'il fait apparaitre (journal -wal, -shm, copies) doit rester lisible et inscriptible par
+# l'utilisateur du service, sinon le service ne demarre plus. On aligne le proprietaire sur celui de la base principale (silencieux si impossible).
+fix_ownership() {
+    local ref="$DATA_DIR/dotation.db" f
+    [ -e "$ref" ] || return 0
+    for f in "$DATA_DIR"/dotation.db-wal "$DATA_DIR"/dotation.db-shm "$DATA_DIR"/users.db "$DATA_DIR"/users.db-wal "$DATA_DIR"/users.db-shm; do
+        [ -e "$f" ] && chown --reference="$ref" "$f" 2>/dev/null || true
+    done
+    [ -d "$BACKEND/db_backups" ] && chown -R --reference="$ref" "$BACKEND/db_backups" 2>/dev/null || true
+    [ -d "$DATA_DIR/db_backups" ] && chown -R --reference="$ref" "$DATA_DIR/db_backups" 2>/dev/null || true
+    return 0
+}
+
 wait_healthy() {
     local attempt
     # 60 essais : sur une grosse base, le premier demarrage (migrations, verrous entre workers) peut depasser 25 s ; --max-time evite
@@ -190,6 +203,7 @@ for name in ("dotation.db", "users.db"):
     dst.close(); src.close()
     print("  sauvegarde :", name)
 PY
+fix_ownership
 # Garde-fou : si la base principale existe et n'est pas vide, sa sauvegarde DOIT exister (sinon on ne poursuit pas : pas de retour arriere possible).
 if [ -s "$DATA_DIR/dotation.db" ] && [ ! -s "$SAVE_DIR/dotation.db" ]; then
     fail "la sauvegarde de dotation.db est absente : mise à jour interrompue avant toute modification"
@@ -221,6 +235,7 @@ write_status running "4/4" "Redémarrage du service"
 systemctl daemon-reload
 systemctl reset-failed "$SERVICE" 2>/dev/null || true
 RESTARTED=1
+fix_ownership
 systemctl restart "$SERVICE" || true
 if wait_healthy; then
     write_status ok "" "Application redémarrée et vérifiée."
