@@ -173,6 +173,34 @@ results["checklist"] = [checklist.get("total"), sorted(i["id"] for i in checklis
 results["checklist_wizard_done_after_apply"] = next((i["done"] for i in checklist.get("items", []) if i["id"] == "wizard"), None)
 results["checklist_anonymous"] = status(app.test_client().get("/api/admin/startup-checklist"))
 
+# Seuil d'alerte pilotage (timing_warning_days) : le changer modifie bien l'etat « En danger » des dossiers listes (et rien d'autre).
+import datetime as _dt
+_start = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+_form = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "PILOTAGE", "prenom": "Test", "qualite": "agent", "datePriseFonction": _start},
+         "resources": {"additional": [{"id": 1, "code": "ordinateur", "label": "Ordinateur", "category": "materiel", "requiresReturn": True,
+                                       "selected": True, "fields": {"marque": "X"}, "details": ""}]},
+         "workflow": {"status": "draft"}, "meta": {"startAt": _start}}
+admin.post("/api/forms", json=_form, headers=H)
+
+
+def _pilotage():
+    rows = admin.get("/api/forms").get_json() or []
+    row = next((x for x in rows if x.get("nom") == "PILOTAGE"), {})
+    return [row.get("timingStatus"), row.get("timingLabel")]
+
+
+admin.put("/api/admin/settings", json={"timing_warning_days": 3}, headers=H)
+results["pilotage_seuil_3"] = _pilotage()
+admin.put("/api/admin/settings", json={"timing_warning_days": 7}, headers=H)
+results["pilotage_seuil_7"] = _pilotage()
+results["pilotage_public_payload"] = (admin.get("/api/settings/public").get_json() or {}).get("timingWarningDays")
+admin.put("/api/admin/settings", json={"timing_warning_days": 3}, headers=H)
+results["pilotage_retour_seuil_3"] = _pilotage()
+_stats_a = (admin.get("/api/admin/dashboard-stats").get_json() or {}).get("timing_distribution")
+admin.put("/api/admin/settings", json={"timing_warning_days": 30}, headers=H)
+results["synthese_inchangee_par_le_seuil"] = _stats_a == (admin.get("/api/admin/dashboard-stats").get_json() or {}).get("timing_distribution")
+admin.put("/api/admin/settings", json={"timing_warning_days": 3}, headers=H)
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):
