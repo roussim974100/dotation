@@ -1,4 +1,8 @@
-# 🌊 À Quai - Guide de Déploiement v3.17.1
+# 🌊 À Quai - Guide de Déploiement
+
+> **Mise à jour d'une installation existante :** ne pas suivre ce guide, qui décrit l'installation initiale. Utiliser `sudo bash deploy.sh` (production) ou `sudo bash deploy-dev.sh` (préprod), documentés dans le [README](README.md#mise-à-jour-en-production). Ils sauvegardent les bases, installent les dépendances dans le bon venv et vérifient que l'application répond. Dépannage (502, module manquant…) : [DEPLOIEMENT_DEPENDANCES.md](DEPLOIEMENT_DEPENDANCES.md).
+>
+> Le venv de l'installation peut se trouver dans `/opt/dotation/venv` ou `/opt/dotation/backend/venv` selon la méthode d'installation ; le script de mise à jour le détecte tout seul.
 
 ## 🎯 Qu'est-ce qu'À Quai ?
 

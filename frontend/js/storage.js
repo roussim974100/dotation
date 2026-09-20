@@ -25,8 +25,176 @@ const dashboardFilters = {
   timing: "",
   qualite: "",
   service: "",
-  sort: "recent"
+  // field: "date" (defaut) | "title" | "qualite" | "service" | "status" | "timing" | "progress"
+  // direction: "asc" | "desc". Le select #sortFilter (recent/oldest) ne pilote que le champ "date" ;
+  // le tri par clic sur un en-tete de colonne (cf bindSortableHeaders) pilote tous les champs.
+  sort: { field: "date", direction: "desc" }
 };
+
+const DASHBOARD_SORT_DEFAULT = { field: "date", direction: "desc" };
+
+// Ordre logique (pas alphabetique) pour les champs a enumeration.
+const DASHBOARD_STATUS_ORDER = {
+  draft: 0, partial_assignment: 1, awaiting_signature: 2, active: 3,
+  partial_return: 4, returned: 5, cancelled: 6
+};
+const DASHBOARD_TIMING_ORDER = { late: 0, warning: 1, neutral: 2, ok: 3 };
+
+// Une fonction par champ triable : renvoie une valeur comparable (nombre ou string).
+const DASHBOARD_SORT_VALUE_GETTERS = {
+  date: (draft) => new Date(draft.updatedAt || draft.assignedAt || 0).getTime(),
+  title: (draft) => (draft.title || "").toLocaleLowerCase("fr"),
+  qualite: (draft) => (formatQualiteLabel(draft) || "").toLocaleLowerCase("fr"),
+  service: (draft) => (getDraftServiceValue(draft) || "").toLocaleLowerCase("fr"),
+  status: (draft) => DASHBOARD_STATUS_ORDER[draft.status || "draft"] ?? 99,
+  timing: (draft) => DASHBOARD_TIMING_ORDER[getDraftProgressMetrics(draft).timingStatus] ?? 99,
+  progress: (draft) => getDraftProgressMetrics(draft).ratio || 0,
+  // Ecart remise/restitution (restitutions-pending.html uniquement) : negatif = restitue
+  // en avance, positif = en retard. Neutre si l'une des deux dates manque.
+  recovery: (draft) => (draft.returnedAt && draft.assignedAt)
+    ? new Date(draft.returnedAt).getTime() - new Date(draft.assignedAt).getTime()
+    : 0,
+};
+
+// Definition centralisee des colonnes des tableaux dashboard : une seule source pour
+// le libelle (th desktop + data-label mobile), le champ de tri et le rendu de cellule.
+// Remplace les <th> autrefois dupliques et codes en dur sur chacune des 4 pages
+// dashboard (et qui avaient deja derive : "Qualite" appelee "Etat" sur une page,
+// "Avancement" appele "Etat" sur une autre, pour les memes donnees).
+const DASHBOARD_COLUMNS = {
+  checkbox: {
+    label: null,
+    sortField: null,
+    headClass: "draft-check-col",
+    headHtml: () => `<input id="selectAllDrafts" class="form-check-input" type="checkbox" aria-label="Tout sélectionner">`,
+    render: (ctx) => `
+      <td class="draft-check-col">
+        ${(ctx.permissions.canExport || ctx.permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${ctx.draft.id}" aria-label="Sélectionner ${escapeHtml(ctx.title)}">` : ""}
+      </td>`
+  },
+  dossier: {
+    label: "Dossier",
+    sortField: "title",
+    render: (ctx) => `
+      <td data-label="Dossier">
+        <div class="draft-title-wrap">
+          <span class="draft-title">${escapeHtml(ctx.title)}</span>
+          ${(ctx.draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${ctx.draft.data.unc_acces.length} chemin${ctx.draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
+        </div>
+        <div class="draft-meta">${escapeHtml(ctx.dossierTypeLabel)}${ctx.startAtLabel ? ` · ${ctx.startAtLabel}` : ""}</div>
+      </td>`
+  },
+  qualite: {
+    label: "Qualité",
+    secondary: true, // masquee sur ecran etroit (l'info reste dans l'apercu rapide)
+    sortField: "qualite",
+    render: (ctx) => `<td data-label="Qualité">${escapeHtml(formatQualiteLabel(ctx.draft))}</td>`
+  },
+  avancement: {
+    label: "Avancement",
+    sortField: "status",
+    render: (ctx) => `<td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(ctx.draft.status || "draft")}" data-status-preview-id="${ctx.draft.id}">${escapeHtml(formatDraftStatusLabel(ctx.draft))}</span></td>`
+  },
+  pilotage: {
+    label: "Pilotage",
+    sortField: "timing",
+    render: (ctx) => `
+      <td data-label="Pilotage">
+        <span class="timing-chip timing-chip--${escapeHtml(ctx.progress.timingStatus)}" data-timing-preview-id="${ctx.draft.id}">${escapeHtml(ctx.progress.timingLabel)}</span>
+        ${ctx.timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(ctx.timingOffsetLabel)}</div>` : ""}
+      </td>`
+  },
+  progression: {
+    label: "Progression",
+    sortField: "progress",
+    render: (ctx) => `
+      <td data-label="Progression">
+        <div class="resource-progress">
+          <div class="resource-progress__fraction">${ctx.progress.completed}/${ctx.progress.total}</div>
+          <div class="resource-progress__track">
+            <div class="resource-progress__bar" style="width:${ctx.progressPercent}%"></div>
+          </div>
+        </div>
+      </td>`
+  },
+  recuperation: {
+    label: "Récupération",
+    sortField: "recovery",
+    render: (ctx) => `<td data-label="Récupération">${ctx.recoveryBadge || ""}</td>`
+  },
+  derniere_modification: {
+    label: "Dernière modification",
+    secondary: true,
+    sortField: "date",
+    render: (ctx) => `<td data-label="Dernière modification">${escapeHtml(formatDate(ctx.draft.updatedAt))}</td>`
+  },
+  actions: {
+    label: "Actions",
+    sortField: null,
+    headClass: "text-end",
+    render: (ctx) => `
+      <td data-label="Actions" class="draft-actions-cell">
+        <div class="draft-actions">
+          ${buildDraftActionButtons(ctx.draft, ctx.permissions)}
+        </div>
+      </td>`
+  }
+};
+
+// Colonnes visibles par vue, dans l'ordre d'affichage.
+const DASHBOARD_VIEW_COLUMNS = {
+  active: ["checkbox", "dossier", "qualite", "avancement", "pilotage", "progression", "derniere_modification", "actions"],
+  restitutions_pending: ["checkbox", "dossier", "qualite", "avancement", "pilotage", "progression", "recuperation", "derniere_modification", "actions"],
+  history_assignments: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
+  history_restitutions: ["dossier", "qualite", "pilotage", "progression", "derniere_modification", "actions"],
+};
+
+// Onglets de navigation des 4 tableaux de bord : une seule definition (libelle, page, regle de
+// comptage) au lieu de 4 copies de <nav> en dur. Le compteur applique le meme predicat que la vue.
+const DASHBOARD_NAV = [
+  { view: "active", label: "Attributions en cours", href: "index.html", count: (d) => isOperationalAssignmentDraft(d) },
+  { view: "history_assignments", label: "Attributions finalisées", href: "assignments-completed.html", count: (d) => isCompletedAssignmentDraft(d) },
+  { view: "restitutions_pending", label: "Restitutions en cours", href: "restitutions-pending.html", count: (d) => isOperationalRestitutionDraft(d) },
+  { view: "history_restitutions", label: "Restitutions finalisées", href: "restitutions-completed.html", count: (d) => isCompletedRestitutionDraft(d) }
+];
+
+function renderDashboardNav(drafts) {
+  const nav = document.getElementById("dashboardNav");
+  if (!nav) {
+    return;
+  }
+  const current = getDashboardViewMode();
+  nav.innerHTML = DASHBOARD_NAV.map((tab) => {
+    const isActive = tab.view === current;
+    const count = Array.isArray(drafts) ? drafts.filter(tab.count).length : null;
+    return `<a class="dashboard-nav__link${isActive ? " is-active" : ""}" href="${tab.href}"${isActive ? ' aria-current="page"' : ""}>${escapeHtml(tab.label)}${count === null ? "" : ` <span class="dashboard-nav__count">${count}</span>`}</a>`;
+  }).join("");
+}
+
+function getDashboardViewColumns() {
+  return DASHBOARD_VIEW_COLUMNS[getDashboardViewMode()] || DASHBOARD_VIEW_COLUMNS.active;
+}
+
+function renderDashboardTableHead(containerId) {
+  const thead = document.getElementById(containerId);
+  if (!thead) {
+    return;
+  }
+  const cells = getDashboardViewColumns().map((key) => {
+    const col = DASHBOARD_COLUMNS[key];
+    if (!col) {
+      return "";
+    }
+    if (col.headHtml) {
+      return `<th class="${col.headClass || ""}">${col.headHtml()}</th>`;
+    }
+    const headClasses = [col.headClass, col.secondary ? "dash-col--secondary" : ""].filter(Boolean).join(" ");
+    const classAttr = headClasses ? ` class="${headClasses}"` : "";
+    const sortAttr = col.sortField ? ` data-sort-field="${col.sortField}"` : "";
+    return `<th${sortAttr}${classAttr}>${escapeHtml(col.label || "")}</th>`;
+  }).join("");
+  thead.innerHTML = `<tr>${cells}</tr>`;
+}
 
 function hasActiveFilters() {
   return Boolean(
@@ -35,7 +203,64 @@ function hasActiveFilters() {
   );
 }
 
+// Filtres du tableau de bord : controle DOM, cle de dashboardFilters et evenement de remise a zero.
+const DASHBOARD_FILTER_CONTROLS = [
+  { key: "search", id: "searchInput", label: "Recherche", event: "input" },
+  { key: "status", id: "statusFilter", label: "Avancement", event: "change" },
+  { key: "timing", id: "timingFilter", label: "Pilotage", event: "change" },
+  { key: "qualite", id: "qualiteFilter", label: "Qualité", event: "change" },
+  { key: "service", id: "serviceFilter", label: "Service", event: "change" }
+];
+
+function renderFilterChips() {
+  const host = document.getElementById("filterChips");
+  if (!host) return;
+  host.innerHTML = DASHBOARD_FILTER_CONTROLS
+    .filter((control) => dashboardFilters[control.key] && document.getElementById(control.id))
+    .map((control) => {
+      const el = document.getElementById(control.id);
+      const text = el.tagName === "SELECT" ? el.selectedOptions[0]?.textContent || dashboardFilters[control.key] : dashboardFilters[control.key];
+      return `<button class="filter-chip" type="button" data-clear-filter="${control.id}" aria-label="Retirer le filtre ${escapeHtml(control.label)}">${escapeHtml(control.label)} : ${escapeHtml(text)} <span aria-hidden="true">✕</span></button>`;
+    }).join("");
+}
+
+function initFilterToolbar() {
+  const toolbar = document.querySelector(".filter-toolbar");
+  const actions = toolbar?.querySelector(".filter-toolbar__actions");
+  const grid = toolbar?.querySelector(".filter-toolbar__grid");
+  if (!toolbar || !actions || !grid || document.getElementById("toggleFiltersBtn")) return;
+
+  grid.id = grid.id || "filterToolbarGrid";
+  toolbar.classList.add("is-collapsed");
+
+  const toggle = document.createElement("button");
+  toggle.id = "toggleFiltersBtn";
+  toggle.type = "button";
+  toggle.className = "btn btn-outline-secondary btn-sm";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", grid.id);
+  toggle.textContent = "Filtres";
+  toggle.addEventListener("click", () => {
+    const collapsed = toolbar.classList.toggle("is-collapsed");
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+  });
+  actions.prepend(toggle);
+
+  const chips = document.createElement("div");
+  chips.id = "filterChips";
+  chips.className = "filter-chips";
+  toolbar.appendChild(chips);
+  chips.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-clear-filter]");
+    const el = chip && document.getElementById(chip.dataset.clearFilter);
+    if (!el) return;
+    el.value = "";
+    el.dispatchEvent(new Event(el.tagName === "INPUT" ? "input" : "change", { bubbles: true }));
+  });
+}
+
 function updateFilterBadge() {
+  renderFilterChips();
   const badge = document.getElementById("filterActiveBadge");
   if (!badge) return;
   const count = [
@@ -44,7 +269,8 @@ function updateFilterBadge() {
     dashboardFilters.timing,
     dashboardFilters.qualite,
     dashboardFilters.service,
-    dashboardFilters.sort !== "recent" ? dashboardFilters.sort : "",
+    (dashboardFilters.sort.field !== DASHBOARD_SORT_DEFAULT.field
+      || dashboardFilters.sort.direction !== DASHBOARD_SORT_DEFAULT.direction) ? "sort" : "",
   ].filter(Boolean).length;
   badge.textContent = count;
   badge.classList.toggle("d-none", count === 0);
@@ -225,7 +451,9 @@ function isDynamicResourceComplete(resource) {
     : (Array.isArray(resource.field_schema) ? resource.field_schema : []);
   const fieldValues = resource.fields || {};
   if (fieldSchema.length) {
-    const hasMissingRequiredField = fieldSchema.some((field) => field.required && !String(fieldValues[field.key] || "").trim());
+    // Un champ masque (cf admin Ressources) n'a plus de saisie possible depuis le
+    // formulaire : on ne peut donc plus exiger de valeur meme s'il est marque obligatoire.
+    const hasMissingRequiredField = fieldSchema.some((field) => !field.hidden && field.required && !String(fieldValues[field.key] || "").trim());
     if (hasMissingRequiredField) {
       return false;
     }
@@ -294,7 +522,8 @@ function summarizeDraftProgressFromPayload(payload = {}) {
   if (daysUntilStart < 0) {
     return { completed, total, ratio: completed / total, timingStatus: "late", timingLabel: "En retard" };
   }
-  if (daysUntilStart <= 3) {
+  const warningDays = Number(window.APP_BRANDING?.timingWarningDays) || 3;
+  if (daysUntilStart <= warningDays) {
     return { completed, total, ratio: completed / total, timingStatus: "warning", timingLabel: "En danger" };
   }
   return { completed, total, ratio: completed / total, timingStatus: "ok", timingLabel: "Dans les temps" };
@@ -373,38 +602,24 @@ function buildRestitutionsPendingRow(draft, permissions) {
     }
   }
 
+  const ctx = {
+    draft, permissions, progress, progressPercent, title, dossierTypeLabel, recoveryBadge,
+    startAtLabel: "", timingOffsetLabel: ""
+  };
+  const cells = getDashboardViewColumns().map((key) => renderDashboardCell(key, ctx)).join("");
+
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
-      <td data-label="Dossier">
-        <div class="draft-title-wrap">
-          <span class="draft-title">${escapeHtml(title)}</span>
-          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
-        </div>
-        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
-        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-      </td>
-      <td data-label="Qualité">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="État"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
-      <td data-label="Pilotage">
-        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
-      </td>
-      <td data-label="Progression">
-        <div class="resource-progress">
-          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
-          <div class="resource-progress__track">
-            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
-          </div>
-        </div>
-      </td>
-      <td data-label="Récupération">${recoveryBadge}</td>
-      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
-      <td data-label="Actions" class="draft-actions-cell">
-        <div class="draft-actions">
-          ${buildDraftActionButtons(draft, permissions)}
-        </div>
-      </td>
+      ${cells}
     </tr>
   `;
+}
+
+// Rendu d'une cellule ; une colonne « secondary » recoit la classe qui la masque sur ecran etroit.
+function renderDashboardCell(key, ctx) {
+  const column = DASHBOARD_COLUMNS[key];
+  const html = column?.render(ctx) || "";
+  return column?.secondary ? html.replace(/<td/, '<td class="dash-col--secondary"') : html;
 }
 
 function buildDashboardRow(draft, permissions) {
@@ -430,40 +645,15 @@ function buildDashboardRow(draft, permissions) {
       ? `Prise de fonction : ${escapeHtml(formatShortDate(draft.startAt))}`
       : "Prise de fonction non renseignée";
 
+  const ctx = {
+    draft, permissions, progress, progressPercent, title, dossierTypeLabel, startAtLabel, timingOffsetLabel,
+    recoveryBadge: ""
+  };
+  const cells = getDashboardViewColumns().map((key) => renderDashboardCell(key, ctx)).join("");
+
   return `
     <tr class="draft-row ${dashboardPendingNewIds.has(draft.id) ? "draft-row--new" : ""}" data-quick-preview-id="${draft.id}">
-      <td class="draft-check-col">
-        ${(permissions.canExport || permissions.canDelete) ? `<input class="form-check-input draft-select" type="checkbox" value="${draft.id}" aria-label="Sélectionner ${escapeHtml(title)}">` : ""}
-      </td>
-      <td data-label="Dossier">
-        <div class="draft-title-wrap">
-          <span class="draft-title">${escapeHtml(title)}</span>
-          ${(draft.data?.unc_acces?.length > 0) ? `<span class="draft-unc-badge" title="${draft.data.unc_acces.length} chemin${draft.data.unc_acces.length > 1 ? "s" : ""} UNC">UNC</span>` : ""}
-        </div>
-        <div class="draft-meta">${escapeHtml(dossierTypeLabel)}</div>
-        <div class="draft-meta">${escapeHtml(draft.nom || draft.data?.beneficiaire?.nom || "")} ${escapeHtml(draft.prenom || draft.data?.beneficiaire?.prenom || "")}</div>
-        ${startAtLabel ? `<div class="draft-meta">${startAtLabel}</div>` : ""}
-      </td>
-      <td data-label="État">${escapeHtml(formatQualiteLabel(draft))}</td>
-      <td data-label="Avancement"><span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}" data-status-preview-id="${draft.id}">${escapeHtml(formatDraftStatusLabel(draft))}</span></td>
-      <td data-label="Pilotage">
-        <span class="timing-chip timing-chip--${escapeHtml(progress.timingStatus)}" data-timing-preview-id="${draft.id}">${escapeHtml(progress.timingLabel)}</span>
-        ${timingOffsetLabel ? `<div class="draft-meta draft-meta--timing">${escapeHtml(timingOffsetLabel)}</div>` : ""}
-      </td>
-      <td data-label="Progression">
-        <div class="resource-progress">
-          <div class="resource-progress__fraction">${progress.completed}/${progress.total}</div>
-          <div class="resource-progress__track">
-            <div class="resource-progress__bar" style="width:${progressPercent}%"></div>
-          </div>
-        </div>
-      </td>
-      <td data-label="Dernière modification">${escapeHtml(formatDate(draft.updatedAt))}</td>
-      <td data-label="Actions" class="draft-actions-cell">
-        <div class="draft-actions">
-          ${buildDraftActionButtons(draft, permissions)}
-        </div>
-      </td>
+      ${cells}
     </tr>
   `;
 }
@@ -583,41 +773,47 @@ function getDashboardViewMode() {
 
 function sortDraftsForDisplay(drafts) {
   const sorted = [...drafts];
+  const { field, direction } = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+  const getValue = DASHBOARD_SORT_VALUE_GETTERS[field] || DASHBOARD_SORT_VALUE_GETTERS.date;
   sorted.sort((left, right) => {
-    const leftDate = new Date(left.updatedAt || left.assignedAt || 0).getTime();
-    const rightDate = new Date(right.updatedAt || right.assignedAt || 0).getTime();
-    if (dashboardFilters.sort === "oldest") {
-      return leftDate - rightDate;
-    }
-    return rightDate - leftDate;
+    const a = getValue(left);
+    const b = getValue(right);
+    const cmp = typeof a === "string" ? a.localeCompare(b, "fr") : (a || 0) - (b || 0);
+    return direction === "asc" ? cmp : -cmp;
   });
   return sorted;
 }
 
 // Rendu d'un groupe d'actions : bouton direct si 1 item, dropdown si plusieurs.
-function renderActionGroup(shortLabel, tone, items) {
-  if (!items.length) return "";
-  if (items.length === 1) {
-    const item = items[0];
-    return `<button class="btn btn-sm ${tone}" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(shortLabel)}</button>`;
-  }
+// Menu "Plus d'actions" d'une ligne : sections nommees (documents, e-mail) puis, tout en bas et
+// separee, l'action destructrice. Les actions sont portees par data-action (cf. DRAFT_ACTION_MAP).
+function renderRowActionMenu(sections, dangerItems) {
+  const groups = sections.filter((section) => section.items.length);
+  if (!groups.length && !dangerItems.length) return "";
+  const button = (item, tone = "btn-outline-secondary") =>
+    `<button class="btn btn-sm ${tone}" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`;
   return `
-    <details class="draft-actions__menu" data-action-menu data-label="${escapeHtml(shortLabel)}" data-open-label="${escapeHtml(`${shortLabel} - moins d'actions`)}">
-      <summary class="btn btn-sm ${tone}"><span data-action-menu-label>${escapeHtml(shortLabel)}</span></summary>
+    <details class="draft-actions__menu" data-action-menu data-label="⋯" data-open-label="✕">
+      <summary class="btn btn-sm btn-outline-secondary" aria-label="Plus d'actions"><span data-action-menu-label>⋯</span></summary>
       <div class="draft-actions__menu-panel">
+        ${groups.map((section) => `
         <div class="draft-actions__menu-section">
-          ${items.map((item) => `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="${item.action}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`).join("")}
-        </div>
+          <p class="draft-actions__menu-title">${escapeHtml(section.title)}</p>
+          ${section.items.map((item) => button(item)).join("")}
+        </div>`).join("")}
+        ${dangerItems.length ? `<div class="draft-actions__menu-section">${dangerItems.map((item) => button(item, "btn-outline-danger")).join("")}</div>` : ""}
       </div>
     </details>
   `;
 }
 
+// Une ligne = "Ouvrir" + l'action metier de l'etape (restituer / demander la signature) + menu "Plus".
 function buildDraftActionButtons(draft, options) {
   const id = draft.id;
   const status = draft.status || "draft";
   const hasRestitution = hasRestitutionData(draft);
   const viewMode = getDashboardViewMode();
+  const inRestitutionPhase = ["returned", "partial_return", "awaiting_signature"].includes(status);
 
   // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html
   const inRestitutionsPendingView = viewMode === "restitutions_pending";
@@ -625,64 +821,61 @@ function buildDraftActionButtons(draft, options) {
     ? "openRestitution"
     : "editDraft";
 
-  // PDF — action principale selon la phase
+  // Action metier de l'etape, mise en avant a cote de "Ouvrir".
+  let stepAction = null;
+  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+    stepAction = { action: "openRestitution", label: "Restituer" };
+  } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
+    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
+  } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
+    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
+  }
+
+  // Documents (PDF) — l'ordre suit la phase
   const pdfItems = [];
   if (options.canExport) {
-    if (["returned", "partial_return"].includes(status) && hasRestitution) {
-      pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
-      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+    if (inRestitutionPhase && hasRestitution) {
+      pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF de restitution" });
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF du dossier" });
     } else {
-      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF dossier" });
+      pdfItems.push({ action: "exportDraftPdf", id, label: "PDF du dossier" });
       if (hasRestitution) {
-        pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF restitution" });
+        pdfItems.push({ action: "exportRestitutionPdf", id, label: "PDF de restitution" });
       }
     }
   }
 
-  // E-mail — un seul groupe, actions adaptées au workflow courant
+  // E-mails — actions adaptées au workflow courant (la demande de signature est promue en bouton)
   const emailItems = [];
-  if (["returned", "partial_return"].includes(status)) {
-    // Phase restitution : actions restitution uniquement
+  if (inRestitutionPhase) {
     emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
     if (options.canExport && hasRestitution) {
-      emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer PDF restitution" });
-    }
-    if (canRequestRestitutionSignature(draft, options)) {
-      emailItems.push({ action: "prepareRestitutionSignatureEmail", id, label: "Lien signature restitution" });
-    }
-  } else if (status === "active") {
-    // Attribution finalisée : pas encore de restitution
-    emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
-    if (options.canExport) {
-      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
+      emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer le PDF de restitution" });
     }
   } else {
-    // En cours / en attente de signature
     emailItems.push({ action: "prepareAssignmentInfoEmail", id, label: "Informer de la création" });
     if (options.canExport) {
-      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer PDF dossier" });
-    }
-    if (canRequestAssignmentSignature(draft, options)) {
-      emailItems.push({ action: "prepareAssignmentSignatureEmail", id, label: "Lien signature dossier" });
+      emailItems.push({ action: "prepareDraftPdfEmail", id, label: "Envoyer le PDF du dossier" });
     }
   }
 
-  const managementItems = [];
-  if (options.canDelete) {
-    managementItems.push({ action: "removeDraft", id, label: "Supprimer le dossier" });
-  }
+  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
+  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+    ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
+    : [];
 
-  // Bouton "Restitution" : uniquement sur attribution finalisée (active) hors vue restitutions en cours
-  // (dans restitutions_pending, "Ouvrir" pointe déjà directement sur restitution.html)
-  const showRestitutionBtn = options.canRestitution && status === "active" && !inRestitutionsPendingView;
+  const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
-      ${showRestitutionBtn ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="openRestitution" data-id="${id}">Restitution</button>` : ""}
-      ${renderActionGroup("PDF", "btn-outline-success", pdfItems)}
-      ${renderActionGroup("E-mail", "btn-outline-primary", emailItems)}
-      ${renderActionGroup("Supprimer", "btn-outline-danger", managementItems)}
+      ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
+      ${renderRowActionMenu([
+        { title: "Documents", items: pdfItems },
+        { title: "Envoyer par e-mail", items: emailItems },
+        { title: "Dossier", items: personItems }
+      ], dangerItems)}
     </div>
   `;
 }
@@ -766,19 +959,18 @@ function filterDraftsForCurrentView(drafts) {
   const viewMode = getDashboardViewMode();
 
   if (viewMode === "history_assignments") {
-    return drafts.filter((draft) => isCompletedAssignmentDraft(draft));
+    return applyDashboardFilters(drafts.filter((draft) => isCompletedAssignmentDraft(draft)));
   }
 
   if (viewMode === "history_restitutions") {
-    return drafts.filter((draft) => isCompletedRestitutionDraft(draft));
+    return applyDashboardFilters(drafts.filter((draft) => isCompletedRestitutionDraft(draft)));
   }
 
   if (viewMode === "restitutions_pending") {
     return applyDashboardFilters(drafts.filter((draft) => isOperationalRestitutionDraft(draft)));
   }
 
-  const operational = drafts.filter((draft) => isOperationalAssignmentDraft(draft) || isOperationalRestitutionDraft(draft));
-  return applyDashboardFilters(operational);
+  return applyDashboardFilters(drafts.filter((draft) => isOperationalAssignmentDraft(draft)));
 }
 
 function hydrateServiceFilterOptions(drafts) {
@@ -807,7 +999,7 @@ function formatDossierTypeLabel(dossierType) {
     arrivee: "Nouvelle arrivée",
     changement_service: "Changement de service",
     mise_a_jour: "Mise à jour de ressources",
-    sortie: "Sortie / restitution"
+    sortie: "Sortie (régularisation)"
   };
   const legacyMap = {
     nouvel_agent: "arrivee",
@@ -899,11 +1091,18 @@ async function getSessionInfo() {
   return sessionInfo;
 }
 
-let listFormsEtag = null;
+// ETag de la liste : persiste avec le cache local, pour que changer d'onglet (autre page du tableau de bord)
+// obtienne un 304 immediat au lieu de retelecharger toute la liste. Le serveur y inclut l'utilisateur,
+// le seuil de pilotage et la date du jour.
+const LIST_ETAG_KEY = "dotationDraftsEtag";
+let listFormsEtag = (() => {
+  try { return localStorage.getItem(LIST_ETAG_KEY); } catch (error) { return null; }
+})();
 async function listForms() {
   try {
     const fetchHeaders = {};
-    if (listFormsEtag) {
+    // Sans cache local exploitable, un 304 renverrait une liste vide : on redemande alors la liste complete.
+    if (listFormsEtag && getCachedDrafts().length > 0) {
       fetchHeaders["If-None-Match"] = listFormsEtag;
     }
     const response = await fetch(API_BASE, {
@@ -917,6 +1116,7 @@ async function listForms() {
     const etag = response.headers.get("ETag");
     if (etag) {
       listFormsEtag = etag;
+      try { localStorage.setItem(LIST_ETAG_KEY, etag); } catch (error) { /* stockage indisponible : sans effet */ }
     }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -1004,8 +1204,247 @@ function editDraft(id) {
   window.location.href = `form.html?id=${encodeURIComponent(id)}`;
 }
 
+function newAssignmentForPerson(id) {
+  window.location.href = `form.html?prefillFrom=${encodeURIComponent(id)}`;
+}
+
 function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
+}
+
+// Modale "Nouvelle restitution" : une restitution part toujours d'une attribution
+// active sans restitution en cours, on la choisit donc dans cette liste.
+async function openNewRestitutionModal() {
+  if (!(sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.restitution"))) {
+    showToast("Votre profil ne permet pas de lancer une restitution.", "warning");
+    return;
+  }
+
+  let modal = document.getElementById("newRestitutionModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "newRestitutionModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="password-generator-modal__backdrop" data-new-restitution-close="true"></div>
+      <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="newRestitutionModalTitle">
+        <div class="password-generator-modal__header">
+          <div>
+            <p class="panel-eyebrow">Restitution</p>
+            <h2 class="section-title" id="newRestitutionModalTitle">Nouvelle restitution</h2>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-new-restitution-close="true">Fermer</button>
+        </div>
+        <div class="btn-group w-100 mt-3" role="group" aria-label="Type de restitution">
+          <button class="btn btn-outline-primary active" type="button" id="newRestitutionModePick" aria-pressed="true">Attribution existante</button>
+          <button class="btn btn-outline-primary" type="button" id="newRestitutionModeRegul" aria-pressed="false">Personne sans attribution</button>
+        </div>
+        <div class="password-generator-modal__content" id="newRestitutionPickPanel">
+          <label class="form-label" for="newRestitutionSearch">Attribution concernée</label>
+          <input class="form-control mb-3" id="newRestitutionSearch" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
+          <div class="list-group" id="newRestitutionResults" role="list"></div>
+          <p class="form-text mb-0" id="newRestitutionHint"></p>
+        </div>
+        <form class="password-generator-modal__content d-none" id="newRestitutionRegulPanel" novalidate>
+          <p class="form-text">Régularisation : le dossier est créé directement en restitution en cours, sans attribution.</p>
+          <div id="newRestitutionRegulFields"></div>
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6">Ressources à récupérer</legend>
+            <div id="newRestitutionRegulResources" class="row row-cols-1 row-cols-sm-2 g-1"></div>
+          </fieldset>
+          <p class="text-danger small d-none" id="newRestitutionRegulError" role="alert"></p>
+          <div class="password-generator-modal__actions password-generator-modal__actions--sticky">
+            <button class="btn btn-outline-primary" type="submit" id="newRestitutionRegulAnother" data-another="true">Enregistrer et créer une autre</button>
+            <button class="btn btn-primary" type="submit" id="newRestitutionRegulSubmit">Créer la restitution</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const search = document.getElementById("newRestitutionSearch");
+  const results = document.getElementById("newRestitutionResults");
+  const hint = document.getElementById("newRestitutionHint");
+  const MAX_RESULTS = 50;
+
+  if (!currentDraftRows.length) {
+    try {
+      currentDraftRows = await listForms();
+    } catch (error) {
+      showToast("Impossible de charger la liste des attributions.", "error");
+      return;
+    }
+  }
+  const candidates = currentDraftRows.filter((draft) => isCompletedAssignmentDraft(draft));
+
+  const close = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => {
+    if (event.key === "Escape") {
+      close();
+    }
+  };
+
+  const renderResults = () => {
+    const query = normalizeText(search.value);
+    const matches = candidates.filter((draft) => {
+      if (!query) return true;
+      const haystack = normalizeText([
+        draft.title, draft.nom, draft.prenom, getDraftServiceValue(draft)
+      ].filter(Boolean).join(" "));
+      return haystack.includes(query);
+    });
+    const shown = matches.slice(0, MAX_RESULTS);
+    results.innerHTML = shown.map((draft) => `
+      <button class="list-group-item list-group-item-action" type="button" data-new-restitution-id="${escapeHtml(draft.id)}">
+        <span class="fw-semibold">${escapeHtml(draft.title || "Dossier")}</span>
+        <span class="d-block small text-muted">${escapeHtml(getDraftServiceValue(draft) || "")}</span>
+      </button>
+    `).join("");
+    if (candidates.length === 0) {
+      hint.textContent = "Aucune attribution active à restituer pour le moment.";
+    } else if (matches.length === 0) {
+      hint.textContent = "Aucune attribution ne correspond à cette recherche.";
+    } else if (matches.length > MAX_RESULTS) {
+      hint.textContent = `${matches.length} résultats, affinez la recherche pour voir les autres.`;
+    } else {
+      hint.textContent = `${matches.length} attribution${matches.length > 1 ? "s" : ""} active${matches.length > 1 ? "s" : ""}.`;
+    }
+  };
+
+  modal.querySelectorAll("[data-new-restitution-close]").forEach((btn) => {
+    btn.onclick = close;
+  });
+  results.onclick = (event) => {
+    const item = event.target.closest("[data-new-restitution-id]");
+    if (item) {
+      openRestitution(item.dataset.newRestitutionId);
+    }
+  };
+  search.oninput = renderResults;
+  search.value = "";
+  renderResults();
+  setupRegularisationPanel(modal);
+
+  document.addEventListener("keydown", onKeydown);
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+  search.focus();
+}
+
+// Champs du formulaire de régularisation, définis en objet (cf. feedback "objet plutôt que HTML en dur").
+const REGULARISATION_FIELDS = [
+  { key: "nom", label: "Nom", type: "text", required: true, autocomplete: "family-name" },
+  { key: "prenom", label: "Prénom", type: "text", required: true, autocomplete: "given-name" },
+  { key: "qualite", label: "Qualité", type: "select", options: [["agent", "Agent"], ["elu", "Élu(e)"]] },
+  { key: "service", label: "Service", type: "select", options: [] }
+];
+
+function buildRegularisationFieldHtml(field) {
+  const id = `regul_${field.key}`;
+  const control = field.type === "select"
+    ? `<select class="form-select" id="${id}">${field.options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}</select>`
+    : `<input class="form-control" id="${id}" type="text"${field.required ? " required" : ""}${field.autocomplete ? ` autocomplete="${field.autocomplete}"` : ""}>`;
+  return `<div class="mb-3"><label class="form-label" for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>${control}</div>`;
+}
+
+async function setupRegularisationPanel(modal) {
+  const pickPanel = document.getElementById("newRestitutionPickPanel");
+  const regulPanel = document.getElementById("newRestitutionRegulPanel");
+  const fieldsWrap = document.getElementById("newRestitutionRegulFields");
+  const resourcesWrap = document.getElementById("newRestitutionRegulResources");
+  const errorEl = document.getElementById("newRestitutionRegulError");
+  const submitBtn = document.getElementById("newRestitutionRegulSubmit");
+  // Les deux boutons d'envoi sont verrouilles ensemble : sinon un double envoi cree un doublon.
+  const setSubmitting = (busy) => regulPanel.querySelectorAll('button[type="submit"]').forEach((btn) => { btn.disabled = busy; });
+
+  const showPanel = (name) => {
+    pickPanel.classList.toggle("d-none", name !== "pick");
+    regulPanel.classList.toggle("d-none", name !== "regul");
+    [["newRestitutionModePick", "pick"], ["newRestitutionModeRegul", "regul"]].forEach(([id, mode]) => {
+      const btn = document.getElementById(id);
+      btn.classList.toggle("active", name === mode);
+      btn.setAttribute("aria-pressed", String(name === mode));
+    });
+    (name === "pick" ? document.getElementById("newRestitutionSearch") : document.getElementById("regul_nom"))?.focus();
+  };
+  showPanel("pick");
+  errorEl.classList.add("d-none");
+  document.getElementById("newRestitutionModeRegul").onclick = () => showPanel("regul");
+  document.getElementById("newRestitutionModePick").onclick = () => showPanel("pick");
+
+  let services = [];
+  let resources = [];
+  try {
+    [services, resources] = await Promise.all([
+      requestJson("/api/reference/services"),
+      requestJson("/api/reference/resources")
+    ]);
+  } catch (error) {
+    services = [];
+    resources = [];
+  }
+  const fields = REGULARISATION_FIELDS.map((field) => field.key === "service"
+    ? { ...field, options: [["", "Non renseigné"], ...services.map((svc) => [svc.label, svc.label])] }
+    : field);
+  fieldsWrap.innerHTML = fields.map(buildRegularisationFieldHtml).join("");
+  const returnable = resources.filter((res) => res.category === "materiel" && res.requires_return);
+  resourcesWrap.innerHTML = returnable.length
+    ? returnable.map((res) => `
+        <div class="col"><div class="form-check">
+          <input class="form-check-input" type="checkbox" id="regul_res_${res.id}" value="${res.id}">
+          <label class="form-check-label" for="regul_res_${res.id}">${escapeHtml(res.label)}</label>
+        </div></div>`).join("")
+    : `<p class="form-text mb-0">Aucune ressource à restituer n'est définie dans le catalogue.</p>`;
+
+  regulPanel.onsubmit = async (event) => {
+    event.preventDefault();
+    const createAnother = event.submitter?.dataset.another === "true";
+    const value = (key) => document.getElementById(`regul_${key}`)?.value.trim() || "";
+    const resourceIds = [...resourcesWrap.querySelectorAll("input:checked")].map((input) => input.value);
+    const showError = (message) => {
+      errorEl.textContent = message;
+      errorEl.classList.remove("d-none");
+    };
+    if (!value("nom") || !value("prenom")) {
+      showError("Le nom et le prénom sont obligatoires.");
+      return;
+    }
+    if (resourceIds.length === 0) {
+      showError("Sélectionnez au moins une ressource à récupérer.");
+      return;
+    }
+    errorEl.classList.add("d-none");
+    setSubmitting(true);
+    try {
+      const result = await requestJson("/api/forms/regularisation", {
+        method: "POST",
+        body: JSON.stringify({
+          nom: value("nom"), prenom: value("prenom"), qualite: value("qualite"),
+          service: value("service"), resourceIds
+        })
+      });
+      if (createAnother) {
+        // Saisie en serie : on vide le formulaire, la liste se rafraichira a la fermeture.
+        showToast(`Restitution créée : ${result.title}.`, "success");
+        regulPanel.reset();
+        resourcesWrap.querySelectorAll("input:checked").forEach((input) => { input.checked = false; });
+        setSubmitting(false);
+        document.getElementById("regul_nom")?.focus();
+        void renderDraftList();
+      } else {
+        openRestitution(result.form_id);
+      }
+    } catch (error) {
+      showError(error.message || "Impossible de créer la restitution.");
+      setSubmitting(false);
+    }
+  };
 }
 
 function renderLoadMoreButton(group, total, displayed, permissions) {
@@ -1070,6 +1509,7 @@ async function renderDraftList() {
     persistPendingDashboardUpdates();
     currentDraftRows = sortedDrafts;
     hydrateServiceFilterOptions(sortedDrafts);
+    renderDashboardNav(sortedDrafts);
     const filteredDrafts = filterDraftsForCurrentView(sortedDrafts);
     const assignmentDrafts = filteredDrafts.filter((draft) => isOperationalAssignmentDraft(draft));
     const restitutionDrafts = filteredDrafts.filter((draft) => isOperationalRestitutionDraft(draft));
@@ -1100,6 +1540,12 @@ async function renderDraftList() {
       if (draftList) draftList.innerHTML = "";
       if (restitutionList) restitutionList.innerHTML = "";
       if (historyList) historyList.innerHTML = "";
+      // Vider aussi les boutons "Voir plus" : sinon ils gardent le HTML du
+      // rendu precedent (non filtre) et restent affiches sur une liste vide.
+      ["assignmentLoadMoreWrap", "restitutionLoadMoreWrap", "historyLoadMoreWrap"].forEach((id) => {
+        const wrap = document.getElementById(id);
+        if (wrap) wrap.innerHTML = "";
+      });
       dashboardSelectedIds = new Set();
       const filtersActive = hasActiveFilters() && sortedDrafts.length > 0;
       filterEmptyState?.classList.toggle("d-none", !filtersActive);
@@ -1156,7 +1602,8 @@ async function renderDraftList() {
     bindStatusPreviews();
     bindTimingPreviews();
     bindDraftActionMenus();
-    bindSelectionActions(viewMode === "active" && canExport, viewMode === "active" && canDelete);
+    const selectable = viewMode === "active" || viewMode === "restitutions_pending";
+    bindSelectionActions(selectable && canExport, viewMode === "active" && canDelete);
     restoreDashboardSelection();
   } finally {
     dashboardRefreshInFlight = false;
@@ -1624,17 +2071,76 @@ async function ensureAssignmentSignatureLink(id) {
   };
 }
 
-async function ensureRestitutionSignatureLink(id) {
+async function ensureRestitutionSignatureLink(id, validityDays) {
   let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
   if (!result?.link || result.link.status !== "active" || !result.link.url) {
     result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
-      method: "POST"
+      method: "POST",
+      body: validityDays ? JSON.stringify({ validityDays }) : undefined
     });
   }
   return {
     link: result.link,
     absoluteUrl: new URL(result.link.url, window.location.origin).href
   };
+}
+
+function askSignatureLinkValidityDays() {
+  return new Promise((resolve) => {
+    let modal = document.getElementById("signatureLinkValidityModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.className = "password-generator-modal d-none";
+      modal.id = "signatureLinkValidityModal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div class="password-generator-modal__backdrop" data-validity-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="signatureLinkValidityModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Signature à distance</p>
+              <h2 class="section-title" id="signatureLinkValidityModalTitle">Validité du lien de signature</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-validity-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <div class="mb-3">
+              <label class="form-label" for="signatureLinkValidityDays">Nombre de jours</label>
+              <input class="form-control" id="signatureLinkValidityDays" type="number" min="1" max="30" value="7">
+              <div class="form-text">Choisissez une durée entre 1 et 30 jours.</div>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-validity-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="signatureLinkValidityConfirmBtn" type="button">Générer le lien</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const input = document.getElementById("signatureLinkValidityDays");
+    input.value = "7";
+
+    const close = (value) => {
+      modal.classList.add("d-none");
+      modal.setAttribute("aria-hidden", "true");
+      resolve(value);
+    };
+
+    modal.querySelectorAll("[data-validity-modal-close]").forEach((btn) => {
+      btn.onclick = () => close(null);
+    });
+    document.getElementById("signatureLinkValidityConfirmBtn").onclick = () => {
+      const raw = Number.parseInt(input.value || "7", 10);
+      const days = Number.isFinite(raw) ? Math.min(30, Math.max(1, raw)) : 7;
+      close(days);
+    };
+
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+    input.focus();
+  });
 }
 
 async function shareSignatureLink(id) {
@@ -1689,7 +2195,11 @@ async function copyRestitutionSignatureLink(id) {
 
 async function prepareRestitutionSignatureEmail(id) {
   try {
-    const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
+    const validityDays = await askSignatureLinkValidityDays();
+    if (validityDays === null) {
+      return;
+    }
+    const { absoluteUrl } = await ensureRestitutionSignatureLink(id, validityDays);
     const result = await getDraftById(id);
     const draft = result
       ? { ...result.summary, data: result.data }
@@ -1938,18 +2448,24 @@ function updateExportSelectedState() {
   const restitutionExportButton = document.getElementById("exportSelectedRestitutionPdfBtn");
   const deleteButton = document.getElementById("deleteSelectedBtn");
 
+  // Actions groupees contextuelles : visibles seulement quand une ligne est cochee (et permise).
+  const setBulkState = (button) => {
+    button.disabled = selectedCount === 0;
+    button.classList.toggle("d-none", button.dataset.permitted !== "true" || selectedCount === 0);
+  };
+
   if (exportButton) {
-    exportButton.disabled = selectedCount === 0;
-    exportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} dossiers` : "PDF dossier sélectionné";
+    setBulkState(exportButton);
+    exportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} dossiers` : "PDF du dossier sélectionné";
   }
 
   if (restitutionExportButton) {
-    restitutionExportButton.disabled = selectedCount === 0;
-    restitutionExportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} restitutions` : "PDF restitution sélectionnée";
+    setBulkState(restitutionExportButton);
+    restitutionExportButton.textContent = selectedCount > 1 ? `PDF de ${selectedCount} restitutions` : "PDF de la restitution sélectionnée";
   }
 
   if (deleteButton) {
-    deleteButton.disabled = selectedCount === 0;
+    setBulkState(deleteButton);
     deleteButton.textContent = selectedCount > 1 ? `Supprimer ${selectedCount} dossiers` : "Supprimer la sélection";
   }
 }
@@ -2057,7 +2573,7 @@ function bindSelectionActions(canExport, canDelete) {
   const canSelect = canExport || canDelete;
 
   if (exportButton) {
-    exportButton.classList.toggle("d-none", !canExport);
+    exportButton.dataset.permitted = String(canExport);
     exportButton.disabled = true;
     if (!exportButton.dataset.boundExportSelection) {
       exportButton.addEventListener("click", () => {
@@ -2068,7 +2584,7 @@ function bindSelectionActions(canExport, canDelete) {
   }
 
   if (restitutionExportButton) {
-    restitutionExportButton.classList.toggle("d-none", !canExport);
+    restitutionExportButton.dataset.permitted = String(canExport);
     restitutionExportButton.disabled = true;
     if (!restitutionExportButton.dataset.boundExportRestitutionSelection) {
       restitutionExportButton.addEventListener("click", () => {
@@ -2079,7 +2595,7 @@ function bindSelectionActions(canExport, canDelete) {
   }
 
   if (deleteButton) {
-    deleteButton.classList.toggle("d-none", !canDelete);
+    deleteButton.dataset.permitted = String(canDelete);
     deleteButton.disabled = true;
     if (!deleteButton.dataset.boundDeleteSelection) {
       deleteButton.addEventListener("click", () => {
@@ -2118,6 +2634,7 @@ function bindSelectionActions(canExport, canDelete) {
     });
     input.dataset.boundSelect = "true";
   });
+  updateExportSelectedState();
 }
 
 async function removeDraft(id) {
@@ -2155,6 +2672,63 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function resetDashboardPagination() {
+  assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
+  restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
+  historyDisplayCount = DASHBOARD_PAGE_SIZE;
+}
+
+// Point d'entree unique pour changer le tri (select #sortFilter ou clic sur en-tete de
+// colonne) : garde les deux UI synchronisees avec dashboardFilters.sort.
+function applyDashboardSort(field, direction) {
+  dashboardFilters.sort = { field, direction };
+  resetDashboardPagination();
+  syncSortUI();
+  updateFilterBadge();
+  void renderDraftList();
+}
+
+// Reflete l'etat de tri courant sur le select "Trier par" (uniquement pertinent pour le
+// champ "date") et sur les en-tetes de colonne triables (chevron + aria-sort).
+function syncSortUI() {
+  const { field, direction } = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+  const sortFilter = document.getElementById("sortFilter");
+  if (sortFilter) {
+    sortFilter.value = field === "date" ? (direction === "asc" ? "oldest" : "recent") : "";
+  }
+  document.querySelectorAll(".draft-table th[data-sort-field]").forEach((th) => {
+    const isActive = th.dataset.sortField === field;
+    th.classList.toggle("is-sorted-asc", isActive && direction === "asc");
+    th.classList.toggle("is-sorted-desc", isActive && direction === "desc");
+    th.setAttribute("aria-sort", isActive ? (direction === "asc" ? "ascending" : "descending") : "none");
+  });
+}
+
+// Delegation de clic sur les en-tetes triables : un clic sur un champ deja actif inverse
+// le sens, un clic sur un nouveau champ demarre en ascendant (desc pour "date", pour
+// rester coherent avec le tri "plus recent d'abord" historique par defaut).
+function bindSortableHeaders() {
+  document.querySelectorAll(".draft-table thead").forEach((thead) => {
+    if (thead.dataset.sortBound === "true") {
+      return;
+    }
+    thead.addEventListener("click", (event) => {
+      const th = event.target.closest("th[data-sort-field]");
+      if (!th) {
+        return;
+      }
+      const field = th.dataset.sortField;
+      const current = dashboardFilters.sort || DASHBOARD_SORT_DEFAULT;
+      const direction = current.field === field
+        ? (current.direction === "asc" ? "desc" : "asc")
+        : (field === "date" ? "desc" : "asc");
+      applyDashboardSort(field, direction);
+    });
+    thead.dataset.sortBound = "true";
+  });
+  syncSortUI();
+}
+
 function bindDashboardFilters() {
   const searchInput = document.getElementById("searchInput");
   const statusFilter = document.getElementById("statusFilter");
@@ -2164,56 +2738,50 @@ function bindDashboardFilters() {
   const sortFilter = document.getElementById("sortFilter");
   const resetButton = document.getElementById("resetFiltersBtn");
 
-  if (!searchInput || !statusFilter || !timingFilter || !qualiteFilter || !serviceFilter || !sortFilter || !resetButton) {
+  if (!searchInput || !timingFilter || !qualiteFilter || !serviceFilter || !sortFilter || !resetButton) {
     return;
   }
 
-  function resetPagination() {
-    assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
-    restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
-    historyDisplayCount = DASHBOARD_PAGE_SIZE;
-  }
+  bindSortableHeaders();
+  initFilterToolbar();
 
   searchInput.addEventListener("input", (event) => {
     dashboardFilters.search = event.target.value.trim();
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
-  statusFilter.addEventListener("change", (event) => {
+  statusFilter?.addEventListener("change", (event) => {
     dashboardFilters.status = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   timingFilter.addEventListener("change", (event) => {
     dashboardFilters.timing = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   qualiteFilter.addEventListener("change", (event) => {
     dashboardFilters.qualite = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   serviceFilter.addEventListener("change", (event) => {
     dashboardFilters.service = event.target.value;
-    resetPagination();
+    resetDashboardPagination();
     updateFilterBadge();
     void renderDraftList();
   });
 
   sortFilter.addEventListener("change", (event) => {
-    dashboardFilters.sort = event.target.value || "recent";
-    resetPagination();
-    updateFilterBadge();
-    void renderDraftList();
+    applyDashboardSort("date", event.target.value === "oldest" ? "asc" : "desc");
   });
 
   resetButton.addEventListener("click", () => {
@@ -2222,13 +2790,13 @@ function bindDashboardFilters() {
     dashboardFilters.timing = "";
     dashboardFilters.qualite = "";
     dashboardFilters.service = "";
-    dashboardFilters.sort = "recent";
+    dashboardFilters.sort = { ...DASHBOARD_SORT_DEFAULT };
     if (searchInput) searchInput.value = "";
     if (statusFilter) statusFilter.value = "";
     if (timingFilter) timingFilter.value = "";
     if (qualiteFilter) qualiteFilter.value = "";
     if (serviceFilter) serviceFilter.value = "";
-    if (sortFilter) sortFilter.value = "recent";
+    syncSortUI();
     updateFilterBadge();
     void renderDraftList();
   });
@@ -2438,12 +3006,7 @@ document.addEventListener("DOMContentLoaded", () => {
   dashboardPendingNewIds = loadPendingDashboardUpdates();
   renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
-    if (user && (user.permissions.includes("users.manage") || user.permissions.includes("*"))) {
-      document.getElementById("adminLink").classList.remove("d-none");
-    }
-    if (user && (user.groups?.includes("direction") || user.is_admin)) {
-      document.getElementById("execDashboardLink").classList.remove("d-none");
-    }
+    // « Administration » et « Synthèse » sont ajoutés au menu du compte par ui.js (renderUserMenuFeatureLinks), sur toutes les pages.
     if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
       document.getElementById("exportMenu")?.classList.remove("d-none");
     }
@@ -2451,13 +3014,19 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("newFormBtn")?.classList.remove("d-none");
       document.getElementById("emptyStateNewFormBtn")?.classList.remove("d-none");
     }
+    if (user && (user.permissions.includes("forms.restitution") || user.permissions.includes("*"))) {
+      document.getElementById("newRestitutionBtn")?.classList.remove("d-none");
+      document.getElementById("emptyStateNewRestitutionBtn")?.classList.remove("d-none");
+    }
     renderDashboardSignatureLinkNotice();
   });
   document.getElementById("newFormBtn")?.addEventListener("click", newForm);
   document.getElementById("emptyStateNewFormBtn")?.addEventListener("click", newForm);
+  document.getElementById("newRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
+  document.getElementById("emptyStateNewRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
-    editDraft, openRestitution, exportDraftPdf, exportRestitutionPdf,
+    editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,
@@ -2485,6 +3054,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  renderDashboardTableHead("draftTableHead");
+  renderDashboardNav(null);
   bindDashboardFilters();
   void renderDraftList();
   startDashboardAutoRefresh();

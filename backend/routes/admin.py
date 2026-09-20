@@ -13,25 +13,29 @@ logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
 
-from utils import utc_now, generate_id, bool_to_int
+from utils import utc_now, generate_id, bool_to_int, mask_text
 from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
     get_user_record, password_complexity_error, is_valid_username,
     current_user, rate_limit,
     list_all_users, list_all_groups, update_group,
-    create_user, update_user, delete_user,
+    create_user, update_user, delete_user, normalize_email,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
 from models.settings import (
     DEFAULT_APP_SETTINGS, THEME_PRESETS,
-    get_app_settings, save_app_settings,
+    get_app_settings, save_app_settings, SettingsValidationError,
     get_brand_logo_public_url, get_dpo_email,
     build_public_settings_payload, resolve_theme_id, resolve_dark_mode,
 )
+from account_rules import normalize_person_name
+from models.resource_rules import blocking_issues, catalog_quality_report, effective_tracking_mode, validate_resource
+from models.inventory import resolve_identifier_key
 from models.catalog import normalize_resource_catalog_payload
+from models.workflow import count_resource_field_usage
 from models.forms import persist_form
-from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR
+from config import CUSTOM_BRANDING_DIR, DB_PATH, BASE_DIR, DATA_DIR
 
 bp = Blueprint("admin", __name__)
 
@@ -227,8 +231,12 @@ def dashboard_stats():
         f"SELECT id, nom, prenom, service, status, updated_at FROM dotation_forms {alerte_where} ORDER BY updated_at",
         alerte_params_full,
     ).fetchall()
+    # Groupe a portee "masked" (RGPD) : noms et prenoms masques comme sur la liste des dossiers.
+    masked_scope = (current_user() or {}).get("data_scope") == "masked"
     alertes = [
-        {"id": row["id"], "nom": row["nom"] or "", "prenom": row["prenom"] or "",
+        {"id": row["id"],
+         "nom": mask_text(row["nom"] or "") if masked_scope else (row["nom"] or ""),
+         "prenom": mask_text(row["prenom"] or "") if masked_scope else (row["prenom"] or ""),
          "service": row["service"] or "—", "jours_blocage": _days_since(row["updated_at"]),
          "status": row["status"]}
         for row in alertes_rows
@@ -364,6 +372,8 @@ def admin_settings_route():
         "support_email": settings.get("support_email") or "",
         "support_role": settings.get("support_role") or "",
         "restitution_phase1_unlock_days": settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"],
+        "timing_warning_days": settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"],
+        "parc_retention_years": settings.get("parc_retention_years") or DEFAULT_APP_SETTINGS["parc_retention_years"],
     }
     payload["themeOptions"] = [
         {"id": key, "label": value["label"]}
@@ -378,38 +388,53 @@ def admin_settings_route():
 @rate_limit(max_requests=20, window_seconds=60, scope="admin_settings_put")
 def update_admin_settings_route():
     payload = request.get_json(silent=True) or {}
-    with get_db() as connection:
-        save_app_settings(connection, {
-            "org_name": payload.get("org_name"),
-            "dpo_email": payload.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"],
-            "email_domains": payload.get("email_domains"),
-            "brand_logo_mode": payload.get("brand_logo_mode"),
-            "brand_logo_url": payload.get("brand_logo_url"),
-            "theme_id": payload.get("theme_id"),
-            "dark_mode_policy": payload.get("dark_mode_policy"),
-            "org_context": payload.get("org_context"),
-            "beneficiary_types": payload.get("beneficiary_types"),
-            "support_name": payload.get("support_name"),
-            "support_email": payload.get("support_email"),
-            "support_role": payload.get("support_role"),
-            "restitution_phase1_unlock_days": str(int(payload.get("restitution_phase1_unlock_days") or 1)),
-        })
-        insert_app_log(
-            connection,
-            "admin",
-            "settings_updated",
-            "Parametres de personnalisation mis a jour",
-            "settings",
-            "branding",
-            {
+
+    def optional_int(key, low, high):
+        """Entier borne, ou None si le champ n'est pas fourni (le reglage existant est alors conserve)."""
+        if payload.get(key) in (None, ""):
+            return None
+        try:
+            return str(max(low, min(high, int(payload.get(key)))))
+        except (TypeError, ValueError):
+            raise SettingsValidationError(f"« {key} » doit être un nombre entier.")
+
+    try:
+        with get_db() as connection:
+            save_app_settings(connection, {
                 "org_name": payload.get("org_name"),
                 "dpo_email": payload.get("dpo_email"),
+                "email_domains": payload.get("email_domains"),
                 "brand_logo_mode": payload.get("brand_logo_mode"),
+                "brand_logo_url": payload.get("brand_logo_url"),
                 "theme_id": payload.get("theme_id"),
                 "dark_mode_policy": payload.get("dark_mode_policy"),
-            },
-            actor=current_actor(),
-        )
+                "org_context": payload.get("org_context"),
+                "beneficiary_types": payload.get("beneficiary_types"),
+                "support_name": payload.get("support_name"),
+                "support_email": payload.get("support_email"),
+                "support_role": payload.get("support_role"),
+                "restitution_phase1_unlock_days": optional_int("restitution_phase1_unlock_days", 0, 365),
+                "timing_warning_days": optional_int("timing_warning_days", 0, 365),
+                "parc_retention_years": optional_int("parc_retention_years", 1, 30),
+            })
+            insert_app_log(
+                connection,
+                "admin",
+                "settings_updated",
+                "Parametres de personnalisation mis a jour",
+                "settings",
+                "branding",
+                {
+                    "org_name": payload.get("org_name"),
+                    "dpo_email": payload.get("dpo_email"),
+                    "brand_logo_mode": payload.get("brand_logo_mode"),
+                    "theme_id": payload.get("theme_id"),
+                    "dark_mode_policy": payload.get("dark_mode_policy"),
+                },
+                actor=current_actor(),
+            )
+    except SettingsValidationError as error:
+        return jsonify({"error": str(error)}), 400
     return jsonify(build_public_settings_payload())
 
 
@@ -436,6 +461,9 @@ def setup_status_route():
 @rate_limit(max_requests=5, window_seconds=600, scope="setup_complete")
 def setup_complete_route():
     payload = request.get_json(silent=True) or {}
+    if get_app_settings().get("setup_completed", "0") == "1" and payload.get("confirm_reconfigure") is not True:
+        # L'installation ne se rejoue pas par megarde : une reconfiguration exige une confirmation explicite (tracee).
+        return jsonify({"error": "L'installation est déjà terminée : utilisez Administration > Personnalisation."}), 409
     updates = {
         "org_name": payload.get("org_name"),
         "dpo_email": payload.get("dpo_email"),
@@ -446,18 +474,22 @@ def setup_complete_route():
         "support_role": payload.get("support_role"),
         "setup_completed": "1",
     }
-    with get_db() as connection:
-        save_app_settings(connection, updates)
-        insert_app_log(
-            connection,
-            "admin",
-            "setup_completed",
-            "Configuration initiale complétée via le wizard",
-            "settings",
-            "setup",
-            {"org_name": payload.get("org_name"), "org_context": payload.get("org_context")},
-            actor=current_actor(),
-        )
+    try:
+        with get_db() as connection:
+            save_app_settings(connection, updates)
+            insert_app_log(
+                connection,
+                "admin",
+                "setup_completed",
+                "Configuration initiale complétée via le wizard",
+                "settings",
+                "setup",
+                {"org_name": payload.get("org_name"), "org_context": payload.get("org_context"),
+                 "reconfigured": payload.get("confirm_reconfigure") is True},
+                actor=current_actor(),
+            )
+    except SettingsValidationError as error:
+        return jsonify({"error": str(error)}), 400
     return jsonify(build_public_settings_payload())
 
 
@@ -696,6 +728,9 @@ def admin_users():
             "is_active": user.get("is_active", True),
             "status": user.get("status", "active"),
             "service": user.get("service") or "",
+            "email": user.get("email") or "",
+            "first_name": user.get("first_name") or "",
+            "last_name": user.get("last_name") or "",
             "db_manage": bool(user.get("db_manage", False)),
         }
         for user in users
@@ -837,7 +872,7 @@ def restore_trash_item(trash_id):
             is_active = bool(payload.get("is_active", True))
             status = payload.get("status", "active")
             db_manage = bool(payload.get("db_manage", False))
-            if not create_user(username, password_hash, groups, service, is_active, status, db_manage):
+            if not create_user(username, password_hash, groups, service, is_active, status, db_manage, payload.get("email") or "", payload.get("first_name") or "", payload.get("last_name") or ""):
                 return jsonify({"error": "failed_to_restore_user"}), 500
             form_data = {"restored": True}
         else:
@@ -1151,6 +1186,9 @@ def create_admin_resource():
 
     if not resource_data["code"] or not resource_data["label"]:
         return jsonify({"error": "code_and_label_required"}), 400
+    blocking = blocking_issues(validate_resource(resource_data))
+    if blocking:
+        return jsonify({"error": "invalid_resource", "issues": blocking}), 400
 
     now = utc_now()
     with get_db() as connection:
@@ -1163,8 +1201,8 @@ def create_admin_resource():
             INSERT INTO resource_catalog (
                 id, code, label, description, category, issuer_service, requires_return,
                 has_assignment_date, has_assignment_condition, has_assignment_notes, display_order,
-                trigger_key, field_schema_json, is_active, is_builtin, is_pool_resource, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                trigger_key, field_schema_json, is_active, tracking_mode, is_builtin, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             """,
             (
                 resource_id,
@@ -1181,7 +1219,7 @@ def create_admin_resource():
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
+                resource_data["tracking_mode"],
                 now,
                 now,
             ),
@@ -1226,12 +1264,35 @@ def update_admin_resource(resource_id):
         ).fetchone()
         if duplicate:
             return jsonify({"error": "resource_code_exists"}), 409
+        blocking = blocking_issues(validate_resource(resource_data))
+        if blocking:
+            return jsonify({"error": "invalid_resource", "issues": blocking}), 400
+        # Garde-fous de l'historique : le code sert de cle aux lignes deja saisies, et le champ identifiant
+        # d'un suivi par objet ne peut plus etre change, masque ou supprime s'il a deja ete utilise.
+        if next_code != row["code"] and connection.execute(
+            "SELECT COUNT(*) FROM dotation_items WHERE item_key = ?", (row["code"],)
+        ).fetchone()[0]:
+            return jsonify({"error": "code_locked"}), 409
+        try:
+            old_schema = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            old_schema = []
+        if effective_tracking_mode(row["tracking_mode"], row["category"], old_schema) == "unit":
+            old_key = resolve_identifier_key(old_schema)
+            new_field = next((f for f in resource_data["field_schema"] if f.get("key") == old_key), None)
+            still_identifier = (
+                effective_tracking_mode(resource_data["tracking_mode"], resource_data["category"], resource_data["field_schema"]) == "unit"
+                and resolve_identifier_key(resource_data["field_schema"]) == old_key
+                and new_field is not None and not new_field.get("hidden")
+            )
+            if old_key and not still_identifier and count_resource_field_usage(connection, row["code"], old_key):
+                return jsonify({"error": "identifier_locked"}), 409
         connection.execute(
             """
             UPDATE resource_catalog
             SET code = ?, label = ?, description = ?, category = ?, issuer_service = ?, requires_return = ?,
                 has_assignment_date = ?, has_assignment_condition = ?, has_assignment_notes = ?, display_order = ?,
-                trigger_key = ?, field_schema_json = ?, is_active = ?, is_pool_resource = ?, updated_at = ?
+                trigger_key = ?, field_schema_json = ?, is_active = ?, tracking_mode = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -1248,7 +1309,7 @@ def update_admin_resource(resource_id):
                 resource_data["trigger_key"],
                 json.dumps(resource_data["field_schema"], ensure_ascii=False),
                 bool_to_int(resource_data["is_active"]),
-                bool_to_int(resource_data["is_pool_resource"]),
+                resource_data["tracking_mode"],
                 now,
                 resource_id,
             ),
@@ -1270,6 +1331,17 @@ def update_admin_resource(resource_id):
             target_label=resource_data["label"],
         )
     return jsonify({"updated": True, "resource": normalize_reference_row(updated_row)})
+
+
+@bp.route("/api/admin/catalog/quality", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def catalog_quality():
+    """Ressources actives dont la configuration empeche un historique coherent (a corriger dans l'admin)."""
+    with get_db() as connection:
+        rows = connection.execute("SELECT * FROM resource_catalog WHERE is_active = 1 ORDER BY category, display_order, label").fetchall()
+    resources = [normalize_reference_row(row) for row in rows]
+    return jsonify({"total": len(resources), "resources": catalog_quality_report(resources)})
 
 
 @bp.route("/api/admin/resources/<resource_id>", methods=["DELETE"])
@@ -1308,21 +1380,21 @@ def delete_admin_resource(resource_id):
     return jsonify({"deleted": True})
 
 
-@bp.route("/api/resources/pool-catalog", methods=["GET"])
+@bp.route("/api/admin/resources/<resource_id>/fields/<field_key>/usage", methods=["GET"])
 @login_required
-def pool_catalog():
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
-    search = request.args.get("search", "").strip().lower()
+@permission_required("users.manage")
+def admin_resource_field_usage(resource_id, field_key):
+    # Nombre de dossiers ayant deja une valeur sur ce champ : appele avant suppression
+    # reelle d'un champ dans l'admin pour avertir et proposer le masquage a la place.
     with get_db() as connection:
-        rows = connection.execute(
-            """SELECT id, code, label, category, issuer_service
-               FROM resource_catalog
-               WHERE is_pool_resource = 1 AND is_active = 1 AND category != 'immateriel'
-               ORDER BY label COLLATE NOCASE"""
-        ).fetchall()
-    results = [dict(r) for r in rows if not search or search in r["label"].lower()]
-    return jsonify(results)
+        resource_row = connection.execute(
+            "SELECT code FROM resource_catalog WHERE id = ?",
+            (resource_id,),
+        ).fetchone()
+        if not resource_row:
+            return jsonify({"error": "not_found"}), 404
+        count = count_resource_field_usage(connection, resource_row["code"], field_key)
+    return jsonify({"count": count})
 
 
 @bp.route("/api/admin/users", methods=["POST"])
@@ -1353,8 +1425,16 @@ def create_admin_user():
     status = "active" if is_active else "disabled"
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     db_manage = bool(payload.get("db_manage", False))
+    email, email_error = normalize_email(payload.get("email"))
+    if email_error:
+        return jsonify({"error": email_error}), 400
 
-    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage):
+    first_name, first_error = normalize_person_name(payload.get("first_name"))
+    last_name, last_error = normalize_person_name(payload.get("last_name"))
+    if first_error or last_error:
+        return jsonify({"error": "invalid_name"}), 400
+
+    if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email, first_name, last_name):
         return jsonify({"error": "failed_to_create_user"}), 500
 
     with get_db() as connection:
@@ -1400,6 +1480,20 @@ def update_admin_user(username):
 
     if "db_manage" in payload:
         update_fields["db_manage"] = int(bool(payload["db_manage"]))
+
+    if "email" in payload:
+        email, email_error = normalize_email(payload["email"])
+        if email_error:
+            return jsonify({"error": email_error}), 400
+        update_fields["email"] = email
+
+    # Nom et prenom : seul un administrateur peut les modifier une fois renseignes.
+    for name_key in ("first_name", "last_name"):
+        if name_key in payload:
+            name_value, name_error = normalize_person_name(payload[name_key])
+            if name_error:
+                return jsonify({"error": name_error}), 400
+            update_fields[name_key] = name_value
 
     password_changed = False
     if payload.get("password"):
@@ -1477,7 +1571,7 @@ _REQUIRED_TABLES = {
 }
 _SQLITE_MAGIC = b"SQLite format 3\x00"
 _DB_MAX_SIZE = 200 * 1024 * 1024  # 200 Mo
-_BACKUP_DIR = os.path.join(BASE_DIR, "db_backups")
+_BACKUP_DIR = os.path.join(DATA_DIR, "db_backups")
 
 
 def _diagnose_db_file(path):
@@ -1510,7 +1604,7 @@ def _diagnose_db_file(path):
         if "dotation_forms" in existing:
             try:
                 stats["dossiers"] = conn.execute(
-                    "SELECT COUNT(*) FROM dotation_forms WHERE is_deleted = 0"
+                    "SELECT COUNT(*) FROM dotation_forms"
                 ).fetchone()[0]
             except Exception as exc:
                 logger.warning("Diagnostic : impossible de compter les dossiers : %s", exc)

@@ -201,8 +201,11 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
     if category == "immateriel":
         has_assignment_condition = False
     is_active = bool(payload.get("is_active", bool(existing.get("is_active", True))))
-    is_pool_resource = bool(payload.get("is_pool_resource", bool(existing.get("is_pool_resource", False))))
+    tracking_mode = str(payload.get("tracking_mode") if payload.get("tracking_mode") is not None else existing.get("tracking_mode") or "").strip()
+    if tracking_mode not in {"", "unit", "none", "access", "quantity"}:
+        tracking_mode = ""
     return {
+        "tracking_mode": tracking_mode,
         "code": code,
         "label": label,
         "description": description,
@@ -216,7 +219,6 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
         "trigger_key": trigger_key,
         "field_schema": field_schema,
         "is_active": is_active,
-        "is_pool_resource": is_pool_resource,
     }
 
 

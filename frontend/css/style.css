@@ -14,10 +14,61 @@
   --radius-md: 14px;
   --font-ui: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   --font-brand: Georgia, "Times New Roman", serif;
+
+  /* Harmonisation Bootstrap sur le bleu maison : sans ca, .btn-primary rend en bleu
+     Bootstrap par defaut (#0d6efd), different du bleu institutionnel utilise partout
+     ailleurs (header, chips, barres de progression) -> deux bleus qui cohabitent. */
+  --bs-primary: var(--brand);
+  --bs-primary-rgb: 15, 91, 141;
+}
+
+/* .btn-primary / .btn-outline-primary consomment leurs propres variables --bs-btn-*
+   (valeurs figees a la compilation Sass de Bootstrap, --bs-primary seul ne suffit pas
+   a les faire changer) : on les recible explicitement sur le bleu maison. */
+.btn-primary {
+  --bs-btn-bg: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand-dark);
+  --bs-btn-hover-border-color: var(--brand-dark);
+  --bs-btn-active-bg: var(--brand-dark);
+  --bs-btn-active-border-color: var(--brand-dark);
+  --bs-btn-disabled-bg: var(--brand);
+  --bs-btn-disabled-border-color: var(--brand);
+  --bs-btn-focus-shadow-rgb: 15, 91, 141;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand);
+  --bs-btn-hover-border-color: var(--brand);
+  --bs-btn-active-bg: var(--brand);
+  --bs-btn-active-border-color: var(--brand);
+  --bs-btn-disabled-color: var(--brand);
+  --bs-btn-disabled-border-color: var(--brand);
+  --bs-btn-focus-shadow-rgb: 15, 91, 141;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Lien d'evitement RGAA (12.1/12.2) : invisible tant qu'il n'a pas le focus clavier */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 0;
+  z-index: 2000;
+  padding: 0.75rem 1.25rem;
+  background: var(--brand-dark);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-md) 0;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
 }
 
 body,
@@ -137,6 +188,45 @@ body.login-shell {
 
 .app-title--dark {
   color: var(--brand-dark);
+}
+
+/* Pastille d'environnement (cf. branding.js applyEnvironmentBadge) */
+.env-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  cursor: help;
+}
+
+.env-badge--dev {
+  color: #7a4312;
+  background: #ffe7d1;
+  border: 1px solid #f3ba87;
+}
+
+[data-color-mode="dark"] .env-badge--dev {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
+  border-color: color-mix(in srgb, #c87830 40%, var(--border));
+}
+
+.env-badge--preprod {
+  color: #4b2d7f;
+  background: #ece3fb;
+  border: 1px solid #c9b3ee;
+}
+
+[data-color-mode="dark"] .env-badge--preprod {
+  color: #c9aef2;
+  background: color-mix(in srgb, #5a3a99 25%, var(--surface));
+  border-color: color-mix(in srgb, #8a63d2 40%, var(--border));
 }
 
 .app-subtitle {
@@ -345,6 +435,8 @@ body.login-shell {
 .password-generator-modal__dialog {
   position: relative;
   width: min(100%, 32rem);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.35rem;
   border: 1px solid rgba(212, 221, 230, 0.9);
   border-radius: 24px;
@@ -377,6 +469,21 @@ body.login-shell {
   gap: 0.75rem;
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+/* Barre d'action toujours visible en bas d'une modale longue (defilement interne). */
+.password-generator-modal__actions--sticky {
+  position: sticky;
+  bottom: -1.35rem;
+  margin: 0 -1.35rem -1.35rem;
+  padding: 0.85rem 1.35rem;
+  border-top: 1px solid var(--border);
+  background: #fff;
+  border-radius: 0 0 24px 24px;
+}
+
+[data-color-mode="dark"] .password-generator-modal__actions--sticky {
+  background: var(--surface);
 }
 
 /* Contenants principaux reutilises dans les pages */
@@ -540,7 +647,57 @@ body.login-shell {
   flex: 1;
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* Filtres replies par defaut : seule la recherche reste visible, avec le bouton "Filtres". */
+.filter-toolbar.is-collapsed {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.filter-toolbar.is-collapsed .filter-toolbar__grid > div:not(.filter-toolbar__search) {
+  display: none;
+}
+
+.filter-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.filter-chips:empty {
+  display: none;
+}
+
+.filter-chip {
+  padding: 0.15rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text, inherit);
+  font-size: 0.82rem;
+}
+
+.filter-chip:hover,
+.filter-chip:focus-visible {
+  border-color: var(--brand, #0f5c8a);
+}
+
+[data-color-mode="dark"] .filter-chip {
+  background: var(--surface);
+}
+
+.dashboard-toolbar__info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.timing-chip,
+.status-chip {
+  white-space: nowrap;
 }
 
 .filter-toolbar__actions {
@@ -905,6 +1062,17 @@ body.login-shell {
   color: var(--muted);
 }
 
+/* Champ masque (cf. Suppr. -> Masquer) : reste dans le schema, retire du formulaire dossier */
+.resource-field-row--hidden {
+  opacity: 0.6;
+  background: repeating-linear-gradient(135deg, #f4f6f8, #f4f6f8 10px, #eef1f4 10px, #eef1f4 20px);
+}
+
+.resource-field-hidden-banner .status-pill {
+  background: rgba(214, 163, 64, 0.16);
+  color: #8a5a00;
+}
+
 .progress-required-field {
   border-color: #d6a53a !important;
   box-shadow: 0 0 0 0.18rem rgba(214, 165, 58, 0.14);
@@ -1052,6 +1220,66 @@ body.login-shell {
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
+}
+
+/* Barre d'action collee en bas d'ecran : "Enregistrer" reste accessible sur un long formulaire. */
+form > .action-bar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 90;
+}
+
+.dashboard-nav.form-toc {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.form-toc .dashboard-nav__link {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+form section.content-card {
+  scroll-margin-top: 9rem;
+}
+
+.section-heading--collapsible {
+  cursor: pointer;
+}
+
+.section-heading--collapsible::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.content-card.is-collapsed > :not(.section-heading) {
+  display: none;
+}
+
+.content-card.is-collapsed .section-heading--collapsible::after {
+  content: "▸";
+}
+
+.section-count {
+  margin-left: 0.75rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(15, 55, 84, 0.1);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-pill--warning {
+  background: #fff4d6;
+  color: #7a4b00;
+}
+
+[data-color-mode="dark"] .status-pill--warning {
+  background: #4a3a12;
+  color: #f5d27a;
 }
 
 .action-bar__hint {
@@ -1285,6 +1513,17 @@ body.login-shell {
   margin-bottom: 0;
 }
 
+/* Affordance de clic : la ligne ouvre l'apercu rapide (bindQuickPreviews) sauf sur
+   boutons/liens/actions, deja exclus cote JS - le survol doit le signaler visuellement. */
+.draft-table tbody tr.draft-row {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.draft-table tbody tr.draft-row:hover {
+  background-color: var(--surface-alt);
+}
+
 /* Pagination du journal */
 .logs-pagination {
   display: flex;
@@ -1370,6 +1609,37 @@ body.login-shell {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* En-tetes triables (cf. bindSortableHeaders, storage.js) */
+.draft-table th[data-sort-field] {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.draft-table th[data-sort-field]:hover {
+  color: var(--brand);
+}
+
+.draft-table th[data-sort-field]::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  margin-left: 0.3em;
+  opacity: 0.35;
+}
+
+.draft-table th[data-sort-field].is-sorted-asc::after {
+  content: "\25B2"; /* triangle plein vers le haut */
+  opacity: 1;
+  color: var(--brand);
+}
+
+.draft-table th[data-sort-field].is-sorted-desc::after {
+  content: "\25BC"; /* triangle plein vers le bas */
+  opacity: 1;
+  color: var(--brand);
 }
 
 .draft-check-col {
@@ -1466,6 +1736,42 @@ body.login-shell {
 
 .draft-actions__menu-panel .btn {
   width: 100%;
+}
+
+@media (min-width: 992px) {
+  .draft-actions__primary {
+    flex-wrap: nowrap;
+  }
+}
+
+/* Volet flottant sur grand ecran : ne deforme pas la hauteur de la ligne. */
+@media (min-width: 768px) {
+  .draft-actions__menu {
+    position: relative;
+  }
+
+  .draft-actions__menu-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 30;
+    width: 15rem;
+  }
+
+  .draft-table tbody tr:nth-last-child(-n+2) .draft-actions__menu-panel {
+    top: auto;
+    bottom: 100%;
+    margin: 0 0 0.45rem;
+  }
+}
+
+.draft-actions__menu-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* Menu filtres dans le header (details/summary natif) */
@@ -1819,9 +2125,10 @@ button.export-menu__item {
   gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.8rem 0;
-  background: rgba(255, 255, 255, 0.98);
+  background: color-mix(in srgb, var(--surface) 98%, transparent);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(212, 221, 230, 0.5);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  border-radius: var(--radius-md);
 }
 
 .dashboard-nav__link {
@@ -1837,6 +2144,22 @@ button.export-menu__item {
   font-weight: 600;
   text-decoration: none;
   transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.dashboard-nav__count {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: 0.35rem;
+  padding: 0 0.45em;
+  border-radius: 999px;
+  background: rgba(15, 55, 84, 0.1);
+  font-size: 0.78em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dashboard-nav__link.is-active .dashboard-nav__count {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .dashboard-nav__link:hover,
@@ -1933,10 +2256,11 @@ button.export-menu__item {
   border-color: #f3ba87;
 }
 
+/* Violet distinct du bleu "returned" : les deux ne doivent jamais se confondre au scan rapide */
 .status-chip--awaiting_signature {
-  color: #18436d;
-  background: #ddefff;
-  border-color: #9cc7f0;
+  color: #4a2382;
+  background: #eee3fb;
+  border-color: #c6a8f0;
 }
 
 .status-chip--returned {
@@ -1945,10 +2269,11 @@ button.export-menu__item {
   border-color: #9cc7f0;
 }
 
+/* Teal distinct de l'orange "partial_assignment" : phase restitution vs phase attribution */
 .status-chip--partial_return {
-  color: #7a4312;
-  background: #ffe7d1;
-  border-color: #f3ba87;
+  color: #0b5c52;
+  background: #d9f5f2;
+  border-color: #8ed9d1;
 }
 
 .status-chip--cancelled {
@@ -1986,9 +2311,9 @@ button.export-menu__item {
 }
 
 .timing-chip--neutral {
-  color: #18436d;
-  background: #ddefff;
-  border-color: #9cc7f0;
+  color: #475569;
+  background: #eef1f4;
+  border-color: #cbd5e0;
 }
 
 .resource-progress {
@@ -2033,9 +2358,10 @@ button.export-menu__item {
 }
 
 /* Apercu flottant au survol d'un statut dans la liste */
+/* z-index > .dashboard-nav (99) pour ne pas etre masque par le bandeau sticky quand la ligne survolee est proche du haut */
 .status-hover-card {
   position: fixed;
-  z-index: 40;
+  z-index: 101;
   pointer-events: none;
   width: min(360px, calc(100vw - 2rem));
   padding: 1rem 1.1rem;
@@ -3171,9 +3497,25 @@ button.export-menu__item {
   color: var(--brand);
 }
 
+[data-color-mode="dark"] .workflow-dialog__item.is-done .workflow-dialog__state {
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #e88080;
+}
+
 /* Branding save loader */
 [data-color-mode="dark"] .branding-save-loader__item.is-active .branding-save-loader__state {
   color: var(--brand);
+}
+
+[data-color-mode="dark"] .branding-save-loader__item.is-done .branding-save-loader__state {
+  color: #6bc990;
+}
+
+[data-color-mode="dark"] .branding-save-loader__item.is-error .branding-save-loader__state {
+  color: #e88080;
 }
 
 /* Couleurs texte fixes */
@@ -3189,6 +3531,11 @@ button.export-menu__item {
 
 [data-color-mode="dark"] .draft-title {
   color: var(--text);
+}
+
+[data-color-mode="dark"] .user-menu__item--danger:hover,
+[data-color-mode="dark"] .user-menu__item--danger:focus {
+  color: #e88080;
 }
 
 [data-color-mode="dark"] .draft-unc-badge {
@@ -3217,6 +3564,7 @@ button.export-menu__item {
 [data-color-mode="dark"] .admin-nav__link {
   color: var(--text);
   border-color: var(--border);
+  background: var(--surface-alt);  /* le fond clair par défaut rendait le titre (clair) illisible */
 }
 
 [data-color-mode="dark"] .admin-nav__link:hover,
@@ -3276,14 +3624,24 @@ button.export-menu__item {
   border-color: color-mix(in srgb, #2d8a56 40%, var(--border));
 }
 
-[data-color-mode="dark"] .status-chip--partial_assignment,
-[data-color-mode="dark"] .status-chip--partial_return {
+[data-color-mode="dark"] .status-chip--partial_assignment {
   color: #e8a060;
   background: color-mix(in srgb, #8a4b12 25%, var(--surface));
   border-color: color-mix(in srgb, #c87830 40%, var(--border));
 }
 
-[data-color-mode="dark"] .status-chip--awaiting_signature,
+[data-color-mode="dark"] .status-chip--partial_return {
+  color: #5fd1c0;
+  background: color-mix(in srgb, #0b5c52 28%, var(--surface));
+  border-color: color-mix(in srgb, #1f9484 40%, var(--border));
+}
+
+[data-color-mode="dark"] .status-chip--awaiting_signature {
+  color: #c9a6f0;
+  background: color-mix(in srgb, #4a2382 28%, var(--surface));
+  border-color: color-mix(in srgb, #7c4bc4 40%, var(--border));
+}
+
 [data-color-mode="dark"] .status-chip--returned {
   color: #7ab8e8;
   background: color-mix(in srgb, #18436d 28%, var(--surface));
@@ -3316,9 +3674,9 @@ button.export-menu__item {
 }
 
 [data-color-mode="dark"] .timing-chip--neutral {
-  color: #7ab8e8;
-  background: color-mix(in srgb, #18436d 28%, var(--surface));
-  border-color: color-mix(in srgb, #3a80b8 40%, var(--border));
+  color: var(--muted);
+  background: var(--surface-alt);
+  border-color: var(--border);
 }
 
 /* Progress bars */
@@ -3351,6 +3709,15 @@ button.export-menu__item {
 [data-color-mode="dark"] .restitution-row {
   background: var(--surface);
   border-color: var(--border);
+}
+
+[data-color-mode="dark"] .resource-field-row--hidden {
+  background: repeating-linear-gradient(135deg, var(--surface), var(--surface) 10px, var(--surface-alt) 10px, var(--surface-alt) 20px);
+}
+
+[data-color-mode="dark"] .resource-field-hidden-banner .status-pill {
+  background: color-mix(in srgb, #d6a340 22%, var(--surface));
+  color: #e8a060;
 }
 
 /* Signature, RGPD, status cards */
@@ -4087,7 +4454,7 @@ button.export-menu__item {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
+  max-height: 85vh;
 }
 
 .global-search__header {
@@ -4131,7 +4498,7 @@ button.export-menu__item {
   padding: 6px 0;
   overflow-y: auto;
   flex: 1;
-  min-height: 60px;
+  min-height: 200px;  /* les filtres ne doivent pas écraser la liste des pages et actions */
 }
 
 .global-search__result {
@@ -4312,136 +4679,6 @@ body.global-search-open { overflow: hidden; }
   border-color: #2d3b4d;
 }
 
-/* ============================================================
-   Matériel mutualisé — inline dans la carte ressource
-   ============================================================ */
-.shared-resource-block {
-  margin-top: .75rem;
-  padding-top: .75rem;
-  border-top: 1px dashed var(--border-color, #e5e7eb);
-}
-.shared-toggle {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  cursor: pointer;
-  font-size: .875rem;
-  font-weight: 500;
-  user-select: none;
-}
-.shared-toggle input { cursor: pointer; }
-.shared-toggle:has(input:disabled) { opacity: 0.55; cursor: not-allowed; }
-.shared-toggle input:disabled { cursor: not-allowed; pointer-events: none; }
-.shared-panel { margin-top: .5rem; padding-left: .25rem; }
-.shared-members-list { list-style: none; padding: 0; margin: 0 0 .5rem; }
-.shared-member-row {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  padding: .3rem 0;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
-  flex-wrap: wrap;
-  font-size: .85rem;
-}
-.shared-member-row:last-child { border-bottom: none; }
-.shared-member-name { font-weight: 500; }
-.shared-member-service { color: var(--text-muted); font-size: .78rem; }
-.shared-member-badge {
-  background: #e0f0e7;
-  color: #1a6b3a;
-  font-size: .7rem;
-  padding: .1rem .4rem;
-  border-radius: 999px;
-  font-weight: 500;
-}
-.shared-member-link { font-size: .78rem; color: var(--brand); text-decoration: none; }
-.shared-member-link:hover { text-decoration: underline; }
-.shared-member-remove { margin-left: auto; }
-
-.shared-couser-badge { margin-top: .4rem; }
-.shared-couser-badge .badge { font-size: .78rem; font-weight: 500; }
-
-[data-color-mode="dark"] .shared-resource-block { border-color: #2d3b4d; }
-[data-color-mode="dark"] .shared-member-row { border-color: #2d3b4d; }
-[data-color-mode="dark"] .shared-member-badge { background: #1a3a2a; color: #5dd68c; }
-
-/* ============================================================
-   Parc mutualisé
-   ============================================================ */
-.btn-xs {
-  padding: .2rem .5rem;
-  font-size: .75rem;
-  border-radius: .25rem;
-}
-
-.pool-card { padding: 1.25rem; }
-.pool-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.pool-card__title { font-size: 1.05rem; font-weight: 600; margin: 0; }
-.pool-card__notes { color: var(--text-muted); font-size: .875rem; margin: .25rem 0 0; }
-.pool-card__actions { display: flex; gap: .5rem; flex-shrink: 0; }
-.pool-card__body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-@media (max-width: 767.98px) { .pool-card__body { grid-template-columns: 1fr; } }
-.pool-card__section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: .5rem;
-}
-
-.pool-members-list { list-style: none; padding: 0; margin: 0; }
-.pool-member {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .35rem 0;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
-  flex-wrap: wrap;
-}
-.pool-member:last-child { border-bottom: none; }
-.pool-member__name { font-weight: 500; }
-.pool-member__service { color: var(--text-muted); font-size: .8rem; }
-.pool-member__link { font-size: .78rem; color: var(--brand); text-decoration: none; }
-.pool-member__link:hover { text-decoration: underline; }
-
-.pool-form-results {
-  position: absolute;
-  z-index: 100;
-  background: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: .375rem;
-  max-height: 220px;
-  overflow-y: auto;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(0,0,0,.1);
-}
-.pool-form-result {
-  padding: .5rem .75rem;
-  cursor: pointer;
-  font-size: .875rem;
-}
-.pool-form-result:hover { background: var(--brand-soft); }
-.pool-form-result--empty { color: var(--text-muted); cursor: default; }
-.pool-form-chosen {
-  margin-top: .4rem;
-  font-size: .875rem;
-  font-weight: 500;
-  color: var(--brand);
-}
-.mb-3 { position: relative; }
-
-[data-color-mode="dark"] .pool-form-results {
-  background: #1b2633;
-  border-color: #2d3b4d;
-}
-[data-color-mode="dark"] .pool-form-result:hover { background: rgba(15,91,141,.25); }
-[data-color-mode="dark"] .pool-member { border-color: #2d3b4d; }
-
 /* Champs verrouillés depuis le dossier source (mise_à_jour) */
 input[data-locked-from-source],
 select[data-locked-from-source] {
@@ -4461,7 +4698,21 @@ select[data-locked-from-source]:focus {
   background-color: #f8f9fa;
   border-color: #dee2e6;
   box-shadow: none;
-  outline: none;
+  outline: 2px solid var(--border);
+  outline-offset: 1px;
+}
+
+[data-color-mode="dark"] input[data-locked-from-source],
+[data-color-mode="dark"] select[data-locked-from-source] {
+  background-color: var(--surface-alt);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] input[data-locked-from-source]:focus,
+[data-color-mode="dark"] select[data-locked-from-source]:focus {
+  background-color: var(--surface-alt);
+  border-color: var(--border);
 }
 
 /* Badge visuel pour indiquer les champs verrouillés */
@@ -4640,4 +4891,455 @@ main {
 
 [data-color-mode="dark"] .sig-success__summary {
   background: var(--surface-alt);
+}
+
+[data-color-mode="dark"] .sig-success__decision-confirmed {
+  color: #6bc990;
+  background: color-mix(in srgb, #0a4d28 25%, var(--surface));
+}
+
+[data-color-mode="dark"] .sig-success__decision-reservation {
+  color: #e8a060;
+  background: color-mix(in srgb, #8a4b12 25%, var(--surface));
+}
+
+
+/* Fil d'Ariane et indicateur des parties de la restitution */
+.restitution-steps {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.restitution-steps__crumb {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.restitution-steps__list {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.restitution-steps__item > a,
+.restitution-steps__item > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem 0.35rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.restitution-steps__item.is-current > span {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.restitution-steps__num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: rgba(15, 55, 84, 0.12);
+  font-size: 0.85rem;
+}
+
+.restitution-steps__item.is-current .restitution-steps__num {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+
+/* Listes d'administration : action principale et menu "Plus" sur une seule ligne. */
+.draft-table td.text-end > .draft-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+
+/* Ecrans tactiles : cibles d'au moins 44 px (boutons de ligne, menus, filtres). */
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm,
+  .dashboard-nav__link,
+  .user-menu__item,
+  .draft-actions__menu summary,
+  .filter-chip,
+  .form-select,
+  .form-control {
+    min-height: 44px;
+  }
+
+  .draft-select,
+  .form-check-input {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+}
+
+
+/* Entree de menu d'une fonctionnalite dediee (ex. Base de donnees) : separee visuellement. */
+.user-menu__item--feature {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.user-menu__item--feature[aria-current="page"] {
+  color: var(--brand);
+}
+
+form section.content-card[id^="db-"],
+section.content-card[id^="db-"] {
+  scroll-margin-top: 9rem;
+}
+
+/* Bandeaux d'alerte de l'accueil admin : aucun espace reserve quand ils sont tous masques. */
+.admin-alerts:not(:has(.alert:not(.d-none))) {
+  display: none !important;
+}
+
+/* Champs en lecture seule (identifiant, nom et prenom verrouilles) : visibles comme non modifiables. */
+.form-control[readonly] {
+  background-color: color-mix(in srgb, var(--border) 35%, var(--surface));
+  cursor: not-allowed;
+}
+
+
+/* Assistant de creation de ressource : fenetre large, apercu a droite. */
+.password-generator-modal__dialog.wizard-dialog {
+  width: min(100%, 64rem);
+  max-height: min(92vh, 48rem);
+}
+
+.wizard-preview {
+  position: sticky;
+  top: 0;
+  background: var(--surface-alt, #f8fafc);
+}
+
+
+/* Tableau de bord : jamais de defilement horizontal.
+   - le bloc parent peut retrecir (sinon il impose la largeur minimale du tableau et la PAGE defile) ;
+   - en-tetes, pastilles et boutons peuvent passer a la ligne ;
+   - entre 1024 et 1199 px, marges resserrees et colonnes « secondaires » masquees (voir DASHBOARD_COLUMNS, storage.js) ;
+   - sous 1024 px, la presentation en cartes prend le relais (mobile : sous 768 px, regles existantes). */
+.dashboard-group {
+  min-width: 0;
+}
+
+.draft-table th[data-sort-field] {
+  white-space: normal;
+}
+
+.draft-table .status-chip {
+  white-space: normal;
+}
+
+.draft-table .draft-actions,
+.draft-table .draft-actions__primary {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.draft-table .draft-actions .btn {
+  white-space: normal;
+}
+
+.draft-table .draft-actions-cell {
+  min-width: 0;
+}
+
+.draft-table .resource-progress {
+  min-width: 100px;
+}
+
+/* 1024-1199 px : marges resserrees et colonnes « secondaires » masquees. */
+@media (min-width: 1024px) and (max-width: 1199.98px) {
+  .draft-table > :not(caption) > * > * {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .draft-table th {
+    letter-spacing: 0.03em;
+  }
+
+  .draft-table .dash-col--secondary {
+    display: none;
+  }
+}
+
+/* 768-1023 px : la zone du tableau est trop etroite pour 6 colonnes, la presentation en cartes (celle du mobile)
+   s'applique aux tableaux du tableau de bord uniquement. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .dashboard-group .table-responsive {
+    overflow-x: visible;
+  }
+
+  .dashboard-group .draft-table,
+  .dashboard-group .draft-table tbody,
+  .dashboard-group .draft-table tr,
+  .dashboard-group .draft-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard-group .draft-table thead {
+    display: none;
+  }
+
+  .dashboard-group .draft-table tbody {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .dashboard-group .draft-row {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-alt);
+    box-shadow: 0 10px 24px rgba(15, 55, 84, 0.06);
+  }
+
+  .dashboard-group .draft-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .dashboard-group .draft-table td + td {
+    margin-top: 0.8rem;
+  }
+
+  .dashboard-group .draft-check-col {
+    width: auto;
+    text-align: left;
+  }
+
+  .dashboard-group .draft-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.28rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .dashboard-group .draft-actions-cell::before {
+    margin-bottom: 0.55rem;
+  }
+}
+
+
+/* Historique de vie (fiche d'un objet) : la date de chaque action est en evidence. */
+.parc-when {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Mode sombre : le gris « atténué » de Bootstrap (libellés des fiches, notes, auteurs) était presque invisible sur fond foncé. */
+[data-color-mode="dark"] .text-muted,
+[data-color-mode="dark"] .text-body-secondary {
+  color: #b9c7d5 !important;
+}
+
+[data-color-mode="dark"] .parc-when {
+  color: #e6eef6;
+}
+
+/* Mode sombre : le texte d'aide des champs (placeholder) était quasiment invisible sur fond foncé. */
+[data-color-mode="dark"] .form-control::placeholder,
+[data-color-mode="dark"] textarea::placeholder,
+[data-color-mode="dark"] input::placeholder {
+  color: #9db0c2;
+  opacity: 1;
+}
+
+
+/* Navigation d'administration commune (admin-nav.js) : groupes, fil d'Ariane, focus et cibles tactiles. */
+.admin-nav__group {
+  margin: 0.9rem 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+}
+
+.admin-nav__link--local {
+  border-style: dashed;
+}
+
+.admin-breadcrumb .breadcrumb {
+  font-size: 0.9rem;
+}
+
+.admin-nav__link,
+.dashboard-nav__link,
+.user-menu__item {
+  min-height: 44px;
+}
+
+.admin-nav__link:focus-visible,
+.dashboard-nav__link:focus-visible,
+.user-menu__item:focus-visible,
+.admin-breadcrumb a:focus-visible {
+  outline: 3px solid var(--brand, #0f5b8d);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+  }
+  .dashboard-nav__link {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
+
+.global-search__group {
+  padding: 0.5rem 0.9rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+  list-style: none;
+}
+
+
+/* Personnalisation : barre d'enregistrement unique, fixée en bas de la zone de contenu. */
+.branding-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d4dde6);
+  border-radius: 14px;
+  box-shadow: 0 -6px 18px rgba(15, 35, 55, 0.08);
+}
+
+.branding-savebar__text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted, #607080);
+}
+
+/* Mode sombre : fil d'Ariane, barre d'enregistrement et palette lisibles. */
+[data-color-mode="dark"] .admin-breadcrumb .breadcrumb {
+  --bs-breadcrumb-divider-color: var(--muted);
+  --bs-breadcrumb-item-active-color: var(--muted);
+}
+
+[data-color-mode="dark"] .admin-breadcrumb a {
+  color: var(--brand);
+}
+
+/* ─── Mode sombre : corrections de contraste relevées par tests/browser/audit_dark.py ───────────────────────────────────
+   En mode sombre la « marque » devient claire (--brand) et la « marque foncée » reste foncée : les textes blancs posés sur --brand
+   (boutons, onglet actif, en-tête) étaient illisibles, de même que les couleurs codées en dur pour le mode clair. */
+[data-color-mode="dark"] .app-header {
+  background: linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)), linear-gradient(135deg, var(--brand-dark), var(--brand-dark));
+}
+
+[data-color-mode="dark"] .btn-primary {
+  --bs-btn-color: #0a1f2e;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-disabled-color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .btn-outline-primary {
+  --bs-btn-color: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: var(--brand);
+  --bs-btn-hover-border-color: var(--brand);
+}
+
+[data-color-mode="dark"] .btn-outline-danger,
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-color: #ff8f9b;
+  --bs-btn-border-color: #ff8f9b;
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: #ff8f9b;
+  --bs-btn-hover-border-color: #ff8f9b;
+}
+
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-bg: transparent;
+}
+
+[data-color-mode="dark"] .btn-link {
+  --bs-btn-color: var(--brand);
+  --bs-btn-hover-color: var(--text);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active,
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .app-footer__version {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .status-pill {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .resource-order-item__position {
+  color: var(--brand);
+}
+
+[data-color-mode="dark"] .form-text {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .list-group-item {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .choice-chip input:checked + span {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active {
+  background: var(--brand-dark);
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  background: rgba(0, 0, 0, 0.3);
 }
