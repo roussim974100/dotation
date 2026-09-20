@@ -84,3 +84,43 @@ def test_update_endpoints_report_status_and_refuse_the_web_update_by_default(htt
     assert status_code == 200 and {"current", "latest", "available", "can_update", "enabled", "progress"} <= set(keys)
     assert http["update_check_disabled"] == [200, False]  # verification desactivee : aucune requete reseau
     assert http["update_start_disabled"] == [403, "update_disabled"]
+
+
+def test_partial_settings_update_keeps_existing_values(http):
+    assert http["partial_put_keeps"] == ["Organisation Test", "aide@test.fr"]
+
+
+def test_invalid_beneficiary_type_is_refused(http):
+    assert http["bad_beneficiary_status"] == 400
+
+
+def test_setup_cannot_be_replayed_without_confirmation(http):
+    assert http["setup_first_run"] == 200 or http["setup_first_run"] == 409  # une base neuve peut deja etre configuree
+    assert http["setup_rerun_locked"] == 409 and http["setup_rerun_org_name"] != "Pirate"
+    assert http["setup_rerun_confirmed"] == 200
+
+
+def test_org_wizard_preview_writes_nothing_and_applies_only_the_previewed_plan(http):
+    assert http["wizard_preview_status"] == 200 and http["wizard_preview_writes_nothing"] is True
+    assert http["wizard_preview_actions"] == [["create", "instrument_de_musique"], ["create", "stock_vetement"], ["deactivate", "zoneAlarme"]]
+    assert http["wizard_apply_bad_hash"] == 409 and http["wizard_apply_unconfirmed"] == 400
+    assert http["wizard_apply_status"] == 200
+    assert http["wizard_created_codes"] == ["instrument_de_musique", "stock_vetement"]
+    assert http["wizard_zone_alarme_active"] == 0
+    assert http["wizard_settings_after"] == ["other", "member:Membre,staff:员工", "4"]
+
+
+def test_org_wizard_is_idempotent_and_add_only(http):
+    assert http["wizard_second_preview_creates"] == [] and http["wizard_second_preview_settings"] == []
+
+
+def test_org_wizard_rejects_bad_input_and_anonymous(http):
+    assert http["wizard_xss_label"] == 400 and http["wizard_bad_context"] == 400
+    assert http["wizard_unknown_template"] == [200, ["blocked"]]
+    assert all(code in (401, 403, 302) for code in http["wizard_anonymous"])
+
+
+def test_startup_checklist_reflects_the_real_state(http):
+    assert http["checklist"] == [7, ["backup", "domains", "dpo", "org_name", "resources", "support", "wizard"], True]
+    assert http["checklist_wizard_done_after_apply"] is True
+    assert http["checklist_anonymous"] in (401, 403, 302)

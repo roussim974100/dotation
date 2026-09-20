@@ -114,6 +114,65 @@ admin.put("/api/admin/settings", json={"brand_logo_url": "file:///etc/passwd"}, 
 saved = admin.get("/api/admin/settings").get_json() or {}
 results["logo_url_file_scheme_stored"] = saved.get("brand_logo_url", saved.get("settings", {}).get("brand_logo_url") if isinstance(saved.get("settings"), dict) else None)
 
+# Reglages : une mise a jour partielle ne vide rien, un type de beneficiaire invalide est refuse (400), le setup ne se rejoue pas.
+admin.put("/api/admin/settings", json={"org_name": "Organisation Test", "support_email": "aide@test.fr"}, headers=H)
+admin.put("/api/admin/settings", json={"theme_id": "foret"}, headers=H)
+kept = admin.get("/api/admin/settings").get_json() or {}
+kept = kept.get("raw") or {}
+results["partial_put_keeps"] = [kept.get("org_name"), kept.get("support_email")]
+r = admin.put("/api/admin/settings", json={"beneficiary_types": "agent:A,B"}, headers=H)
+results["bad_beneficiary_status"] = status(r)
+r = admin.post("/api/setup/complete", json={"org_name": "X", "org_context": "association", "beneficiary_types": "membre:Membre"}, headers=H)
+results["setup_first_run"] = status(r)
+r = admin.post("/api/setup/complete", json={"org_name": "Pirate", "org_context": "association", "beneficiary_types": "membre:Membre"}, headers=H)
+results["setup_rerun_locked"] = status(r)
+after = admin.get("/api/admin/settings").get_json() or {}
+after = after.get("raw") or {}
+results["setup_rerun_org_name"] = after.get("org_name")
+r = admin.post("/api/setup/complete", json={"org_name": "Reconfiguree", "org_context": "association", "beneficiary_types": "membre:Membre", "confirm_reconfigure": True}, headers=H)
+results["setup_rerun_confirmed"] = status(r)
+
+# Assistant d'organisation : apercu sans ecriture, application uniquement du plan apercu, ajout seulement.
+def resource_codes():
+    return sorted(r["code"] for r in (admin.get("/api/admin/org-presets").get_json() or {}).get("resources", []))
+
+wizard_before = resource_codes()
+wizard_payload = {
+    "settings": {"org_context": "other", "beneficiary_types": "member:Membre,staff:员工", "parc_retention_years": "4"},
+    "resources": {"create": [{"template": "stock_vetement"}, {"template": "custom", "label": "Instrument de musique", "mode": "unit"}],
+                  "deactivate": ["zoneAlarme"], "activate": []},
+}
+r = admin.post("/api/admin/org-wizard/preview", json=wizard_payload, headers=H)
+preview = r.get_json() or {}
+results["wizard_preview_status"] = status(r)
+results["wizard_preview_writes_nothing"] = resource_codes() == wizard_before
+results["wizard_preview_actions"] = sorted((a["action"], a["code"]) for a in preview.get("resources", []))
+r = admin.post("/api/admin/org-wizard/apply", json={**wizard_payload, "plan_hash": "faux", "confirmed": True}, headers=H)
+results["wizard_apply_bad_hash"] = status(r)
+r = admin.post("/api/admin/org-wizard/apply", json={**wizard_payload, "plan_hash": preview.get("plan_hash")}, headers=H)
+results["wizard_apply_unconfirmed"] = status(r)
+r = admin.post("/api/admin/org-wizard/apply", json={**wizard_payload, "plan_hash": preview.get("plan_hash"), "confirmed": True}, headers=H)
+results["wizard_apply_status"] = status(r)
+after = admin.get("/api/admin/org-presets").get_json() or {}
+results["wizard_created_codes"] = sorted(set(resource_codes()) - set(wizard_before))
+results["wizard_zone_alarme_active"] = next((x["is_active"] for x in after.get("resources", []) if x["code"] == "zoneAlarme"), None)
+results["wizard_settings_after"] = [after["current"]["org_context"], after["current"]["beneficiary_types"], after["current"]["parc_retention_years"]]
+again = (admin.post("/api/admin/org-wizard/preview", json=wizard_payload, headers=H).get_json() or {})
+results["wizard_second_preview_creates"] = [a["code"] for a in again.get("resources", []) if a["action"] == "create"]
+results["wizard_second_preview_settings"] = again.get("settings")
+r = admin.post("/api/admin/org-wizard/preview", json={"resources": {"create": [{"template": "custom", "label": "<img src=x onerror=1>", "mode": "unit"}]}}, headers=H)
+results["wizard_xss_label"] = status(r)
+r = admin.post("/api/admin/org-wizard/preview", json={"resources": {"create": [{"template": "inconnu"}]}}, headers=H)
+results["wizard_unknown_template"] = [status(r), [a["action"] for a in (r.get_json() or {}).get("resources", [])]]
+r = admin.post("/api/admin/org-wizard/preview", json={"settings": {"org_context": "nimporte"}}, headers=H)
+results["wizard_bad_context"] = status(r)
+results["wizard_anonymous"] = [status(app.test_client().get("/api/admin/org-presets")), status(app.test_client().post("/api/admin/org-wizard/apply", json={}))]
+
+checklist = admin.get("/api/admin/startup-checklist").get_json() or {}
+results["checklist"] = [checklist.get("total"), sorted(i["id"] for i in checklist.get("items", [])), 0 <= (checklist.get("percent") or -1) <= 100]
+results["checklist_wizard_done_after_apply"] = next((i["done"] for i in checklist.get("items", []) if i["id"] == "wizard"), None)
+results["checklist_anonymous"] = status(app.test_client().get("/api/admin/startup-checklist"))
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):

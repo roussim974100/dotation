@@ -1,5 +1,34 @@
 # Historique des versions — À Quai
 
+## [3.50.0] - 2026-09-19
+
+Chantier « Assistant d'organisation » : configuration de démarrage rejouable, adaptée à toute structure (y compris hors France : libellés dans toutes les langues, type « Autre / sur mesure », toutes les suggestions modifiables).
+
+### 🧭 Assistant d'organisation (Administration > Personnalisation)
+- **5 étapes** : type d'organisation, bénéficiaires, ressources à activer, réglages de départ, récapitulatif avec **aperçu exact** de ce qui sera modifié et confirmation.
+- **Suggestions par type d'organisation** (collectivité, administration, entreprise, association, autre) : types de bénéficiaires, ressources recommandées, conservation. Ressources supplémentaires par modèle (vêtement, stock, accès…) ou **sur mesure**.
+- **Ajout seulement** : rien de ce qui est utilisé n'est supprimé ni renommé ; une ressource déjà utilisée ne peut pas être masquée ; un type de bénéficiaire porté par des dossiers ne peut pas disparaître (seul son libellé change) ; une ressource équivalente existante n'est jamais recréée ; rejouer l'assistant sans rien changer ne fait rien.
+- **Sécurité** : le serveur calcule le plan (`plan_org_wizard`) et n'applique que le plan aperçu (empreinte vérifiée) ; copie de sécurité de la base avant application ; une seule transaction ; entrée au journal d'audit ; droit `users.manage`, limitation de fréquence. API : `GET /api/admin/org-presets`, `POST /api/admin/org-wizard/preview` et `/apply`.
+- **Checklist de démarrage** sur le portail admin (avancement calculé sur l'état réel : nom, assistant passé, ressources, DPO, sauvegarde automatique, support, domaines e-mail) ; l'installation initiale débouche sur l'assistant.
+
+### 🧭 Navigation cohérente, moins de clics
+- **Menu du compte identique sur toutes les pages**, généré par `ui.js` : Administration, Synthèse, Parc matériel et Base de données (selon les droits) puis Mon profil, Mode sombre, Changer le mot de passe, Aide générale, Déconnexion. Corrige les pages où « Administration » ou « Synthèse » manquaient (journal, corbeille, aide…).
+- **Navigation d'administration commune** (`admin-nav.js`) : menu latéral groupé (Utilisateurs, Organisation, Apparence, Exploitation) identique sur toutes les sous-pages, ajouté au journal et à la corbeille ; page courante marquée ; **fil d'Ariane** Accueil › Administration › Page ; l'assistant d'organisation est accessible en un clic. Passer d'une sous-page à une autre : 1 clic au lieu de 2 ou 3.
+- **Palette Ctrl+K étendue** : en plus des dossiers, on y trouve les **pages et actions** (Nouvelle attribution, Administration, Créer un compte, Ajouter une ressource, Assistant d'organisation, Sauvegarder maintenant, Restaurer une sauvegarde, Journal, Corbeille, Mon profil, Aide…), filtrées par droits, insensibles aux accents, avec des raccourcis dès l'ouverture. Ce sont de simples liens : aucune action sensible ne s'exécute depuis la palette. Toute tâche courante : 2 actions au clavier (Ctrl+K puis Entrée).
+- **Portail d'administration regroupé** en trois sections identiques au menu latéral (Comptes et droits, Votre organisation, Suivi et exploitation), avec l'assistant d'organisation, le Parc, la Base de données, le Journal, la Corbeille et la Synthèse en cartes.
+- **Personnalisation** : le bouton « Enregistrer la personnalisation », qui enregistre toute la page, n'est plus au milieu (sous la section Contact) mais dans une barre fixée en bas, toujours visible.
+- **Mode sombre** : correction du menu latéral d'administration (titres blancs sur fond clair, illisibles) et du fil d'Ariane ; la liste de la palette Ctrl+K n'est plus écrasée par les filtres.
+- **Comptes et droits en français simple** : chaque groupe est expliqué en une phrase, avec la liste de ce qu'il peut faire et de ce qu'il ne peut pas faire (fini les noms techniques comme `forms.read_list`) ; nouveau tableau « Qui peut faire quoi ? » qui compare tous les groupes ; formulaires reformulés (mot de passe, sauvegardes, accès réseau).
+- Accessibilité : focus clavier visible, cibles de 44 px, onglets défilants sur mobile.
+
+### 🔒 Sprint 1 : sécurité des réglages
+
+### 🔒 Sécurité et robustesse des réglages
+- Une mise à jour **partielle** des réglages n'efface plus les champs non envoyés (une valeur absente est conservée ; une chaîne vide vide bien le réglage). Les durées (restitution, alerte, conservation) ne se remettent plus à leur défaut quand elles sont absentes.
+- **Types de bénéficiaires validés** côté serveur : identifiant `a-z 0-9 _ -`, libellé libre dans toutes les langues sauf la virgule, les deux-points, le point-virgule, `<`, `>`, `&`, les guillemets et l'antislash, doublons refusés, plus de retour silencieux sur Agent/Élu ; erreur 400 explicite.
+- Textes de réglages limités à 200 caractères.
+- L'**installation ne se rejoue plus** par mégarde : une fois terminée, `/api/setup/complete` répond 409 sauf confirmation explicite (`confirm_reconfigure`), tracée au journal.
+
 ## [3.49.1] - 2026-09-19
 
 ### 🗃️ Parc matériel

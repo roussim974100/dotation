@@ -365,6 +365,8 @@ async function loadCatalogQuality() {
 
 document.addEventListener("DOMContentLoaded", () => {
   byId("resourceWizardBtn")?.addEventListener("click", openResourceWizard);
+  if (window.location.hash === "#new") openResourceWizard();  // lien profond (palette Ctrl+K : « Ajouter une ressource »)
+  window.addEventListener("hashchange", () => { if (window.location.hash === "#new") openResourceWizard(); });
   byId("catalogQuality")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-quality-fix]");
     if (button) { populateResourceForm(button.dataset.qualityFix); }

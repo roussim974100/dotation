@@ -139,6 +139,7 @@
             <h2 class="section-title">Contexte organisationnel</h2>
             <p class="panel-text">Adaptez le vocabulaire et les champs du formulaire selon le type d'organisation.</p>
           </div>
+          <button class="btn btn-primary" type="button" data-open-org-wizard>Assistant d'organisation</button>
         </div>
 
         <div class="row g-3">
@@ -149,6 +150,7 @@
               <option value="public_administration">Administration publique (ministère, préfecture…)</option>
               <option value="private_company">Entreprise privée</option>
               <option value="association">Association</option>
+              <option value="other">Autre / sur mesure</option>
             </select>
           </div>
           <div class="col-md-6">
@@ -180,11 +182,6 @@
           <div class="col-md-4">
             <label class="form-label" for="brandingSupportEmail">Email support</label>
             <input class="form-control" id="brandingSupportEmail" type="email" placeholder="support@organisation.fr">
-          </div>
-          <div class="col-12">
-            <div class="header-actions">
-              <button class="btn btn-primary" id="saveBrandingBtn" type="button">Enregistrer la personnalisation</button>
-            </div>
           </div>
         </div>
 
@@ -223,6 +220,12 @@
           </div>
         </div>
       </section>
+
+      <!-- Un seul bouton pour toute la page : fixé en bas, toujours visible quel que soit le champ modifié. -->
+      <div class="branding-savebar">
+        <p class="branding-savebar__text">Les modifications de toutes les sections de cette page sont enregistrées ensemble.</p>
+        <button class="btn btn-primary" id="saveBrandingBtn" type="button">Enregistrer la personnalisation</button>
+      </div>
     </div>
   </div>
 </main>
@@ -244,7 +247,9 @@
 <!-- Scripts dédiés au branding administrable. -->
 <script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/admin-nav.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/admin-branding.js"></script>
+<script src="js/admin-org-wizard.js"></script>
 </body>
 </html>

@@ -3006,12 +3006,7 @@ document.addEventListener("DOMContentLoaded", () => {
   dashboardPendingNewIds = loadPendingDashboardUpdates();
   renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
-    if (user && (user.permissions.includes("users.manage") || user.permissions.includes("*"))) {
-      document.getElementById("adminLink").classList.remove("d-none");
-    }
-    if (user && (user.groups?.includes("direction") || user.is_admin)) {
-      document.getElementById("execDashboardLink").classList.remove("d-none");
-    }
+    // « Administration » et « Synthèse » sont ajoutés au menu du compte par ui.js (renderUserMenuFeatureLinks), sur toutes les pages.
     if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
       document.getElementById("exportMenu")?.classList.remove("d-none");
     }

@@ -3564,6 +3564,7 @@ button.export-menu__item {
 [data-color-mode="dark"] .admin-nav__link {
   color: var(--text);
   border-color: var(--border);
+  background: var(--surface-alt);  /* le fond clair par défaut rendait le titre (clair) illisible */
 }
 
 [data-color-mode="dark"] .admin-nav__link:hover,
@@ -4453,7 +4454,7 @@ button.export-menu__item {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
+  max-height: 85vh;
 }
 
 .global-search__header {
@@ -4497,7 +4498,7 @@ button.export-menu__item {
   padding: 6px 0;
   overflow-y: auto;
   flex: 1;
-  min-height: 60px;
+  min-height: 200px;  /* les filtres ne doivent pas écraser la liste des pages et actions */
 }
 
 .global-search__result {
@@ -5166,4 +5167,179 @@ section.content-card[id^="db-"] {
 [data-color-mode="dark"] input::placeholder {
   color: #9db0c2;
   opacity: 1;
+}
+
+
+/* Navigation d'administration commune (admin-nav.js) : groupes, fil d'Ariane, focus et cibles tactiles. */
+.admin-nav__group {
+  margin: 0.9rem 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+}
+
+.admin-nav__link--local {
+  border-style: dashed;
+}
+
+.admin-breadcrumb .breadcrumb {
+  font-size: 0.9rem;
+}
+
+.admin-nav__link,
+.dashboard-nav__link,
+.user-menu__item {
+  min-height: 44px;
+}
+
+.admin-nav__link:focus-visible,
+.dashboard-nav__link:focus-visible,
+.user-menu__item:focus-visible,
+.admin-breadcrumb a:focus-visible {
+  outline: 3px solid var(--brand, #0f5b8d);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+  }
+  .dashboard-nav__link {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
+
+.global-search__group {
+  padding: 0.5rem 0.9rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #607080);
+  list-style: none;
+}
+
+
+/* Personnalisation : barre d'enregistrement unique, fixée en bas de la zone de contenu. */
+.branding-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d4dde6);
+  border-radius: 14px;
+  box-shadow: 0 -6px 18px rgba(15, 35, 55, 0.08);
+}
+
+.branding-savebar__text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted, #607080);
+}
+
+/* Mode sombre : fil d'Ariane, barre d'enregistrement et palette lisibles. */
+[data-color-mode="dark"] .admin-breadcrumb .breadcrumb {
+  --bs-breadcrumb-divider-color: var(--muted);
+  --bs-breadcrumb-item-active-color: var(--muted);
+}
+
+[data-color-mode="dark"] .admin-breadcrumb a {
+  color: var(--brand);
+}
+
+/* ─── Mode sombre : corrections de contraste relevées par tests/browser/audit_dark.py ───────────────────────────────────
+   En mode sombre la « marque » devient claire (--brand) et la « marque foncée » reste foncée : les textes blancs posés sur --brand
+   (boutons, onglet actif, en-tête) étaient illisibles, de même que les couleurs codées en dur pour le mode clair. */
+[data-color-mode="dark"] .app-header {
+  background: linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)), linear-gradient(135deg, var(--brand-dark), var(--brand-dark));
+}
+
+[data-color-mode="dark"] .btn-primary {
+  --bs-btn-color: #0a1f2e;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-disabled-color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .btn-outline-primary {
+  --bs-btn-color: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: var(--brand);
+  --bs-btn-hover-border-color: var(--brand);
+}
+
+[data-color-mode="dark"] .btn-outline-danger,
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-color: #ff8f9b;
+  --bs-btn-border-color: #ff8f9b;
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: #ff8f9b;
+  --bs-btn-hover-border-color: #ff8f9b;
+}
+
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-bg: transparent;
+}
+
+[data-color-mode="dark"] .btn-link {
+  --bs-btn-color: var(--brand);
+  --bs-btn-hover-color: var(--text);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active,
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .app-footer__version {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .status-pill {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .resource-order-item__position {
+  color: var(--brand);
+}
+
+[data-color-mode="dark"] .form-text {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .list-group-item {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .choice-chip input:checked + span {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active {
+  background: var(--brand-dark);
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  background: rgba(0, 0, 0, 0.3);
 }
