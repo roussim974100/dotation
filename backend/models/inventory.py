@@ -57,6 +57,7 @@ def align_with_embedded_schema(fields, embedded_schema, current_schema):
     LIBELLE, dont la cle est connue avec certitude."""
     if not isinstance(fields, dict) or not isinstance(embedded_schema, list):
         return {}
+    by_id = {f["id"]: f["key"] for f in embedded_schema if isinstance(f, dict) and f.get("id") and f.get("key")}
     by_label = {}
     for f in embedded_schema:
         if isinstance(f, dict) and f.get("key") and f.get("label"):
@@ -64,6 +65,10 @@ def align_with_embedded_schema(fields, embedded_schema, current_schema):
     result = {}
     for f in current_schema or []:
         if not isinstance(f, dict) or not f.get("key") or f["key"] in fields:
+            continue
+        old_key = by_id.get(f.get("id")) if f.get("id") else None
+        if old_key and old_key != f["key"] and str(fields.get(old_key) or "").strip():
+            result[f["key"]] = fields[old_key]  # meme identifiant de champ : correspondance certaine, meme si le libelle a change
             continue
         keys = [k for k in by_label.get(canonical_key(f.get("label")), []) if str(fields.get(k) or "").strip()]
         if len(keys) == 1:

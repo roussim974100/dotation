@@ -163,6 +163,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  document.getElementById("dbHealthBtn")?.addEventListener("click", async () => {
+    try {
+      const response = await fetch("/api/admin/health", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Contrôle impossible.");
+      const report = await response.json();
+      if (report.status === "ok") {
+        showDbResult("fieldHealthResult", "ok", "Base en bon état.", `Intégrité : ${escapeHtml(report.integrity)} · migrations appliquées jusqu'à la version ${escapeHtml(String(report.schemaVersion ?? "—"))}.`);
+      } else {
+        showDbResult("fieldHealthResult", "warning", "Points à examiner", `<ul class="mb-0">${(report.problems || []).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`);
+      }
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Contrôle impossible.", "");
+    }
+  });
+
   scanBtn.addEventListener("click", scan);
   repairBtn.addEventListener("click", async () => {
     repairBtn.disabled = true;
@@ -172,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!response.ok) throw new Error("Rattachement impossible.");
       const report = await response.json();
       await scan();
-      showDbResult("fieldHealthResult", "ok", `${report.repairedFields} valeur(s) rattachée(s) dans ${report.repairedForms} dossier(s). Copie de sécurité faite avant.`, "");
+      showDbResult("fieldHealthResult", "ok", `${report.repairedFields} valeur(s) rattachée(s) dans ${report.repairedForms} dossier(s) ; copie à plat recalculée pour ${report.resyncedForms || 0} dossier(s). Copie de sécurité faite avant.`, "");
     } catch (error) {
       showDbResult("fieldHealthResult", "error", error.message || "Rattachement impossible.", "");
     } finally {

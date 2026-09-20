@@ -1684,6 +1684,16 @@ def db_diagnose():
     return jsonify(report)
 
 
+@bp.route("/api/admin/health", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def database_health_report():
+    """Contrôle de santé de la base (lecture seule) : intégrité, références, migrations, champs orphelins, copies à plat."""
+    from models.health import database_health
+    with get_db() as conn:
+        return jsonify(database_health(conn))
+
+
 @bp.route("/api/admin/field-health", methods=["GET"])
 @login_required
 @permission_required("db.manage")
@@ -1715,6 +1725,8 @@ def field_health_repair():
             source.close()
     with get_db() as conn:
         report = repair_orphan_fields(conn)
+        from models.health import resync_flat_copies
+        report["resyncedForms"] = resync_flat_copies(conn)
         insert_app_log(conn, "admin", "field_health_repaired", "Reparation des champs de ressources", details=report)
     return jsonify(report)
 

@@ -30,7 +30,10 @@ def normalize_resource_field_schema(raw_schema):
         options = field.get("options") or []
         if not isinstance(options, list):
             options = []
+        raw_id = str(field.get("id") or "").strip()
         normalized.append({
+            # Identifiant interne IMMUABLE du champ (independant de la cle et du libelle) ; attribue par le catalogue.
+            "id": raw_id if re.fullmatch(r"[A-Za-z0-9_\-]{1,40}", raw_id) else "",
             "key": key,
             "label": label,
             "type": field_type,

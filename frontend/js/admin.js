@@ -558,7 +558,7 @@ function createResourceFieldRow(field = {}) {
   // formulaire de dossier, alternative a la suppression reelle pour ne pas perdre les
   // valeurs deja saisies.
   return `
-    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}" data-field-placeholder="${escapeHtml(field.placeholder || "")}" data-field-aliases="${escapeHtml(JSON.stringify(Array.isArray(field.aliases) ? field.aliases : []))}">
+    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}" data-field-id="${escapeHtml(field.id || "")}" data-field-placeholder="${escapeHtml(field.placeholder || "")}" data-field-aliases="${escapeHtml(JSON.stringify(Array.isArray(field.aliases) ? field.aliases : []))}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
@@ -705,6 +705,7 @@ function collectResourceFieldSchema(containerId = "resourceFieldRows") {
         .filter(Boolean)
       : [];
     return {
+      id: row.dataset.fieldId || "",
       label,
       key,
       type,

@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from utils import generate_id, utc_now
 from models.workflow import normalize_resource_field_schema
@@ -182,6 +183,10 @@ def carry_over_field_aliases(old_schema, new_schema):
         previous = old_by_key.get(f["key"])
         if previous:
             f["aliases"] = list(dict.fromkeys([*(previous.get("aliases") or []), *(f.get("aliases") or [])]))
+    for f in new_schema:  # un champ deja connu garde son identifiant, meme si l'editeur ne le renvoie pas
+        previous = old_by_key.get(f["key"])
+        if previous and not f.get("id") and previous.get("id"):
+            f["id"] = previous["id"]
     new_keys = {f["key"] for f in new_schema}
     removed = [f for k, f in old_by_key.items() if k not in new_keys]
     added = [f for f in new_schema if f["key"] not in old_by_key]
@@ -190,6 +195,8 @@ def carry_over_field_aliases(old_schema, new_schema):
         same = [f for f in added if str(f.get("label") or "").strip().lower() == label]
         if len(same) == 1:
             target = same[0]
+            if old.get("id") and not target.get("id"):
+                target["id"] = old["id"]  # meme champ, nouvelle cle : meme identifiant
             for alias in [old["key"], *(old.get("aliases") or [])]:
                 if alias != target["key"] and alias not in (target.get("aliases") or []):
                     target["aliases"] = [*(target.get("aliases") or []), alias]
@@ -218,6 +225,9 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
             field_schema = carry_over_field_aliases(normalize_resource_field_schema(json.loads(existing.get("field_schema_json") or "[]")), field_schema)
         except (TypeError, json.JSONDecodeError):
             pass
+    for f in field_schema:
+        if not f.get("id"):
+            f["id"] = "fld_" + uuid.uuid4().hex[:12]
     display_order = payload.get("display_order") if payload.get("display_order") is not None else existing.get("display_order", 100)
     try:
         display_order = int(display_order)

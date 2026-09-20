@@ -183,3 +183,9 @@ def test_optimistic_lock_refuses_a_stale_save_instead_of_overwriting(http):
 def test_resource_used_by_dossiers_cannot_be_deleted(http):
     assert http["delete_used_resource"] == [409]
     assert http["delete_unused_resource"] == 200
+
+
+def test_database_health_report(http):
+    assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
+    assert http["health_report_has_schema_version"] == 2
+    assert http["health_report_status_known"] is True

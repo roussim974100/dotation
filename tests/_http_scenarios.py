@@ -305,6 +305,11 @@ results["e2e_pdf_status"] = admin.get(f"/api/forms/{_id}/pdf").status_code
 _exp = admin.get("/api/forms/export")
 results["e2e_export_contains_values"] = _exp.status_code == 200 and (b"V-" in _exp.data or "V-" in _exp.get_data(as_text=True))
 
+_health = admin.get("/api/admin/health").get_json() or {}
+results["health_report"] = {k: _health.get(k) for k in ("integrity", "brokenReferences")}
+results["health_report_has_schema_version"] = _health.get("schemaVersion")
+results["health_report_status_known"] = _health.get("status") in ("ok", "attention")
+
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
 admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)

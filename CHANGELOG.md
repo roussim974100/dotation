@@ -1,5 +1,19 @@
 # Historique des versions — À Quai
 
+## [3.53.0] - 2026-09-20
+
+Fondations (décisions D9 à D11 et D15 du comité).
+
+### 🧱 Identifiant de champ immuable
+- Chaque champ d'une ressource a un **identifiant interne** (`id`) indépendant de sa clé et de son libellé : attribué automatiquement aux champs existants (migration), conservé aux sauvegardes, **hérité** quand la clé change. Un dossier est relu par cet identifiant en priorité (correspondance certaine, même si le libellé a changé), puis par libellé, puis en dernier recours par ressemblance de noms.
+
+### 🗂️ Migrations numérotées
+- Table `schema_migrations` + `PRAGMA user_version` : chaque migration est appliquée une fois, dans l'ordre, avec une **copie de sécurité de la base avant** (API de sauvegarde SQLite, fiable en mode WAL) dès que la base contient des dossiers.
+
+### 🩺 Contrôle de santé
+- `GET /api/admin/health` et bouton « Contrôle général de la base » (Administration > Base de données) : intégrité SQLite, références cassées, version des migrations, valeurs de champs orphelines, écarts entre un dossier et sa copie à plat. Contrôle aussi fait au démarrage (avertissement au journal).
+- Intégration continue GitHub Actions : la suite de tests tourne à chaque push et pull request.
+
 ## [3.52.0] - 2026-09-20
 
 Suite du chantier « fiabiliser l'édition » (décisions D5 à D8 et D13 du comité, `docs/audit/DECISIONS_COMITE.md`).

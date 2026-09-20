@@ -436,6 +436,24 @@ def persist_form(payload, allow_locked_update=False):
     return get_form(form_id)
 
 
+def resync_items_for_form(connection, form_id):
+    """Recalcule la copie a plat (dotation_items) d'un dossier depuis son payload, qui fait foi : meme operation que
+    l'enregistrement, sans rien modifier d'autre (ni dossier, ni parc)."""
+    row = connection.execute("SELECT payload_json FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+    if not row:
+        return 0
+    items = extract_items(json.loads(row["payload_json"] or "{}"))
+    connection.execute("DELETE FROM dotation_items WHERE form_id = ?", (form_id,))
+    connection.executemany(
+        """
+        INSERT INTO dotation_items (form_id, item_key, category, label, assigned, returned, returned_at, return_condition, notes, details_json)
+        VALUES (:form_id, :item_key, :category, :label, :assigned, :returned, :returned_at, :return_condition, :notes, :details_json)
+        """,
+        [{"form_id": form_id, **item, "assigned": bool_to_int(item["assigned"]), "returned": bool_to_int(item["returned"])} for item in items],
+    )
+    return len(items)
+
+
 def align_payload_field_names(connection, payload):
     """Anciens dossiers : les valeurs des ressources sont stockees sous d'anciens noms de champs (nomPoste, numeroSerie, adresse)
     alors que le catalogue actuel attend nom_du_poste, numero_de_serie, adresse_email. Sans correspondance, le formulaire les

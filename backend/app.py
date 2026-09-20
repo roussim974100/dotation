@@ -569,6 +569,8 @@ def init_db():
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
+        from migrations import run_pending_migrations
+        run_pending_migrations(connection)  # migrations numerotees (identifiants de champs...), copie de securite avant
         # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
         from models.units import backfill_units, ensure_units_schema
         ensure_units_schema(connection)
@@ -583,6 +585,14 @@ def init_db():
         if _stock_config:
             for _row in connection.execute("SELECT id FROM dotation_forms").fetchall():
                 sync_stock_for_form(connection, _row["id"], _stock_config)
+        try:
+            from models.health import database_health
+            from models.audit import insert_app_log
+            _health = database_health(connection)
+            if _health["status"] != "ok":
+                insert_app_log(connection, "system", "database_health", "Contrôle de santé au démarrage : " + " ".join(_health["problems"]), details=_health)
+        except Exception as _exc:  # le controle ne doit jamais empecher le demarrage
+            print(f"[sante] controle impossible : {_exc}")
         from models.settings import get_app_settings
         from models.units_extra import anonymize_old_holders
         anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))
