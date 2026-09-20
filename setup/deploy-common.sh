@@ -111,9 +111,11 @@ echo "=========================================="
 
 wait_healthy() {
     local attempt
-    for attempt in $(seq 1 "${DEPLOY_HEALTH_TRIES:-25}"); do
+    # 60 essais : sur une grosse base, le premier demarrage (migrations, verrous entre workers) peut depasser 25 s ; --max-time evite
+    # qu'un curl suspendu bloque le script. Un faux echec declencherait un retour arriere inutile.
+    for attempt in $(seq 1 "${DEPLOY_HEALTH_TRIES:-60}"); do
         sleep "${DEPLOY_SLEEP:-1}"
-        if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login"; then
+        if curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:$PORT/login"; then
             return 0
         fi
     done
@@ -188,6 +190,10 @@ for name in ("dotation.db", "users.db"):
     dst.close(); src.close()
     print("  sauvegarde :", name)
 PY
+# Garde-fou : si la base principale existe et n'est pas vide, sa sauvegarde DOIT exister (sinon on ne poursuit pas : pas de retour arriere possible).
+if [ -s "$DATA_DIR/dotation.db" ] && [ ! -s "$SAVE_DIR/dotation.db" ]; then
+    fail "la sauvegarde de dotation.db est absente : mise à jour interrompue avant toute modification"
+fi
 echo "  -> $SAVE_DIR"
 
 say "2/4 Récupération du code"
