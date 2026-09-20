@@ -233,3 +233,27 @@ def test_init_db_is_idempotent(http):
     assert http["init_idempotent_schema"] is True
     assert http["init_idempotent_data"] == {}
     assert http["init_idempotent_migrations"] is True
+
+
+def test_unexpected_errors_give_a_shareable_code_and_no_raw_message(http):
+    status, prefix, length, request_id, header = http["obs_error_shape"]
+    assert status == 500 and prefix == "E-" and length == 8
+    assert request_id == "requete-de-test-01" == header  # identifiant du proxy conserve et renvoye
+    assert http["obs_message_has_no_value"] is True  # jamais la valeur qui a provoque l'erreur
+    assert http["obs_same_defect_same_code"] is True  # meme defaut = meme code (le support le retrouve)
+    assert http["obs_bad_request_id_replaced"] is True  # pas d'injection dans le journal
+    assert http["obs_log_has_code_not_value"] is True
+
+
+def test_diagnostic_pack_contains_no_personal_data(http):
+    """Base pleine de valeurs « sentinelles » (noms, e-mail, serie, libelles, options, chemin reseau, organisation) : aucune ne doit sortir."""
+    assert http["diag_status"] == 200
+    assert http["diag_leaks"] == []
+    assert http["diag_content"][0] == "aquai-diagnostic" and http["diag_content"][2] is True and http["diag_content"][3] == 1
+    status, names, checksum_ok, zip_leaks = http["diag_zip"]
+    assert status == 200 and names == ["LISEZMOI.txt", "checksums.txt", "diagnostic.json"] and checksum_ok is True and zip_leaks == []
+
+
+def test_diagnostic_guard_refuses_personal_looking_content_and_is_admin_only(http):
+    assert http["diag_guard_misses"] == []  # e-mail, chemin reseau, IP, URL, chemin de fichier : tous refuses
+    assert http["diag_forbidden_for_anonymous"] in (401, 403)

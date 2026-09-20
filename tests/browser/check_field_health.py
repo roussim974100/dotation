@@ -76,6 +76,11 @@ with Instance() as inst:
     time.sleep(1.5)
     after = api(driver, "GET", "/api/admin/field-health")["json"]
     check("nomPoste / numeroSerie / adresse ne sont plus orphelins", not any(o["field"] in ("nomPoste", "numeroSerie", "adresse") for o in after["orphans"]), str(after)[:200])
+    driver.execute_script("document.getElementById('diagPreviewBtn').click()")
+    check("paquet de diagnostic : aperçu affiché avant téléchargement", wait_for(lambda: '"format": "aquai-diagnostic"' in driver.find_element("id", "diagPreview").text))
+    preview_text = driver.find_element("id", "diagPreview").text
+    check("paquet de diagnostic : aucune donnée de l'ancien dossier (nom, valeurs saisies)", "SANTE" not in preview_text and "SN-LEGACY" not in preview_text and "legacy@exemple.fr" not in preview_text)
+    check("paquet de diagnostic : lien de téléchargement présent", driver.execute_script("return document.getElementById('diagDownloadLink').getAttribute('href')") == "/api/admin/diagnostic/download")
     errors = [e for e in inst.console_errors(driver) if "favicon" not in e and "api/debug/logs" not in e]
     check("aucune erreur JavaScript", not errors, str(errors)[:200])
 

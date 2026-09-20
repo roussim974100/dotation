@@ -415,6 +415,76 @@ results["init_idempotent_schema"] = _before_init[0] == _after_init[0]
 results["init_idempotent_data"] = {k: (v, _after_init[1].get(k)) for k, v in _before_init[1].items() if v != _after_init[1].get(k)}
 results["init_idempotent_migrations"] = _before_init[2] == _after_init[2]
 
+# ---- Observabilite : code d'erreur communicable, identifiant de requete, journal sans valeur personnelle ----
+app._got_first_request = False  # Flask interdit d'ajouter des routes apres la premiere requete : test uniquement
+
+
+@app.route("/api/_test_boom")
+def _test_boom():
+    raise ValueError("VALEUR-SECRETE-DU-CLIENT-123")
+
+
+@app.route("/api/_test_boom2")
+def _test_boom2():
+    raise ValueError("AUTRE-VALEUR-SECRETE")
+
+
+_b1 = admin.get("/api/_test_boom", headers={"X-Request-ID": "requete-de-test-01"})
+_b2 = admin.get("/api/_test_boom2")
+_b3 = admin.get("/api/_test_boom", headers={"X-Request-ID": "mauvais id <script>ligne-injectee"})
+_j1 = _b1.get_json() or {}
+results["obs_error_shape"] = [_b1.status_code, (_j1.get("code") or "")[:2], len(_j1.get("code") or ""), _j1.get("requestId"), _b1.headers.get("X-Request-ID")]
+results["obs_message_has_no_value"] = "VALEUR-SECRETE" not in json.dumps(_j1) and "VALEUR-SECRETE" not in json.dumps(_b2.get_json() or {})
+results["obs_same_defect_same_code"] = (_b3.get_json() or {}).get("code") == _j1.get("code") and (_b2.get_json() or {}).get("code") != _j1.get("code")  # meme defaut = meme code ; autre defaut = autre code
+results["obs_bad_request_id_replaced"] = (_b3.headers.get("X-Request-ID") or "") != "mauvais id <script>ligne-injectee" and len(_b3.headers.get("X-Request-ID") or "") == 12
+from observability import LOG_FILE as _LOG  # noqa: E402
+_log_text = open(_LOG, encoding="utf-8").read() if os.path.exists(_LOG) else ""
+results["obs_log_has_code_not_value"] = (_j1.get("code") or "?") in _log_text and "VALEUR-SECRETE" not in _log_text and "AUTRE-VALEUR" not in _log_text
+
+# ---- Paquet de diagnostic : AUCUNE donnee personnelle ni libelle saisi, meme quand la base en est pleine ----
+import io as _io  # noqa: E402
+import zipfile as _zip  # noqa: E402
+import hashlib as _hash  # noqa: E402
+
+_SENTINELS = ["NOMSENTINELLE", "PRENOMSENTINELLE", "SERIESENTINELLE123", "sentinelle@exemple.fr", "ORGSENTINELLE", "LIBELLESENTINELLE",
+              "CHAMPSENTINELLE", "OPTIONSENTINELLE", "DESCSENTINELLE", "PARTAGESENTINELLE", "COMMENTAIRESENTINELLE", "SERVICESENTINELLE"]
+admin.put("/api/admin/settings", json={"org_name": "ORGSENTINELLE", "support_email": "sentinelle@exemple.fr", "dpo_email": "dpo-sentinelle@exemple.fr",
+                                        "support_name": "NOMSENTINELLE Support"}, headers=H)
+admin.post("/api/admin/resources", json={"code": "diag_sentinelle", "label": "LIBELLESENTINELLE", "description": "DESCSENTINELLE", "category": "materiel",
+                                         "issuer_service": "SERVICESENTINELLE", "requires_return": True, "tracking_mode": "unit", "display_order": 970, "is_active": True,
+                                         "field_schema": [{"key": "num", "label": "CHAMPSENTINELLE", "type": "select", "options": ["OPTIONSENTINELLE", "autre"],
+                                                           "identifier": True, "required": True}]}, headers=H)
+_dr = next((r["id"] for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "diag_sentinelle"), None)
+admin.post("/api/forms", json={"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "NOMSENTINELLE", "prenom": "PRENOMSENTINELLE", "qualite": "agent",
+                                                                               "service": "SERVICESENTINELLE"},
+                               "resources": {"additional": [{"id": _dr, "code": "diag_sentinelle", "label": "LIBELLESENTINELLE", "category": "materiel", "requiresReturn": True,
+                                                             "selected": True, "fields": {"num": "SERIESENTINELLE123", "mail": "sentinelle@exemple.fr"}, "details": "COMMENTAIRESENTINELLE"}]},
+                               "unc_acces": [{"chemin": "\\\\serveur\\PARTAGESENTINELLE", "acces": "lecture", "commentaire": "COMMENTAIRESENTINELLE"}],
+                               "workflow": {"status": "draft"}, "meta": {}}, headers=H)
+_pack_response = admin.get("/api/admin/diagnostic")
+_pack_text = _pack_response.get_data(as_text=True)
+results["diag_status"] = _pack_response.status_code
+results["diag_leaks"] = [s for s in _SENTINELS if s.lower() in _pack_text.lower()]
+_pack = _pack_response.get_json() or {}
+results["diag_content"] = [_pack.get("format"), sorted(_pack)[:3] == ["format", "generatedAt", "health"], any(r["code"] == "diag_sentinelle" and r["fieldCount"] == 1 for r in _pack.get("resources", [])),
+                           (_pack.get("usage") or {}).get("formsPerResource", {}).get("diag_sentinelle"), (_pack.get("pragmas") or {}).get("userVersion")]
+_zip_response = admin.get("/api/admin/diagnostic/download")
+_archive = _zip.ZipFile(_io.BytesIO(_zip_response.data))
+_names = sorted(_archive.namelist())
+_json_bytes = _archive.read("diagnostic.json")
+results["diag_zip"] = [_zip_response.status_code, _names, _hash.sha256(_json_bytes).hexdigest() in _archive.read("checksums.txt").decode("utf-8"),
+                       [s for s in _SENTINELS if s.lower() in _json_bytes.decode("utf-8").lower()]]
+from models.diagnostic import UnsafeDiagnosticError as _Unsafe, assert_safe as _assert_safe  # noqa: E402
+_unsafe = []
+for _bad in ("contact jean.dupont@ville.fr", "\\\\srv\\partage\\dossier", "ip 192.168.1.20", "https://exemple.fr/x", "C:\\Users\\jean\\fichier"):
+    try:
+        _assert_safe({"x": _bad})
+        _unsafe.append(_bad)
+    except _Unsafe:
+        pass
+results["diag_guard_misses"] = _unsafe
+results["diag_forbidden_for_anonymous"] = anonymous.get("/api/admin/diagnostic").status_code
+
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
 admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)

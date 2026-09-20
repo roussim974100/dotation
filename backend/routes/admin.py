@@ -1702,6 +1702,57 @@ def db_diagnose():
     return jsonify(report)
 
 
+@bp.route("/api/admin/diagnostic", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=60, scope="diagnostic")
+def diagnostic_preview():
+    """Aperçu du paquet de diagnostic (aucune donnée personnelle : liste blanche + verrou final)."""
+    from models.diagnostic import UnsafeDiagnosticError, assert_safe, collect_diagnostic
+    with get_db() as conn:
+        pack = collect_diagnostic(conn)
+    try:
+        assert_safe(pack)
+    except UnsafeDiagnosticError as error:
+        return jsonify({"error": "diagnostic_unsafe", "message": str(error)}), 500
+    return jsonify(pack)
+
+
+@bp.route("/api/admin/diagnostic/download", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=60, scope="diagnostic")
+def diagnostic_download():
+    """Archive zip à envoyer au support : diagnostic.json + LISEZMOI.txt + empreinte SHA-256."""
+    import hashlib
+    import zipfile
+    from models.diagnostic import UnsafeDiagnosticError, assert_safe, collect_diagnostic
+    with get_db() as conn:
+        pack = collect_diagnostic(conn)
+        try:
+            assert_safe(pack)
+        except UnsafeDiagnosticError as error:
+            return jsonify({"error": "diagnostic_unsafe", "message": str(error)}), 500
+        insert_app_log(conn, "admin", "diagnostic_generated", "Paquet de diagnostic genere")
+    content = json.dumps(pack, ensure_ascii=False, indent=2).encode("utf-8")
+    readme = "\n".join([
+        "Paquet de diagnostic A quai", "",
+        "Contenu : versions, schema de la base, volumes, sante, structure des ressources (codes et cles techniques),",
+        "statistiques d'usage, evenements d'erreur techniques.",
+        "Ne contient AUCUNE donnee personnelle (noms, e-mails, numeros de serie, chemins reseau, signatures) ni libelle saisi.",
+        "Vous pouvez ouvrir diagnostic.json pour le relire avant de l'envoyer.", ""]).encode("utf-8")
+    checksums = f"sha256  diagnostic.json  {hashlib.sha256(content).hexdigest()}".encode("utf-8") + b"\n"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("diagnostic.json", content)
+        archive.writestr("LISEZMOI.txt", readme)
+        archive.writestr("checksums.txt", checksums)
+    response = make_response(buffer.getvalue())
+    response.headers["Content-Type"] = "application/zip"
+    response.headers["Content-Disposition"] = 'attachment; filename="aquai_diagnostic.zip"'
+    return response
+
+
 @bp.route("/api/admin/config-export", methods=["GET"])
 @login_required
 @permission_required("users.manage")

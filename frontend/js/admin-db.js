@@ -262,3 +262,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
+// Paquet de diagnostic : aperçu du contenu avant téléchargement (rien n'est envoyé automatiquement).
+document.addEventListener("DOMContentLoaded", () => {
+  const button = document.getElementById("diagPreviewBtn");
+  const preview = document.getElementById("diagPreview");
+  if (!button || !preview) return;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/admin/diagnostic", { credentials: "same-origin" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || "Diagnostic impossible.");
+      preview.textContent = JSON.stringify(body, null, 2);
+      preview.classList.remove("d-none");
+      const health = body.health || {};
+      showDbResult("diagResult", health.status === "ok" ? "ok" : "info",
+        `Paquet prêt : version ${escapeHtml(String(body.versions?.app || "?"))}, ${Object.keys(body.schema?.tables || {}).length} tables, ${(body.resources || []).length} ressources.`,
+        health.status === "ok" ? "Aucun point à examiner." : `<ul class="mb-0">${(health.problems || []).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`);
+    } catch (error) {
+      showDbResult("diagResult", "error", error.message || "Diagnostic impossible.", "");
+    } finally {
+      button.disabled = false;
+    }
+  });
+});

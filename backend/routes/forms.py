@@ -545,8 +545,8 @@ def get_retraits_pdf(form_id):
         beneficiaire = form_data.get("data", {}).get("beneficiaire", {})
         filename = slugify_filename(f"retraits_{beneficiaire.get('nom')}_{beneficiaire.get('prenom')}")
         return download_response(pdf_bytes, f"{filename}.pdf", "application/pdf")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        raise  # gestionnaire global : code d'erreur communicable, jamais le message brut (qui peut contenir une valeur)
 
 
 @bp.route("/api/forms/<form_id>", methods=["GET"])

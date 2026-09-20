@@ -38,6 +38,8 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100"
 # X-Forwarded-* : confiance automatique selon l'appelant direct (voir proxy.py) ; fonctionne derriere
 # un reverse proxy comme en acces direct, sans reglage. APP_TRUSTED_PROXIES=0 pour tout desactiver.
 app.wsgi_app = AutoProxyFix(app.wsgi_app)
+from observability import init_observability
+init_observability(app)  # identifiant de requete, code d'erreur communicable, journal fichier sans donnee personnelle
 
 # Valider les permissions au démarrage (dev uniquement)
 if os.environ.get("FLASK_ENV") == "development":
