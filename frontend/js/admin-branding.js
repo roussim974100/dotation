@@ -165,8 +165,13 @@ function describeBrandingChanges(previous, next) {
   const supportRoleChange = describeValueChange("Rôle du contact support", previous.support_role, next.support_role);
   const orgContextChange = describeValueChange("Type d'organisation", previous.org_context, next.org_context);
   const beneficiaryTypesChange = describeValueChange("Types de bénéficiaires", previous.beneficiary_types, next.beneficiary_types);
+  // Réglages numériques : sans eux, modifier UNIQUEMENT l'un d'eux donnait « Aucune modification à enregistrer » et rien n'était envoyé.
+  const phase1Change = describeValueChange("Fenêtre de modification de la phase 1 (jours)", previous.restitution_phase1_unlock_days, next.restitution_phase1_unlock_days);
+  const timingChange = describeValueChange("Seuil d'alerte pilotage (jours)", previous.timing_warning_days, next.timing_warning_days);
+  const retentionChange = describeValueChange("Conservation de l'historique du parc (ans)", previous.parc_retention_years, next.parc_retention_years);
 
-  [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange, supportNameChange, supportEmailChange, supportRoleChange, orgContextChange, beneficiaryTypesChange].filter(Boolean).forEach((item) => {
+  [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange, supportNameChange, supportEmailChange, supportRoleChange, orgContextChange, beneficiaryTypesChange,
+    phase1Change, timingChange, retentionChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 
@@ -318,6 +323,7 @@ async function saveBrandingSettings() {
 
   if (!changeLabels.length) {
     showBrandingNotice("Aucune modification à enregistrer.");
+    brandingById("brandingNotice")?.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
 
