@@ -189,3 +189,14 @@ def test_database_health_report(http):
     assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
     assert http["health_report_has_schema_version"] == 2
     assert http["health_report_status_known"] is True
+
+
+def test_db_export_then_import_keeps_data_and_schema(http):
+    assert http["db_export_is_sqlite"] is True
+    assert http["db_import_status"] == 200
+    assert http["db_import_keeps_forms"] is True
+    assert http["db_import_health"] == ["ok", 2]
+
+
+def test_importing_an_older_database_upgrades_its_schema_immediately(http):
+    assert http["old_db_import"] == [200, 2, True]

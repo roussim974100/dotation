@@ -130,6 +130,9 @@ def backup_import():
         return _error_response(error)
     except OSError as error:
         return jsonify({"error": "import_failed", "message": f"Échec du remplacement : {error}"}), 500
+    if any(key != "users" for key in result["restored"]):
+        from migrations import upgrade_after_restore
+        upgrade_after_restore()  # une ancienne archive : schema de la base principale remis a niveau tout de suite
     if "users" in result["restored"]:
         ensure_users_schema()  # une ancienne archive remet l'ancien schema des comptes
     _log("backup_imported", "Import sauvegarde", {"restored": result["restored"], "safety_copies": result["safety_copies"]})

@@ -1650,8 +1650,23 @@ def db_export():
     filename = f"aquai_db_{date_str}.db"
     with get_db() as conn:
         insert_app_log(conn, "admin", "db_exported", "Export base de donnees", details={"filename": filename})
-    with open(DB_PATH, "rb") as fh:
-        data = fh.read()
+    # Copie coherente par l'API de sauvegarde SQLite : lire le fichier brut d'une base en mode WAL peut omettre les ecritures recentes.
+    snapshot_path = os.path.join(tempfile.gettempdir(), f"aquai_export_{uuid.uuid4().hex}.db")
+    source = sqlite3.connect(DB_PATH)
+    target = sqlite3.connect(snapshot_path)
+    try:
+        source.backup(target)
+    finally:
+        target.close()
+        source.close()
+    try:
+        with open(snapshot_path, "rb") as fh:
+            data = fh.read()
+    finally:
+        try:
+            os.unlink(snapshot_path)
+        except OSError:
+            pass
     resp = make_response(data)
     resp.headers["Content-Type"] = "application/octet-stream"
     resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1755,8 +1770,20 @@ def db_import():
         backup_name = f"dotation_backup_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db"
         backup_path = os.path.join(_BACKUP_DIR, backup_name)
         if os.path.exists(DB_PATH):
-            shutil.copy2(DB_PATH, backup_path)
-        shutil.move(tmp_path, DB_PATH)
+            # copie de securite coherente (API SQLite, fiable en mode WAL), puis remplacement EN PLACE : pas de fichier
+            # deplace sous la base ouverte, et aucun ancien journal WAL ne peut etre rejoue sur la nouvelle base.
+            live = sqlite3.connect(DB_PATH)
+            saved = sqlite3.connect(backup_path)
+            try:
+                live.backup(saved)
+            finally:
+                saved.close()
+                live.close()
+        import backup as _backup
+        _backup.restore_sqlite(tmp_path, DB_PATH)
+        os.unlink(tmp_path)
+        from migrations import upgrade_after_restore
+        upgrade_after_restore()
     except Exception as exc:
         try:
             os.unlink(tmp_path)

@@ -86,3 +86,16 @@ def run_pending_migrations(connection):
         applied.append(version)
     connection.execute(f"PRAGMA user_version = {max(m[0] for m in MIGRATIONS)}")
     return applied
+
+
+def upgrade_after_restore():
+    """Apres une restauration ou un import de base (souvent plus ancienne) : remet le schema a niveau (tables, colonnes,
+    migrations numerotees) en rejouant l'initialisation idempotente de l'application. Sans cela, une base d'une version
+    anterieure resterait en l'etat jusqu'au prochain redemarrage."""
+    import sys
+    for name in ("app", "__main__"):
+        init = getattr(sys.modules.get(name), "init_db", None)
+        if callable(init):
+            init()
+            return True
+    return False

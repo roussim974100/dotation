@@ -310,6 +310,34 @@ results["health_report"] = {k: _health.get(k) for k in ("integrity", "brokenRefe
 results["health_report_has_schema_version"] = _health.get("schemaVersion")
 results["health_report_status_known"] = _health.get("status") in ("ok", "attention")
 
+# ---- Export puis import d'une base (schema remis a niveau, donnees conservees) ----
+_before = len(admin.get("/api/forms").get_json() or [])
+_exp = admin.get("/api/admin/db/export")
+results["db_export_is_sqlite"] = _exp.status_code == 200 and _exp.data[:15] == b"SQLite format 3"
+_imp = admin.post("/api/admin/db/import", data={"file": (io.BytesIO(_exp.data), "export.db")}, content_type="multipart/form-data", headers=H)
+results["db_import_status"] = _imp.status_code
+results["db_import_keeps_forms"] = len(admin.get("/api/forms").get_json() or []) == _before
+_after = admin.get("/api/admin/health").get_json() or {}
+results["db_import_health"] = [_after.get("integrity"), _after.get("schemaVersion")]
+
+# Import d'une base « ancienne » (sans table de migrations ni identifiants de champs) : remise a niveau immediate
+import sqlite3 as _sql
+import tempfile as _tmp
+_old_path = os.path.join(_tmp.gettempdir(), "aquai_ancienne_base.db")
+open(_old_path, "wb").write(_exp.data)
+_oc = _sql.connect(_old_path)
+_oc.execute("DROP TABLE IF EXISTS schema_migrations")
+_oc.execute("UPDATE resource_catalog SET field_schema_json = REPLACE(field_schema_json, '\"id\": \"fld_', '\"idx\": \"fld_')")
+_oc.execute("PRAGMA user_version = 0")
+_oc.commit()
+_oc.close()
+_old_bytes = open(_old_path, "rb").read()
+os.unlink(_old_path)
+_imp2 = admin.post("/api/admin/db/import", data={"file": (io.BytesIO(_old_bytes), "ancienne.db")}, content_type="multipart/form-data", headers=H)
+_h2 = admin.get("/api/admin/health").get_json() or {}
+_res = next((r for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "ordinateur"), {})
+results["old_db_import"] = [_imp2.status_code, _h2.get("schemaVersion"), all(f.get("id") for f in (_res.get("field_schema") or _res.get("fieldSchema") or []))]
+
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
 admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)

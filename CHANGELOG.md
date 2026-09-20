@@ -1,5 +1,12 @@
 # Historique des versions — À Quai
 
+## [3.54.0] - 2026-09-20
+
+### 💾 Export / import de la base (décision D12 du comité)
+- **Export** : copie cohérente par l'API de sauvegarde SQLite (lire le fichier brut d'une base en mode WAL pouvait omettre les écritures récentes).
+- **Import** : copie de sécurité cohérente avant, puis remplacement **en place** (plus de fichier déplacé sous une base ouverte, plus de journal WAL ancien rejoué sur la nouvelle base).
+- **Remise à niveau immédiate après restauration** (import simple ou archive chiffrée) : tables, colonnes et migrations numérotées sont rejouées tout de suite, sans attendre un redémarrage. Testé avec une base « ancienne » sans table de migrations ni identifiants de champs.
+
 ## [3.53.0] - 2026-09-20
 
 Fondations (décisions D9 à D11 et D15 du comité).

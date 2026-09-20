@@ -3,7 +3,7 @@
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 // Numéro de version, IDENTIQUE dans toutes les branches (dev, preprod, prod) : l'environnement est décidé par le serveur.
-const APP_BUILD_VERSION = "3.53.0";
+const APP_BUILD_VERSION = "3.54.0";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-logo.png";
 const COOKIECONSENT_VERSION = "3.1.0";
