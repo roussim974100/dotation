@@ -137,3 +137,10 @@ def test_pilotage_threshold_changes_the_danger_state_of_dossiers(http):
 def test_pilotage_threshold_does_not_change_the_executive_summary(http):
     """La page Synthese a ses propres seuils (3 / 7 / 30 jours) : le reglage « Seuil d'alerte pilotage » ne la modifie pas."""
     assert http["synthese_inchangee_par_le_seuil"] is True
+
+
+def test_legacy_field_names_are_shown_under_the_current_catalog_names(http):
+    """Dossier saisi avec d'anciens noms de champs : le formulaire recoit aussi les valeurs sous les noms du catalogue (sinon il les affiche vides)."""
+    assert http["legacy_fields_aligned"] == {"nom_du_poste": "PC-ANCIEN-1", "numero_de_serie": "SN-ANCIEN-1", "adresse_email": "ancien@exemple.fr", "marque": "HP"}
+    # rien n'est retire : les anciens noms restent presents (aucune perte de donnees)
+    assert http["legacy_fields_old_keys_kept"] == {"nomPoste": "PC-ANCIEN-1", "numeroSerie": "SN-ANCIEN-1", "adresse": "ancien@exemple.fr"}

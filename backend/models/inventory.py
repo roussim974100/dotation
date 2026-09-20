@@ -39,7 +39,7 @@ def canonical_key(key):
     return "".join(w.lower() for w in words if w.lower() not in _KEY_STOPWORDS)
 
 
-def align_fields(fields, schema_keys):
+def align_fields(fields, schema_keys, loose=False):
     """Renvoie les champs d'une ligne de dossier sous les noms du CATALOGUE actuel. Les anciens dossiers ont ete
     saisis avec d'autres noms de champs (numeroSerie) que ceux du catalogue (numero_de_serie) : sans cette
     correspondance, l'identifiant serait ignore. Un nom deja present dans le catalogue est garde tel quel."""
@@ -53,6 +53,13 @@ def align_fields(fields, schema_keys):
             aligned[key] = value
             continue
         candidates = by_canonical.get(canonical_key(key), [])
+        if not candidates and loose:
+            # Repli (affichage du formulaire seulement) : ancien nom plus court que le nom du catalogue (« adresse » -> « adresse_email »).
+            # « numero » et « n° » sont equivalents (numeroSerie ~ n_de_serie_sn).
+            own = canonical_key(key).replace("numero", "n")
+            if len(own) >= 4:
+                candidates = [k for c, keys in by_canonical.items() if len(c.replace("numero", "n")) >= 4
+                              and (c.replace("numero", "n").startswith(own) or own.startswith(c.replace("numero", "n"))) for k in keys]
         if len(candidates) == 1 and candidates[0] not in fields:
             aligned.setdefault(candidates[0], value)
     return aligned

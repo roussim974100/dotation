@@ -201,6 +201,26 @@ admin.put("/api/admin/settings", json={"timing_warning_days": 30}, headers=H)
 results["synthese_inchangee_par_le_seuil"] = _stats_a == (admin.get("/api/admin/dashboard-stats").get_json() or {}).get("timing_distribution")
 admin.put("/api/admin/settings", json={"timing_warning_days": 3}, headers=H)
 
+# Anciens dossiers : valeurs saisies sous d'anciens noms (nomPoste, numeroSerie, adresse), catalogue aux noms actuels (nom_du_poste...).
+admin.post("/api/admin/resources", json={
+    "code": "poste_ancien", "label": "Poste ancien", "description": "", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+    "has_assignment_date": True, "has_assignment_condition": True, "has_assignment_notes": True, "display_order": 900, "is_active": True, "tracking_mode": "unit",
+    "field_schema": [{"key": "nom_du_poste", "label": "Nom du poste", "type": "text", "required": False},
+                     {"key": "marque", "label": "Marque", "type": "text", "required": True},
+                     {"key": "numero_de_serie", "label": "N° de série", "type": "text", "required": True, "identifier": True},
+                     {"key": "adresse_email", "label": "Adresse e-mail", "type": "text", "required": False}]}, headers=H)
+_legacy = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "ANCIEN", "prenom": "Champs", "qualite": "agent"},
+           "resources": {"additional": [{"id": 1, "code": "poste_ancien", "label": "Poste ancien", "category": "materiel", "requiresReturn": True, "selected": True,
+                                         "fields": {"marque": "HP", "nomPoste": "PC-ANCIEN-1", "numeroSerie": "SN-ANCIEN-1", "adresse": "ancien@exemple.fr"}, "details": ""}]},
+           "workflow": {"status": "draft"}, "meta": {}}
+_created = admin.post("/api/forms", json=_legacy, headers=H).get_json() or {}
+_fid = (_created.get("summary") or {}).get("id")
+_read = (admin.get(f"/api/forms/{_fid}").get_json() or {}).get("data", {}) if _fid else {}
+_fields = (((_read.get("resources") or {}).get("additional") or [{}])[0]).get("fields", {})
+results["legacy_fields_aligned"] = {k: _fields.get(k) for k in ("nom_du_poste", "numero_de_serie", "adresse_email", "marque")}
+results["legacy_fields_old_keys_kept"] = {k: _fields.get(k) for k in ("nomPoste", "numeroSerie", "adresse")}
+results["legacy_form_id"] = _fid
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):

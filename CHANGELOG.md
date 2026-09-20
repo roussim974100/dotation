@@ -1,5 +1,11 @@
 # Historique des versions — À Quai
 
+## [3.50.2] - 2026-09-20
+
+### 🐛 Correctifs
+- **Formulaire d'un ancien dossier : e-mail et numéros de série affichés vides alors que le survol les montrait** : les valeurs étaient enregistrées sous d'anciens noms de champs (`nomPoste`, `numeroSerie`, `adresse`) que le catalogue actuel ne connaît plus. Le serveur les présente désormais aussi sous les noms actuels (rien n'est retiré ni écrasé).
+- **Tableau de bord : un dossier « en attente de signature » sans restitution n'avait pas de bouton de signature** (et proposait à tort « Informer de la restitution »). Boutons renommés : « Envoyer le lien de signature » / « Renvoyer le lien de signature ».
+
 ## [3.50.1] - 2026-09-20
 
 ### 🐛 Correctifs

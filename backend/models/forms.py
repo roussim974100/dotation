@@ -18,6 +18,7 @@ from models.workflow import (
     describe_assignment_condition, extract_items,
 )
 from models.dossier import sync_person_and_dossier
+from models.inventory import align_fields
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS, get_dpo_email
 from utils import generate_id
 
@@ -433,6 +434,33 @@ def persist_form(payload, allow_locked_update=False):
     return get_form(form_id)
 
 
+def align_payload_field_names(connection, payload):
+    """Anciens dossiers : les valeurs des ressources sont stockees sous d'anciens noms de champs (nomPoste, numeroSerie, adresse)
+    alors que le catalogue actuel attend nom_du_poste, numero_de_serie, adresse_email. Sans correspondance, le formulaire les
+    affiche VIDES (et un enregistrement pourrait les perdre). On ajoute les valeurs sous les noms du catalogue, sans jamais rien
+    retirer ni ecraser une valeur deja saisie."""
+    additional = ((payload.get("resources") or {}).get("additional")) or []
+    if not additional:
+        return payload
+    schemas = {}
+    for row in connection.execute("SELECT code, field_schema_json FROM resource_catalog").fetchall():
+        try:
+            schemas[row["code"]] = [f["key"] for f in json.loads(row["field_schema_json"] or "[]") if isinstance(f, dict) and f.get("key")]
+        except (TypeError, ValueError):
+            continue
+    for entry in additional:
+        fields = entry.get("fields") if isinstance(entry, dict) else None
+        keys = schemas.get(entry.get("code")) if isinstance(entry, dict) else None
+        if not isinstance(fields, dict) or not keys:
+            continue
+        merged = dict(fields)
+        for key, value in align_fields(fields, keys, loose=True).items():
+            if not str(merged.get(key) or "").strip():
+                merged[key] = value
+        entry["fields"] = merged
+    return payload
+
+
 def row_to_summary(row, warning_days=None):
     payload = {}
     try:
@@ -529,6 +557,7 @@ def get_form(form_id):
         # Seulement mettre lockedAt vide si c'était déjà vide (dossier non finalisé)
         if payload["workflow"]["status"] != "active":
             payload["meta"]["lockedAt"] = ""
+    align_payload_field_names(connection, payload)
     user = current_user()
     if user and user.get("data_scope") == "masked":
         payload = mask_payload(payload)

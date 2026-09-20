@@ -813,7 +813,9 @@ function buildDraftActionButtons(draft, options) {
   const status = draft.status || "draft";
   const hasRestitution = hasRestitutionData(draft);
   const viewMode = getDashboardViewMode();
-  const inRestitutionPhase = ["returned", "partial_return", "awaiting_signature"].includes(status);
+  // « En attente de signature » existe aussi avant toute restitution (signature de mise à disposition) : on ne
+  // bascule en phase de restitution que si des données de restitution existent.
+  const inRestitutionPhase = ["returned", "partial_return"].includes(status) || (status === "awaiting_signature" && hasRestitution);
 
   // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html
   const inRestitutionsPendingView = viewMode === "restitutions_pending";
@@ -826,9 +828,9 @@ function buildDraftActionButtons(draft, options) {
   if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
     stepAction = { action: "openRestitution", label: "Restituer" };
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
-    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
+    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
-    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Relancer la signature" : "Demander la signature" };
+    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
   }
 
   // Documents (PDF) — l'ordre suit la phase
