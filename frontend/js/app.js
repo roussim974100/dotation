@@ -208,7 +208,7 @@ function collectProgressRequirementsFromForm() {
 
   const qualite = document.querySelector('input[name="qualite"]:checked')?.value || "agent";
   const eluBlockDisabledForReq = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
-  if (qualite === "elu" && !eluBlockDisabledForReq) {
+  if (isMandateType(qualite) && !eluBlockDisabledForReq) {
     if (!getFieldValue("mandat")) {
       pushRequirement("mandat", "Mandat");
     }
@@ -1563,7 +1563,7 @@ function initQualite() {
     const selected = selectedInput ? selectedInput.value : (radios[0]?.value || "agent");
     const eluBlockEl = document.getElementById("eluBlock");
     const eluBlockDisabled = Boolean(eluBlockEl?.dataset.eluBlockDisabled);
-    const isElu = selected === "elu" && !eluBlockDisabled;
+    const isElu = isMandateType(selected) && !eluBlockDisabled;
 
     toggleField("eluBlock", isElu);
     toggleField("serviceFieldBlock", !isElu);
@@ -2579,6 +2579,8 @@ function populateForm(data, signaturePad) {
 }
 
 function formatStatusLabel(status) {
+  const served = window.APP_BRANDING?.statusLabels;  // libellés publiés par le serveur (une seule définition)
+  if (served && served[status]) return served[status];
   const labels = {
     draft: "À compléter",
     partial_assignment: "Attribution partielle",
@@ -2809,7 +2811,7 @@ function validateFormData(formData, options = {}) {
   }
 
   const eluBlockDisabledForValidation = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
-  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat && !eluBlockDisabledForValidation) {
+  if (isMandateType(formData.beneficiaire.qualite) && !formData.beneficiaire.mandat && !eluBlockDisabledForValidation) {
     return "Veuillez renseigner le mandat de l'élu.";
   }
 

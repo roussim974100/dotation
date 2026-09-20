@@ -605,6 +605,11 @@ def init_db():
 
 init_db()
 init_users_db()
+try:  # controle de sante quotidien (APP_HEALTH_INTERVAL_HOURS=0 pour le desactiver)
+    from models.health import start_daily_health_check
+    start_daily_health_check(float(os.environ.get("APP_HEALTH_INTERVAL_HOURS", "24") or 0))
+except Exception as _exc:  # noqa: BLE001
+    print(f"[sante] controle quotidien non demarre : {_exc}")
 
 
 if __name__ == "__main__":

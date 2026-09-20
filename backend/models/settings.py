@@ -42,16 +42,20 @@ VALID_ORG_CONTEXTS = {"public_collectivite", "public_administration", "private_c
 
 
 def _parse_beneficiary_types(raw):
+    """« valeur:Libelle » ou « valeur:Libelle|mandat » : le drapeau « mandat » indique un type qui porte un mandat (titre
+    affiche a la place du service, champ « mandat » demande). Sans aucun drapeau, le type historique « elu » garde son mandat."""
     result = []
     for part in (raw or "").split(","):
         part = part.strip()
         if ":" in part:
             value, label = part.split(":", 1)
+            label, _, flags = label.partition("|")
             value = value.strip()
             label = label.strip()
             if value and label:
-                result.append({"value": value, "label": label})
-    return result or [{"value": "agent", "label": "Agent"}, {"value": "elu", "label": "Élu(e)"}]
+                flag_list = [f.strip().lower() for f in flags.split("|") if f.strip()]
+                result.append({"value": value, "label": label, "mandate": "mandat" in flag_list or (value == "elu" and not flag_list)})
+    return result or [{"value": "agent", "label": "Agent", "mandate": False}, {"value": "elu", "label": "Élu(e)", "mandate": True}]
 
 THEME_PRESETS = {
     "institutionnel": {
@@ -231,7 +235,7 @@ class SettingsValidationError(ValueError):
 
 
 _BENEFICIARY_VALUE_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
-_FORBIDDEN_LABEL_CHARS = set(",:;<>&\"\\")
+_FORBIDDEN_LABEL_CHARS = set(",:;|<>&\"\\")
 MAX_TEXT_LENGTH = 200
 
 
@@ -245,7 +249,11 @@ def normalize_beneficiary_types(raw):
         if not part:
             continue
         value, sep, label = part.partition(":")
+        label, _, flags = label.partition("|")
         value, label = value.strip(), label.strip()
+        flags = [f.strip().lower() for f in flags.split("|") if f.strip()]
+        if any(f != "mandat" for f in flags):
+            raise SettingsValidationError(f"Option inconnue pour « {value} » : seul « |mandat » est possible.")
         if not sep or not _BENEFICIARY_VALUE_RE.match(value):
             raise SettingsValidationError(
                 f"Type de bénéficiaire invalide « {part[:40]} » : l'identifiant ne peut contenir que a-z, 0-9, _ et - (40 max)."
@@ -257,7 +265,7 @@ def normalize_beneficiary_types(raw):
         if value in seen:
             raise SettingsValidationError(f"Le type « {value} » est défini deux fois.")
         seen.add(value)
-        entries.append(f"{value}:{label}")
+        entries.append(f"{value}:{label}" + ("|mandat" if flags else ""))
     if not entries:
         raise SettingsValidationError("Indiquez au moins un type de bénéficiaire.")
     return ",".join(entries)

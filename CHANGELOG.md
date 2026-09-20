@@ -1,5 +1,21 @@
 # Historique des versions — À Quai
 
+## [3.56.0] - 2026-09-20
+
+Finitions du chantier « champs et personnalisation » (décisions D8, D11, D14, D15, D17).
+
+### 🏷️ Types de bénéficiaires avec mandat
+- Le type « élu » n'est plus câblé dans le code : un type porte un mandat s'il est déclaré avec `|mandat` (Personnalisation, ex. `conseiller:Conseiller municipal|mandat`). Le formulaire demande alors le mandat et l'affiche à la place du service (titre du dossier, synthèse par service, régularisation). Les bases existantes sont inchangées : sans drapeau, `elu` garde son mandat.
+
+### 📦 Paramétrage exportable
+- Administration > Base de données : **export du paramétrage** (réglages d'organisation, services, ressources et champs, sans aucun dossier ni donnée personnelle) et **import additif** avec aperçu : il crée ce qui manque, ne modifie jamais une ressource déjà présente, et peut être rejoué sans effet.
+
+### 🩺 Contrôle quotidien
+- Contrôle de santé de la base toutes les 24 h en arrière-plan (désactivable : `APP_HEALTH_INTERVAL_HOURS=0`), consigné au journal seulement en cas de point à examiner.
+
+### 🧪 Tests
+- Profil « données masquées » (écriture refusée, vrai nom jamais remplacé par une valeur masquée), rejeu de l'initialisation (`init_db`) sans effet sur le schéma ni les données, types à mandat en formulaire (`check_mandate_type.py`), export/import du paramétrage (`check_config_transfer.py`).
+
 ## [3.55.0] - 2026-09-20
 
 ### 🏷️ Vocabulaire configurable (décision D14 du comité, première étape)

@@ -524,7 +524,8 @@ def row_to_summary(row, warning_days=None):
         summary["nom"] = mask_text(summary["nom"])
         summary["prenom"] = mask_text(summary["prenom"])
         type_label = DOSSIER_TYPE_LABELS.get(summary["dossierType"], "Dossier")
-        if summary["beneficiaryType"] == "elu":
+        from models.vocab import has_mandate
+        if has_mandate(summary["beneficiaryType"]):
             prefix = summary["mandat"] or type_label
         else:
             prefix = summary["service"] or type_label

@@ -127,7 +127,8 @@ def build_title(payload):
     prenom = beneficiaire.get("prenom") or ""
     dossier_type = normalize_dossier_type(dossier.get("type"))
     type_label = DOSSIER_TYPE_LABELS.get(dossier_type, "Dossier")
-    if beneficiaire.get("qualite") == "elu":
+    from models.vocab import has_mandate
+    if has_mandate(beneficiaire.get("qualite")):
         prefix = beneficiaire.get("mandat") or type_label
     else:
         prefix = beneficiaire.get("service") or type_label

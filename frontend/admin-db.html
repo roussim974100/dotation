@@ -176,6 +176,19 @@
         <div id="backupHistoryList" class="text-muted small">Chargement…</div>
       </section>
 
+      <section class="content-card mt-4" id="db-config">
+        <p class="panel-eyebrow">Paramétrage</p>
+        <h3 class="h5">Exporter ou reprendre le paramétrage</h3>
+        <p class="text-muted small">Le fichier contient les réglages de l'organisation, les services, les ressources et leurs champs. <strong>Aucun dossier ni donnée personnelle.</strong> L'import est <strong>additif</strong> : il crée ce qui manque et ne modifie jamais une ressource déjà présente. Vous voyez d'abord un aperçu.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <a class="btn btn-outline-primary" id="configExportLink" href="/api/admin/config-export" download="aquai_parametrage.json">Télécharger le paramétrage</a>
+          <input class="form-control w-auto" id="configImportFile" type="file" accept=".json,application/json" aria-label="Fichier de paramétrage à importer">
+          <button class="btn btn-outline-secondary" id="configPreviewBtn" type="button">Aperçu de l'import</button>
+          <button class="btn btn-primary d-none" id="configApplyBtn" type="button">Appliquer l'import</button>
+        </div>
+        <div id="configImportResult" class="mt-3 d-none" role="status"></div>
+      </section>
+
       <section class="content-card mt-4" id="db-fieldhealth">
         <p class="panel-eyebrow">Santé des données</p>
         <h3 class="h5">Valeurs de dossiers sans champ correspondant</h3>

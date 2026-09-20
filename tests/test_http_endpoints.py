@@ -206,3 +206,30 @@ def test_configured_beneficiary_types_and_status_labels_are_served(http):
     assert http["vocab_custom_type_kept"] == [201, "stagiaire"]  # avant : ramene a « agent »
     assert http["vocab_public_status_labels"] == "En attente de signature"
     assert http["vocab_label_python"] == "Stagiaire"
+
+
+def test_masked_profile_cannot_overwrite_a_dossier_with_masked_values(http):
+    assert http["masked_can_read"] == 200
+    assert http["masked_put_status"] == 403
+    assert http["masked_put"] == {"error": "masked_scope_read_only"}
+    assert http["masked_real_name_intact"] == "MASQUE"  # le vrai nom n'a pas ete remplace par une valeur masquee
+
+
+def test_custom_type_with_mandate_flag_keeps_its_mandate_and_title(http):
+    assert http["mandate_custom_type"] == ["Conseiller municipal", "CONSEILLER MUNICIPAL"]
+    assert http["mandate_public_flag"] == {"agent": False, "elu": True, "stagiaire": False, "conseiller": True}
+
+
+def test_config_export_import_is_additive_and_previewable(http):
+    assert http["config_export"] == [200, "aquai-config", True, False]  # pas de donnee personnelle dans le fichier
+    assert http["config_preview"] == [False, ["import_nouvelle"], False]  # l'apercu n'ecrit rien
+    assert http["config_apply"] == [True, True, True]  # nouvelle ressource creee, ressource existante inchangee
+    assert http["config_idempotent"] == [[], []]  # rejouer ne cree plus rien
+    assert http["config_bad_file"] == 400
+
+
+def test_init_db_is_idempotent(http):
+    """Redemarrer l'application (init_db rejoue toutes les creations et migrations) ne change ni le schema, ni les donnees."""
+    assert http["init_idempotent_schema"] is True
+    assert http["init_idempotent_data"] == {}
+    assert http["init_idempotent_migrations"] is True

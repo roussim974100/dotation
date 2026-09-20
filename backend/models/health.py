@@ -66,3 +66,38 @@ def database_health(connection):
         problems.append(f"{drift} dossier(s) dont la copie à plat diffère du dossier.")
     return {"status": "ok" if not problems else "attention", "problems": problems, "integrity": integrity, "brokenReferences": broken_refs,
             "schemaVersion": version, "orphanFields": len(orphans["orphans"]), "copyDrift": drift}
+
+
+def run_health_check_and_log():
+    """Un controle : consigne au journal (app_logs) seulement quand quelque chose est a examiner."""
+    from database import get_db
+    from models.audit import insert_app_log
+    with get_db() as connection:
+        report = database_health(connection)
+        if report["status"] != "ok":
+            insert_app_log(connection, "system", "database_health", "Contrôle de santé : " + " ".join(report["problems"]), details=report)
+    return report
+
+
+def start_daily_health_check(interval_hours=24, first_delay_seconds=600):
+    """Controle de sante quotidien en arriere-plan (fil daemon, ne bloque ni le demarrage ni l'arret). Desactivable :
+    APP_HEALTH_INTERVAL_HOURS=0. Un premier passage a lieu apres `first_delay_seconds`, puis toutes les `interval_hours`."""
+    import logging
+    import threading
+    import time
+
+    if not interval_hours or interval_hours <= 0:
+        return None
+
+    def loop():
+        time.sleep(first_delay_seconds)
+        while True:
+            try:
+                run_health_check_and_log()
+            except Exception:  # noqa: BLE001 - un controle ne doit jamais faire tomber l'application
+                logging.getLogger(__name__).warning("Controle de sante quotidien impossible", exc_info=True)
+            time.sleep(interval_hours * 3600)
+
+    thread = threading.Thread(target=loop, name="health-check", daemon=True)
+    thread.start()
+    return thread

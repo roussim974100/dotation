@@ -164,16 +164,19 @@ def dashboard_stats():
     svc_conds = [c for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else conditions
     svc_params = [p for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else base_params
     svc_where = ("WHERE " + " AND ".join(svc_conds)) if svc_conds else ""
+    from models.vocab import mandate_values
+    mandate_ids = sorted(mandate_values(db)) or ["elu"]
+    mandate_placeholders = ",".join("?" * len(mandate_ids))
     by_service_rows = db.execute(
         f"""SELECT
-            CASE WHEN beneficiary_type = 'elu'
+            CASE WHEN beneficiary_type IN ({mandate_placeholders})
                  THEN 'Élu(e)'
                  ELSE COALESCE(NULLIF(service,''), '—')
             END as service,
             COUNT(*) as count
             FROM dotation_forms {svc_where}
             GROUP BY 1 ORDER BY count DESC LIMIT 10""",
-        svc_params,
+        [*mandate_ids, *svc_params],
     ).fetchall()
     by_service = [{"service": row["service"], "count": row["count"]} for row in by_service_rows]
 
@@ -1697,6 +1700,41 @@ def db_diagnose():
     with get_db() as conn:
         insert_app_log(conn, "admin", "db_diagnosed", "Diagnostic base de donnees", details={"level": report["level"]})
     return jsonify(report)
+
+
+@bp.route("/api/admin/config-export", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def config_export():
+    """Paramétrage (réglages d'organisation, services, ressources et champs) sans aucun dossier ni donnée personnelle."""
+    from models.config_transfer import export_config
+    with get_db() as conn:
+        data = export_config(conn)
+        insert_app_log(conn, "admin", "config_exported", "Export du parametrage", details={"resources": len(data["resources"]), "services": len(data["services"])})
+    response = make_response(json.dumps(data, ensure_ascii=False, indent=2))
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="aquai_parametrage.json"'
+    return response
+
+
+@bp.route("/api/admin/config-import", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+@rate_limit(max_requests=10, window_seconds=600, scope="config_import")
+def config_import():
+    """Import ADDITIF du paramétrage. ?apply=1 pour appliquer ; sinon simple aperçu du plan (rien n'est écrit)."""
+    from models.config_transfer import import_config
+    from models.settings import SettingsValidationError
+    apply = request.args.get("apply") == "1"
+    data = request.get_json(silent=True)
+    try:
+        with get_db() as conn:
+            plan = import_config(conn, data, apply=apply)
+            if apply:
+                insert_app_log(conn, "admin", "config_imported", "Import du parametrage", details={k: (len(v) if isinstance(v, list) else v) for k, v in plan.items()})
+    except SettingsValidationError as error:
+        return jsonify({"error": "invalid_config", "message": str(error)}), 400
+    return jsonify({"applied": apply, "plan": plan})
 
 
 @bp.route("/api/admin/health", methods=["GET"])

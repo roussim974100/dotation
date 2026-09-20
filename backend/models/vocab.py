@@ -34,3 +34,15 @@ def beneficiary_label(value):
 
 def configured_beneficiary_values(connection=None):
     return {item["value"] for item in beneficiary_types(connection)}
+
+
+def mandate_values(connection=None):
+    """Identifiants des types de bénéficiaires qui portent un mandat (« élu » par défaut)."""
+    return {item["value"] for item in beneficiary_types(connection) if item.get("mandate")}
+
+
+def has_mandate(value, connection=None):
+    try:
+        return value in mandate_values(connection)
+    except Exception:  # noqa: BLE001
+        return value == "elu"

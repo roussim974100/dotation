@@ -601,7 +601,7 @@ def create_regularisation_restitution():
     prenom = (data.get("prenom") or "").strip()
     if not nom or not prenom:
         return jsonify({"error": "nom_prenom_required"}), 400
-    from models.vocab import configured_beneficiary_values
+    from models.vocab import configured_beneficiary_values, has_mandate
     # tout type de bénéficiaire configuré est accepté (avant : tout autre type que « élu » était ramené à « agent »)
     qualite = data.get("qualite") if data.get("qualite") in configured_beneficiary_values() else "agent"
     service = (data.get("service") or "").strip() or None
@@ -626,7 +626,7 @@ def create_regularisation_restitution():
         "dossier": {"type": "sortie", "objet": note, "regularisation": True},
         "beneficiaire": {
             "nom": nom, "prenom": prenom, "service": service, "qualite": qualite,
-            "mandat": (data.get("mandat") or "").strip() if qualite == "elu" else "",
+            "mandat": (data.get("mandat") or "").strip() if has_mandate(qualite) else "",
         },
         "resources": {"additional": [
             {

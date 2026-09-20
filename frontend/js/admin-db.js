@@ -195,3 +195,70 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
+// Paramétrage : aperçu puis application (import additif).
+document.addEventListener("DOMContentLoaded", () => {
+  const fileInput = document.getElementById("configImportFile");
+  const previewBtn = document.getElementById("configPreviewBtn");
+  const applyBtn = document.getElementById("configApplyBtn");
+  if (!fileInput || !previewBtn || !applyBtn) return;
+  let pendingConfig = null;
+
+  async function readFile() {
+    const file = fileInput.files?.[0];
+    if (!file) throw new Error("Choisissez d'abord un fichier de paramétrage.");
+    try { return JSON.parse(await file.text()); } catch { throw new Error("Ce fichier n'est pas un JSON valide."); }
+  }
+
+  async function send(config, apply) {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`/api/admin/config-import${apply ? "?apply=1" : ""}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify(config)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || "Import impossible.");
+    return body.plan;
+  }
+
+  function summary(plan) {
+    const li = (text) => `<li>${escapeHtml(text)}</li>`;
+    const items = [];
+    if (plan.settings.length) items.push(li(`${plan.settings.length} réglage(s) modifié(s) : ${plan.settings.join(", ")}`));
+    if (plan.servicesToCreate.length) items.push(li(`${plan.servicesToCreate.length} service(s) à créer`));
+    if (plan.resourcesToCreate.length) items.push(li(`${plan.resourcesToCreate.length} ressource(s) à créer : ${plan.resourcesToCreate.join(", ")}`));
+    if (plan.resourcesSkipped.length) items.push(li(`${plan.resourcesSkipped.length} ressource(s) déjà présente(s), laissée(s) telle(s) quelle(s)`));
+    (plan.errors || []).forEach((e) => items.push(li(`À corriger : ${e}`)));
+    return items.length ? `<ul class="mb-0">${items.join("")}</ul>` : "";
+  }
+
+  previewBtn.addEventListener("click", async () => {
+    applyBtn.classList.add("d-none");
+    try {
+      pendingConfig = await readFile();
+      const plan = await send(pendingConfig, false);
+      const nothing = !plan.settings.length && !plan.servicesToCreate.length && !plan.resourcesToCreate.length;
+      showDbResult("configImportResult", nothing ? "ok" : "info", nothing ? "Rien à importer : ce paramétrage est déjà en place." : "Voici ce que l'import ferait (rien n'est encore écrit).", summary(plan));
+      applyBtn.classList.toggle("d-none", nothing);
+    } catch (error) {
+      pendingConfig = null;
+      showDbResult("configImportResult", "error", error.message || "Import impossible.", "");
+    }
+  });
+
+  applyBtn.addEventListener("click", async () => {
+    if (!pendingConfig) return;
+    applyBtn.disabled = true;
+    try {
+      const plan = await send(pendingConfig, true);
+      showDbResult("configImportResult", "ok", "Paramétrage importé.", summary(plan));
+      applyBtn.classList.add("d-none");
+      pendingConfig = null;
+    } catch (error) {
+      showDbResult("configImportResult", "error", error.message || "Import impossible.", "");
+    } finally {
+      applyBtn.disabled = false;
+    }
+  });
+});

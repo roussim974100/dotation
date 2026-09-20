@@ -347,7 +347,72 @@ results["vocab_custom_type_kept"] = [_reg.status_code, ((_reg_read.get("data") o
 results["vocab_public_status_labels"] = ((admin.get("/api/settings/public").get_json() or {}).get("statusLabels") or {}).get("awaiting_signature")
 from utils import format_beneficiary_label as _fbl  # noqa: E402
 results["vocab_label_python"] = _fbl("stagiaire")
+admin.put("/api/admin/settings", json={"beneficiary_types": "agent:Agent,elu:Élu(e),stagiaire:Stagiaire,conseiller:Conseiller|mandat"}, headers=H)
+_reg2 = admin.post("/api/forms/regularisation", json={"nom": "MANDAT", "prenom": "Conseil", "qualite": "conseiller", "mandat": "Conseiller municipal", "resourceIds": [_rid]}, headers=H)
+_reg2_read = (admin.get(f"/api/forms/{(_reg2.get_json() or {}).get('form_id')}").get_json() or {})
+results["mandate_custom_type"] = [((_reg2_read.get("data") or {}).get("beneficiaire") or {}).get("mandat"), (_reg2_read.get("summary") or {}).get("title", "")[:20]]
+results["mandate_public_flag"] = {t["value"]: t.get("mandate") for t in ((admin.get("/api/settings/public").get_json() or {}).get("beneficiaryTypes") or [])}
 admin.put("/api/admin/settings", json={"beneficiary_types": "agent:Agent,elu:Élu(e)"}, headers=H)
+
+# ---- Profil « donnees masquees » avec droit de modification : lecture masquee, ecriture refusee ----
+import auth as _auth  # noqa: E402
+from database import get_users_db as _gudb  # noqa: E402
+with _gudb() as _uc:
+    _uc.execute("INSERT OR REPLACE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES ('lecteur_masque','Lecteur masque','',?,'masked','2026-01-01','2026-01-01')",
+                (json.dumps(["forms.read_list", "forms.read_detail", "forms.view_all", "forms.edit"]),))
+_real_get_user_record = _auth.get_user_record
+_auth.get_user_record = lambda username: ({"username": "masque", "groups": ["lecteur_masque"], "active": True, "role": "user"} if username == "masque" else _real_get_user_record(username))
+masked = app.test_client()
+with masked.session_transaction() as _s:
+    _s["user"] = "masque"
+    _s["csrf_token"] = "jeton"
+_mid = ((admin.post("/api/forms", json={"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "MASQUE", "prenom": "Personne", "qualite": "agent"}, "resources": {"additional": []},
+                                        "workflow": {"status": "draft"}, "meta": {}}, headers=H).get_json() or {}).get("summary") or {}).get("id")
+_masked_read = masked.get(f"/api/forms/{_mid}")
+results["masked_can_read"] = _masked_read.status_code
+_masked_data = (_masked_read.get_json() or {}).get("data", {})
+results["masked_put"] = masked.put(f"/api/forms/{_mid}", json=_masked_data, headers=H).get_json()
+results["masked_put_status"] = masked.put(f"/api/forms/{_mid}", json=_masked_data, headers=H).status_code
+results["masked_real_name_intact"] = ((admin.get(f"/api/forms/{_mid}").get_json() or {}).get("data", {}).get("beneficiaire") or {}).get("nom")
+_auth.get_user_record = _real_get_user_record
+
+# ---- Export / import du parametrage (additif) ----
+_cfg = admin.get("/api/admin/config-export")
+_cfg_data = json.loads(_cfg.data.decode("utf-8"))
+results["config_export"] = [_cfg.status_code, _cfg_data.get("format"), "custom_e2e" in [r["code"] for r in _cfg_data.get("resources", [])], "beneficiaire" in json.dumps(_cfg_data)]
+_cfg_data["resources"].append({"code": "import_nouvelle", "label": "Importee", "category": "materiel", "requires_return": True, "tracking_mode": "none",
+                               "field_schema": [{"key": "ref", "label": "Référence", "type": "text"}]})
+_cfg_data["resources"][0]["label"] = "NE DOIT PAS CHANGER"  # une ressource deja presente n'est jamais modifiee
+_first_code = _cfg_data["resources"][0]["code"]
+_preview = admin.post("/api/admin/config-import", json=_cfg_data, headers=H).get_json()
+_codes_before = sorted(r["code"] for r in (admin.get("/api/admin/resources").get_json() or []))
+results["config_preview"] = [_preview["applied"], _preview["plan"]["resourcesToCreate"], "import_nouvelle" in _codes_before]
+_applied = admin.post("/api/admin/config-import?apply=1", json=_cfg_data, headers=H).get_json()
+_after_codes = {r["code"]: r for r in (admin.get("/api/admin/resources").get_json() or [])}
+results["config_apply"] = [_applied["applied"], "import_nouvelle" in _after_codes, _after_codes[_first_code]["label"] != "NE DOIT PAS CHANGER"]
+_again = admin.post("/api/admin/config-import?apply=1", json=_cfg_data, headers=H).get_json()
+results["config_idempotent"] = [_again["plan"]["resourcesToCreate"], _again["plan"]["servicesToCreate"]]
+results["config_bad_file"] = admin.post("/api/admin/config-import", json={"format": "autre"}, headers=H).status_code
+
+# ---- Initialisation idempotente : rejouer init_db() ne change ni le schema ni les donnees ----
+from database import get_db as _gdb  # noqa: E402
+
+
+def _schema_and_counts():
+    with _gdb() as _c:
+        tables = [r[0] for r in _c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall()]
+        columns = {t: [r[1] for r in _c.execute(f"PRAGMA table_info({t})").fetchall()] for t in tables}
+        counts = {t: _c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables if t not in ("app_logs", "audit_events", "unit_events")}
+        return columns, counts, _c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
+
+
+_before_init = _schema_and_counts()
+app_module.init_db()
+app_module.init_db()
+_after_init = _schema_and_counts()
+results["init_idempotent_schema"] = _before_init[0] == _after_init[0]
+results["init_idempotent_data"] = {k: (v, _after_init[1].get(k)) for k, v in _before_init[1].items() if v != _after_init[1].get(k)}
+results["init_idempotent_migrations"] = _before_init[2] == _after_init[2]
 
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]

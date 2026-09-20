@@ -381,7 +381,7 @@ function buildDraftTitle(data) {
   const mandat = data.beneficiaire.mandat || "MANDAT";
   const nom = (data.beneficiaire.nom || "SANS NOM").toUpperCase();
   const prenom = data.beneficiaire.prenom || "";
-  const prefix = qualite === "elu" ? mandat : service;
+  const prefix = isMandateType(qualite) ? mandat : service;
   return `${prefix.toUpperCase()} - ${nom} ${prenom}`.trim();
 }
 
