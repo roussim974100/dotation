@@ -5259,3 +5259,87 @@ section.content-card[id^="db-"] {
 [data-color-mode="dark"] .admin-breadcrumb a {
   color: var(--brand);
 }
+
+/* ─── Mode sombre : corrections de contraste relevées par tests/browser/audit_dark.py ───────────────────────────────────
+   En mode sombre la « marque » devient claire (--brand) et la « marque foncée » reste foncée : les textes blancs posés sur --brand
+   (boutons, onglet actif, en-tête) étaient illisibles, de même que les couleurs codées en dur pour le mode clair. */
+[data-color-mode="dark"] .app-header {
+  background: linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)), linear-gradient(135deg, var(--brand-dark), var(--brand-dark));
+}
+
+[data-color-mode="dark"] .btn-primary {
+  --bs-btn-color: #0a1f2e;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-disabled-color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .btn-outline-primary {
+  --bs-btn-color: var(--brand);
+  --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: var(--brand);
+  --bs-btn-hover-border-color: var(--brand);
+}
+
+[data-color-mode="dark"] .btn-outline-danger,
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-color: #ff8f9b;
+  --bs-btn-border-color: #ff8f9b;
+  --bs-btn-hover-color: #0a1f2e;
+  --bs-btn-hover-bg: #ff8f9b;
+  --bs-btn-hover-border-color: #ff8f9b;
+}
+
+[data-color-mode="dark"] .btn-danger {
+  --bs-btn-bg: transparent;
+}
+
+[data-color-mode="dark"] .btn-link {
+  --bs-btn-color: var(--brand);
+  --bs-btn-hover-color: var(--text);
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active,
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .app-footer__version {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .status-pill {
+  color: var(--text);
+}
+
+[data-color-mode="dark"] .resource-order-item__position {
+  color: var(--brand);
+}
+
+[data-color-mode="dark"] .form-text {
+  color: var(--muted);
+}
+
+[data-color-mode="dark"] .list-group-item {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-color-mode="dark"] .choice-chip input:checked + span {
+  color: #0a1f2e;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active {
+  background: var(--brand-dark);
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  color: #ffffff;
+}
+
+[data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
+  background: rgba(0, 0, 0, 0.3);
+}
