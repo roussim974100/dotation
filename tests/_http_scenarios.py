@@ -338,6 +338,17 @@ _h2 = admin.get("/api/admin/health").get_json() or {}
 _res = next((r for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "ordinateur"), {})
 results["old_db_import"] = [_imp2.status_code, _h2.get("schemaVersion"), all(f.get("id") for f in (_res.get("field_schema") or _res.get("fieldSchema") or []))]
 
+# ---- Vocabulaire : types de beneficiaires configures acceptes cote serveur, libelles de statut publies ----
+admin.put("/api/admin/settings", json={"beneficiary_types": "agent:Agent,elu:Élu(e),stagiaire:Stagiaire"}, headers=H)
+_reg = admin.post("/api/forms/regularisation", json={"nom": "VOCAB", "prenom": "Stagiaire", "qualite": "stagiaire", "resourceIds": [_rid]}, headers=H)
+_reg_id = (_reg.get_json() or {}).get("form_id")
+_reg_read = (admin.get(f"/api/forms/{_reg_id}").get_json() or {}) if _reg_id else {}
+results["vocab_custom_type_kept"] = [_reg.status_code, ((_reg_read.get("data") or {}).get("beneficiaire") or {}).get("qualite")]
+results["vocab_public_status_labels"] = ((admin.get("/api/settings/public").get_json() or {}).get("statusLabels") or {}).get("awaiting_signature")
+from utils import format_beneficiary_label as _fbl  # noqa: E402
+results["vocab_label_python"] = _fbl("stagiaire")
+admin.put("/api/admin/settings", json={"beneficiary_types": "agent:Agent,elu:Élu(e)"}, headers=H)
+
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
 admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)

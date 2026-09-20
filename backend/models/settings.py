@@ -406,6 +406,7 @@ def build_public_settings_payload(settings=None):
         "supportRole": settings.get("support_role") or "",
         "orgContext": settings.get("org_context") or DEFAULT_APP_SETTINGS["org_context"],
         "beneficiaryTypes": _parse_beneficiary_types(settings.get("beneficiary_types")),
+        "statusLabels": __import__("models.vocab", fromlist=["STATUS_LABELS"]).STATUS_LABELS,
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
         "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),

@@ -672,6 +672,9 @@ function formatQualiteLabel(item) {
 }
 
 function formatStatusLabel(status) {
+  // Libellés publiés par le serveur (une seule définition) ; liste ci-dessous = secours si la page n'a pas encore chargé les réglages.
+  const served = window.APP_BRANDING?.statusLabels;
+  if (served && served[status]) return served[status];
   const labels = {
     draft: "À compléter",
     partial_assignment: "Attribution partielle",

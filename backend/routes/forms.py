@@ -601,7 +601,9 @@ def create_regularisation_restitution():
     prenom = (data.get("prenom") or "").strip()
     if not nom or not prenom:
         return jsonify({"error": "nom_prenom_required"}), 400
-    qualite = "elu" if data.get("qualite") == "elu" else "agent"
+    from models.vocab import configured_beneficiary_values
+    # tout type de bénéficiaire configuré est accepté (avant : tout autre type que « élu » était ramené à « agent »)
+    qualite = data.get("qualite") if data.get("qualite") in configured_beneficiary_values() else "agent"
     service = (data.get("service") or "").strip() or None
     raw_ids = data.get("resourceIds")
     resource_ids = [r for r in raw_ids if isinstance(r, str) and r] if isinstance(raw_ids, list) else []

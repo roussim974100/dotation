@@ -1,5 +1,12 @@
 # Historique des versions — À Quai
 
+## [3.55.0] - 2026-09-20
+
+### 🏷️ Vocabulaire configurable (décision D14 du comité, première étape)
+- **Types de bénéficiaires** : tout type configuré dans Personnalisation est accepté par le serveur (avant, un dossier de régularisation ramenait tout type autre que « Élu » à « Agent ») et ses libellés sont utilisés dans les exports et PDF.
+- **Libellés de statut** définis une seule fois côté serveur (`models/vocab.py`) et publiés au navigateur (`statusLabels` dans `/api/settings/public`) ; le tableau de bord les utilise (la liste locale ne sert plus que de secours).
+- Reste à faire (chantier suivant) : le type « élu » (mandat) est encore traité à part dans le code ; les autres copies des libellés de statut dans les pages JS seront branchées progressivement.
+
 ## [3.54.0] - 2026-09-20
 
 ### 💾 Export / import de la base (décision D12 du comité)

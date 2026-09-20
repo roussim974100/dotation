@@ -195,24 +195,13 @@ def get_restitution_signature_datetime(payload):
 
 
 def format_beneficiary_label(value):
-    labels = {
-        "agent": "Agent",
-        "elu": "Élu(e)",
-    }
-    return labels.get(value, value or "-")
+    from models.vocab import beneficiary_label  # libelles configures dans Personnalisation
+    return beneficiary_label(value)
 
 
 def format_status_label(status):
-    labels = {
-        "draft": "À compléter",
-        "partial_assignment": "Attribution partielle",
-        "awaiting_signature": "En attente de signature",
-        "active": "Attribution active",
-        "returned": "Restitution terminée",
-        "partial_return": "Restitution partielle",
-        "cancelled": "Dossier annulé",
-    }
-    return labels.get(status, "À compléter")
+    from models.vocab import status_label
+    return status_label(status)
 
 
 def format_restitution_state_label(state):

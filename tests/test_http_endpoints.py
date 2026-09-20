@@ -200,3 +200,9 @@ def test_db_export_then_import_keeps_data_and_schema(http):
 
 def test_importing_an_older_database_upgrades_its_schema_immediately(http):
     assert http["old_db_import"] == [200, 2, True]
+
+
+def test_configured_beneficiary_types_and_status_labels_are_served(http):
+    assert http["vocab_custom_type_kept"] == [201, "stagiaire"]  # avant : ramene a « agent »
+    assert http["vocab_public_status_labels"] == "En attente de signature"
+    assert http["vocab_label_python"] == "Stagiaire"
