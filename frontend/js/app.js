@@ -1049,6 +1049,9 @@ async function loadDynamicResourceReferences() {
 // Valeurs d'un dossier dont le nom de champ n'existe plus dans le catalogue (champ renomme depuis, ancien dossier...) :
 // { idRessource: { ancienNom: valeur } }. Affichees en lecture seule et renvoyees telles quelles a l'enregistrement.
 let orphanFieldValues = {};
+// Ressources du dossier qui ne sont plus proposees (desactivees ou retirees du catalogue) : conservees telles quelles a
+// l'enregistrement, sinon elles disparaitraient du dossier au premier enregistrement.
+let preservedAdditionalResources = [];
 
 function humanizeFieldKey(key) {
   const text = String(key || "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim();
@@ -1115,7 +1118,7 @@ function getAdditionalResourcesData() {
     const hasContent = resource.details || Object.keys(resource.fields).length || resource.assignedAt || resource.conditionAttribution || resource.conditionNotes;
     // Inclure si sélectionnée, ou si elle a du contenu (pour permettre la suppression au serveur)
     return resource.selected || hasContent;
-  });
+  }).concat(preservedAdditionalResources);
 }
 
 function populateAdditionalResources(data = {}) {
@@ -1123,6 +1126,8 @@ function populateAdditionalResources(data = {}) {
   const isLocked = Boolean(data.meta?.lockedAt);
   orphanFieldValues = {};
   document.querySelectorAll(".dynamic-resource-orphans").forEach((el) => el.remove());
+  preservedAdditionalResources = resources.filter((entry) => entry && (entry.selected || entry.details || Object.keys(entry.fields || {}).length)
+    && !dynamicResourceReferences.some((ref) => ref.id === entry.id || (entry.code && ref.code === entry.code)));
 
   resources.forEach((resource) => {
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
@@ -2337,6 +2342,8 @@ function getFormData(signaturePad) {
     meta: {
       id: currentDraftId,
       savedAt: now,
+      // version du dossier telle que chargee : le serveur refuse l'enregistrement si quelqu'un l'a modifie depuis
+      baseSavedAt: form.dataset.baseSavedAt || "",
       lockedAt,
       assignedAt,
       startAt
@@ -2528,6 +2535,7 @@ function populateForm(data, signaturePad) {
   renderReopenInfo(data.meta || {});
   signaturePad.restore(data.validation?.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
+  form.dataset.baseSavedAt = data.meta.savedAt || "";
   const workflowStatus = data.workflow?.status || "draft";
   const isLocked = Boolean(data.meta.lockedAt) || ["returned", "partial_return"].includes(workflowStatus);
   applyLockState(isLocked);
@@ -3114,6 +3122,7 @@ async function saveDraft(signaturePad) {
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || "";
+    form.dataset.baseSavedAt = result.data?.meta?.savedAt || "";
     form.dataset.workflowStatus = result.summary.status;  // CRITICAL FIX #4: Syncer le workflow status post-save
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
 
@@ -3169,7 +3178,9 @@ async function saveDraft(signaturePad) {
       "Erreur d'enregistrement",
       error.message === "form_locked"
         ? "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
-        : "Impossible d'enregistrer la fiche."
+        : error.message === "form_conflict"
+          ? "Cette fiche a été modifiée par une autre personne (ou dans un autre onglet) depuis son ouverture. Rechargez la page pour voir la dernière version, puis refaites votre modification : rien n'a été écrasé."
+          : "Impossible d'enregistrer la fiche."
     );
   }
 }

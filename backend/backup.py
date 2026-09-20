@@ -250,7 +250,7 @@ def diagnose_archive(blob, password=None):
     reports = []
     with tempfile.TemporaryDirectory() as workdir:
         for entry in manifest["databases"]:
-            path = os.path.join(workdir, entry["file"])
+            path = os.path.join(workdir, os.path.basename(str(entry["file"])))
             with open(path, "wb") as handle:
                 handle.write(contents[entry["key"]])
             report = diagnose_sqlite(path, entry["key"])
@@ -298,7 +298,7 @@ def restore_archive(blob, password=None, keys=None):
         with tempfile.TemporaryDirectory() as workdir:
             for entry in selected:
                 spec = next(db for db in DATABASES if db["key"] == entry["key"])
-                staging = os.path.join(workdir, entry["file"])
+                staging = os.path.join(workdir, os.path.basename(str(entry["file"])))
                 with open(staging, "wb") as handle:
                     handle.write(contents[entry["key"]])
                 restore_sqlite(staging, spec["path"])

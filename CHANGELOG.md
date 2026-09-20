@@ -1,5 +1,26 @@
 # Historique des versions — À Quai
 
+## [3.52.0] - 2026-09-20
+
+Suite du chantier « fiabiliser l'édition » (décisions D5 à D8 et D13 du comité, `docs/audit/DECISIONS_COMITE.md`).
+
+### 🛡️ Fiabilité
+- **Deux personnes ou deux onglets sur le même dossier** : le serveur refuse d'enregistrer une version périmée (`form_conflict`, HTTP 409) avec un message clair, au lieu d'écraser en silence le travail de l'autre.
+- **Ressource désactivée ou retirée du catalogue** : ses valeurs restent dans les dossiers déjà saisis au lieu de disparaître au premier enregistrement.
+- **Suppression d'une ressource utilisée par des dossiers refusée** (`resource_in_use`) : il faut la désactiver.
+- **Profils « données masquées »** : ne peuvent plus enregistrer un dossier (ils renverraient les valeurs masquées à la place des vraies).
+
+### 🧩 Éditeur de champs (Administration > Ressources)
+- Types **« Liste de valeurs »** et **« Adresse e-mail avec domaine »** disponibles ; ils ne repassent plus en « Texte » à l'enregistrement.
+- Aide à la saisie et anciens noms (alias) des champs conservés à l'aller-retour de l'éditeur.
+
+### 🔐 Sécurité des exports
+- Cellules qui ressemblent à une formule (`=`, `+`, `-`, `@`) neutralisées dans les exports CSV (accès UNC, services) ; guillemets et séparateurs protégés.
+- Chemin du fichier du manifeste de sauvegarde réduit à un nom simple (plus de traversée de répertoire).
+
+### 🧪 Tests
+- `tests/browser/check_editor_and_lock.py` (éditeur, ressource hors catalogue, deux onglets, bouton Enregistrer sans faux conflit), verrou optimiste, suppression de ressource, CSV.
+
 ## [3.51.0] - 2026-09-20
 
 Chantier « ne plus jamais perdre une valeur de champ » (audit et comité du 20/09 : `docs/audit/`).

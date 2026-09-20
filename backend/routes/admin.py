@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
 
-from utils import utc_now, generate_id, bool_to_int, mask_text
+from utils import utc_now, generate_id, bool_to_int, mask_text, csv_safe
 from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
@@ -1100,7 +1100,7 @@ def export_services_csv():
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["label", "is_active"])
     for row in rows:
-        writer.writerow([row["label"], row["is_active"]])
+        writer.writerow([csv_safe(row["label"]), row["is_active"]])
     resp = make_response(output.getvalue())
     resp.headers["Content-Type"] = "text/csv; charset=utf-8"
     resp.headers["Content-Disposition"] = "attachment; filename=services.csv"
@@ -1354,6 +1354,10 @@ def delete_admin_resource(resource_id):
             (resource_id,),
         ).fetchone()
         if row:
+            # Une ressource portee par des dossiers ne se supprime pas (ils perdraient leur description) : la desactiver suffit.
+            used = connection.execute("SELECT COUNT(*) FROM dotation_forms WHERE payload_json LIKE ? OR payload_json LIKE ?", (f'%"code": "{row["code"]}"%', f'%"code":"{row["code"]}"%')).fetchone()[0]
+            if used:
+                return jsonify({"error": "resource_in_use", "dossiers": used}), 409
             insert_deleted_item(
                 connection,
                 "resource",

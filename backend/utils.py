@@ -55,6 +55,13 @@ def mask_payload(payload):
     return data
 
 
+def csv_safe(value):
+    """Neutralise l'injection de formules dans un export CSV : une cellule qui commence par = + - @ (ou tabulation / retour)
+    serait executee par Excel ; on la precede d'une apostrophe."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", chr(9), chr(13)) else text
+
+
 def slugify_field_key(value):
     """Cle technique d'un champ a partir d'un libelle. Meme resultat que slugifyFieldKey (frontend/js/admin.js) :
     accents retires, minuscules, toute suite de caracteres non alphanumeriques devient UN seul « _ »."""

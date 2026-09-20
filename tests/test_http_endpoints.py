@@ -171,3 +171,15 @@ def test_custom_resource_rename_hide_and_exports(http):
     assert http["e2e_hidden_value_kept"] is True
     assert http["e2e_pdf_status"] == 200
     assert http["e2e_export_contains_values"] is True
+
+
+def test_optimistic_lock_refuses_a_stale_save_instead_of_overwriting(http):
+    assert http["lock_first_save"] == 200
+    assert http["lock_second_save"] == [409, "form_conflict"]
+    assert http["lock_value_kept"] == "Premiere modification"  # la modification de l'autre personne n'a pas ete ecrasee
+    assert http["lock_without_base_still_saves"] == 200  # anciens clients / imports : comportement inchange
+
+
+def test_resource_used_by_dossiers_cannot_be_deleted(http):
+    assert http["delete_used_resource"] == [409]
+    assert http["delete_unused_resource"] == 200

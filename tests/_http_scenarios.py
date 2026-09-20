@@ -305,6 +305,30 @@ results["e2e_pdf_status"] = admin.get(f"/api/forms/{_id}/pdf").status_code
 _exp = admin.get("/api/forms/export")
 results["e2e_export_contains_values"] = _exp.status_code == 200 and (b"V-" in _exp.data or "V-" in _exp.get_data(as_text=True))
 
+# ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
+results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
+admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)
+_unused = next((r["id"] for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "jamais_utilisee"), None)
+results["delete_unused_resource"] = admin.delete(f"/api/admin/resources/{_unused}", headers=H).status_code if _unused else None
+
+# ---- Verrou optimiste : deux enregistrements successifs a partir de la meme version chargee ----
+_lock_body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "VERROU", "prenom": "Test", "qualite": "agent"},
+              "resources": {"additional": []}, "workflow": {"status": "draft"}, "meta": {}}
+_lid = ((admin.post("/api/forms", json=_lock_body, headers=H).get_json() or {}).get("summary") or {}).get("id")
+_loaded = (admin.get(f"/api/forms/{_lid}").get_json() or {}).get("data", {})
+_base = _loaded["meta"]["savedAt"]
+_first = dict(_loaded, meta=dict(_loaded["meta"], baseSavedAt=_base))
+_first["beneficiaire"] = dict(_first["beneficiaire"], fonction="Premiere modification")
+results["lock_first_save"] = admin.put(f"/api/forms/{_lid}", json=_first, headers=H).status_code
+_second = dict(_loaded, meta=dict(_loaded["meta"], baseSavedAt=_base))  # meme version de depart : perimee
+_second["beneficiaire"] = dict(_second["beneficiaire"], fonction="Seconde modification")
+_r2 = admin.put(f"/api/forms/{_lid}", json=_second, headers=H)
+results["lock_second_save"] = [_r2.status_code, (_r2.get_json() or {}).get("error")]
+results["lock_value_kept"] = ((admin.get(f"/api/forms/{_lid}").get_json() or {}).get("data", {}).get("beneficiaire") or {}).get("fonction")
+_nobase = dict(_loaded)
+_nobase["meta"] = {k: v for k, v in _loaded["meta"].items() if k != "baseSavedAt"}
+results["lock_without_base_still_saves"] = admin.put(f"/api/forms/{_lid}", json=_nobase, headers=H).status_code
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):
