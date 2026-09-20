@@ -124,3 +124,16 @@ def test_startup_checklist_reflects_the_real_state(http):
     assert http["checklist"] == [7, ["backup", "domains", "dpo", "org_name", "resources", "support", "wizard"], True]
     assert http["checklist_wizard_done_after_apply"] is True
     assert http["checklist_anonymous"] in (401, 403, 302)
+
+
+def test_pilotage_threshold_changes_the_danger_state_of_dossiers(http):
+    """Un dossier incomplet qui demarre dans 5 jours : « Dans les temps » avec un seuil de 3 jours, « En danger » avec 7 ; retour au seuil 3 = retour a l'etat initial."""
+    assert http["pilotage_seuil_3"][0] == "ok" and http["pilotage_seuil_3"][1] == "Dans les temps"
+    assert http["pilotage_seuil_7"] == ["warning", "En danger"]
+    assert http["pilotage_public_payload"] == 7  # la valeur est aussi publiee au navigateur (calcul cote client)
+    assert http["pilotage_retour_seuil_3"] == http["pilotage_seuil_3"]
+
+
+def test_pilotage_threshold_does_not_change_the_executive_summary(http):
+    """La page Synthese a ses propres seuils (3 / 7 / 30 jours) : le reglage « Seuil d'alerte pilotage » ne la modifie pas."""
+    assert http["synthese_inchangee_par_le_seuil"] is True

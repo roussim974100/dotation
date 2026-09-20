@@ -1,5 +1,11 @@
 # Historique des versions — À Quai
 
+## [3.50.1] - 2026-09-20
+
+### 🐛 Correctifs
+- **Personnalisation : modifier uniquement le « Seuil d'alerte pilotage » (ou le délai de la phase 1, ou la conservation de l'historique du parc) n'enregistrait rien** : la page répondait « Aucune modification à enregistrer » (message affiché en haut, loin du bouton). Les trois réglages numériques sont désormais pris en compte, et le message « aucune modification » défile jusqu'à l'écran.
+- Tests ajoutés : `tests/browser/check_personnalisation.py` (chaque champ de Personnalisation modifié seul, avec sauvegarde et remise en état des réglages quand il vise un serveur local), `tests/browser/check_admin_saves.py` (comptes, services, profil) et, côté serveur, le lien entre le seuil et l'état « En danger » des dossiers (la page Synthèse, elle, garde ses propres seuils).
+
 ## [3.50.0] - 2026-09-19
 
 Chantier « Assistant d'organisation » : configuration de démarrage rejouable, adaptée à toute structure (y compris hors France : libellés dans toutes les langues, type « Autre / sur mesure », toutes les suggestions modifiables).
