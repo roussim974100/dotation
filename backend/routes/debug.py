@@ -9,6 +9,15 @@ from auth import admin_required
 bp = Blueprint("debug", __name__, url_prefix="/api/debug")
 
 
+@bp.before_request
+def _debug_endpoints_are_off_by_default():
+    """Ces routes ecrivent des fichiers dans le repertoire courant (avec le contenu de la console du navigateur : donnees
+    personnelles possibles). Fermees sauf demande explicite d'un developpeur : APP_DEBUG_ENDPOINTS=1."""
+    if os.environ.get("APP_DEBUG_ENDPOINTS") != "1":
+        return jsonify({"error": "not_found"}), 404
+    return None
+
+
 @bp.route("/test", methods=["GET"])
 @admin_required
 def lock_test():

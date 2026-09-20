@@ -10,8 +10,7 @@ let formDirty = false;
 // de donnees personnelles via les /api/debug/logs.
 const DEBUG_LOGS_ENABLED = (function () {
   try {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    // Jamais automatique : meme en local, la console peut contenir des donnees personnelles (base copiee de la production).
     if (new URLSearchParams(window.location.search).has('debug')) return true;
   } catch (_) { /* ignore */ }
   return false;
@@ -208,7 +207,7 @@ function collectProgressRequirementsFromForm() {
 
   const qualite = document.querySelector('input[name="qualite"]:checked')?.value || "agent";
   const eluBlockDisabledForReq = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
-  if (qualite === "elu" && !eluBlockDisabledForReq) {
+  if (isMandateType(qualite) && !eluBlockDisabledForReq) {
     if (!getFieldValue("mandat")) {
       pushRequirement("mandat", "Mandat");
     }
@@ -1046,6 +1045,43 @@ async function loadDynamicResourceReferences() {
   bindDynamicResourceToggles();
 }
 
+// Valeurs d'un dossier dont le nom de champ n'existe plus dans le catalogue (champ renomme depuis, ancien dossier...) :
+// { idRessource: { ancienNom: valeur } }. Affichees en lecture seule et renvoyees telles quelles a l'enregistrement.
+let orphanFieldValues = {};
+// Ressources du dossier qui ne sont plus proposees (desactivees ou retirees du catalogue) : conservees telles quelles a
+// l'enregistrement, sinon elles disparaitraient du dossier au premier enregistrement.
+let preservedAdditionalResources = [];
+
+function humanizeFieldKey(key) {
+  const text = String(key || "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : String(key || "");
+}
+
+function renderOrphanFieldValues(resourceId) {
+  const wrap = document.getElementById(`dynamic_resource_fields_wrap_${resourceId}`);
+  if (!wrap) return;
+  wrap.querySelector(".dynamic-resource-orphans")?.remove();
+  const entries = Object.entries(orphanFieldValues[resourceId] || {});
+  if (!entries.length) return;
+  const box = document.createElement("div");
+  box.className = "dynamic-resource-orphans mt-3 small border rounded p-2";
+  const title = document.createElement("div");
+  title.className = "fw-semibold mb-1";
+  title.textContent = "Autres informations enregistrées";
+  const hint = document.createElement("div");
+  hint.className = "text-muted mb-1";
+  hint.textContent = "Ces valeurs ne correspondent plus à un champ de la ressource : elles sont conservées et ne seront pas perdues.";
+  box.append(title, hint);
+  entries.forEach(([key, value]) => {
+    const line = document.createElement("div");
+    const label = document.createElement("strong");
+    label.textContent = `${humanizeFieldKey(key)} : `;
+    line.append(label, document.createTextNode(String(value)));
+    box.append(line);
+  });
+  wrap.append(box);
+}
+
 function getAdditionalResourcesData() {
   return dynamicResourceReferences.map((resource) => ({
     id: resource.id,
@@ -1062,11 +1098,15 @@ function getAdditionalResourcesData() {
     displayOrder: Number(resource.display_order || 100),
     selected: Boolean(document.getElementById(`dynamic_resource_${resource.id}`)?.checked),
     fieldSchema: Array.isArray(resource.field_schema) ? resource.field_schema : [],
-    fields: Object.fromEntries(
-      (Array.isArray(resource.field_schema) ? resource.field_schema : [])
-        .map((field) => [field.key, getDynamicResourceFieldValue(resource.id, field.key)])
-        .filter(([, value]) => value)
-    ),
+    fields: {
+      // Valeurs saisies sous un nom que le catalogue ne connait plus : conservees telles quelles (jamais perdues a l'enregistrement).
+      ...(orphanFieldValues[resource.id] || {}),
+      ...Object.fromEntries(
+        (Array.isArray(resource.field_schema) ? resource.field_schema : [])
+          .map((field) => [field.key, getDynamicResourceFieldValue(resource.id, field.key)])
+          .filter(([, value]) => value)
+      )
+    },
     details: getFieldValue(`dynamic_resource_details_${resource.id}`),
 
     ...getDynamicResourceAssignmentData(resource.id)
@@ -1077,12 +1117,16 @@ function getAdditionalResourcesData() {
     const hasContent = resource.details || Object.keys(resource.fields).length || resource.assignedAt || resource.conditionAttribution || resource.conditionNotes;
     // Inclure si sélectionnée, ou si elle a du contenu (pour permettre la suppression au serveur)
     return resource.selected || hasContent;
-  });
+  }).concat(preservedAdditionalResources);
 }
 
 function populateAdditionalResources(data = {}) {
   const resources = data.resources?.additional || [];
   const isLocked = Boolean(data.meta?.lockedAt);
+  orphanFieldValues = {};
+  document.querySelectorAll(".dynamic-resource-orphans").forEach((el) => el.remove());
+  preservedAdditionalResources = resources.filter((entry) => entry && (entry.selected || entry.details || Object.keys(entry.fields || {}).length)
+    && !dynamicResourceReferences.some((ref) => ref.id === entry.id || (entry.code && ref.code === entry.code)));
 
   resources.forEach((resource) => {
     const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
@@ -1126,6 +1170,19 @@ function populateAdditionalResources(data = {}) {
     const schemaToUse = catalogRef
       ? (Array.isArray(catalogRef.field_schema) ? catalogRef.field_schema : [])
       : Object.keys(normalizedFields).map((k) => ({ key: k, type: "text" }));
+
+    if (catalogRef) {
+      const schemaKeys = new Set(schemaToUse.map((f) => f.key));
+      const schemaValues = new Set(schemaToUse.map((f) => String(normalizedFields[f.key] ?? "").trim()).filter(Boolean));
+      const orphans = {};
+      Object.entries(storedFields).forEach(([key, value]) => {
+        const text = String(value ?? "").trim();
+        // hors catalogue, non vide, et pas deja affichee sous le nom actuel du champ
+        if (!schemaKeys.has(FIELD_LEGACY_KEYS[key] || key) && text && !schemaValues.has(text)) orphans[key] = value;
+      });
+      orphanFieldValues[resource.id] = orphans;
+      renderOrphanFieldValues(resource.id);
+    }
 
     schemaToUse.forEach((fieldDef) => {
       const fieldKey = fieldDef.key;
@@ -1505,7 +1562,7 @@ function initQualite() {
     const selected = selectedInput ? selectedInput.value : (radios[0]?.value || "agent");
     const eluBlockEl = document.getElementById("eluBlock");
     const eluBlockDisabled = Boolean(eluBlockEl?.dataset.eluBlockDisabled);
-    const isElu = selected === "elu" && !eluBlockDisabled;
+    const isElu = isMandateType(selected) && !eluBlockDisabled;
 
     toggleField("eluBlock", isElu);
     toggleField("serviceFieldBlock", !isElu);
@@ -2284,6 +2341,8 @@ function getFormData(signaturePad) {
     meta: {
       id: currentDraftId,
       savedAt: now,
+      // version du dossier telle que chargee : le serveur refuse l'enregistrement si quelqu'un l'a modifie depuis
+      baseSavedAt: form.dataset.baseSavedAt || "",
       lockedAt,
       assignedAt,
       startAt
@@ -2475,6 +2534,7 @@ function populateForm(data, signaturePad) {
   renderReopenInfo(data.meta || {});
   signaturePad.restore(data.validation?.signatureDataUrl || "");
   updateDraftUi(data.meta.savedAt, true, data.workflow.status || "draft");
+  form.dataset.baseSavedAt = data.meta.savedAt || "";
   const workflowStatus = data.workflow?.status || "draft";
   const isLocked = Boolean(data.meta.lockedAt) || ["returned", "partial_return"].includes(workflowStatus);
   applyLockState(isLocked);
@@ -2518,6 +2578,8 @@ function populateForm(data, signaturePad) {
 }
 
 function formatStatusLabel(status) {
+  const served = window.APP_BRANDING?.statusLabels;  // libellés publiés par le serveur (une seule définition)
+  if (served && served[status]) return served[status];
   const labels = {
     draft: "À compléter",
     partial_assignment: "Attribution partielle",
@@ -2748,7 +2810,7 @@ function validateFormData(formData, options = {}) {
   }
 
   const eluBlockDisabledForValidation = Boolean(document.getElementById("eluBlock")?.dataset.eluBlockDisabled);
-  if (formData.beneficiaire.qualite === "elu" && !formData.beneficiaire.mandat && !eluBlockDisabledForValidation) {
+  if (isMandateType(formData.beneficiaire.qualite) && !formData.beneficiaire.mandat && !eluBlockDisabledForValidation) {
     return "Veuillez renseigner le mandat de l'élu.";
   }
 
@@ -3061,6 +3123,7 @@ async function saveDraft(signaturePad) {
     const result = await saveFormData(formData);
     form.dataset.draftId = result.summary.id;
     form.dataset.lockedAt = result.data.meta.lockedAt || "";
+    form.dataset.baseSavedAt = result.data?.meta?.savedAt || "";
     form.dataset.workflowStatus = result.summary.status;  // CRITICAL FIX #4: Syncer le workflow status post-save
     updateDraftUi(result.summary.updatedAt, false, result.summary.status);
 
@@ -3116,7 +3179,9 @@ async function saveDraft(signaturePad) {
       "Erreur d'enregistrement",
       error.message === "form_locked"
         ? "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
-        : "Impossible d'enregistrer la fiche."
+        : error.message === "form_conflict"
+          ? "Cette fiche a été modifiée par une autre personne (ou dans un autre onglet) depuis son ouverture. Rechargez la page pour voir la dernière version, puis refaites votre modification : rien n'a été écrasé."
+          : "Impossible d'enregistrer la fiche."
     );
   }
 }

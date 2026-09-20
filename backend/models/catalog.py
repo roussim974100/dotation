@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from utils import generate_id, utc_now
 from models.workflow import normalize_resource_field_schema
@@ -172,6 +173,43 @@ DEFAULT_SERVICE_REFERENCES = [
 ]
 
 
+def _schema_list(text):
+    """Description des champs lue sans jamais lever : `null`, un objet ou du texte abime donnent une liste vide."""
+    from utils import safe_json
+    value = safe_json(text, [])
+    return value if isinstance(value, list) else []
+
+
+def carry_over_field_aliases(old_schema, new_schema):
+    """Garde les anciens noms d'un champ (alias) pour retrouver les valeurs des dossiers deja saisis.
+    1) Les alias deja connus d'un champ sont conserves a chaque sauvegarde (l'editeur ne les renvoie pas).
+    2) Si la cle d'un champ change (l'ancienne disparait), elle devient un alias du champ ajoute qui porte le MEME LIBELLE.
+    Jamais d'appariement « au jugé » (par position) : sans libelle identique, on ne rattache rien."""
+    old_by_key = {f["key"]: f for f in old_schema if isinstance(f, dict) and f.get("key")}
+    for f in new_schema:
+        previous = old_by_key.get(f["key"])
+        if previous:
+            f["aliases"] = list(dict.fromkeys([*(previous.get("aliases") or []), *(f.get("aliases") or [])]))
+    for f in new_schema:  # un champ deja connu garde son identifiant, meme si l'editeur ne le renvoie pas
+        previous = old_by_key.get(f["key"])
+        if previous and not f.get("id") and previous.get("id"):
+            f["id"] = previous["id"]
+    new_keys = {f["key"] for f in new_schema}
+    removed = [f for k, f in old_by_key.items() if k not in new_keys]
+    added = [f for f in new_schema if f["key"] not in old_by_key]
+    for old in removed:
+        label = str(old.get("label") or "").strip().lower()
+        same = [f for f in added if str(f.get("label") or "").strip().lower() == label]
+        if len(same) == 1:
+            target = same[0]
+            if old.get("id") and not target.get("id"):
+                target["id"] = old["id"]  # meme champ, nouvelle cle : meme identifiant
+            for alias in [old["key"], *(old.get("aliases") or [])]:
+                if alias != target["key"] and alias not in (target.get("aliases") or []):
+                    target["aliases"] = [*(target.get("aliases") or []), alias]
+    return new_schema
+
+
 def normalize_resource_catalog_payload(payload, existing_row=None):
     existing = dict(existing_row) if existing_row else {}
     code = str(payload.get("code") if payload.get("code") is not None else existing.get("code") or "").strip()
@@ -185,10 +223,18 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
     raw_field_schema = payload.get("field_schema") if "field_schema" in payload else payload.get("fieldSchema")
     if raw_field_schema is None:
         try:
-            raw_field_schema = json.loads(existing.get("field_schema_json") or "[]")
+            raw_field_schema = _schema_list(existing.get("field_schema_json"))
         except (TypeError, json.JSONDecodeError):
             raw_field_schema = []
     field_schema = normalize_resource_field_schema(raw_field_schema)
+    if existing and "field_schema_json" in existing and raw_field_schema is not None:
+        try:
+            field_schema = carry_over_field_aliases(normalize_resource_field_schema(_schema_list(existing.get("field_schema_json"))), field_schema)
+        except (TypeError, json.JSONDecodeError):
+            pass
+    for f in field_schema:
+        if not f.get("id"):
+            f["id"] = "fld_" + uuid.uuid4().hex[:12]
     display_order = payload.get("display_order") if payload.get("display_order") is not None else existing.get("display_order", 100)
     try:
         display_order = int(display_order)
@@ -305,7 +351,7 @@ def migrate_builtin_resource_schemas(connection):
         if code not in seed_by_code:
             continue
         try:
-            current = json.loads(row["field_schema_json"] or "[]")
+            current = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             current = []
         if current:
@@ -402,7 +448,7 @@ def migrate_telephone_imei_field(connection):
     ).fetchall()
     for row in rows:
         try:
-            schema = json.loads(row["field_schema_json"] or "[]")
+            schema = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             continue
         changed = False
@@ -439,7 +485,7 @@ def migrate_suggest_flags(connection):
         if code not in SUGGEST_KEYS:
             continue
         try:
-            schema = json.loads(row["field_schema_json"] or "[]")
+            schema = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             continue
         changed = False
@@ -462,7 +508,7 @@ def migrate_cartes_visite_quantite(connection):
     if not row:
         return
     try:
-        schema = json.loads(row["field_schema_json"] or "[]")
+        schema = _schema_list(row["field_schema_json"])
     except (TypeError, ValueError):
         return
     if any(f.get("key") == "quantite" for f in schema):

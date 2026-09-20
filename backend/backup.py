@@ -111,10 +111,16 @@ def diagnose_sqlite(path, key):
                     issues.append(f"Tables manquantes : {', '.join(sorted(missing))}")
             if key == "dotation" and "dotation_forms" in existing:
                 stats["dossiers"] = conn.execute("SELECT COUNT(*) FROM dotation_forms").fetchone()[0]
+            if key == "dotation" and "schema_migrations" in existing:
+                from migrations import MIGRATIONS
+                newest = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] or 0
+                stats["schema"] = newest
+                if newest > max(m[0] for m in MIGRATIONS):
+                    issues.append(f"Cette base vient d'une version plus récente de l'application (schéma {newest}, cette version connaît {max(m[0] for m in MIGRATIONS)}) : restauration refusée, mettez d'abord l'application à jour.")
             if key == "users" and "users" in existing:
                 stats["comptes"] = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
                 if stats["comptes"] == 0:
-                    warnings.append("Aucun compte dans cette base : personne ne pourrait se connecter après restauration.")
+                    issues.append("Aucun compte dans cette base : personne ne pourrait se connecter après restauration (restauration refusée).")
         finally:
             conn.close()
     except sqlite3.Error as exc:
@@ -250,7 +256,7 @@ def diagnose_archive(blob, password=None):
     reports = []
     with tempfile.TemporaryDirectory() as workdir:
         for entry in manifest["databases"]:
-            path = os.path.join(workdir, entry["file"])
+            path = os.path.join(workdir, os.path.basename(str(entry["file"])))
             with open(path, "wb") as handle:
                 handle.write(contents[entry["key"]])
             report = diagnose_sqlite(path, entry["key"])
@@ -294,16 +300,30 @@ def restore_archive(blob, password=None, keys=None):
             safety_path = os.path.join(BACKUP_DIR, f"avant_restauration_{stamp}_{entry['key']}.db")
             snapshot_sqlite(spec["path"], safety_path)
             safety_copies.append(os.path.basename(safety_path))
+    restored_keys = []
     try:
         with tempfile.TemporaryDirectory() as workdir:
             for entry in selected:
                 spec = next(db for db in DATABASES if db["key"] == entry["key"])
-                staging = os.path.join(workdir, entry["file"])
+                staging = os.path.join(workdir, os.path.basename(str(entry["file"])))
                 with open(staging, "wb") as handle:
                     handle.write(contents[entry["key"]])
                 restore_sqlite(staging, spec["path"])
-    except sqlite3.Error as exc:
-        raise BackupError("import_failed", f"Échec du remplacement : {exc}")
+                restored_keys.append(entry["key"])
+    except (sqlite3.Error, OSError) as exc:
+        # Tout ou rien : les bases deja remplacees retrouvent leur etat d'avant (copies de securite faites plus haut).
+        rolled_back = []
+        for key in restored_keys:
+            safety_path = os.path.join(BACKUP_DIR, f"avant_restauration_{stamp}_{key}.db")
+            spec = next(db for db in DATABASES if db["key"] == key)
+            if os.path.exists(safety_path):
+                try:
+                    restore_sqlite(safety_path, spec["path"])
+                    rolled_back.append(key)
+                except (sqlite3.Error, OSError):
+                    pass
+        detail = f" Les bases déjà remplacées ont été remises à leur état d'avant ({', '.join(rolled_back)})." if rolled_back else ""
+        raise BackupError("import_failed", f"Échec du remplacement : {exc}.{detail}")
     return {"restored": [entry["key"] for entry in selected], "safety_copies": safety_copies, "report": report}
 
 

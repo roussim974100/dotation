@@ -8,7 +8,7 @@ from proxy import AutoProxyFix
 from config import get_app_secret_key, AUTH_CONFIG_PATH
 from database import get_db, get_users_db, ensure_column, ensure_users_schema
 from models.dossier import migrate_forms_to_dossiers
-from utils import utc_now
+from utils import utc_now, single_instance_lock
 import json
 from pathlib import Path
 from models.settings import seed_app_settings
@@ -38,6 +38,8 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100"
 # X-Forwarded-* : confiance automatique selon l'appelant direct (voir proxy.py) ; fonctionne derriere
 # un reverse proxy comme en acces direct, sans reglage. APP_TRUSTED_PROXIES=0 pour tout desactiver.
 app.wsgi_app = AutoProxyFix(app.wsgi_app)
+from observability import init_observability
+init_observability(app)  # identifiant de requete, code d'erreur communicable, journal fichier sans donnee personnelle
 
 # Valider les permissions au démarrage (dev uniquement)
 if os.environ.get("FLASK_ENV") == "development":
@@ -559,16 +561,19 @@ def init_db():
         seed_reference_catalogs(connection)
         seed_service_catalog(connection)
         seed_app_settings(connection)
-        migrate_forms_to_dossiers(connection)
-        migrate_suggest_flags(connection)
-        migrate_builtin_resource_schemas(connection)
-        migrate_builtin_resource_flags(connection)
-        migrate_builtin_issuer_service(connection)
-        migrate_builtin_display_order(connection)
-        migrate_telephone_imei_field(connection)
-        migrate_missing_builtin_resources(connection)
-        migrate_cartes_visite_quantite(connection)
-        migrate_field_suggestions_from_history(connection)
+        # Corrections de donnees historiques, toutes idempotentes : l'echec de l'une (donnee atypique d'un client) est consigne mais
+        # n'empeche JAMAIS l'application de demarrer ni les suivantes de s'appliquer.
+        for _step in (migrate_forms_to_dossiers, migrate_suggest_flags, migrate_builtin_resource_schemas, migrate_builtin_resource_flags,
+                      migrate_builtin_issuer_service, migrate_builtin_display_order, migrate_telephone_imei_field,
+                      migrate_missing_builtin_resources, migrate_cartes_visite_quantite, migrate_field_suggestions_from_history):
+            try:
+                _step(connection)
+            except Exception as _exc:  # noqa: BLE001
+                import logging as _logging
+                _logging.getLogger(__name__).error("Etape de demarrage %s en echec (ignoree) : %s", _step.__name__, _exc)
+                print(f"[demarrage] {_step.__name__} ignoree : {_exc}")
+        from migrations import run_pending_migrations
+        run_pending_migrations(connection)  # migrations numerotees (identifiants de champs...), copie de securite avant
         # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
         from models.units import backfill_units, ensure_units_schema
         ensure_units_schema(connection)
@@ -582,7 +587,11 @@ def init_db():
         _stock_config = stock_resource_config(connection)
         if _stock_config:
             for _row in connection.execute("SELECT id FROM dotation_forms").fetchall():
-                sync_stock_for_form(connection, _row["id"], _stock_config)
+                try:
+                    sync_stock_for_form(connection, _row["id"], _stock_config)
+                except Exception as _exc:  # noqa: BLE001 - un dossier atypique ne doit jamais empecher le demarrage
+                    print(f"[stock] dossier {_row['id']} ignore au demarrage : {_exc}")
+        # (le controle de sante n'est plus lance ici : trop couteux sur une grosse base, il tourne en arriere-plan apres le demarrage)
         from models.settings import get_app_settings
         from models.units_extra import anonymize_old_holders
         anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))
@@ -593,8 +602,18 @@ def init_db():
 
 
 
-init_db()
-init_users_db()
+_init_lock = single_instance_lock("init", wait_seconds=120)  # un seul worker initialise a la fois (les autres attendent puis rejouent, ce qui est rapide)
+try:
+    init_db()
+    init_users_db()
+finally:
+    if _init_lock:
+        _init_lock.close()
+try:  # controle de sante quotidien (APP_HEALTH_INTERVAL_HOURS=0 pour le desactiver)
+    from models.health import start_daily_health_check
+    start_daily_health_check(float(os.environ.get("APP_HEALTH_INTERVAL_HOURS", "24") or 0))
+except Exception as _exc:  # noqa: BLE001
+    print(f"[sante] controle quotidien non demarre : {_exc}")
 
 
 if __name__ == "__main__":

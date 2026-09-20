@@ -78,7 +78,7 @@ function buildMissingProgressPreview(data) {
   if (!beneficiaire.prenom) {
     missing.push("Prénom");
   }
-  if ((beneficiaire.qualite || "agent") === "elu") {
+  if (isMandateType(beneficiaire.qualite || "agent")) {
     if (!beneficiaire.mandat) {
       missing.push("Mandat");
     }

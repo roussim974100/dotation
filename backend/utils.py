@@ -1,6 +1,7 @@
 import base64
 import json
 import struct
+import re
 import unicodedata
 import uuid
 from datetime import datetime, timezone
@@ -54,13 +55,53 @@ def mask_payload(payload):
     return data
 
 
+def single_instance_lock(name, wait_seconds=0):
+    """Verrou de fichier entre processus (plusieurs workers gunicorn). Renvoie un objet a GARDER (le verrou tient tant qu'il vit),
+    ou None si un autre processus le detient et que `wait_seconds` est ecoule."""
+    import os
+    import time
+    from config import DATA_DIR
+    handle = open(os.path.join(DATA_DIR, f".{name}.lock"), "a+")
+    deadline = time.time() + wait_seconds
+    while True:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return handle
+        except OSError:
+            if time.time() >= deadline:
+                handle.close()
+                return None
+            time.sleep(0.25)
+
+
+def safe_json(text, default=None):
+    """json.loads qui ne leve jamais : une donnee illisible ne doit pas empecher l'application de demarrer ni une page de s'afficher."""
+    import json as _json
+    try:
+        return _json.loads(text) if text not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+
+
+def csv_safe(value):
+    """Neutralise l'injection de formules dans un export CSV : une cellule qui commence par = + - @ (ou tabulation / retour)
+    serait executee par Excel ; on la precede d'une apostrophe."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", chr(9), chr(13)) else text
+
+
 def slugify_field_key(value):
+    """Cle technique d'un champ a partir d'un libelle. Meme resultat que slugifyFieldKey (frontend/js/admin.js) :
+    accents retires, minuscules, toute suite de caracteres non alphanumeriques devient UN seul « _ »."""
     normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
-    return "".join(
-        character if character.isalnum() else "_"
-        for character in normalized
-        if unicodedata.category(character) != "Mn"
-    ).strip("_")
+    without_marks = "".join(character for character in normalized if unicodedata.category(character) != "Mn")
+    return re.sub(r"[^a-z0-9]+", "_", without_marks).strip("_")
 
 
 def normalize_pdf_text(value):
@@ -120,7 +161,8 @@ def build_title(payload):
     prenom = beneficiaire.get("prenom") or ""
     dossier_type = normalize_dossier_type(dossier.get("type"))
     type_label = DOSSIER_TYPE_LABELS.get(dossier_type, "Dossier")
-    if beneficiaire.get("qualite") == "elu":
+    from models.vocab import has_mandate
+    if has_mandate(beneficiaire.get("qualite")):
         prefix = beneficiaire.get("mandat") or type_label
     else:
         prefix = beneficiaire.get("service") or type_label
@@ -188,24 +230,13 @@ def get_restitution_signature_datetime(payload):
 
 
 def format_beneficiary_label(value):
-    labels = {
-        "agent": "Agent",
-        "elu": "Élu(e)",
-    }
-    return labels.get(value, value or "-")
+    from models.vocab import beneficiary_label  # libelles configures dans Personnalisation
+    return beneficiary_label(value)
 
 
 def format_status_label(status):
-    labels = {
-        "draft": "À compléter",
-        "partial_assignment": "Attribution partielle",
-        "awaiting_signature": "En attente de signature",
-        "active": "Attribution active",
-        "returned": "Restitution terminée",
-        "partial_return": "Restitution partielle",
-        "cancelled": "Dossier annulé",
-    }
-    return labels.get(status, "À compléter")
+    from models.vocab import status_label
+    return status_label(status)
 
 
 def format_restitution_state_label(state):

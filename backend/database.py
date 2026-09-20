@@ -15,7 +15,7 @@ _KNOWN_TABLES = {
 
 
 def get_db():
-    # timeout=10 : attendre 10 secondes avant de lever une erreur de verrouillage
+    # timeout=30 : attendre 10 secondes avant de lever une erreur de verrouillage
     # check_same_thread=False : permettre l'accès cross-thread (gunicorn workers)
     connection = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
     connection.row_factory = sqlite3.Row
@@ -60,7 +60,13 @@ def ensure_users_schema():
         has_groups = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='groups'").fetchone()
         row = connection.execute("SELECT permissions_json FROM groups WHERE key = 'admin'").fetchone() if (columns and has_groups) else None
         if row:
-            permissions = _json.loads(row[0] or "[]")
+            try:
+                permissions = _json.loads(row[0] or "[]")
+            except (TypeError, ValueError):
+                permissions = None  # liste illisible : on n'y touche pas
+            if not isinstance(permissions, list):
+                connection.commit()
+                return
             if "*" not in permissions and "parc.manage" not in permissions:
                 permissions.append("parc.manage")
                 connection.execute("UPDATE groups SET permissions_json = ? WHERE key = 'admin'", (_json.dumps(permissions),))
