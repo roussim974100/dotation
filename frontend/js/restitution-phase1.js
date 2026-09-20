@@ -86,15 +86,15 @@ async function initPhase1Page() {
     loader?.classList.remove("is-hidden");
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    if (!id) { alert("Aucune fiche sélectionnée."); window.location.href = "index.html"; return; }
+    if (!id) { alert("Aucune fiche sélectionnée."); window.location.href = "restitutions-pending.html"; return; }
 
     const result = await requestJson(`/api/forms/${encodeURIComponent(id)}`);
-    if (!result?.data) { alert("Fiche introuvable."); window.location.href = "index.html"; return; }
+    if (!result?.data) { alert("Fiche introuvable."); window.location.href = "restitutions-pending.html"; return; }
 
     const status = result.summary?.status || result.data?.workflow?.status;
     if (!["active", "partial_return", "awaiting_signature", "returned"].includes(status)) {
       alert("Ce dossier n'est pas en phase de restitution.");
-      window.location.href = "index.html";
+      window.location.href = "restitutions-pending.html";
       return;
     }
 
@@ -108,6 +108,7 @@ async function initPhase1Page() {
     // Hydrater l'en-tête
     const b = result.data.beneficiaire || {};
     if (getEl("phase1Title")) getEl("phase1Title").textContent = `${b.nom || ""} ${b.prenom || ""}`.trim() || "Dossier";
+    renderRestitutionSteps({ current: 1, id, name: getEl("phase1Title")?.textContent || "Dossier", phase1Validated: Boolean(currentRestitutionCheck.phase1ValidatedAt) });
     if (getEl("phase1Subtitle")) getEl("phase1Subtitle").textContent = b.service || b.mandat || "Fiche active";
     const statusLabels = { active: "Attribution active", partial_return: "Restitution partielle", awaiting_signature: "En attente de signature", returned: "Restitution terminée" };
     if (getEl("phase1StatusPill")) getEl("phase1StatusPill").textContent = statusLabels[status] || status;

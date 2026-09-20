@@ -1,11 +1,12 @@
 from flask import Flask, jsonify, request, session
 from flask.sessions import SecureCookieSessionInterface
+import gzip
 import os
 import secrets
-from werkzeug.middleware.proxy_fix import ProxyFix
+from proxy import AutoProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
-from database import get_db, get_users_db, ensure_column
+from database import get_db, get_users_db, ensure_column, ensure_users_schema
 from models.dossier import migrate_forms_to_dossiers
 from utils import utc_now
 import json
@@ -32,7 +33,11 @@ class _AutoSecureSessionInterface(SecureCookieSessionInterface):
 app = Flask(__name__, static_folder=None)
 app.secret_key = get_app_secret_key()
 app.session_interface = _AutoSecureSessionInterface()
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+# Plafond de taille des requetes (uploads CSV, logo, restauration de base) ; reglable via l'environnement.
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100")) * 1024 * 1024
+# X-Forwarded-* : confiance automatique selon l'appelant direct (voir proxy.py) ; fonctionne derriere
+# un reverse proxy comme en acces direct, sans reglage. APP_TRUSTED_PROXIES=0 pour tout desactiver.
+app.wsgi_app = AutoProxyFix(app.wsgi_app)
 
 # Valider les permissions au démarrage (dev uniquement)
 if os.environ.get("FLASK_ENV") == "development":
@@ -68,6 +73,43 @@ def validate_csrf():
     expected = session.get("csrf_token", "")
     if not expected or not token or not secrets.compare_digest(token, expected):
         return jsonify({"error": "csrf_invalid"}), 403
+
+
+COMPRESSIBLE_TYPES = ("text/html", "application/json", "application/javascript", "text/css", "text/javascript")
+COMPRESS_MIN_BYTES = 1024
+COMPRESS_MAX_BYTES = 1024 * 1024  # au-dela (exports, sauvegardes), on ne charge pas la reponse en memoire
+
+
+@app.after_request
+def compress_response(response):
+    """Compression gzip (bibliotheque standard) des reponses texte : la liste des dossiers
+    passe d'environ 340 Ko a une trentaine de Ko. Enregistre avant disable_frontend_cache, donc
+    executee apres lui (Flask inverse l'ordre des after_request) et voit les en-tetes finaux."""
+    if (
+        response.status_code != 200
+        or response.headers.get("Content-Encoding")
+        or "gzip" not in (request.headers.get("Accept-Encoding") or "").lower()
+        or not any(t in (response.headers.get("Content-Type") or "").lower() for t in COMPRESSIBLE_TYPES)
+    ):
+        return response
+    # Reponse en flux (taille inconnue) ou volumineuse : servie telle quelle.
+    if response.direct_passthrough and response.content_length is None:
+        return response
+    if (response.content_length or 0) > COMPRESS_MAX_BYTES:
+        return response
+    response.direct_passthrough = False
+    data = response.get_data()
+    if len(data) < COMPRESS_MIN_BYTES:
+        return response
+    compressed = gzip.compress(data, compresslevel=6)
+    response.set_data(compressed)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(compressed))
+    response.headers.add("Vary", "Accept-Encoding")
+    etag = response.headers.get("ETag")
+    if etag and not etag.startswith("W/"):
+        response.headers["ETag"] = f"W/{etag}"
+    return response
 
 
 @app.after_request
@@ -115,6 +157,7 @@ def disable_frontend_cache(response):
     return response
 
 def init_users_db():
+    ensure_users_schema()  # ajoute les colonnes recentes (email) a une base existante
     with get_users_db() as connection:
         connection.executescript(
             """
@@ -125,6 +168,9 @@ def init_users_db():
                 status TEXT NOT NULL DEFAULT 'active',
                 service TEXT,
                 db_manage INTEGER NOT NULL DEFAULT 0,
+                email TEXT NOT NULL DEFAULT '',
+                first_name TEXT NOT NULL DEFAULT '',
+                last_name TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -156,7 +202,7 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
@@ -173,10 +219,11 @@ def seed_default_groups(connection):
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe déjà : mettre à jour label/description et permissions
+            # Groupe existe déjà : mettre à jour label/description, sans écraser
+            # les permissions (potentiellement personnalisées par un admin)
             connection.execute(
-                "UPDATE groups SET label = ?, description = ?, permissions_json = ?, data_scope = ?, updated_at = ? WHERE key = ?",
-                (label, description, json.dumps(permissions), data_scope, now, key)
+                "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
+                (label, description, now, key)
             )
         else:
             # Groupe n'existe pas : créer avec les permissions par défaut
@@ -214,7 +261,7 @@ def migrate_missing_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
@@ -231,10 +278,11 @@ def migrate_missing_groups(connection):
     for key, label, description, permissions, data_scope in default_groups:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe : mettre à jour les permissions
+            # Groupe existe : mettre à jour label/description, sans écraser
+            # les permissions (potentiellement personnalisées par un admin)
             connection.execute(
-                "UPDATE groups SET label = ?, description = ?, permissions_json = ?, data_scope = ?, updated_at = ? WHERE key = ?",
-                (label, description, json.dumps(permissions), data_scope, now, key)
+                "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
+                (label, description, now, key)
             )
         else:
             # Groupe n'existe pas : créer
@@ -488,6 +536,8 @@ def init_db():
         ensure_column(connection, "resource_catalog", "has_assignment_condition", "has_assignment_condition INTEGER NOT NULL DEFAULT 0")
         ensure_column(connection, "resource_catalog", "has_assignment_notes", "has_assignment_notes INTEGER NOT NULL DEFAULT 1")
         ensure_column(connection, "resource_catalog", "display_order", "display_order INTEGER NOT NULL DEFAULT 100")
+        # Mode de suivi (unit / none / access) choisi par l'assistant de creation ; vide = automatique.
+        ensure_column(connection, "resource_catalog", "tracking_mode", "tracking_mode TEXT NOT NULL DEFAULT ''")
         connection.execute(
             """
             UPDATE resource_catalog
@@ -519,6 +569,23 @@ def init_db():
         migrate_missing_builtin_resources(connection)
         migrate_cartes_visite_quantite(connection)
         migrate_field_suggestions_from_history(connection)
+        # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
+        from models.units import backfill_units, ensure_units_schema
+        ensure_units_schema(connection)
+        if connection.execute("SELECT COUNT(*) FROM resource_units").fetchone()[0] == 0:
+            backfill_units(connection)
+        from models.units import resync_all_units_once
+        resync_all_units_once(connection)  # objets saisis avec d'anciens noms de champs (une seule fois)
+        # Stocks par quantite : table de mouvements ; alimentation depuis les dossiers signes (idempotente).
+        from models.stock import ensure_stock_schema, stock_resource_config, sync_stock_for_form
+        ensure_stock_schema(connection)
+        _stock_config = stock_resource_config(connection)
+        if _stock_config:
+            for _row in connection.execute("SELECT id FROM dotation_forms").fetchall():
+                sync_stock_for_form(connection, _row["id"], _stock_config)
+        from models.settings import get_app_settings
+        from models.units_extra import anonymize_old_holders
+        anonymize_old_holders(connection, int(get_app_settings(connection).get("parc_retention_years") or 5))
         # Migration auto depuis users.json vers users.db (voir init_users_db)
 
 

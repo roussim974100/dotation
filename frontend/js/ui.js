@@ -574,11 +574,34 @@ function toggleDarkMode() {
   updateDarkModeLabel();
 }
 
+// Menu du compte : UNE seule definition, generee sur toutes les pages (le HTML statique des pages n'est plus qu'un repli).
+// Ordre fixe : identite, « espaces » autorises par les droits (ajoutes apres /api/session), compte, aide, deconnexion.
+function buildUserMenuPanel(menu) {
+  const panel = menu.querySelector(".user-menu__panel");
+  if (!panel) {
+    return;
+  }
+  const onAccount = window.location.pathname.endsWith("account.html") ? ' aria-current="page"' : "";
+  panel.innerHTML = `
+    <div class="user-menu__header">
+      <span class="user-menu__name" id="userMenuName"></span>
+      <span class="user-menu__role" id="userMenuRole"></span>
+    </div>
+    <div id="userMenuSpaces" class="d-none"><div class="user-menu__sep"></div></div>
+    <a class="user-menu__item" id="accountLink" href="account.html"${onAccount}>Mon profil</a>
+    <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+    <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+    <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide générale</a>
+    <div class="user-menu__sep"></div>
+    <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>`;
+}
+
 function initUserMenu() {
   const menu = document.getElementById("userMenu");
   if (!menu) {
     return;
   }
+  buildUserMenuPanel(menu);
 
   // Fermer le menu au clic externe
   document.addEventListener("click", (e) => {
@@ -617,6 +640,66 @@ function initUserMenu() {
   populateUserMenuIdentity();
 }
 
+// Entrees de menu reservees a un droit precis, distinctes de "Administration".
+// Ajouter une entree ici suffit : le menu est genere sur toutes les pages.
+const USER_MENU_FEATURE_LINKS = [
+  {
+    id: "parcLink",
+    label: "Parc matériel",
+    navHint: "Historique des objets",
+    href: "parc.html",
+    isAllowed: (user) => (user.permissions || []).includes("forms.read_list") || (user.permissions || []).includes("*")
+  },
+  {
+    id: "dbLink",
+    label: "Base de données",
+    navHint: "Sauvegarde et restauration",
+    href: "admin-db.html",
+    isAllowed: (user) => Boolean(user.db_manage) || (user.permissions || []).includes("*") || (user.permissions || []).includes("db.manage")
+  }
+];
+
+// Espaces du menu du compte, dans l'ordre d'affichage.
+const USER_MENU_SPACES = [
+  {
+    id: "adminLink", label: "Administration", href: "admin.html",
+    isAllowed: (user) => (user.permissions || []).includes("users.manage") || (user.permissions || []).includes("*")
+  },
+  { id: "execDashboardLink", label: "Synthèse", href: "executive-dashboard.html", isAllowed: (user) => Boolean(user.groups?.includes("direction") || user.is_admin) },
+  ...USER_MENU_FEATURE_LINKS
+];
+
+function renderUserMenuFeatureLinks(user) {
+  // Meme entree dans la navigation laterale des pages d'administration.
+  document.querySelectorAll(".admin-nav:not([data-managed])").forEach((nav) => {
+    USER_MENU_FEATURE_LINKS.forEach((link) => {
+      if (nav.querySelector(`[href="${link.href}"]`) || !link.isAllowed(user)) return;
+      const item = document.createElement("a");
+      item.className = "admin-nav__link";
+      item.href = link.href;
+      item.dataset.featureNav = link.id;
+      item.innerHTML = `<span>${link.label}</span><small>${link.navHint || ""}</small>`;
+      if (window.location.pathname.endsWith(link.href)) item.setAttribute("aria-current", "page");
+      nav.appendChild(item);
+    });
+  });
+  const spaces = document.getElementById("userMenuSpaces");
+  if (!spaces) return;
+  let shown = 0;
+  USER_MENU_SPACES.forEach((link) => {
+    if (document.getElementById(link.id) || !link.isAllowed(user)) return;
+    const item = document.createElement("a");
+    item.id = link.id;
+    item.className = "user-menu__item user-menu__item--feature";
+    item.href = link.href;
+    item.textContent = link.label;
+    if (window.location.pathname.endsWith(link.href)) item.setAttribute("aria-current", "page");
+    spaces.insertBefore(item, spaces.querySelector(".user-menu__sep"));
+    shown += 1;
+  });
+  spaces.classList.toggle("d-none", shown === 0);
+}
+
 async function populateUserMenuIdentity() {
   try {
     const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
@@ -627,9 +710,12 @@ async function populateUserMenuIdentity() {
     const nameEl = document.getElementById("userMenuName");
     const roleEl = document.getElementById("userMenuRole");
     const btnEl = document.getElementById("userMenuBtn");
-    if (nameEl) nameEl.textContent = user.username || "";
+    const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    if (nameEl) nameEl.textContent = fullName || user.username || "";
     if (roleEl) roleEl.textContent = user.is_admin ? "Administrateur" : (user.groups || []).join(", ") || "Utilisateur";
     if (btnEl) btnEl.childNodes[0].textContent = user.username || "Mon compte";
+
+    renderUserMenuFeatureLinks(user);
   } catch (_) {
     // silently ignore
   }
@@ -773,3 +859,75 @@ document.addEventListener("DOMContentLoaded", () => {
   initUserMenu();
 });
 
+
+
+// Fil d'Ariane et indicateur "partie 1 / partie 2" des pages de restitution.
+const RESTITUTION_STEPS = [
+  { step: 1, label: "Dates de départ", href: (id) => `restitution-phase1.html?id=${encodeURIComponent(id)}` },
+  { step: 2, label: "État du matériel", href: (id) => `restitution.html?id=${encodeURIComponent(id)}` }
+];
+
+function renderRestitutionSteps({ current, id, name, phase1Validated }) {
+  const main = document.getElementById("main");
+  if (!main || !id) return;
+  let host = document.getElementById("restitutionSteps");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "restitutionSteps";
+    host.className = "restitution-steps no-print";
+    main.prepend(host);
+  }
+  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const steps = RESTITUTION_STEPS.map((item) => {
+    const isCurrent = item.step === current;
+    const reachable = item.step === 1 || phase1Validated;
+    const inner = `<span class="restitution-steps__num">${item.step}</span> ${esc(item.label)}`;
+    return `<li class="restitution-steps__item${isCurrent ? " is-current" : ""}">${isCurrent || !reachable
+      ? `<span${isCurrent ? ' aria-current="step"' : ""}>${inner}</span>`
+      : `<a href="${item.href(id)}">${inner}</a>`}</li>`;
+  }).join("");
+  host.innerHTML = `
+    <nav class="restitution-steps__crumb" aria-label="Fil d'Ariane">
+      <a href="restitutions-pending.html">Restitutions en cours</a> <span aria-hidden="true">›</span> <span>${esc(name)}</span>
+    </nav>
+    <ol class="restitution-steps__list" aria-label="Étapes de la restitution">${steps}</ol>`;
+}
+
+
+// Raccourcis clavier des pages de liste : "/" recherche, "n" nouveau dossier, "?" aide.
+// Ignores dans un champ de saisie ou avec un modificateur (pour ne pas gener Ctrl+K ni la saisie).
+const KEYBOARD_SHORTCUTS = [
+  { key: "/", label: "Rechercher", run: () => document.getElementById("searchInput")?.focus() },
+  {
+    key: "n",
+    label: "Nouveau dossier",
+    run: () => {
+      const button = ["newFormBtn", "newRestitutionBtn"]
+        .map((id) => document.getElementById(id))
+        .find((el) => el && !el.classList.contains("d-none"));
+      button?.click();
+    }
+  },
+  {
+    key: "?",
+    label: "Afficher les raccourcis",
+    run: () => {
+      if (typeof showToast === "function") {
+        showToast(KEYBOARD_SHORTCUTS.map((item) => `${item.key.toUpperCase()} : ${item.label}`).join(" · ") + " · Ctrl+K : Recherche globale", "info");
+      }
+    }
+  }
+];
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+  const target = event.target;
+  if (target && (/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName) || target.isContentEditable)) return;
+  // Pas de raccourci si le focus est sur un controle (bouton, lien, menu) ou si un dialogue est ouvert.
+  if (target && target.closest && target.closest("button, a, summary, details[open], [role='dialog']")) return;
+  if (document.querySelector(".password-generator-modal:not(.d-none), .modal.show")) return;
+  const shortcut = KEYBOARD_SHORTCUTS.find((item) => item.key === event.key.toLowerCase());
+  if (!shortcut) return;
+  event.preventDefault();
+  shortcut.run();
+});

@@ -47,6 +47,26 @@ def ensure_column(connection, table_name, column_name, column_sql):
         connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
 
 
+def ensure_users_schema():
+    """Migrations de users.db (idempotentes) : appelee au demarrage et apres une restauration de sauvegarde,
+    car une ancienne archive remet le schema d'origine (sans colonne email)."""
+    with get_users_db() as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(users)")}
+        for column in ("email", "first_name", "last_name"):
+            if columns and column not in columns:
+                connection.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        # Droit de gestion du parc : donne au groupe admin s'il ne l'a pas encore (idempotent).
+        import json as _json
+        has_groups = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='groups'").fetchone()
+        row = connection.execute("SELECT permissions_json FROM groups WHERE key = 'admin'").fetchone() if (columns and has_groups) else None
+        if row:
+            permissions = _json.loads(row[0] or "[]")
+            if "*" not in permissions and "parc.manage" not in permissions:
+                permissions.append("parc.manage")
+                connection.execute("UPDATE groups SET permissions_json = ? WHERE key = 'admin'", (_json.dumps(permissions),))
+        connection.commit()
+
+
 def normalize_reference_row(row):
     if not row:
         return None
@@ -55,6 +75,11 @@ def normalize_reference_row(row):
         data["field_schema"] = json.loads(data.get("field_schema_json") or "[]")
     except (TypeError, json.JSONDecodeError):
         data["field_schema"] = []
+    from models.inventory import resolve_identifier_key
+    data["identifier_key"] = resolve_identifier_key(data["field_schema"]) if data.get("category") == "materiel" else None
+    from models.resource_rules import effective_tracking_mode
+    data["tracking_mode"] = data.get("tracking_mode") or ""
+    data["effective_tracking_mode"] = effective_tracking_mode(data["tracking_mode"], data.get("category"), data["field_schema"])
     data["requires_return"] = bool(data.get("requires_return"))
     data["has_assignment_date"] = bool(data.get("has_assignment_date", True))
     data["has_assignment_condition"] = bool(data.get("has_assignment_condition", False))

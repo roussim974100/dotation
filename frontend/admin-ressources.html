@@ -4,17 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<link rel="preload" as="image" href="/assets/a-quai-logo.png">
 <title>Administration des ressources</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <!-- En-tête commun de l'administration. -->
 <header class="app-header">
   <div class="container app-header__inner">
     <div class="app-brand" data-home-link>
-      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo collectivité">
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-logo.png" alt="Logo collectivité">
       <div>
         <p class="app-kicker">Administration</p>
         <h1 class="app-title">Ressources attribuables</h1>
@@ -44,7 +45,7 @@
 </header>
 
 <!-- Page dédiée au référentiel de ressources et à leurs schémas de champs. -->
-<main class="container py-4 py-lg-5">
+<main id="main" class="container py-4 py-lg-5">
   <div class="admin-layout">
     <aside class="content-card admin-sidebar">
       <p class="panel-eyebrow">Navigation</p>
@@ -76,6 +77,17 @@
         </div>
       </section>
 
+      <section class="content-card mt-4" id="catalog-quality">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Qualité</p>
+            <h2 class="section-title">Qualité du catalogue</h2>
+            <p class="panel-text">Contrôle que chaque ressource permet un historique cohérent (champ identifiant, état à la remise, service émetteur).</p>
+          </div>
+        </div>
+        <div id="catalogQuality" class="text-muted">Contrôle en cours…</div>
+      </section>
+
       <section class="content-card mt-4" id="admin-resources">
         <div class="section-heading">
           <div>
@@ -84,11 +96,12 @@
             <p class="panel-text">Définissez ce qui peut être attribué et les champs qui devront être saisis dans les dossiers.</p>
           </div>
           <div class="header-actions">
+            <button class="btn btn-primary" id="resourceWizardBtn" type="button">+ Assistant de création</button>
             <a class="btn btn-outline-primary" href="admin-ressources-ordre.html">Réorganiser l'ordre</a>
           </div>
         </div>
         <div id="resourceEditNotice" class="alert alert-info d-none" role="alert"></div>
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-4" data-create-panel data-create-trigger="Création rapide (expert)" data-create-tone="btn-outline-secondary">
           <input id="resource_code" type="hidden">
           <div class="col-md-4">
             <label class="form-label" for="resource_label">Libellé</label>
@@ -176,7 +189,6 @@
           <div class="col-12">
             <div class="header-actions">
               <button class="btn btn-primary" id="saveResourceBtn" type="button">Ajouter la ressource</button>
-              <button class="btn btn-outline-secondary d-none" id="cancelResourceEditBtn" type="button">Annuler la modification</button>
             </div>
           </div>
         </div>
@@ -184,12 +196,12 @@
           <table class="table align-middle draft-table">
             <thead>
               <tr>
-                <th>Ressource</th>
-                <th>Catégorie</th>
-                <th>Service</th>
+                <th data-sort-field="label">Ressource</th>
+                <th data-sort-field="category">Catégorie</th>
+                <th data-sort-field="service">Service</th>
                 <th>Suivi</th>
-                <th>Champs</th>
-                <th>État</th>
+                <th data-sort-field="fields">Champs</th>
+                <th data-sort-field="active">État</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
@@ -197,6 +209,107 @@
           </table>
         </div>
       </section>
+
+      <div class="password-generator-modal d-none" id="resourceEditModal" aria-hidden="true">
+        <div class="password-generator-modal__backdrop" data-resource-modal-close="true"></div>
+        <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="resourceEditModalTitle">
+          <div class="password-generator-modal__header">
+            <div>
+              <p class="panel-eyebrow">Ressource</p>
+              <h2 class="section-title" id="resourceEditModalTitle">Modifier la ressource</h2>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-resource-modal-close="true">Fermer</button>
+          </div>
+          <div class="password-generator-modal__content">
+            <input id="modalResourceCode" type="hidden">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="modalResourceLabel">Libellé</label>
+                <input class="form-control" id="modalResourceLabel" placeholder="Badge visiteur">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="modalResourceCategory">Catégorie</label>
+                <select class="form-select" id="modalResourceCategory">
+                  <option value="materiel">Matériel</option>
+                  <option value="immateriel">Immatériel</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="modalResourceIssuer">Service émetteur</label>
+                <select class="form-select" id="modalResourceIssuer">
+                  <option value="">Sélectionner un service</option>
+                </select>
+              </div>
+              <div class="col-12 d-flex gap-3">
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="modalResourceRequiresReturn">
+                  <span class="form-check-label">Restituable</span>
+                </label>
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" id="modalResourceActive">
+                  <span class="form-check-label">Active</span>
+                </label>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="modalResourceDescription">Description</label>
+                <textarea class="form-control" id="modalResourceDescription" rows="2" placeholder="Résumé court de la ressource et de son usage"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modalResourceDisplayOrder">Position dans la liste</label>
+                <select class="form-select" id="modalResourceDisplayOrder">
+                  <option value="10">Tout en haut</option>
+                  <option value="30">Début de liste</option>
+                  <option value="60" selected>Position standard</option>
+                  <option value="90">Plus bas</option>
+                  <option value="120">Fin de liste</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <div class="content-card admin-inner-card">
+                  <div class="section-heading mb-3">
+                    <div>
+                      <p class="panel-eyebrow">Suivi</p>
+                      <h3 class="section-title">Suivi à l'attribution</h3>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-3">
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentDate">
+                      <span class="form-check-label">Afficher la date d'attribution</span>
+                    </label>
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentCondition">
+                      <span class="form-check-label">Afficher l'état à la remise</span>
+                    </label>
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modalResourceHasAssignmentNotes">
+                      <span class="form-check-label">Afficher l'observation de remise</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="content-card admin-inner-card">
+                  <div class="section-heading mb-3">
+                    <div>
+                      <p class="panel-eyebrow">Champs</p>
+                      <h3 class="section-title">Structure de la ressource</h3>
+                    </div>
+                    <div class="header-actions">
+                      <button class="btn btn-outline-primary" id="modalAddResourceFieldBtn" type="button">Ajouter un champ</button>
+                    </div>
+                  </div>
+                  <div id="modalResourceFieldRows" class="resource-field-builder"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="password-generator-modal__actions">
+            <button class="btn btn-outline-secondary" type="button" data-resource-modal-close="true">Annuler</button>
+            <button class="btn btn-primary" id="modalSaveResourceBtn" type="button">Enregistrer</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -204,8 +317,10 @@
 <!-- Scripts mutualisés de branding et d'administration. -->
 <script src="js/branding.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/admin-nav.js"></script>
 <script src="js/global-search.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-resource-wizard.js"></script>
 </body>
 </html>
 

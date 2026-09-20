@@ -144,6 +144,26 @@ Le groupe `lecture` ne peut pas :
 
 Dans les PDF exportes par un profil `lecture`, les signatures sont masquees et remplacees par une mention reservee aux personnes autorisees.
 
+## Parc matériel et stocks
+
+Menu *Mon compte > Parc matériel* (visible pour qui consulte les dossiers).
+
+**Objets suivis un par un** (ordinateur, badge, véhicule…) : la liste montre l'état de chaque objet (en stock, réservé, attribué, dégradé, perdu, en réparation, réformé). Cliquer sur *Fiche* ouvre sa frise chronologique. Les personnes disposant du droit de gestion peuvent déclarer un objet perdu, retrouvé, en réparation ou réformé, ajouter une note, corriger son identifiant, le transférer ou fusionner un doublon. Un objet choisi dans un brouillon est **réservé** : un autre dossier ne peut pas le choisir en même temps (la réservation est libérée après 30 jours sans activité).
+
+**Stocks par quantité** (vêtements, consommables) : la section *Stocks par quantité* affiche, par taille, le nombre en stock et le nombre détenu par des agents. Le stock baisse à la signature d'un dossier, remonte à la restitution en bon état, et revient si le dossier est supprimé. Les personnes autorisées enregistrent une **réception**, un **ajustement d'inventaire** (note obligatoire) ou une **perte**, et règlent un **seuil d'alerte** : « Stock bas » s'affiche quand le total l'atteint. Un stock négatif est signalé « à vérifier ».
+
+**Import du parc initial** : un fichier CSV peut être analysé à blanc puis importé (droit de gestion du parc).
+
+Les noms des détenteurs sont masqués pour les profils à données masquées et anonymisés après la durée de conservation réglée par l'administrateur.
+
+## Mon profil
+
+Menu *Mon compte > Mon profil* : modifier son adresse e-mail (facultative) et renseigner son nom et prénom (une seule fois). L'identifiant de connexion ne peut pas être modifié.
+
+## Sauvegardes (administrateurs)
+
+*Administration > Base de données* : créer une sauvegarde (avec un mot de passe pour la chiffrer), la télécharger, en analyser une avant de la restaurer, l'envoyer vers un dossier réseau, et programmer une **sauvegarde automatique** (fréquence, jour, heure, durée de conservation). Conserver le mot de passe : sans lui, une sauvegarde chiffrée ne peut pas être restaurée.
+
 ## Journal
 
 La page `Journal` permet de :

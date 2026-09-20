@@ -5,14 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connexion</title>
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<link rel="preload" as="image" href="/assets/a-quai-logo.png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="login-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
 
 <!-- Écran d'authentification scindé entre bloc marque et bloc formulaire. -->
-<main class="login-layout">
+<main id="main" class="login-layout">
   <section class="login-brand-panel">
     <div class="login-brand-panel__content">
       <figure class="product-hero-card product-hero-card--login" aria-label="Illustration de l'application A quai">
@@ -28,7 +29,7 @@
     <div class="login-card">
       <div class="login-card__header">
         <p class="panel-eyebrow">Connexion</p>
-        <h2 class="panel-title" data-text="login.title">Connexion</h2>
+        <h1 class="panel-title" data-text="login.title">Connexion</h1>
       </div>
 
       <div id="loginNotice" class="alert alert-info d-none" role="status"></div>
@@ -58,11 +59,11 @@
           <input id="password" class="form-control form-control-lg" type="password" name="password" autocomplete="current-password" data-placeholder="login.passwordPlaceholder" placeholder="Votre mot de passe" required>
         </div>
         <button class="btn btn-primary btn-lg w-100" type="submit" data-text="login.submit">Se connecter</button>
-        <a class="btn btn-outline-primary btn-lg w-100" href="/signup">S'inscrire</a>
+        <a class="btn btn-link w-100" href="/signup">Pas de compte ? Faire une demande</a>
       </form>
 
       <div class="login-footnote">
-        <h3 class="login-footnote__title" data-text="login.securityTitle">Usage interne</h3>
+        <h2 class="login-footnote__title" data-text="login.securityTitle">Usage interne</h2>
         <p class="login-footnote__text" data-text="login.securityText">Cet outil est réservé aux agents habilités de la commune pour la gestion des parcours agents et élu(e)s.</p>
         <p class="login-footnote__text" data-text="login.supportText">En cas de difficulté, rapprochez-vous de l'administration de l'application.</p>
       </div>

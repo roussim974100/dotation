@@ -14,7 +14,7 @@ from models.audit import insert_audit_event, insert_app_log
 from models.workflow import (
     collect_resource_entries, collect_resource_validation_errors,
     compute_effective_workflow_status, summarize_assignment_progress,
-    summarize_dynamic_resource, is_restitution_eligible_material_details,
+    summarize_resource_item_details, is_restitution_eligible_material_details,
     describe_assignment_condition, extract_items,
 )
 from models.dossier import sync_person_and_dossier
@@ -389,6 +389,20 @@ def persist_form(payload, allow_locked_update=False):
                 for item in items
             ],
         )
+        # Parc : alimente unites et journal (ne doit jamais empecher l'enregistrement du dossier).
+        try:
+            from models.units import sync_units_for_form
+            sync_units_for_form(connection, form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du parc impossible pour le dossier %s", form_id, exc_info=True)
+        try:
+            from models.stock import sync_stock_for_form
+            sync_stock_for_form(connection, form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du stock impossible pour le dossier %s", form_id, exc_info=True)
+
         insert_audit_event(
             connection,
             dossier_id,
@@ -419,14 +433,14 @@ def persist_form(payload, allow_locked_update=False):
     return get_form(form_id)
 
 
-def row_to_summary(row):
+def row_to_summary(row, warning_days=None):
     payload = {}
     try:
         payload = json.loads(row["payload_json"] or "{}")
     except (TypeError, json.JSONDecodeError):
         payload = {}
     effective_status = compute_effective_workflow_status(payload)
-    progress = summarize_assignment_progress(payload)
+    progress = summarize_assignment_progress(payload, warning_days)
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],
@@ -486,6 +500,7 @@ def get_form(form_id):
             (form_id,)
         ).fetchall()
         selected_item_ids = {r["item_id"] for r in selections}
+        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
 
     payload = json.loads(form_row["payload_json"])
 
@@ -519,7 +534,7 @@ def get_form(form_id):
         payload = mask_payload(payload)
 
     return {
-        "summary": row_to_summary(form_row),
+        "summary": row_to_summary(form_row, warning_days),
         "data": payload,
         "items": [
             {
@@ -598,11 +613,7 @@ def build_restitution_signature_public_payload(form_data, link_row):
     for item_key, state in (restitution.get("items") or {}).items():
         item = material_index.get(item_key, {})
         details = item.get("details") or {}
-        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
-            str(value).strip()
-            for key, value in details.items()
-            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
-        )
+        detail_text = summarize_resource_item_details(details)
         restitution_items.append(
             {
                 "label": item.get("label") or item_key,
@@ -641,107 +652,3 @@ def build_restitution_signature_public_payload(form_data, link_row):
             },
         },
     }
-
-
-# ==============================================================================
-# Multi-selection management (Attribution de ressources multiples)
-# ==============================================================================
-
-def save_item_selections(connection, form_id, item_ids_by_type):
-    """
-    Sauvegarder les sélections multiples d'items pour un dossier.
-
-    Args:
-        connection: DB connection
-        form_id: ID du dossier
-        item_ids_by_type: Dict {type: [item_ids]}
-                         Ex: {"ordinateurs": [1, 3], "telephones": [5]}
-    """
-    now = utc_now()
-
-    # Récupérer tous les items actuellement sélectionnés
-    current = connection.execute(
-        "SELECT item_id FROM dotation_item_selections WHERE form_id = ? AND returned_at IS NULL",
-        (form_id,)
-    ).fetchall()
-    current_ids = {r[0] for r in current}
-
-    # Construire la liste des nouveaux item_ids à sélectionner
-    new_ids = set()
-    for type_key, ids in (item_ids_by_type or {}).items():
-        new_ids.update(ids if isinstance(ids, list) else [ids])
-
-    # Supprimer les sélections qui ne sont plus valides
-    for item_id in current_ids - new_ids:
-        connection.execute(
-            "DELETE FROM dotation_item_selections WHERE form_id = ? AND item_id = ? AND returned_at IS NULL",
-            (form_id, item_id)
-        )
-
-    # Ajouter les nouvelles sélections
-    for item_id in new_ids - current_ids:
-        connection.execute(
-            """INSERT INTO dotation_item_selections (form_id, item_id, assigned_at)
-               VALUES (?, ?, ?)""",
-            (form_id, item_id, now)
-        )
-
-
-def get_item_selections(connection, form_id):
-    """
-    Récupérer tous les items sélectionnés pour un dossier.
-
-    Returns:
-        List of dicts: [{item_id, item_label, resource_type, assigned_at, ...}]
-    """
-    rows = connection.execute(
-        """SELECT dis.id, dis.item_id, di.label, di.resource_type, di.serial_number,
-                  dis.assigned_at, dis.returned_at, dis.returned_status, dis.notes
-           FROM dotation_item_selections dis
-           JOIN dotation_items di ON dis.item_id = di.id
-           WHERE dis.form_id = ? AND dis.returned_at IS NULL
-           ORDER BY di.resource_type, di.label""",
-        (form_id,)
-    ).fetchall()
-
-    return [
-        {
-            "id": r["id"],
-            "item_id": r["item_id"],
-            "label": r["label"],
-            "resource_type": r["resource_type"],
-            "serial_number": r["serial_number"],
-            "assigned_at": r["assigned_at"],
-        }
-        for r in rows
-    ]
-
-
-def get_items_with_selection_status(connection, form_id):
-    """
-    Récupérer tous les items du dossier avec leur statut de sélection.
-    Utile pour afficher les checkboxes dans le formulaire.
-
-    Returns:
-        List of dicts: [{item_id, label, resource_type, is_selected}]
-    """
-    rows = connection.execute(
-        """SELECT di.id, di.label, di.resource_type,
-                  CASE WHEN dis.item_id IS NOT NULL THEN 1 ELSE 0 END as is_selected
-           FROM dotation_items di
-           LEFT JOIN dotation_item_selections dis
-                ON di.id = dis.item_id AND dis.form_id = ? AND dis.returned_at IS NULL
-           WHERE di.form_id = ?
-           ORDER BY di.resource_type, di.label""",
-        (form_id, form_id)
-    ).fetchall()
-
-    return [
-        {
-            "item_id": r["id"],
-            "label": r["label"],
-            "resource_type": r["resource_type"],
-            "is_selected": bool(r["is_selected"]),
-        }
-        for r in rows
-    ]
