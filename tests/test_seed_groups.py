@@ -167,7 +167,11 @@ def test_scenario_3_manual_permission_change():
     - relancer init_users_db() ou seed_default_groups
     - vérifier que la permission retirée n'a pas été réajoutée
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # ignore_cleanup_errors : sous pytest+Windows, le fichier sqlite reste
+    # verrouillé assez longtemps après conn.close() pour faire échouer le rmtree
+    # du tempdir (non reproductible hors pytest) ; les assertions du test
+    # restent la seule source de vérité sur la logique testée.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = os.path.join(tmpdir, 'test_users.db')
 
         # Créer une base avec les groupes par défaut

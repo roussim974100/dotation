@@ -1,3 +1,12 @@
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const STATUS_LABELS = {
   draft: "À compléter", active: "Actif",
   partial_assignment: "Attribution partielle",
@@ -144,7 +153,7 @@ async function loadStats() {
     const data = await response.json();
     allData = data;
 
-    renderKpis(data.kpis);
+    renderKpis(data.kpis, data.period);
     renderCharts(data);
     renderAlertes(data.alertes, data.kpis.alerte_seuil);
     renderServicesTable(data.by_service);
@@ -154,8 +163,17 @@ async function loadStats() {
   }
 }
 
-function renderKpis(kpis) {
+function renderKpis(kpis, period) {
   const byId = (id) => document.getElementById(id);
+  // Total et actifs suivent la periode choisie ; taux de restitution et alertes portent sur tous les dossiers.
+  const periodLabel = (period?.label || "période").toLowerCase();
+  const scopes = {
+    kpiTotalScope: `créés · ${periodLabel}`,
+    kpiActifsScope: `créés · ${periodLabel}`,
+    kpiRestitutionScope: "tous dossiers",
+    kpiAlertesScope: `brouillons > ${kpis.alerte_seuil || 30} j · tous dossiers`
+  };
+  Object.entries(scopes).forEach(([id, text]) => { if (byId(id)) byId(id).textContent = text; });
   if (byId("kpiTotal")) byId("kpiTotal").textContent = kpis.total || 0;
   if (byId("kpiActifs")) byId("kpiActifs").textContent = kpis.actifs || 0;
   if (byId("kpiRestitution")) byId("kpiRestitution").textContent = `${kpis.taux_restitution || 0}%`;
@@ -371,10 +389,10 @@ function renderAlertes(alertes, seuil) {
 
   const rows = alertes.map(a => `
     <tr>
-      <td><strong>${a.nom} ${a.prenom}</strong></td>
-      <td>${a.service}</td>
+      <td><strong>${escapeHtml(a.nom)} ${escapeHtml(a.prenom)}</strong></td>
+      <td>${escapeHtml(a.service)}</td>
       <td><span class="badge bg-danger">${a.jours_blocage} j</span></td>
-      <td>${STATUS_LABELS[a.status] || a.status}</td>
+      <td>${escapeHtml(STATUS_LABELS[a.status] || a.status)}</td>
       <td class="text-end">
         <a href="form.html?id=${encodeURIComponent(a.id)}" class="btn btn-sm btn-primary">Ouvrir</a>
       </td>
@@ -404,8 +422,8 @@ function renderServicesTable(by_service) {
   if (!container || !by_service) return;
 
   const rows = by_service.slice(0, 20).map(s => `
-    <tr style="cursor:pointer" onclick="window.location.href='/index.html?service=${encodeURIComponent(s.service)}'">
-      <td><strong>${s.service}</strong></td>
+    <tr style="cursor:pointer" tabindex="0" data-service-link="${escapeHtml(encodeURIComponent(s.service))}">
+      <td><strong>${escapeHtml(s.service)}</strong></td>
       <td>${s.count}</td>
     </tr>
   `).join("");
@@ -423,6 +441,23 @@ function renderServicesTable(by_service) {
       </tbody>
     </table>
   `;
+
+  // Navigation par delegation : la CSP interdit les handlers inline (onclick=).
+  const goToService = (row) => {
+    window.location.href = `/index.html?service=${row.dataset.serviceLink}`;
+  };
+  container.onclick = (event) => {
+    const row = event.target.closest("[data-service-link]");
+    if (row) goToService(row);
+  };
+  container.onkeydown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const row = event.target.closest("[data-service-link]");
+    if (row) {
+      event.preventDefault();
+      goToService(row);
+    }
+  };
 }
 
 function showError(message) {

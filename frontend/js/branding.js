@@ -2,9 +2,10 @@
 // Le logo reste masqué jusqu'à ce que le bon visuel soit prêt,
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
-const APP_BUILD_VERSION = "3.18.5-prod";
+// Numéro de version, IDENTIQUE dans toutes les branches (dev, preprod, prod) : l'environnement est décidé par le serveur.
+const APP_BUILD_VERSION = "3.50.0";
 const APP_FIXED_NAME = "A quai";
-const APP_PRIMARY_LOGO_URL = "/assets/a-quai-hero.png";
+const APP_PRIMARY_LOGO_URL = "/assets/a-quai-logo.png";
 const COOKIECONSENT_VERSION = "3.1.0";
 const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
 const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
@@ -179,7 +180,7 @@ function bindHomeBrandLinks() {
 }
 
 function ensureAppFooter() {
-  if (document.querySelector("[data-app-footer]")) {
+  if (isPublicSignaturePage() || document.querySelector("[data-app-footer]")) {
     return;
   }
 
@@ -208,7 +209,7 @@ function ensureAppFooter() {
   appName.textContent = APP_FIXED_NAME;
   const version = document.createElement("span");
   version.className = "app-footer__version";
-  version.textContent = `Version ${APP_BUILD_VERSION}`;
+  version.textContent = `Version ${appDisplayVersion()}`;
   identityWrap.append(appName, version);
   const identityText = document.createElement("p");
   identityText.className = "app-footer__text";
@@ -693,6 +694,64 @@ function applyBrandingTheme(settings) {
   root.style.setProperty("--border", palette.border);
 }
 
+// Pages de signature publiques (lien envoye a un signataire externe, pas un
+// utilisateur de l'appli) : ne jamais y afficher de metadonnees internes
+// (version, pastille d'environnement, navigation/support de l'appli).
+function isPublicSignaturePage() {
+  return document.body?.dataset.publicSignaturePage === "true";
+}
+
+// Pastille d'environnement dans l'en-tete : reconnaitre en un coup d'oeil qu'on est
+// sur la branche dev (utile en preprod pour savoir ce qui a ete deploye). Injectee en
+// JS (pas dans le HTML) pour ne pas dupliquer le markup sur chaque page.
+// Environnement de l'instance (dev / preprod / prod) : fourni par le serveur avec les réglages publics ; le repli sur le
+// suffixe de la version ne sert qu'aux anciennes installations (« 3.18.5-prod »).
+function appEnvironment() {
+  const fromServer = window.APP_BRANDING?.environment;
+  if (fromServer) {
+    return String(fromServer).toLowerCase();
+  }
+  return (APP_BUILD_VERSION.split("-")[1] || "").toLowerCase();
+}
+
+function appDisplayVersion() {
+  const base = APP_BUILD_VERSION.split("-")[0];
+  const environment = appEnvironment();
+  return environment ? `${base}-${environment}` : base;
+}
+
+// Pastille d'environnement selon l'environnement de l'instance : « -dev » -> DEV, « -preprod » -> PREPROD ; aucune en production.
+const ENV_BADGES = {
+  dev: { label: "DEV", title: "Cette instance tourne sur la branche de developpement (dev)" },
+  preprod: { label: "PREPROD", title: "Cette instance est la preproduction : version en validation avant la production" }
+};
+
+function applyEnvironmentBadge() {
+  if (isPublicSignaturePage()) {
+    document.getElementById("envBadge")?.remove();
+    return;
+  }
+  const suffix = appEnvironment();
+  const environment = ENV_BADGES[suffix];
+  if (!environment) {
+    document.getElementById("envBadge")?.remove();
+    return;
+  }
+  const title = document.querySelector(".app-header .app-title");
+  if (!title) {
+    return;
+  }
+  let badge = document.getElementById("envBadge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.id = "envBadge";
+    title.appendChild(badge);
+  }
+  badge.className = `env-badge env-badge--${suffix}`;
+  badge.title = environment.title;
+  badge.textContent = environment.label;
+}
+
 function applyBrandingContent(settings) {
   const orgName = settings?.orgName || APP_FIXED_NAME;
   const appName = APP_FIXED_NAME;
@@ -757,8 +816,12 @@ function applyBrandingContent(settings) {
   });
 
   document.querySelectorAll("[data-app-version]").forEach((node) => {
-    node.textContent = APP_BUILD_VERSION;
+    node.textContent = appDisplayVersion();
   });
+  document.querySelectorAll(".app-footer__version").forEach((node) => {
+    node.textContent = `Version ${appDisplayVersion()}`;
+  });
+  applyEnvironmentBadge();
 
   // Radios qualité dynamiques
   const beneficiaryTypes = settings?.beneficiaryTypes || [

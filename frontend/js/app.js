@@ -64,7 +64,7 @@ const DOSSIER_TYPE_LABELS = {
   arrivee: "Nouvelle arrivée",
   changement_service: "Changement de service",
   mise_a_jour: "Mise à jour de ressources",
-  sortie: "Sortie / restitution"
+  sortie: "Sortie"
 };
 const DEFAULT_SERVICE_OPTIONS = [];
 let serviceOptions = [...DEFAULT_SERVICE_OPTIONS];
@@ -191,7 +191,7 @@ function addProgressIndicator(fieldId) {
   const badge = document.createElement("span");
   badge.className = "progress-required-badge";
   badge.dataset.progressRequiredBadge = "true";
-  badge.textContent = "À renseigner";
+  badge.textContent = "Requis";
   label.appendChild(badge);
 }
 
@@ -317,6 +317,138 @@ function bindSignatureProtectionHandlers() {
   }
 }
 
+// Reprend un materiel restitue : la liste vient de /api/catalog/available/<ressource> (unites dont la derniere
+// ligne est restituee) et le choix remplit tous les champs de la ressource, sans ressaisie.
+async function openReuseResourceModal(resourceId) {
+  if (document.getElementById("dotationForm")?.dataset.lockedAt) {
+    showToast("Fiche verrouillée : elle ne peut plus être modifiée.", "warning");
+    return;
+  }
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(resourceId));
+  if (!resource) return;
+  let data;
+  try {
+    data = await requestJson(`/api/catalog/available/${encodeURIComponent(resourceId)}`);
+  } catch (error) {
+    showToast("Impossible de charger le matériel disponible.", "error");
+    return;
+  }
+
+  let modal = document.getElementById("reuseResourceModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "reuseResourceModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="password-generator-modal__backdrop" data-reuse-close="true"></div>
+      <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reuseResourceTitle">
+        <div class="password-generator-modal__header">
+          <div><p class="panel-eyebrow">Matériel restitué</p><h2 class="section-title" id="reuseResourceTitle"></h2></div>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-reuse-close="true">Fermer</button>
+        </div>
+        <div class="password-generator-modal__content">
+          <input class="form-control" id="reuseResourceSearch" type="search" placeholder="Rechercher (n° de série, marque, modèle…)" autocomplete="off">
+          <div class="list-group" id="reuseResourceList" role="list"></div>
+          <p class="form-text mb-0" id="reuseResourceHint"></p>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.querySelector("#reuseResourceTitle").textContent = resource.label;
+  const search = modal.querySelector("#reuseResourceSearch");
+  const list = modal.querySelector("#reuseResourceList");
+  const hint = modal.querySelector("#reuseResourceHint");
+  const schema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+  const labelOf = (key) => schema.find((field) => field.key === key)?.label || key;
+  const summary = (item) => Object.entries(item.fields)
+    .filter(([key]) => key !== data.identifierKey)
+    .map(([, value]) => String(value)).join(" · ");
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const close = () => {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+
+  const render = () => {
+    const query = normalize(search.value);
+    const items = data.items.filter((item) => !query || normalize(`${item.identifier} ${summary(item)}`).includes(query));
+    list.innerHTML = items.map((item, index) => `
+      <button class="list-group-item list-group-item-action" type="button" data-reuse-index="${data.items.indexOf(item)}">
+        <span class="fw-semibold">${escapeHtml(labelOf(data.identifierKey))} : ${escapeHtml(item.identifier)}</span>
+        ${item.status === "degraded" ? '<span class="status-chip status-chip--draft ms-2">Restitué dégradé</span>' : ""}
+        <span class="d-block small text-muted">${escapeHtml(summary(item))}${item.returned_at ? ` · restitué le ${escapeHtml(new Date(item.returned_at).toLocaleDateString("fr-FR"))}` : ""}</span>
+      </button>`).join("");
+    hint.textContent = !data.items.length
+      ? "Aucun matériel restitué disponible pour cette ressource : il se remplit au fil des restitutions."
+      : (items.length ? `${items.length} matériel(s) disponible(s).` : "Aucun résultat pour cette recherche.");
+  };
+
+  list.onclick = (event) => {
+    const button = event.target.closest("[data-reuse-index]");
+    if (!button) return;
+    const item = data.items[Number(button.dataset.reuseIndex)];
+    const checkbox = document.getElementById(`dynamic_resource_${resource.id}`);
+    if (checkbox && !checkbox.checked) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    schema.forEach((field) => {
+      const input = document.getElementById(`dynamic_resource_${resource.id}_${field.key}`);
+      if (!input) return;
+      input.value = item.fields[field.key] ?? "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    close();
+    showToast(`« ${item.identifier} » repris : vérifiez l'état à la remise et la date d'attribution.`, item.status === "degraded" ? "warning" : "success");
+  };
+  modal.querySelectorAll("[data-reuse-close]").forEach((button) => { button.onclick = close; });
+  search.oninput = render;
+  search.value = "";
+  render();
+  document.addEventListener("keydown", onKeydown);
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+  search.focus();
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reuse-resource]");
+  if (button) void openReuseResourceModal(button.dataset.reuseResource);
+});
+
+// Avertissement (non bloquant) quand le n° de serie / badge saisi est deja attribue dans un autre dossier.
+document.addEventListener("change", async (event) => {
+  const input = event.target.closest?.(".dynamic-resource-field");
+  if (!input) return;
+  const resource = dynamicResourceReferences.find((item) => String(item.id) === String(input.dataset.resourceId));
+  if (!resource || !resource.identifier_key || input.dataset.fieldKey !== resource.identifier_key) return;
+  let warning = input.parentElement.querySelector(".resource-duplicate-warning");
+  if (!warning) {
+    warning = document.createElement("div");
+    warning.className = "form-text text-warning resource-duplicate-warning";
+    warning.setAttribute("role", "status");
+    input.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "";
+  const value = input.value.trim();
+  if (!value) return;
+  try {
+    const exclude = document.getElementById("dotationForm")?.dataset.draftId || "";
+    const data = await requestJson(`/api/catalog/holder/${encodeURIComponent(resource.id)}?value=${encodeURIComponent(value)}&exclude=${encodeURIComponent(exclude)}`);
+    if (data.holder) {
+      const since = data.holder.since ? ` depuis le ${new Date(data.holder.since).toLocaleDateString("fr-FR")}` : "";
+      warning.textContent = `Attention : « ${value} » est déjà attribué dans un autre dossier${data.holder.service ? ` (service ${data.holder.service})` : ""}${since}. Vérifiez qu'il a bien été restitué.`;
+    }
+  } catch (error) {
+    // Controle de confort : une erreur reseau ne doit pas gener la saisie.
+  }
+});
+
 function buildDynamicFieldInput(resource, field) {
   const inputId = `dynamic_resource_${resource.id}_${field.key}`;
   const placeholder = field.placeholder || field.label;
@@ -389,6 +521,7 @@ function buildDynamicFieldInput(resource, field) {
     <div>
       <label class="form-label" for="${escapeAttribute(inputId)}">${escapeHtml(field.label)}</label>
       <input class="form-control dynamic-resource-field" type="${escapeAttribute(type)}" id="${escapeAttribute(inputId)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}" data-field-type="${escapeAttribute(type)}"${requiredAttribute} placeholder="${escapeAttribute(placeholder)}">
+      ${field.identifier ? "<div class=\"form-text\">Pour renuméroter un objet déjà suivi, utilisez d'abord Parc → Corriger l'identifiant : sinon un doublon est créé.</div>" : ""}
     </div>
   `;
 }
@@ -788,8 +921,16 @@ async function loadDynamicResourceReferences() {
 
   const buildResourceCard = (resource) => {
     const fieldSchema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+    const visibleFieldSchema = fieldSchema.filter((field) => !field.hidden);
+    // Champs masques (cf admin Ressources) : rendus en input hidden pour que leur valeur
+    // deja saisie survive au prochain enregistrement (getDynamicResourceFieldValue les lit
+    // normalement), sans les proposer a la saisie.
+    const hiddenFieldsMarkup = fieldSchema
+      .filter((field) => field.hidden)
+      .map((field) => `<input type="hidden" class="dynamic-resource-field" id="dynamic_resource_${escapeAttribute(resource.id)}_${escapeAttribute(field.key)}" data-resource-id="${escapeAttribute(resource.id)}" data-field-key="${escapeAttribute(field.key)}">`)
+      .join("");
     const fieldsMarkup = fieldSchema.length
-      ? `<div class="subgrid">${fieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>`
+      ? `${visibleFieldSchema.length ? `<div class="subgrid">${visibleFieldSchema.map((field) => buildDynamicFieldInput(resource, field)).join("")}</div>` : ""}${hiddenFieldsMarkup}`
       : `
         <div class="mt-3">
           <label class="form-label" for="dynamic_resource_details_${escapeAttribute(resource.id)}">Précision / Détails</label>
@@ -812,6 +953,7 @@ async function loadDynamicResourceReferences() {
         </div>
         ${descriptionMarkup}
         <div id="dynamic_resource_fields_wrap_${escapeAttribute(resource.id)}" class="d-none equipment-item__body">
+          ${resource.identifier_key ? `<div class="mb-2"><button type="button" class="btn btn-sm btn-outline-primary" data-reuse-resource="${escapeAttribute(resource.id)}">Reprendre un matériel déjà restitué</button></div>` : ""}
           ${fieldsMarkup}
           ${trackingMarkup}
         </div>
@@ -1637,7 +1779,7 @@ function initRetraitsSection() {
       resultsDiv.innerHTML = forms
         .map(
           (f) =>
-            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${f.id}">${f.title}</button>`
+            `<button type="button" class="list-group-item list-group-item-action retrait-form-option" data-form-id="${escapeHtml(f.id)}">${escapeHtml(f.title)}</button>`
         )
         .join("");
       resultsDiv.classList.toggle("d-none", forms.length === 0);
@@ -1762,8 +1904,8 @@ function initRetraitsSection() {
         <div class="card">
           <div class="card-body">
             <div class="form-check mb-2">
-              <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}">
-              <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+              <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}">
+              <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
             </div>
             <div class="row g-2">
               <div class="col-md-6">
@@ -2111,23 +2253,6 @@ function populateUncAcces(entries = []) {
   entries.forEach(e => list.appendChild(createUncRow(e)));
 }
 
-function buildSelectedItems() {
-  // Construire le dictionnaire {triggerKey: [id1, id2, ...]} pour les ressources sélectionnées
-  const selectedItems = {};
-
-  // Collecter les ressources dynamiques sélectionnées
-  const additionalResources = getAdditionalResourcesData();
-  additionalResources.forEach((resource) => {
-    const key = resource.triggerKey || String(resource.id);
-    if (!selectedItems[key]) {
-      selectedItems[key] = [];
-    }
-    selectedItems[key].push(resource.id);
-  });
-
-  return selectedItems;
-}
-
 function getFormData(signaturePad) {
   // Produit le payload métier complet qui sera envoyé à l'API.
   const now = new Date().toISOString();
@@ -2184,7 +2309,6 @@ function getFormData(signaturePad) {
     resources: {
       additional: getAdditionalResourcesData()
     },
-    selectedItems: buildSelectedItems(),
     unc_acces: getUncAccesData(),
     unc_ref_ad: getUncRefAd(),
     restitution: currentRestitutionData,
@@ -2208,9 +2332,17 @@ function populateForm(data, signaturePad) {
 
   form.dataset.draftId = data.meta.id || "";
   form.dataset.lockedAt = data.meta.lockedAt || "";
+  void renderLockedDossierActions(data.workflow?.status);
   document.getElementById("nom").value = data.beneficiaire.nom || "";
     document.getElementById("prenom").value = data.beneficiaire.prenom || "";
-    document.getElementById("dossier_type").value = normalizeDossierType(data.dossier.type || "arrivee");
+    const loadedDossierType = normalizeDossierType(data.dossier.type || "arrivee");
+    const dossierTypeSelect = document.getElementById("dossier_type");
+    // "Sortie" n'est plus proposé à la création (les restitutions ont leur propre parcours),
+    // mais les dossiers existants de ce type doivent rester ouvrables sans changer de type.
+    if (loadedDossierType === "sortie" && !dossierTypeSelect.querySelector('option[value="sortie"]')) {
+      dossierTypeSelect.add(new Option(DOSSIER_TYPE_LABELS.sortie, "sortie"));
+    }
+    dossierTypeSelect.value = loadedDossierType;
     setServiceValue(data.beneficiaire.service || "");
     setServiceDestinationValue(data.dossier.serviceDestination || "");
   document.getElementById("fonction").value = data.beneficiaire.fonction || "";
@@ -2255,13 +2387,13 @@ function populateForm(data, signaturePad) {
             <div class="card">
               <div class="card-body">
                 <div class="form-check mb-2">
-                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${item.item_key}" id="retrait_${item.item_key}" data-item-key="${item.item_key}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
-                  <label class="form-check-label fw-500" for="retrait_${item.item_key}">${item.label}</label>
+                  <input class="form-check-input retrait-checkbox" type="checkbox" value="${escapeHtml(item.item_key)}" id="retrait_${escapeHtml(item.item_key)}" data-item-key="${escapeHtml(item.item_key)}" ${retraitsData.items?.[item.item_key]?.selected ? "checked" : ""}>
+                  <label class="form-check-label fw-500" for="retrait_${escapeHtml(item.item_key)}">${escapeHtml(item.label)}</label>
                 </div>
                 <div class="row g-2">
                   <div class="col-md-6">
                     <label class="form-label small text-muted">État</label>
-                    <select class="form-select form-select-sm retrait-etat" data-item-key="${item.item_key}">
+                    <select class="form-select form-select-sm retrait-etat" data-item-key="${escapeHtml(item.item_key)}">
                       <option value="Bon" ${retraitsData.items?.[item.item_key]?.etat === "Bon" ? "selected" : ""}>Bon</option>
                       <option value="Dégâts" ${retraitsData.items?.[item.item_key]?.etat === "Dégâts" ? "selected" : ""}>Dégâts</option>
                       <option value="Autre" ${retraitsData.items?.[item.item_key]?.etat === "Autre" ? "selected" : ""}>Autre</option>
@@ -2269,7 +2401,7 @@ function populateForm(data, signaturePad) {
                   </div>
                   <div class="col-md-6">
                     <label class="form-label small text-muted">Notes</label>
-                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${item.item_key}" placeholder="Observations…" value="${retraitsData.items?.[item.item_key]?.notes || ""}">
+                    <input type="text" class="form-control form-control-sm retrait-notes" data-item-key="${escapeHtml(item.item_key)}" placeholder="Observations…" value="${escapeHtml(retraitsData.items?.[item.item_key]?.notes || "")}">
                   </div>
                 </div>
               </div>
@@ -2515,12 +2647,37 @@ async function createSignatureLink(options = {}) {
   }
 }
 
+// "Nouvelle attribution pour cette personne" : reprend l'identite d'un dossier existant, rien d'autre.
+async function prefillIdentityFromForm(sourceId) {
+  try {
+    const result = await requestJson(`/api/forms/${encodeURIComponent(sourceId)}`);
+    const person = result?.data?.beneficiaire || {};
+    ["nom", "prenom", "fonction", "mandat"].forEach((key) => {
+      const el = document.getElementById(key);
+      if (el && person[key]) el.value = person[key];
+    });
+    const radio = person.qualite && document.querySelector(`input[name="qualite"][value="${person.qualite}"]`);
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (person.service) setServiceValue(person.service);
+    showToast("Identité reprise du dossier précédent.", "info");
+  } catch (error) {
+    showToast("Impossible de reprendre l'identité du dossier précédent.", "warning");
+  }
+}
+
 async function loadDraftFromUrl(signaturePad) {
   // Ouvre une fiche existante si l'URL contient id=...
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
 
   if (!id) {
+    const prefillFrom = params.get("prefillFrom");
+    if (prefillFrom) {
+      await prefillIdentityFromForm(prefillFrom);
+    }
     form.dataset.draftId = "";
     form.dataset.lockedAt = "";
     form.dataset.workflowStatus = "draft";
@@ -2629,12 +2786,119 @@ function setSaveButtonLoading(loading) {
   }
 }
 
+function setUnsavedIndicator(isDirty) {
+  document.getElementById("unsavedBadge")?.classList.toggle("d-none", !isDirty);
+}
+
 function markFormDirty() {
   formDirty = true;
+  setUnsavedIndicator(true);
 }
 
 function markFormClean() {
   formDirty = false;
+  setUnsavedIndicator(false);
+}
+
+// Sommaire des sections (chips collants) et sections repliables : construits depuis le DOM,
+// donc valables aussi pour les sections de ressources generees dynamiquement.
+function shortSectionLabel(title) {
+  const label = title.replace(/^Ressources remises par le service\s+/i, "");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function refreshFormSections() {
+  const form = document.getElementById("dotationForm");
+  if (!form) return;
+  const sections = [...form.querySelectorAll("section.content-card")]
+    .filter((section) => section.querySelector(".section-title") && section.offsetParent !== null);
+
+  let toc = document.getElementById("formToc");
+  if (!toc) {
+    toc = document.createElement("nav");
+    toc.id = "formToc";
+    toc.className = "dashboard-nav form-toc no-print";
+    toc.setAttribute("aria-label", "Sections du dossier");
+    form.prepend(toc);
+    toc.addEventListener("click", (event) => {
+      const link = event.target.closest("a[data-toc-target]");
+      if (!link) return;
+      event.preventDefault();
+      document.getElementById(link.dataset.tocTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  sections.forEach((section, index) => {
+    section.id = section.id || `form-section-${index}`;
+    const heading = section.querySelector(".section-heading");
+    if (heading && !heading.dataset.collapsibleInit && section.id !== "section-personne" && section.id !== "section-validation") {
+      heading.dataset.collapsibleInit = "true";
+      heading.classList.add("section-heading--collapsible");
+      heading.setAttribute("role", "button");
+      heading.setAttribute("tabindex", "0");
+      heading.setAttribute("aria-expanded", "true");
+      const toggle = () => {
+        const collapsed = section.classList.toggle("is-collapsed");
+        heading.setAttribute("aria-expanded", String(!collapsed));
+      };
+      heading.addEventListener("click", toggle);
+      heading.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+    }
+    if (heading) {
+      const count = section.querySelectorAll('input[type="checkbox"]:checked').length;
+      let badge = heading.querySelector("[data-section-count]");
+      if (count && !badge) {
+        badge = document.createElement("span");
+        badge.className = "section-count";
+        badge.dataset.sectionCount = "true";
+        heading.appendChild(badge);
+      }
+      if (badge) {
+        badge.textContent = count ? `${count} sélectionnée${count > 1 ? "s" : ""}` : "";
+        badge.classList.toggle("d-none", !count);
+      }
+    }
+  });
+  toc.innerHTML = sections.map((section) =>
+    `<a class="dashboard-nav__link" href="#${section.id}" data-toc-target="${section.id}">${escapeHtml(shortSectionLabel(section.querySelector(".section-title").textContent.trim()))}</a>`
+  ).join("");
+}
+
+let refreshFormSectionsTimer = null;
+function scheduleRefreshFormSections() {
+  window.clearTimeout(refreshFormSectionsTimer);
+  refreshFormSectionsTimer = window.setTimeout(refreshFormSections, 250);
+}
+
+// Dossier signe : les actions de suite (PDF, e-mail, restitution) sont proposees dans la barre du bas.
+async function renderLockedDossierActions(workflowStatus) {
+  const form = document.getElementById("dotationForm");
+  const bar = document.querySelector(".action-bar__buttons");
+  const id = form?.dataset.draftId;
+  if (!bar || !id) return;
+  bar.querySelectorAll("[data-locked-action]").forEach((btn) => btn.remove());
+  if (!form.dataset.lockedAt) return;
+  const user = await getSessionInfo();
+  const can = (permission) => user?.permissions?.includes("*") || user?.permissions?.includes(permission);
+  const actions = [
+    can("forms.export") && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
+    can("forms.export") && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
+    can("forms.restitution") && workflowStatus === "active" && { label: "Restituer", tone: "btn-primary", run: () => openRestitution(id) }
+  ].filter(Boolean);
+  const anchor = document.getElementById("saveDraftBtn");
+  actions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `btn ${action.tone}`;
+    btn.dataset.lockedAction = "true";
+    btn.textContent = action.label;
+    btn.addEventListener("click", action.run);
+    bar.insertBefore(btn, anchor);
+  });
 }
 
 function closeSaveProgress() {
@@ -2913,7 +3177,11 @@ window.addEventListener("unhandledrejection", (event) => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-back-to-index]").forEach((btn) => {
-    btn.addEventListener("click", () => { window.location.href = "index.html"; });
+    // Un dossier signé (verrouillé) vit dans "Attributions finalisées", les autres dans "Attributions en cours".
+    btn.addEventListener("click", () => {
+      const locked = Boolean(document.getElementById("dotationForm")?.dataset.lockedAt);
+      window.location.href = locked ? "assignments-completed.html" : "index.html";
+    });
   });
 
   if (!form) {
@@ -2989,6 +3257,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFormBootstrapStage("initialisation des blocs métier", "Préparation du formulaire...");
     ensureAssignmentConditionFields();
     initRepeatableResourceLists();
+    document.getElementById("dotationForm")?.addEventListener("change", scheduleRefreshFormSections);
+    window.setTimeout(refreshFormSections, 1200);
+    window.setTimeout(refreshFormSections, 3000);
     initConditionalBlocks();
     initQualite();
     bindProgressIndicatorRefresh();

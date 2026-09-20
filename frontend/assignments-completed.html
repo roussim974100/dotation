@@ -4,16 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
-<link rel="preload" as="image" href="/assets/a-quai-hero.png">
+<link rel="preload" as="image" href="/assets/a-quai-logo.png">
 <title>A quai</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="app-shell" data-dashboard-view="history_assignments">
+<a class="skip-link" href="#main">Aller au contenu</a>
 <header class="app-header">
   <div class="container app-header__inner">
     <div class="app-brand" data-home-link>
-      <img class="app-logo" data-brand-logo src="/assets/a-quai-hero.png" alt="Logo application">
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-logo.png" alt="Logo application">
       <div>
         <h1 class="app-title">Attributions finalisées</h1>
         <p class="app-subtitle">Attributions finalisées, signées et consultables.</p>
@@ -31,6 +32,7 @@
           <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
           <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
           <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide</a>
+          <a id="execDashboardLink" class="user-menu__item d-none" href="executive-dashboard.html">Synthèse</a>
           <a id="adminLink" class="user-menu__item d-none" href="admin.html">Administration</a>
           <div class="user-menu__sep"></div>
           <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
@@ -40,76 +42,59 @@
   </div>
 </header>
 
-<main class="container py-4 py-lg-5">
-  <section class="hero-panel mb-4">
-    <div>
-      <h2 class="panel-title">Attributions finalisées</h2>
-      <p class="panel-text">Retrouvez ici les attributions achevées pour consultation, export ou recherche ultérieure.</p>
-    </div>
-    <div class="hero-panel__meta">
-      <div class="hero-panel__stats hero-panel__stats--single">
-        <div class="stat-card">
-          <span class="stat-card__label">Attributions finalisées</span>
-          <strong class="stat-card__value" id="historyCountValue">0</strong>
-        </div>
+<main id="main" class="container py-4 py-lg-5">
+
+  <nav class="dashboard-nav mb-4" id="dashboardNav" aria-label="Navigation dossiers"></nav>
+
+  <div class="filter-toolbar">
+    <div class="filter-toolbar__grid">
+      <div class="filter-toolbar__search">
+        <label class="form-label" for="searchInput">Recherche</label>
+        <input id="searchInput" class="form-control" type="search" placeholder="Nom, prénom, service, titre…" autocomplete="off">
+      </div>
+      <div>
+        <label class="form-label" for="timingFilter">Pilotage</label>
+        <select id="timingFilter" class="form-select">
+          <option value="">Tous les pilotages</option>
+          <option value="ok">Prêt / Dans les temps</option>
+          <option value="warning">En danger</option>
+          <option value="late">En retard</option>
+          <option value="neutral">À planifier</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="qualiteFilter">Qualité</label>
+        <select id="qualiteFilter" class="form-select">
+          <option value="">Tous</option>
+          <option value="agent">Agent</option>
+          <option value="elu">Élu(e)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="serviceFilter">Service</label>
+        <select id="serviceFilter" class="form-select">
+          <option value="">Tous les services</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="sortFilter">Trier par</label>
+        <select id="sortFilter" class="form-select">
+          <option value="recent">Plus récents d'abord</option>
+          <option value="oldest">Plus anciens d'abord</option>
+        </select>
       </div>
     </div>
-  </section>
-
-  <nav class="dashboard-nav mb-4" aria-label="Navigation dossiers">
-    <a class="dashboard-nav__link" href="index.html">Attributions en cours</a>
-    <a class="dashboard-nav__link is-active" href="assignments-completed.html">Attributions finalisées</a>
-    <a class="dashboard-nav__link" href="restitutions-pending.html">Restitutions en cours</a>
-    <a class="dashboard-nav__link" href="restitutions-completed.html">Restitutions finalisées</a>
-  </nav>
-
-  <div class="mb-4" style="display: flex; gap: 12px; align-items: center;">
-    <input id="searchInput" class="form-control form-control-sm" type="search"
-           placeholder="Rechercher par nom, prénom, service, titre…" autocomplete="off"
-           style="max-width: 300px;">
-  </div>
-
-  <!-- Filtres cachés (contrôlés via Ctrl+K et utilisés par storage.js) -->
-  <div style="display: none;">
-    <select id="statusFilter">
-      <option value="">Tous les avancements</option>
-      <option value="draft">À compléter</option>
-      <option value="partial_assignment">Attribution partielle</option>
-      <option value="awaiting_signature">En attente de signature</option>
-      <option value="active">Attribution active</option>
-      <option value="returned">Restitution terminée</option>
-      <option value="partial_return">Restitution partielle</option>
-      <option value="cancelled">Dossier annulé</option>
-    </select>
-    <select id="timingFilter">
-      <option value="">Tous les pilotages</option>
-      <option value="ok">Prêt / Dans les temps</option>
-      <option value="warning">En danger</option>
-      <option value="late">En retard</option>
-      <option value="neutral">À planifier</option>
-    </select>
-    <select id="qualiteFilter">
-      <option value="">Tous</option>
-      <option value="agent">Agent</option>
-      <option value="elu">Élu(e)</option>
-    </select>
-    <select id="serviceFilter">
-      <option value="">Tous les services</option>
-    </select>
-    <select id="sortFilter">
-      <option value="recent">Plus récents d'abord</option>
-      <option value="oldest">Plus anciens d'abord</option>
-    </select>
-    <button id="resetFiltersBtn">Réinitialiser</button>
-    <span id="filterActiveBadge" class="d-none">0</span>
+    <div class="filter-toolbar__actions">
+      <span id="filterActiveBadge" class="status-pill d-none">0</span>
+      <button id="resetFiltersBtn" class="btn btn-outline-secondary btn-sm" type="button">Réinitialiser</button>
+    </div>
   </div>
 
   <section class="content-card">
 
     <div class="dashboard-toolbar mb-3">
-      <div>
-        <p class="panel-eyebrow">Historique</p>
-        <h3 class="section-title">Attributions finalisées</h3>
+      <div class="dashboard-toolbar__info">
+        <span id="historyCountBadge" class="dashboard-group__badge">0</span>
         <p class="panel-text mb-0" id="dashboardRefreshInfo">Mise à jour automatique active.</p>
       </div>
       <div class="dashboard-toolbar__actions">
@@ -124,26 +109,9 @@
     </div>
 
     <section class="dashboard-group">
-      <div class="dashboard-group__header">
-        <div>
-          <p class="panel-eyebrow">Dossiers</p>
-          <h3 class="section-title">Historique des attributions</h3>
-        </div>
-        <span id="historyCountBadge" class="dashboard-group__badge">0</span>
-      </div>
       <div class="table-responsive">
         <table class="table align-middle draft-table">
-          <thead>
-            <tr>
-              <th>Dossier</th>
-              <th>Qualité</th>
-              <th>État</th>
-              <th>Pilotage</th>
-              <th>Progression</th>
-              <th>Dernière modification</th>
-              <th class="text-end">Actions</th>
-            </tr>
-          </thead>
+          <thead id="draftTableHead"></thead>
           <tbody id="historyList"></tbody>
         </table>
       </div>

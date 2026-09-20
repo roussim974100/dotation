@@ -22,6 +22,76 @@
     cancelled: "Annulé",
   };
 
+  // Palette : pages et actions atteignables au clavier (Ctrl+K puis Entrée). Ce sont de simples LIENS : aucune action sensible
+  // ne s'exécute d'ici (« Sauvegarder maintenant » ouvre la page de sauvegarde, où la confirmation a lieu).
+  // perm : null = tous ; sinon "forms.create" | "forms.read_list" | "users.manage" | "db.manage" | "direction".
+  const COMMANDS = [
+    { label: "Nouvelle attribution", href: "form.html", perm: "forms.create", keys: "creer dossier arrivee nouveau" },
+    { label: "Attributions en cours", href: "index.html", keys: "dossiers accueil liste" },
+    { label: "Attributions finalisées", href: "assignments-completed.html", keys: "dossiers signes historique" },
+    { label: "Restitutions en cours", href: "restitutions-pending.html", keys: "retour depart materiel" },
+    { label: "Restitutions finalisées", href: "restitutions-completed.html", keys: "retours termines historique" },
+    { label: "Parc matériel", href: "parc.html", perm: "forms.read_list", keys: "objets stock inventaire historique de vie" },
+    { label: "Synthèse", href: "executive-dashboard.html", perm: "direction", keys: "tableau de bord direction indicateurs" },
+    { label: "Administration", href: "admin.html", perm: "users.manage", keys: "portail admin configuration" },
+    { label: "Comptes et droits", href: "admin-comptes.html", perm: "users.manage", keys: "utilisateurs groupes permissions" },
+    { label: "Créer un compte", href: "admin-comptes.html#admin-users-create", perm: "users.manage", keys: "nouvel utilisateur mot de passe" },
+    { label: "Services", href: "admin-services.html", perm: "users.manage", keys: "direction service catalogue" },
+    { label: "Ressources", href: "admin-ressources.html", perm: "users.manage", keys: "catalogue materiel referentiel" },
+    { label: "Ajouter une ressource", href: "admin-ressources.html#new", perm: "users.manage", keys: "creer nouvelle ressource assistant" },
+    { label: "Ordre des ressources", href: "admin-ressources-ordre.html", perm: "users.manage", keys: "reorganiser trier" },
+    { label: "Assistant d'organisation", href: "admin-personnalisation.html?wizard=1", perm: "users.manage", keys: "configuration demarrage type organisation beneficiaires" },
+    { label: "Personnalisation", href: "admin-personnalisation.html", perm: "users.manage", keys: "logo theme couleurs mode sombre support dpo" },
+    { label: "Sauvegarder maintenant", href: "admin-db.html#db-export", perm: "db.manage", keys: "exporter archive base de donnees telecharger" },
+    { label: "Planifier la sauvegarde", href: "admin-db.html#db-schedule", perm: "db.manage", keys: "automatique frequence destination" },
+    { label: "Restaurer une sauvegarde", href: "admin-db.html#db-restore", perm: "db.manage", keys: "importer analyser" },
+    { label: "Journal", href: "logs.html", perm: "users.manage", keys: "traces audit historique actions" },
+    { label: "Corbeille", href: "trash.html", perm: "users.manage", keys: "supprimes restaurer" },
+    { label: "Mon profil", href: "account.html", keys: "compte e-mail mot de passe identite" },
+    { label: "Aide", href: "help.html", keys: "documentation guide support" }
+  ];
+  let sessionPermissions = null;
+
+  function fold(text) {
+    return String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  async function loadPermissions() {
+    if (sessionPermissions) return sessionPermissions;
+    try {
+      const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+      const user = response.ok ? await response.json() : {};
+      const permissions = user.permissions || [];
+      const all = permissions.includes("*");
+      sessionPermissions = {
+        all, list: permissions, direction: Boolean(user.is_admin || (user.groups || []).includes("direction")),
+        db: Boolean(all || permissions.includes("db.manage") || user.db_manage)
+      };
+    } catch (_error) {
+      sessionPermissions = { all: false, list: [], direction: false, db: false };
+    }
+    return sessionPermissions;
+  }
+
+  function isAllowed(command, access) {
+    if (!command.perm) return true;
+    if (command.perm === "direction") return access.direction;
+    if (command.perm === "db.manage") return access.db;
+    return access.all || access.list.includes(command.perm);
+  }
+
+  // Commandes qui correspondent : tous les mots saisis doivent se trouver dans le libellé ou les mots-clés.
+  function matchCommands(query, access, limit) {
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    return COMMANDS.filter((command) => isAllowed(command, access))
+      .filter((command) => {
+        const haystack = fold(`${command.label} ${command.keys || ""}`);
+        return words.every((word) => haystack.includes(word));
+      })
+      .slice(0, limit)
+      .map((command) => ({ kind: "command", label: command.label, href: command.href }));
+  }
+
   const FILTER_CONFIG = {
     active: { status: true, timing: true, qualite: true, service: true, sort: true },
     history_assignments: { status: true, timing: true, qualite: true, service: true, sort: true },
@@ -232,6 +302,18 @@
     activeIndex = -1;
     renderResults();
     renderQuickFilters();
+    void showDefaultCommands();
+  }
+
+  // Sans saisie : les raccourcis les plus utiles pour ce profil.
+  async function showDefaultCommands() {
+    const access = await loadPermissions();
+    if (lastQuery) return;
+    const wanted = ["Nouvelle attribution", "Parc matériel", "Administration", "Assistant d'organisation", "Sauvegarder maintenant", "Journal", "Mon profil"];
+    currentResults = wanted.map((label) => COMMANDS.find((command) => command.label === label)).filter((command) => command && isAllowed(command, access))
+      .map((command) => ({ kind: "command", label: command.label, href: command.href }));
+    activeIndex = currentResults.length ? 0 : -1;
+    renderResults();
   }
 
   function closeModal() {
@@ -258,6 +340,7 @@
       currentResults = [];
       activeIndex = -1;
       renderResults();
+      if (!query) void showDefaultCommands();
       return;
     }
     debounceTimer = setTimeout(() => { void runSearch(query); }, DEBOUNCE_MS);
@@ -292,7 +375,9 @@
       if (activeFilters.qualite) {
         results = results.filter((r) => r.beneficiaryType === activeFilters.qualite);
       }
-      currentResults = results.slice(0, MAX_RESULTS);
+      const access = await loadPermissions();
+      const commands = query ? matchCommands(query, access, 6) : [];
+      currentResults = commands.concat(results.slice(0, MAX_RESULTS).map((form) => ({ kind: "form", ...form })));
       activeIndex = currentResults.length ? 0 : -1;
       renderResults();
     } catch (_error) {
@@ -313,23 +398,38 @@
       return;
     }
 
-    list.innerHTML = currentResults.map((item, index) => {
+    const rowHtml = (item, index) => {
+      const isActive = index === activeIndex ? " is-active" : "";
+      const aria = `role="option" data-gs-index="${index}" aria-selected="${index === activeIndex ? "true" : "false"}"`;
+      if (item.kind === "command") {
+        return `
+        <li class="global-search__result${isActive}" ${aria} data-gs-href="${escapeHtml(item.href)}">
+          <div class="global-search__result-main"><strong class="global-search__result-name">${escapeHtml(item.label)}</strong></div>
+          <span class="global-search__result-status">Aller à</span>
+        </li>`;
+      }
       const fullName = escapeHtml(`${item.prenom || ""} ${item.nom || ""}`.trim() || "(sans nom)");
       const service = escapeHtml(item.service || "");
       const statusLabel = escapeHtml(STATUS_LABELS[item.status] || item.status || "");
-      const isActive = index === activeIndex ? " is-active" : "";
       return `
-        <li class="global-search__result${isActive}" role="option"
-            data-gs-index="${index}" data-gs-id="${escapeHtml(item.id)}"
-            aria-selected="${index === activeIndex ? "true" : "false"}">
+        <li class="global-search__result${isActive}" ${aria} data-gs-id="${escapeHtml(item.id)}">
           <div class="global-search__result-main">
             <strong class="global-search__result-name">${fullName}</strong>
             ${service ? `<span class="global-search__result-service">${service}</span>` : ""}
           </div>
           <span class="global-search__result-status">${statusLabel}</span>
-        </li>
-      `;
-    }).join("");
+        </li>`;
+    };
+    let html = "";
+    let lastKind = "";
+    currentResults.forEach((item, index) => {
+      if (item.kind !== lastKind) {
+        html += `<li class="global-search__group" role="presentation">${item.kind === "command" ? "Pages et actions" : "Dossiers"}</li>`;
+        lastKind = item.kind;
+      }
+      html += rowHtml(item, index);
+    });
+    list.innerHTML = html;
 
     list.querySelectorAll(".global-search__result").forEach((el) => {
       el.addEventListener("mouseenter", () => {
@@ -340,8 +440,8 @@
         }
       });
       el.addEventListener("click", () => {
-        const id = el.dataset.gsId;
-        if (id) navigateTo(id);
+        const idx = Number(el.dataset.gsIndex);
+        if (!Number.isNaN(idx) && currentResults[idx]) activate(currentResults[idx]);
       });
     });
   }
@@ -392,7 +492,7 @@
     } else if (event.key === "Enter") {
       event.preventDefault();
       if (activeIndex >= 0 && currentResults[activeIndex]) {
-        navigateTo(currentResults[activeIndex].id);
+        activate(currentResults[activeIndex]);
       }
     } else if (event.key === "Escape") {
       event.preventDefault();
@@ -400,9 +500,9 @@
     }
   }
 
-  function navigateTo(id) {
+  function activate(item) {
     closeModal();
-    window.location.href = `form.html?id=${encodeURIComponent(id)}`;
+    window.location.href = item.kind === "command" ? item.href : `form.html?id=${encodeURIComponent(item.id)}`;
   }
 
   function onGlobalKeyDown(event) {

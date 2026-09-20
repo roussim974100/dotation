@@ -17,7 +17,7 @@ ROUTES_REQUIRED_PERMISSIONS = {
 }
 
 DEFAULT_GROUPS = {
-    "admin": ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all"],
+    "admin": ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "parc.manage", "unc.view_all"],
     "user": ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"],
     "administration": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"],
     "direction": ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all", "users.manage"],

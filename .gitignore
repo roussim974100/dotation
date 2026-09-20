@@ -49,6 +49,17 @@ graphify-out/obsidian/
 # Claude Code local screenshots
 .claude/*.png
 
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+backend/backup_config.json
+backend/.backup_password
+backend/db_backups/
+
+# Archives et copies de bases (ne jamais commiter : donnees personnelles)
+*.7z
+backend/*.zip
+*.sqlite
+
 # --- Fichiers locaux : non publies sur GitHub (ils restent sur le poste de travail) ---
 # Donnees et sauvegardes
 /backend/.backups/
@@ -78,3 +89,8 @@ graphify-out/obsidian/
 /.graphifyignore
 /.ignore
 /graphify-out/
+
+# Etat, journal et verrou de la mise a jour depuis le navigateur (generes par le serveur)
+/backend/update/
+# Environnement de ce serveur (dev, preprod, prod), ecrit par deploy*.sh
+/backend/environment

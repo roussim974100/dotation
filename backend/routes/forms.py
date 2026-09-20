@@ -12,11 +12,18 @@ from utils import (
     format_beneficiary_label, format_restitution_state_label,
     dossier_type_label, slugify_filename, AppError,
 )
-from database import get_db
+from database import get_db, normalize_reference_row
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
+def can_export_unmasked():
+    """Export/PDF : droit forms.export ET portee de donnees complete. Les exports ne sont pas masques,
+    donc un groupe a portee "masked" (RGPD) ne doit pas pouvoir les generer."""
+    user = current_user() or {}
+    return has_permission("forms.export") and user.get("data_scope") != "masked"
+
+
 from models.audit import insert_audit_event, insert_app_log, insert_deleted_item
 from models.workflow import (
-    summarize_dynamic_resource, collect_resource_entries,
+    summarize_resource_item_details, collect_resource_entries,
     derive_restitution_workflow_status, collect_resource_validation_errors,
 )
 from models.forms import persist_form, row_to_summary, get_form
@@ -103,11 +110,7 @@ def build_excel_workbook(rows, item_rows):
 
     for row in item_rows:
         details = json.loads(row["details_json"] or "{}")
-        detail_text = summarize_dynamic_resource(details) if details.get("fields") else " - ".join(
-            str(value).strip()
-            for key, value in details.items()
-            if key not in {"selected", "conditionAttribution", "conditionNotes"} and str(value or "").strip()
-        )
+        detail_text = summarize_resource_item_details(details)
         resource_rows_xml.append(
             "<Row>" + "".join(
                 [
@@ -254,9 +257,14 @@ def list_forms():
             "SELECT COALESCE(MAX(updated_at),''), COUNT(*) FROM dotation_forms" + where_clause,
             params,
         ).fetchone()
-        etag = hashlib.md5(f"{fingerprint[0]}:{fingerprint[1]}".encode()).hexdigest()
+        warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
+        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage et de la date du jour
+        # (statuts En retard / En danger) : sans eux, un 304 servirait des donnees perimees.
+        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}"
+        etag = hashlib.md5(etag_source.encode()).hexdigest()
 
-        if request.headers.get("If-None-Match") == etag:
+        # La compression gzip transforme l'ETag en validateur faible (W/...) : on compare la valeur nue.
+        if (request.headers.get("If-None-Match") or "").removeprefix("W/").strip('"') == etag:
             return "", 304
 
         rows = connection.execute(
@@ -264,7 +272,7 @@ def list_forms():
             params,
         ).fetchall()
 
-    resp = jsonify([row_to_summary(row) for row in rows])
+    resp = jsonify([row_to_summary(row, warning_days) for row in rows])
     resp.headers["ETag"] = etag
     return resp
 
@@ -272,7 +280,7 @@ def list_forms():
 @bp.route("/api/forms/export", methods=["GET"])
 @login_required
 def export_forms():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     status_filter = (request.args.get("status") or "").strip()
@@ -330,7 +338,7 @@ def export_forms():
 @bp.route("/api/forms/export-unc", methods=["GET"])
 @login_required
 def export_unc_access():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     _ACCES = {"lecture": "Lecture", "lecture_ecriture": "Lecture / Ecriture", "refuse": "Acces refuse"}
@@ -376,7 +384,7 @@ def export_unc_access():
 @bp.route("/api/forms/<form_id>/pdf", methods=["GET"])
 @login_required
 def export_form_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
@@ -391,7 +399,7 @@ def export_form_pdf(form_id):
 @bp.route("/api/forms/<form_id>/restitution-pdf", methods=["GET"])
 @login_required
 def export_restitution_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
@@ -417,7 +425,7 @@ def export_restitution_pdf(form_id):
 @bp.route("/api/forms/export-pdf-batch", methods=["POST"])
 @login_required
 def export_forms_pdf_batch():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -447,7 +455,7 @@ def export_forms_pdf_batch():
 @bp.route("/api/forms/export-restitution-pdf-batch", methods=["POST"])
 @login_required
 def export_restitution_forms_pdf_batch():
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -514,7 +522,7 @@ def get_retrait_items(form_id):
 @bp.route("/api/forms/<form_id>/pdf/retraits", methods=["GET"])
 @login_required
 def get_retraits_pdf(form_id):
-    if not has_permission("forms.export"):
+    if not can_export_unmasked():
         return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
@@ -570,6 +578,67 @@ def quick_draft():
     return jsonify({"form_id": form_data["summary"]["id"], "title": form_data["summary"]["title"]}), 201
 
 
+@bp.route("/api/forms/regularisation", methods=["POST"])
+@login_required
+@rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
+def create_regularisation_restitution():
+    """Crée un dossier de restitution pour une personne qui n'a jamais eu d'attribution
+    saisie (départ avant enregistrement). Le dossier naît directement en restitution
+    en cours, avec les ressources à récupérer sélectionnées dans le catalogue."""
+    if not (has_permission("forms.create") and has_permission("forms.restitution")):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    nom = (data.get("nom") or "").strip()
+    prenom = (data.get("prenom") or "").strip()
+    if not nom or not prenom:
+        return jsonify({"error": "nom_prenom_required"}), 400
+    qualite = "elu" if data.get("qualite") == "elu" else "agent"
+    service = (data.get("service") or "").strip() or None
+    raw_ids = data.get("resourceIds")
+    resource_ids = [r for r in raw_ids if isinstance(r, str) and r] if isinstance(raw_ids, list) else []
+    if not resource_ids:
+        return jsonify({"error": "resources_required"}), 400
+
+    with get_db() as connection:
+        placeholders = ",".join("?" for _ in resource_ids)
+        rows = connection.execute(
+            f"SELECT * FROM resource_catalog WHERE is_active = 1 AND id IN ({placeholders})",
+            resource_ids,
+        ).fetchall()
+    references = [normalize_reference_row(row) for row in rows]
+    references = [r for r in references if r["category"] == "materiel" and r["requires_return"]]
+    if not references:
+        return jsonify({"error": "resources_required"}), 400
+
+    note = "Régularisation : aucune attribution enregistrée avant le départ."
+    payload = {
+        "dossier": {"type": "sortie", "objet": note, "regularisation": True},
+        "beneficiaire": {
+            "nom": nom, "prenom": prenom, "service": service, "qualite": qualite,
+            "mandat": (data.get("mandat") or "").strip() if qualite == "elu" else "",
+        },
+        "resources": {"additional": [
+            {
+                "id": r["id"], "code": r["code"], "label": r["label"],
+                "description": r.get("description") or "", "category": r["category"],
+                "issuerService": r.get("issuer_service"), "triggerKey": r.get("trigger_key") or "",
+                "requiresReturn": True, "displayOrder": r["display_order"],
+                "selected": True, "fieldSchema": r["field_schema"], "fields": {},
+                "details": "Non renseigné (régularisation)",
+            }
+            for r in references
+        ]},
+        "restitution": {"notes": note, "pendingFinalization": True, "items": {}},
+        "workflow": {"status": "partial_return"},
+        "meta": {},
+    }
+    try:
+        form_data = persist_form(payload)
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+    return jsonify({"form_id": form_data["summary"]["id"], "title": form_data["summary"]["title"]}), 201
+
+
 @bp.route("/api/forms", methods=["POST"])
 @login_required
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
@@ -596,12 +665,6 @@ def update_form(form_id):
         form_data = persist_form(payload)
     except AppError as error:
         return jsonify({"error": error.code}), error.status
-    with get_db() as conn:
-        # Sauvegarder les sélections multiples d'items (multi-ordinateurs, multi-téléphones, etc.)
-        from models.forms import save_item_selections
-        selected_items = payload.get("selectedItems", {})
-        if selected_items:
-            save_item_selections(conn, form_id, selected_items)
     return jsonify(form_data)
 
 
@@ -809,6 +872,16 @@ def delete_form(form_id):
                 row["title"],
                 json.loads(row["payload_json"] or "{}"),
             )
+        try:
+            from models.units import release_units_for_form
+            release_units_for_form(connection, form_id)  # l'objet detenu est libere, l'historique reste
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from models.stock import release_stock_for_form
+            release_stock_for_form(connection, form_id)  # la remise est annulee, le stock revient
+        except Exception:  # noqa: BLE001
+            pass
         deleted = connection.execute(
             "DELETE FROM dotation_forms WHERE id = ?",
             (form_id,),

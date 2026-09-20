@@ -74,9 +74,7 @@ function slugifyFieldKey(value) {
     .replace(/^_+|_+$/g, "");
 }
 
-function syncResourceCodeFromLabel(force = false) {
-  const labelInput = byId("resource_label");
-  const codeInput = byId("resource_code");
+function syncResourceCodeFromLabel(force = false, labelInput = byId("resource_label"), codeInput = byId("resource_code")) {
   if (!labelInput || !codeInput) {
     return;
   }
@@ -86,8 +84,7 @@ function syncResourceCodeFromLabel(force = false) {
   codeInput.value = slugifyFieldKey(labelInput.value);
 }
 
-function renderResourceIssuerOptions(selectedValue = "") {
-  const select = byId("resource_issuer");
+function renderResourceIssuerOptions(selectedValue = "", select = byId("resource_issuer")) {
   if (!select) {
     return;
   }
@@ -107,10 +104,8 @@ function renderResourceIssuerOptions(selectedValue = "") {
   select.value = normalizedSelectedValue;
 }
 
-function syncResourceTrackingOptions() {
-  const category = byId("resource_category")?.value || "materiel";
-  const conditionInput = byId("resource_has_assignment_condition");
-  const notesInput = byId("resource_has_assignment_notes");
+function syncResourceTrackingOptions(categoryInput = byId("resource_category"), conditionInput = byId("resource_has_assignment_condition"), notesInput = byId("resource_has_assignment_notes")) {
+  const category = categoryInput?.value || "materiel";
   if (!conditionInput || !notesInput) {
     return;
   }
@@ -136,8 +131,7 @@ function formatResourceTrackingSummary(resource) {
   return labels.length ? labels.join(", ") : "Aucun suivi";
 }
 
-function renderResourceDisplayOrderOptions(selectedValue = 60) {
-  const select = byId("resource_display_order");
+function renderResourceDisplayOrderOptions(selectedValue = 60, select = byId("resource_display_order")) {
   if (!select) {
     return;
   }
@@ -182,8 +176,15 @@ function updateAdminMetrics() {
   if (usersCount) {
     usersCount.textContent = String(currentUsers.length);
   }
+  const pendingTotal = currentUsers.filter((user) => user.status === "pending").length;
   if (pendingCount) {
-    pendingCount.textContent = String(currentUsers.filter((user) => user.status === "pending").length);
+    pendingCount.textContent = String(pendingTotal);
+  }
+  const pendingBanner = byId("pendingAccountsBanner");
+  if (pendingBanner) {
+    pendingBanner.classList.toggle("d-none", pendingTotal === 0);
+    const text = byId("pendingAccountsText");
+    if (text) text.textContent = `${pendingTotal} compte${pendingTotal > 1 ? "s" : ""} en attente de validation.`;
   }
   if (servicesCount) {
     servicesCount.textContent = String(currentServices.filter((service) => service.is_active).length);
@@ -217,28 +218,100 @@ function renderGroups() {
   }
 
   if (cards) {
-    cards.innerHTML = Object.entries(groups).map(([key, group]) => {
-      const isAdmin = (group.permissions || []).includes("*");
-      const hasUnc = (group.permissions || []).includes("unc.view_all");
-      const uncToggle = isAdmin
-        ? `<span class="status-chip status-chip--active mt-2">Accès UNC complet (admin)</span>`
-        : `<button class="btn btn-sm mt-2 ${hasUnc ? "btn-success" : "btn-outline-secondary"}"
-             type="button" data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
-             ${hasUnc ? "✓ Accès UNC complet" : "Accès UNC complet : non"}
-           </button>`;
-      return `
-        <div class="equipment-item">
-          <div class="draft-title">${escapeHtml(group.label)}</div>
-          <div class="draft-meta">${escapeHtml(group.description || "")}</div>
-          <div class="mt-2"><span class="status-chip status-chip--${group.data_scope === "masked" ? "draft" : "active"}">${escapeHtml(group.data_scope)}</span></div>
-          <ul class="print-list mt-3">
-            ${(group.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("")}
-          </ul>
-          ${uncToggle}
-        </div>
-      `;
-    }).join("");
+    cards.innerHTML = Object.entries(groups).map(([key, group]) => groupCardHtml(key, group)).join("");
   }
+  renderGroupMatrix();
+}
+
+// ─── Droits expliqués simplement ───────────────────────────────────────────────────────────────────────────────────────────
+// Un droit = une chose qu'une personne a le droit de faire. Les textes sont écrits pour être compris sans connaître le vocabulaire
+// technique : phrases courtes, mots de tous les jours. L'ordre est celui du tableau « Qui peut faire quoi ? ».
+const PERMISSION_INFO = [
+  { key: "forms.read_list", label: "Voir la liste des dossiers" },
+  { key: "forms.read_detail", label: "Ouvrir un dossier pour le lire" },
+  { key: "forms.create", label: "Créer un nouveau dossier" },
+  { key: "forms.edit", label: "Modifier un dossier" },
+  { key: "forms.restitution", label: "Faire un retour de matériel (restitution)" },
+  { key: "forms.export", label: "Télécharger des listes et des PDF" },
+  { key: "forms.delete", label: "Mettre un dossier à la corbeille" },
+  { key: "forms.view_all", label: "Voir les dossiers de tous les services (sinon : seulement ceux de son service)" },
+  { key: "unc.view_all", label: "Voir tous les accès réseau demandés (dossiers partagés)" },
+  { key: "parc.manage", label: "Gérer le parc : déclarer un objet perdu ou réformé, recevoir du stock" },
+  { key: "users.manage", label: "Créer les comptes et régler l'application" },
+  { key: "db.manage", label: "Sauvegarder et restaurer les données" }
+];
+
+const GROUP_SUMMARIES = {
+  lecture: "Peut regarder les dossiers, sans rien changer. Comme un visiteur qui a le droit de lire.",
+  user: "Peut voir les dossiers de tous les services et en créer de nouveaux, mais pas les modifier.",
+  redaction: "Peut créer et modifier des dossiers, et faire les retours de matériel. Ne peut pas les supprimer.",
+  gestion: "Comme « Rédaction », et peut aussi mettre un dossier à la corbeille et voir ceux de tous les services.",
+  direction: "Comme « Gestion », et voit en plus tous les accès réseau. Pensé pour la direction générale, les RH et l'encadrement.",
+  administration: "Comme « Gestion », et peut aussi créer les comptes et régler l'application. Ne gère pas les sauvegardes.",
+  admin: "Peut tout faire : les comptes, les réglages, les sauvegardes et le parc. À donner à très peu de personnes."
+};
+
+const DATA_SCOPE_INFO = {
+  full: "Voit les noms et toutes les informations des dossiers.",
+  masked: "Les noms sont cachés (par exemple « D*** ») et les téléchargements sont interdits."
+};
+
+function groupCan(group, permissionKey) {
+  const list = group.permissions || [];
+  return list.includes("*") || list.includes(permissionKey);
+}
+
+function groupCardHtml(key, group) {
+  const isAdmin = (group.permissions || []).includes("*");
+  const hasUnc = (group.permissions || []).includes("unc.view_all");
+  const uncToggle = isAdmin
+    ? `<span class="status-chip status-chip--active mt-2">Voit tous les accès réseau (administrateur)</span>`
+    : `<div class="form-check form-switch mt-2">
+         <input class="form-check-input" type="checkbox" role="switch" id="unc_${escapeHtml(key)}" ${hasUnc ? "checked" : ""}
+           data-admin-action="toggleGroupUnc" data-group-key="${escapeHtml(key)}" data-current="${hasUnc}">
+         <label class="form-check-label" for="unc_${escapeHtml(key)}">Peut voir tous les accès réseau demandés</label>
+       </div>`;
+  const can = PERMISSION_INFO.filter((info) => groupCan(group, info.key));
+  const cannot = PERMISSION_INFO.filter((info) => !groupCan(group, info.key));
+  const known = new Set(PERMISSION_INFO.map((info) => info.key));
+  const others = (group.permissions || []).filter((permission) => permission !== "*" && !known.has(permission));
+  const summary = GROUP_SUMMARIES[key] || group.description || "";
+  return `
+    <div class="equipment-item">
+      <div class="draft-title">${escapeHtml(group.label)}</div>
+      <div class="draft-meta">${escapeHtml(summary)}</div>
+      <p class="small fw-semibold mt-3 mb-1">Ce groupe peut :</p>
+      <ul class="small list-unstyled mb-2">
+        ${isAdmin ? "<li>✔ Tout faire</li>" : can.map((info) => `<li>✔ ${escapeHtml(info.label)}</li>`).join("") || "<li>Rien pour l'instant.</li>"}
+        ${others.map((permission) => `<li>✔ Un droit particulier (${escapeHtml(permission)})</li>`).join("")}
+      </ul>
+      ${cannot.length && !isAdmin ? `<details class="small mb-2"><summary>Ce qu'il ne peut pas faire</summary>
+        <ul class="list-unstyled mt-1 mb-0">${cannot.map((info) => `<li>✖ ${escapeHtml(info.label)}</li>`).join("")}</ul></details>` : ""}
+      <p class="small text-muted mb-1">${escapeHtml(DATA_SCOPE_INFO[group.data_scope] || DATA_SCOPE_INFO.full)}</p>
+      ${uncToggle}
+    </div>
+  `;
+}
+
+function renderGroupMatrix() {
+  const host = byId("groupMatrix");
+  if (!host) return;
+  const entries = Object.entries(groups);
+  if (!entries.length) {
+    host.innerHTML = "";
+    return;
+  }
+  const head = entries.map(([, group]) => `<th scope="col" class="text-center">${escapeHtml(group.label)}</th>`).join("");
+  const rows = PERMISSION_INFO.map((info) => `
+    <tr><th scope="row" class="fw-normal">${escapeHtml(info.label)}</th>
+      ${entries.map(([, group]) => groupCan(group, info.key)
+        ? '<td class="text-center text-success" aria-label="Oui">✔</td>'
+        : '<td class="text-center text-muted" aria-label="Non">–</td>').join("")}</tr>`).join("");
+  host.innerHTML = `
+    <h3 class="h5 mt-4">Qui peut faire quoi ?</h3>
+    <p class="panel-text">✔ veut dire « a le droit », – veut dire « n'a pas le droit ».</p>
+    <div class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th scope="col">Ce que l'on peut faire</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function getSelectedGroups() {
@@ -388,6 +461,9 @@ function resetUserForm() {
   byId("admin_password").placeholder = "Mot de passe temporaire";
   byId("admin_active").checked = true;
   if (byId("admin_service")) byId("admin_service").value = "";
+  if (byId("admin_email")) byId("admin_email").value = "";
+  if (byId("admin_first_name")) byId("admin_first_name").value = "";
+  if (byId("admin_last_name")) byId("admin_last_name").value = "";
   if (byId("admin_db_manage")) byId("admin_db_manage").checked = false;
   setSelectedGroups([]);
 }
@@ -403,6 +479,9 @@ function populateUserForm(username) {
   byId("modalAdminPassword").value = "";
   byId("modalAdminActive").checked = user.status !== "disabled";
   if (byId("modalAdminService")) byId("modalAdminService").value = user.service || "";
+  if (byId("modalAdminEmail")) byId("modalAdminEmail").value = user.email || "";
+  if (byId("modalAdminFirstName")) byId("modalAdminFirstName").value = user.first_name || "";
+  if (byId("modalAdminLastName")) byId("modalAdminLastName").value = user.last_name || "";
   if (byId("modalAdminDbManage")) byId("modalAdminDbManage").checked = Boolean(user.db_manage);
   setSelectedGroupsInModal(user.groups || []);
 
@@ -444,6 +523,9 @@ async function saveUserFromModal() {
   }
 
   const service = byId("modalAdminService")?.value.trim() || "";
+  const email = byId("modalAdminEmail")?.value.trim() || "";
+  const firstName = byId("modalAdminFirstName")?.value.trim() || "";
+  const lastName = byId("modalAdminLastName")?.value.trim() || "";
   const dbManage = Boolean(byId("modalAdminDbManage")?.checked);
 
   try {
@@ -452,7 +534,7 @@ async function saveUserFromModal() {
       body: JSON.stringify({
         groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password, service, db_manage: dbManage
+        password, service, email, first_name: firstName, last_name: lastName, db_manage: dbManage
       })
     });
     showToast("Compte mis à jour.");
@@ -466,16 +548,25 @@ async function saveUserFromModal() {
 function createResourceFieldRow(field = {}) {
   const optionsValue = Array.isArray(field.options) ? field.options.join("\n") : "";
   const showOptions = field.type === "select";
+  const isHidden = Boolean(field.hidden);
+  // data-field-key fige la cle technique d'un champ existant : reformuler le libelle
+  // (correction, traduction...) ne doit plus regenerer la cle et orpheliner les valeurs
+  // deja enregistrees dans les dossiers. Vide pour un champ nouvellement ajoute : sa cle
+  // sera derivee du libelle a la sauvegarde, comme avant.
+  // data-field-hidden : champ masque (cf resource-field-remove) - reste dans le schema
+  // (donc toujours resoluble en label pour les dossiers existants) mais disparait du
+  // formulaire de dossier, alternative a la suppression reelle pour ne pas perdre les
+  // valeurs deja saisies.
   return `
-    <div class="resource-field-row">
+    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
-          <input class="form-control resource-field-label" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série">
+          <input class="form-control resource-field-label" aria-label="Libellé du champ" value="${escapeHtml(field.label || "")}" placeholder="Numéro de série" ${isHidden ? "disabled" : ""}>
         </div>
         <div class="col-md-4">
           <label class="form-label">Type</label>
-          <select class="form-select resource-field-type">
+          <select class="form-select resource-field-type" aria-label="Type du champ" ${isHidden ? "disabled" : ""}>
             <option value="text" ${field.type === "text" ? "selected" : ""}>Texte</option>
             <option value="textarea" ${field.type === "textarea" ? "selected" : ""}>Texte long</option>
             <option value="select" ${field.type === "select" ? "selected" : ""}>Liste déroulante</option>
@@ -486,16 +577,20 @@ function createResourceFieldRow(field = {}) {
         </div>
         <div class="col-md-3">
           <label class="form-check">
-            <input class="form-check-input resource-field-required" type="checkbox" ${field.required ? "checked" : ""}>
+            <input class="form-check-input resource-field-required" type="checkbox" ${field.required ? "checked" : ""} ${isHidden ? "disabled" : ""}>
             <span class="form-check-label">Champ obligatoire</span>
           </label>
         </div>
         <div class="col-12 resource-field-options ${showOptions ? "" : "d-none"}">
           <label class="form-label">Choix de la liste</label>
-          <textarea class="form-control resource-field-options-input" rows="3" placeholder="Une option par ligne">${escapeHtml(optionsValue)}</textarea>
+          <textarea class="form-control resource-field-options-input" rows="3" placeholder="Une option par ligne" ${isHidden ? "disabled" : ""}>${escapeHtml(optionsValue)}</textarea>
           <div class="form-text">Ajoutez une valeur par ligne pour la liste déroulante.</div>
         </div>
-        <div class="col-12 d-flex justify-content-md-end">
+        <div class="col-12 resource-field-hidden-banner ${isHidden ? "" : "d-none"}">
+          <span class="status-pill">Champ masqué — conserve les données déjà saisies, retiré du formulaire de dossier</span>
+        </div>
+        <div class="col-12 d-flex justify-content-md-end gap-2">
+          <button class="btn btn-outline-secondary resource-field-unhide ${isHidden ? "" : "d-none"}" type="button">Réafficher</button>
           <button class="btn btn-outline-danger resource-field-remove" type="button">Suppr.</button>
         </div>
       </div>
@@ -503,8 +598,55 @@ function createResourceFieldRow(field = {}) {
   `;
 }
 
-function bindResourceFieldRows() {
-  document.querySelectorAll(".resource-field-row").forEach((row) => {
+async function handleResourceFieldRemove(row) {
+  const label = row.querySelector(".resource-field-label")?.value.trim() || "ce champ";
+  const existingKey = row.dataset.fieldKey || "";
+  // Champ pas encore enregistre (nouvelle ligne) : rien a perdre, on retire directement.
+  if (!existingKey || !editingResourceId) {
+    row.remove();
+    return;
+  }
+  let count = 0;
+  try {
+    const usage = await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}/fields/${encodeURIComponent(existingKey)}/usage`);
+    count = Number(usage?.count) || 0;
+  } catch (error) {
+    // Impossible de verifier l'usage : on reste prudent et on demande confirmation simple.
+    count = -1;
+  }
+  if (count === 0) {
+    const confirmed = await askConfirm(`Aucun dossier n'utilise "${label}". Le supprimer ?`, { confirmLabel: "Supprimer", confirmClass: "btn-danger" });
+    if (confirmed) {
+      row.remove();
+    }
+    return;
+  }
+  const usageText = count > 0 ? `est utilisé par ${count} dossier(s)` : "est peut-être déjà utilisé (vérification impossible)";
+  const preferHide = await askConfirm(
+    `Le champ "${label}" ${usageText}. Le masquer conserve les données déjà saisies et le retire simplement du formulaire — recommandé plutôt qu'une suppression définitive.`,
+    { title: "Champ utilisé", confirmLabel: "Masquer le champ", confirmClass: "btn-warning", cancelLabel: "Autre option" }
+  );
+  if (preferHide) {
+    row.dataset.fieldHidden = "true";
+    row.classList.add("resource-field-row--hidden");
+    row.querySelectorAll(".resource-field-label, .resource-field-type, .resource-field-required, .resource-field-options-input").forEach((el) => {
+      el.disabled = true;
+    });
+    row.querySelector(".resource-field-hidden-banner")?.classList.remove("d-none");
+    row.querySelector(".resource-field-unhide")?.classList.remove("d-none");
+    return;
+  }
+  const confirmedDelete = await askConfirm(
+    `Supprimer définitivement "${label}" ? Les données déjà saisies pour ce champ seront perdues au prochain enregistrement des dossiers concernés.`,
+    { confirmLabel: "Supprimer définitivement", confirmClass: "btn-danger" }
+  );
+  if (confirmedDelete) {
+    row.remove();
+  }
+}
+
+function bindResourceFieldRows(containerId = "resourceFieldRows") {
+  byId(containerId)?.querySelectorAll(".resource-field-row").forEach((row) => {
     if (row.dataset.bound === "true") {
       return;
     }
@@ -518,25 +660,41 @@ function bindResourceFieldRows() {
       optionsWrap?.classList.toggle("d-none", typeInput.value !== "select");
     });
     row.querySelector(".resource-field-remove")?.addEventListener("click", () => {
-      row.remove();
+      void handleResourceFieldRemove(row);
+    });
+    row.querySelector(".resource-field-unhide")?.addEventListener("click", () => {
+      row.dataset.fieldHidden = "false";
+      row.classList.remove("resource-field-row--hidden");
+      row.querySelectorAll(".resource-field-label, .resource-field-type, .resource-field-required, .resource-field-options-input").forEach((el) => {
+        el.disabled = false;
+      });
+      row.querySelector(".resource-field-hidden-banner")?.classList.add("d-none");
+      row.querySelector(".resource-field-unhide")?.classList.add("d-none");
     });
     row.dataset.bound = "true";
   });
 }
 
-function appendResourceFieldRow(field = {}) {
-  const container = byId("resourceFieldRows");
+function appendResourceFieldRow(field = {}, containerId = "resourceFieldRows") {
+  const container = byId(containerId);
   if (!container) {
     return;
   }
   container.insertAdjacentHTML("beforeend", createResourceFieldRow(field));
-  bindResourceFieldRows();
+  bindResourceFieldRows(containerId);
 }
 
-function collectResourceFieldSchema() {
-  return Array.from(document.querySelectorAll(".resource-field-row")).map((row, index) => {
+function collectResourceFieldSchema(containerId = "resourceFieldRows") {
+  const container = byId(containerId);
+  if (!container) {
+    return [];
+  }
+  return Array.from(container.querySelectorAll(".resource-field-row")).map((row, index) => {
     const label = row.querySelector(".resource-field-label")?.value.trim() || "";
-    const key = slugifyFieldKey(label || `champ_${index + 1}`);
+    // Cle figee a la creation du champ (cf. createResourceFieldRow) : on ne re-derive
+    // du libelle que si le champ est nouveau (pas encore de cle enregistree).
+    const existingKey = row.dataset.fieldKey || "";
+    const key = existingKey || slugifyFieldKey(label || `champ_${index + 1}`);
     const type = row.querySelector(".resource-field-type")?.value || "text";
     const options = type === "select"
       ? String(row.querySelector(".resource-field-options-input")?.value || "")
@@ -550,18 +708,22 @@ function collectResourceFieldSchema() {
       type,
       placeholder: "",
       required: Boolean(row.querySelector(".resource-field-required")?.checked),
+      hidden: row.dataset.fieldHidden === "true",
+      // Indicateurs sans controle dans l'editeur : on les reporte tels quels pour ne pas les perdre.
+      suggest: row.dataset.fieldSuggest === "true",
+      identifier: row.dataset.fieldIdentifier === "true",
       options
     };
   }).filter((field) => field.label && field.key);
 }
 
-function renderResourceFieldSchema(fields = []) {
-  const container = byId("resourceFieldRows");
+function renderResourceFieldSchema(fields = [], containerId = "resourceFieldRows") {
+  const container = byId(containerId);
   if (!container) {
     return;
   }
   container.innerHTML = "";
-  fields.forEach((field) => appendResourceFieldRow(field));
+  fields.forEach((field) => appendResourceFieldRow(field, containerId));
 }
 
 function resetServiceForm() {
@@ -569,9 +731,6 @@ function resetServiceForm() {
     return;
   }
   editingServiceId = null;
-  byId("serviceFormTitle").textContent = "Services";
-  byId("saveServiceBtn").textContent = "Ajouter le service";
-  byId("cancelServiceEditBtn").classList.add("d-none");
   setNotice("serviceEditNotice");
   byId("service_label").value = "";
   byId("service_active").checked = true;
@@ -579,16 +738,54 @@ function resetServiceForm() {
 
 function populateServiceForm(serviceId) {
   const service = currentServices.find((item) => item.id === serviceId);
-  if (!service || !byId("serviceFormTitle")) {
+  if (!service) {
     return;
   }
   editingServiceId = service.id;
-  byId("serviceFormTitle").textContent = `Modifier le service ${service.label}`;
-  byId("saveServiceBtn").textContent = "Enregistrer les modifications";
-  byId("cancelServiceEditBtn").classList.remove("d-none");
-  setNotice("serviceEditNotice", "Mettez à jour le libellé ou désactivez le service sans perdre l'historique des dossiers.", true);
-  byId("service_label").value = service.label || "";
-  byId("service_active").checked = Boolean(service.is_active);
+  byId("modalServiceLabel").value = service.label || "";
+  byId("modalServiceActive").checked = Boolean(service.is_active);
+  openServiceEditModal();
+}
+
+function openServiceEditModal() {
+  const modal = byId("serviceEditModal");
+  if (modal) {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeServiceEditModal() {
+  const modal = byId("serviceEditModal");
+  if (modal) {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingServiceId = null;
+}
+
+async function saveServiceFromModal() {
+  const label = byId("modalServiceLabel")?.value.trim() || "";
+  const isActive = Boolean(byId("modalServiceActive")?.checked);
+  if (!label) {
+    showToast("Le libellé du service est obligatoire.", "error");
+    return;
+  }
+  if (!editingServiceId) {
+    showToast("Erreur : aucun service en cours d'édition", "error");
+    return;
+  }
+  try {
+    await adminRequest(`/api/admin/services/${encodeURIComponent(editingServiceId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ label, is_active: isActive })
+    });
+    showToast("Service mis à jour.");
+    closeServiceEditModal();
+    await loadServices();
+  } catch (error) {
+    showToast(`Impossible d'enregistrer le service : ${error.message}`, "error");
+  }
 }
 
 function resetResourceForm() {
@@ -596,9 +793,6 @@ function resetResourceForm() {
     return;
   }
   editingResourceId = null;
-  byId("resourceFormTitle").textContent = "Ressources attribuables";
-  byId("saveResourceBtn").textContent = "Ajouter la ressource";
-  byId("cancelResourceEditBtn").classList.add("d-none");
   setNotice("resourceEditNotice");
   byId("resource_code").value = "";
   byId("resource_code").dataset.manual = "";
@@ -618,58 +812,141 @@ function resetResourceForm() {
 
 function populateResourceForm(resourceId) {
   const resource = currentResources.find((item) => item.id === resourceId);
-  if (!resource || !byId("resourceFormTitle")) {
+  if (!resource) {
     return;
   }
   editingResourceId = resource.id;
-  byId("resourceFormTitle").textContent = `Modifier la ressource ${resource.label}`;
-  byId("saveResourceBtn").textContent = "Enregistrer les modifications";
-  byId("cancelResourceEditBtn").classList.remove("d-none");
-  setNotice("resourceEditNotice", "Définissez ici les champs qui devront être renseignés quand la ressource est attribuée.", true);
-  byId("resource_code").value = resource.code || "";
-  byId("resource_code").dataset.manual = "true";
-  byId("resource_label").value = resource.label || "";
-  byId("resource_category").value = resource.category || "materiel";
-  renderResourceIssuerOptions(resource.issuer_service || "");
-  byId("resource_description").value = resource.description || "";
-  renderResourceDisplayOrderOptions(resource.display_order || 60);
-  byId("resource_requires_return").checked = Boolean(resource.requires_return);
-  byId("resource_active").checked = Boolean(resource.is_active);
-  byId("resource_has_assignment_date").checked = resource.has_assignment_date !== false;
-  byId("resource_has_assignment_condition").checked = Boolean(resource.has_assignment_condition);
-  byId("resource_has_assignment_notes").checked = resource.has_assignment_notes !== false;
-  syncResourceTrackingOptions();
-  renderResourceFieldSchema(resource.field_schema || []);
+  const modalLabel = byId("modalResourceLabel");
+  const modalCode = byId("modalResourceCode");
+  const modalCategory = byId("modalResourceCategory");
+  const modalIssuer = byId("modalResourceIssuer");
+  const modalCondition = byId("modalResourceHasAssignmentCondition");
+  const modalNotes = byId("modalResourceHasAssignmentNotes");
+  modalCode.value = resource.code || "";
+  modalCode.dataset.manual = "true";
+  modalLabel.value = resource.label || "";
+  modalCategory.value = resource.category || "materiel";
+  renderResourceIssuerOptions(resource.issuer_service || "", modalIssuer);
+  byId("modalResourceDescription").value = resource.description || "";
+  renderResourceDisplayOrderOptions(resource.display_order || 60, byId("modalResourceDisplayOrder"));
+  byId("modalResourceRequiresReturn").checked = Boolean(resource.requires_return);
+  byId("modalResourceActive").checked = Boolean(resource.is_active);
+  byId("modalResourceHasAssignmentDate").checked = resource.has_assignment_date !== false;
+  modalCondition.checked = Boolean(resource.has_assignment_condition);
+  modalNotes.checked = resource.has_assignment_notes !== false;
+  syncResourceTrackingOptions(modalCategory, modalCondition, modalNotes);
+  renderResourceFieldSchema(resource.field_schema || [], "modalResourceFieldRows");
+  openResourceEditModal();
 }
 
-async function loadUsers() {
-  if (!byId("userTableBody")) {
-    currentUsers = await adminRequest("/api/admin/users");
-    updateAdminMetrics();
+function openResourceEditModal() {
+  const modal = byId("resourceEditModal");
+  if (modal) {
+    modal.classList.remove("d-none");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeResourceEditModal() {
+  const modal = byId("resourceEditModal");
+  if (modal) {
+    modal.classList.add("d-none");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingResourceId = null;
+}
+
+async function saveResourceFromModal() {
+  syncResourceCodeFromLabel(false, byId("modalResourceLabel"), byId("modalResourceCode"));
+  const payload = {
+    code: byId("modalResourceCode")?.value.trim() || "",
+    label: byId("modalResourceLabel")?.value.trim() || "",
+    description: byId("modalResourceDescription")?.value.trim() || "",
+    category: byId("modalResourceCategory")?.value || "materiel",
+    issuer_service: byId("modalResourceIssuer")?.value || "",
+    requires_return: Boolean(byId("modalResourceRequiresReturn")?.checked),
+    has_assignment_date: Boolean(byId("modalResourceHasAssignmentDate")?.checked),
+    has_assignment_condition: Boolean(byId("modalResourceHasAssignmentCondition")?.checked),
+    has_assignment_notes: Boolean(byId("modalResourceHasAssignmentNotes")?.checked),
+    display_order: Number.parseInt(byId("modalResourceDisplayOrder")?.value || "100", 10) || 100,
+    is_active: Boolean(byId("modalResourceActive")?.checked),
+    field_schema: collectResourceFieldSchema("modalResourceFieldRows")
+  };
+  if (!payload.label) {
+    showToast("Le libellé de la ressource est obligatoire.", "error");
     return;
   }
-  currentUsers = await adminRequest("/api/admin/users");
-  byId("userTableBody").innerHTML = currentUsers.map((user) => {
+  if (!payload.code) {
+    showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
+    return;
+  }
+  if (!editingResourceId) {
+    showToast("Erreur : aucune ressource en cours d'édition", "error");
+    return;
+  }
+  try {
+    await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+    showToast("Ressource mise à jour.");
+    closeResourceEditModal();
+    await loadResources();
+  } catch (error) {
+    showToast(`Impossible d'enregistrer la ressource : ${error.message}`, "error");
+  }
+}
+
+// Ligne admin : action principale visible + menu "Plus" (desactiver / supprimer en dernier, en rouge).
+function renderAdminRowMenu(items, dangerItem) {
+  const button = (item, tone) => `<button class="btn btn-sm ${tone}" type="button" ${item.attrs}>${item.label}</button>`;
+  return `
+    <details class="draft-actions__menu">
+      <summary class="btn btn-sm btn-outline-secondary" aria-label="Plus d'actions">⋯</summary>
+      <div class="draft-actions__menu-panel">
+        ${items.length ? `<div class="draft-actions__menu-section">${items.map((item) => button(item, "btn-outline-secondary")).join("")}</div>` : ""}
+        <div class="draft-actions__menu-section">${button(dangerItem, "btn-outline-danger")}</div>
+      </div>
+    </details>`;
+}
+
+function renderUserTable() {
+  const table = byId("userTableBody");
+  if (!table) {
+    return;
+  }
+  table.innerHTML = sortAdminTable("user", currentUsers).map((user) => {
     const statusMeta = getUserStatusMeta(user);
-    const statusAction = user.status === "pending"
-      ? `<button class="btn btn-sm btn-outline-success" type="button" data-admin-action="approveUser" data-username="${escapeHtml(user.username)}">Valider</button>`
-      : `<button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleUserState" data-username="${escapeHtml(user.username)}" data-active="${user.is_active ? "false" : "true"}">${user.is_active ? "Desactiver" : "Activer"}</button>`;
+    const username = escapeHtml(user.username);
+    const approveButton = user.status === "pending"
+      ? `<button class="btn btn-sm btn-success" type="button" data-admin-action="approveUser" data-username="${username}">Valider</button>`
+      : "";
+    const menuItems = user.status === "pending"
+      ? []
+      : [{ label: user.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleUserState" data-username="${username}" data-active="${user.is_active ? "false" : "true"}"` }];
+    const rowMenu = renderAdminRowMenu(menuItems, { label: "Supprimer", attrs: `data-admin-action="deleteUser" data-username="${username}"` });
     return `
       <tr>
-        <td data-label="Utilisateur">${escapeHtml(user.username)}</td>
+        <td data-label="Utilisateur">${escapeHtml(user.username)}${(user.first_name || user.last_name) ? `<div class="draft-meta">${escapeHtml(`${user.first_name || ""} ${user.last_name || ""}`.trim())}</div>` : ""}${user.email ? `<div class="draft-meta">${escapeHtml(user.email)}</div>` : ""}</td>
         <td data-label="Groupes">${escapeHtml((user.groups || []).join(", ") || "-")}</td>
         <td data-label="Service">${escapeHtml(user.service || "—")}</td>
         <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
-            <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateUserForm" data-username="${escapeHtml(user.username)}">Modifier</button>
-            ${statusAction}
-            <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteUser" data-username="${escapeHtml(user.username)}">Supprimer</button>
+            ${approveButton}
+            <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateUserForm" data-username="${username}">Modifier</button>
+            ${rowMenu}
           </div>
         </td>
       </tr>
     `;
   }).join("");
+}
+
+async function loadUsers() {
+  currentUsers = await adminRequest("/api/admin/users");
+  bindAdminSortableHeaders("user", "userTableBody", renderUserTable);
+  renderUserTable();
   updateAdminMetrics();
 }
 
@@ -690,6 +967,9 @@ async function saveUser() {
   }
 
   const service = byId("admin_service")?.value.trim() || "";
+  const email = byId("admin_email")?.value.trim() || "";
+  const firstName = byId("admin_first_name")?.value.trim() || "";
+  const lastName = byId("admin_last_name")?.value.trim() || "";
   const dbManage = Boolean(byId("admin_db_manage")?.checked);
   if (!editingUsername) {
     await adminRequest("/api/admin/users", {
@@ -697,7 +977,7 @@ async function saveUser() {
       body: JSON.stringify({
         username, password, groups: selectedGroups,
         is_active: isActive, status: isActive ? "active" : "disabled",
-        service, db_manage: dbManage
+        service, email, first_name: firstName, last_name: lastName, db_manage: dbManage
       })
     });
   } else {
@@ -706,7 +986,7 @@ async function saveUser() {
       body: JSON.stringify({
         groups: selectedGroups, is_active: isActive,
         status: isActive ? "active" : "disabled",
-        password, service, db_manage: dbManage
+        password, service, email, first_name: firstName, last_name: lastName, db_manage: dbManage
       })
     });
   }
@@ -810,8 +1090,10 @@ async function loadServices() {
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
           <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateServiceForm" data-id="${escapeHtml(String(service.id))}">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleServiceState" data-id="${escapeHtml(String(service.id))}" data-active="${service.is_active ? "false" : "true"}">${service.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteService" data-id="${escapeHtml(String(service.id))}">Supprimer</button>
+          ${renderAdminRowMenu(
+            [{ label: service.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleServiceState" data-id="${escapeHtml(String(service.id))}" data-active="${service.is_active ? "false" : "true"}"` }],
+            { label: "Supprimer", attrs: `data-admin-action="deleteService" data-id="${escapeHtml(String(service.id))}"` }
+          )}
         </div>
       </td>
     </tr>
@@ -828,17 +1110,10 @@ async function saveService() {
     showToast("Le libellé du service est obligatoire.", "error");
     return;
   }
-  if (!editingServiceId) {
-    await adminRequest("/api/admin/services", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  } else {
-    await adminRequest(`/api/admin/services/${encodeURIComponent(editingServiceId)}`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-  }
+  await adminRequest("/api/admin/services", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
   resetServiceForm();
   await loadServices();
 }
@@ -862,7 +1137,7 @@ async function deleteService(serviceId) {
     method: "DELETE"
   });
   if (editingServiceId === serviceId) {
-    resetServiceForm();
+    closeServiceEditModal();
   }
   await loadServices();
 }
@@ -909,14 +1184,76 @@ function showCsvFeedback(el, msg, isError) {
   el.classList.remove("d-none");
 }
 
-async function loadResources() {
-  currentResources = await adminRequest("/api/admin/resources");
-  const table = byId("resourceTableBody");
-  if (!table) {
-    updateAdminMetrics();
+// Tri des tableaux admin (ressources / comptes) : trie un tableau deja en memoire et
+// re-rend sans re-fetcher le serveur - meme principe que le tri par en-tete du dashboard
+// (storage.js applyDashboardSort) mais adapte a des listes chargees une fois.
+const adminTableSortState = {
+  resource: { field: null, direction: "asc" },
+  user: { field: null, direction: "asc" },
+};
+
+const ADMIN_SORT_GETTERS = {
+  resource: {
+    label: (r) => (r.label || "").toLocaleLowerCase("fr"),
+    category: (r) => (r.category || "").toLocaleLowerCase("fr"),
+    service: (r) => (r.issuer_service || "").toLocaleLowerCase("fr"),
+    fields: (r) => (r.field_schema || []).length || 0,
+    active: (r) => (r.is_active ? 1 : 0),
+  },
+  user: {
+    username: (u) => (u.username || "").toLocaleLowerCase("fr"),
+    service: (u) => (u.service || "").toLocaleLowerCase("fr"),
+    status: (u) => (u.status || "").toLocaleLowerCase("fr"),
+  },
+};
+
+function sortAdminTable(table, items) {
+  const state = adminTableSortState[table];
+  const getValue = state.field && ADMIN_SORT_GETTERS[table][state.field];
+  if (!getValue) {
+    return items;
+  }
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    const va = getValue(a);
+    const vb = getValue(b);
+    const cmp = typeof va === "string" ? va.localeCompare(vb, "fr") : (va || 0) - (vb || 0);
+    return state.direction === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function bindAdminSortableHeaders(table, tableBodyId, onSortChange) {
+  const thead = byId(tableBodyId)?.closest("table")?.querySelector("thead");
+  if (!thead || thead.dataset.sortBound === "true") {
     return;
   }
-  table.innerHTML = currentResources.map((resource) => `
+  thead.addEventListener("click", (event) => {
+    const th = event.target.closest("th[data-sort-field]");
+    if (!th) {
+      return;
+    }
+    const field = th.dataset.sortField;
+    const state = adminTableSortState[table];
+    state.direction = state.field === field ? (state.direction === "asc" ? "desc" : "asc") : "asc";
+    state.field = field;
+    thead.querySelectorAll("th[data-sort-field]").forEach((h) => {
+      const active = h.dataset.sortField === field;
+      h.classList.toggle("is-sorted-asc", active && state.direction === "asc");
+      h.classList.toggle("is-sorted-desc", active && state.direction === "desc");
+      h.setAttribute("aria-sort", active ? (state.direction === "asc" ? "ascending" : "descending") : "none");
+    });
+    onSortChange();
+  });
+  thead.dataset.sortBound = "true";
+}
+
+function renderResourceTable() {
+  const table = byId("resourceTableBody");
+  if (!table) {
+    return;
+  }
+  table.innerHTML = sortAdminTable("resource", currentResources).map((resource) => `
     <tr>
       <td data-label="Ressource">
         <div class="draft-title">${escapeHtml(resource.label)}</div>
@@ -930,13 +1267,23 @@ async function loadResources() {
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
           <button class="btn btn-sm btn-outline-primary" type="button" data-admin-action="populateResourceForm" data-id="${escapeHtml(String(resource.id))}">Modifier</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-admin-action="toggleResourceState" data-id="${escapeHtml(String(resource.id))}" data-active="${resource.is_active ? "false" : "true"}">${resource.is_active ? "Désactiver" : "Activer"}</button>
-          <button class="btn btn-sm btn-outline-danger" type="button" data-admin-action="deleteResource" data-id="${escapeHtml(String(resource.id))}">Supprimer</button>
+          ${renderAdminRowMenu(
+            [{ label: resource.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleResourceState" data-id="${escapeHtml(String(resource.id))}" data-active="${resource.is_active ? "false" : "true"}"` }],
+            { label: "Supprimer", attrs: `data-admin-action="deleteResource" data-id="${escapeHtml(String(resource.id))}"` }
+          )}
         </div>
       </td>
     </tr>
   `).join("");
+}
+
+async function loadResources() {
+  currentResources = await adminRequest("/api/admin/resources");
+  bindAdminSortableHeaders("resource", "resourceTableBody", renderResourceTable);
+  renderResourceTable();
   updateAdminMetrics();
+  // L'écran « Qualité du catalogue » doit refléter chaque modification (création, édition, activation, suppression).
+  if (typeof loadCatalogQuality === "function") loadCatalogQuality();
 }
 
 async function saveResource() {
@@ -963,17 +1310,10 @@ async function saveResource() {
     showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
     return;
   }
-  if (!editingResourceId) {
-    await adminRequest("/api/admin/resources", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  } else {
-    await adminRequest(`/api/admin/resources/${encodeURIComponent(editingResourceId)}`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-  }
+  await adminRequest("/api/admin/resources", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
   resetResourceForm();
   await loadResources();
 }
@@ -997,7 +1337,7 @@ async function deleteResource(resourceId) {
     method: "DELETE"
   });
   if (editingResourceId === resourceId) {
-    resetResourceForm();
+    closeResourceEditModal();
   }
   await loadResources();
 }
@@ -1024,10 +1364,41 @@ async function toggleGroupUnc(groupKey, currentValue) {
   }
 }
 
+// Creation "a la demande" : la liste passe en premier, le formulaire s'ouvre via "+ Nouveau ...".
+// [data-create-panel] = bloc de champs a replier ; [data-create-section] = carte entiere a replier.
+function initAdminCreatePanels() {
+  document.querySelectorAll("[data-create-panel], [data-create-section]").forEach((target) => {
+    const card = target.closest(".content-card");
+    const heading = card?.querySelector(".section-heading");
+    if (!card || !heading || heading.querySelector("[data-create-trigger-btn]")) return;
+    const isSection = target.hasAttribute("data-create-section");
+    const label = target.dataset.createTrigger || "+ Nouveau";
+    const trigger = document.createElement("button");
+    const isOpen = () => (isSection ? !target.classList.contains("is-collapsed") : !target.classList.contains("d-none"));
+    const setOpen = (open) => {
+      if (isSection) target.classList.toggle("is-collapsed", !open);
+      else target.classList.toggle("d-none", !open);
+      trigger.textContent = open ? "Fermer" : label;
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) target.querySelector("input, select, textarea")?.focus();
+    };
+    trigger.type = "button";
+    trigger.className = `btn ${target.dataset.createTone || "btn-primary"} ms-auto`;
+    trigger.dataset.createTriggerBtn = "true";
+    trigger.addEventListener("click", () => setOpen(!isOpen()));
+    (heading.querySelector(".header-actions") || heading).appendChild(trigger);
+    setOpen(false);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  initAdminCreatePanels();
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-admin-action]");
     if (!btn) return;
+    // Interrupteur : l'etat visuel ne change qu'apres confirmation et enregistrement (re-rendu de la liste).
+    if (btn.type === "checkbox") e.preventDefault();
+    btn.closest("details.draft-actions__menu")?.removeAttribute("open");
     const action = btn.dataset.adminAction;
     const id = btn.dataset.id;
     const username = btn.dataset.username;
@@ -1098,17 +1469,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     byId("saveServiceBtn")?.addEventListener("click", async () => {
-      const wasEditingService = Boolean(editingServiceId);
       try {
         await saveService();
-        alert(wasEditingService ? "Service mis à jour." : "Service ajouté.");
+        alert("Service ajouté.");
       } catch (error) {
         alert(`Impossible d'enregistrer le service : ${error.message}`);
       }
     });
 
-    byId("cancelServiceEditBtn")?.addEventListener("click", () => {
-      resetServiceForm();
+    byId("modalSaveServiceBtn")?.addEventListener("click", async () => {
+      await saveServiceFromModal();
+    });
+
+    document.querySelectorAll("[data-service-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeServiceEditModal();
+      });
     });
 
     byId("csvImportBtn")?.addEventListener("click", () => {
@@ -1116,17 +1492,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     byId("saveResourceBtn")?.addEventListener("click", async () => {
-      const wasEditingResource = Boolean(editingResourceId);
       try {
         await saveResource();
-        alert(wasEditingResource ? "Ressource mise à jour." : "Ressource ajoutée.");
+        alert("Ressource ajoutée.");
       } catch (error) {
         alert(`Impossible d'enregistrer la ressource : ${error.message}`);
       }
     });
 
-    byId("cancelResourceEditBtn")?.addEventListener("click", () => {
-      resetResourceForm();
+    byId("modalAddResourceFieldBtn")?.addEventListener("click", () => {
+      appendResourceFieldRow({}, "modalResourceFieldRows");
+    });
+
+    byId("modalResourceCategory")?.addEventListener("change", () => {
+      syncResourceTrackingOptions(byId("modalResourceCategory"), byId("modalResourceHasAssignmentCondition"), byId("modalResourceHasAssignmentNotes"));
+    });
+
+    byId("modalSaveResourceBtn")?.addEventListener("click", async () => {
+      await saveResourceFromModal();
+    });
+
+    document.querySelectorAll("[data-resource-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeResourceEditModal();
+      });
     });
 
     initPasswordGeneratorModal();
