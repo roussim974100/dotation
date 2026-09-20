@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [Non publié : proposé 3.50.1]
+## [3.50.1] - 2026-09-20
 
 ### 🐛 Correctifs
 - **Personnalisation : modifier uniquement le « Seuil d'alerte pilotage » (ou le délai de la phase 1, ou la conservation de l'historique du parc) n'enregistrait rien** : la page répondait « Aucune modification à enregistrer » (message affiché en haut, loin du bouton). Les trois réglages numériques sont désormais pris en compte, et le message « aucune modification » défile jusqu'à l'écran.
