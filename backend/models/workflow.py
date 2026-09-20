@@ -13,6 +13,34 @@ from models.settings import DEFAULT_APP_SETTINGS
 # Normalisation du schema de champs dynamiques
 # ---------------------------------------------------------------------------
 
+FIELD_ROLES = ("identifier", "quantity", "variant")
+
+
+def _field_role(field):
+    role = str(field.get("role") or "").strip().lower()
+    if role in FIELD_ROLES:
+        return role
+    for legacy in FIELD_ROLES:  # anciens schemas : drapeaux identifier / quantity / variant
+        if field.get(legacy):
+            return legacy
+    return ""
+
+
+def _apply_roles(normalized):
+    """Un seul champ par role (le premier) ; les drapeaux historiques sont derives du role pour rester lisibles par le reste du code."""
+    seen = set()
+    for field in normalized:
+        role = field.get("role") or ""
+        if role and role in seen:
+            role = ""
+        if role:
+            seen.add(role)
+        field["role"] = role
+        for legacy in FIELD_ROLES:
+            field[legacy] = role == legacy
+    return normalized
+
+
 MAX_FIELDS_PER_RESOURCE = 60
 MAX_FIELD_LABEL = 120
 MAX_FIELD_OPTIONS = 200
@@ -54,6 +82,8 @@ def normalize_resource_field_schema(raw_schema):
             "suggest": bool(field.get("suggest", False)),
             # Champ qui identifie l'objet (n° de serie...) : permet de re-selectionner un materiel restitue.
             "identifier": bool(field.get("identifier", False)),
+            # Role du champ pour le suivi : identifier | quantity | variant (un seul champ par role). Explicite : plus de dependance a des noms de cle.
+            "role": _field_role(field),
             # Masque : le champ reste dans le schema (donc toujours resoluble en label pour
             # les dossiers existants et les exports) mais disparait du formulaire de saisie.
             # Alternative a la suppression reelle pour ne pas perdre les valeurs deja saisies.
@@ -61,7 +91,7 @@ def normalize_resource_field_schema(raw_schema):
             # Anciens noms de ce champ (renommage) : permettent de retrouver les valeurs des dossiers deja saisis.
             "aliases": [a for a in dict.fromkeys(slugify_field_key(x) for x in (field.get("aliases") or []) if isinstance(x, str)) if a and a != key],
         })
-    return normalized
+    return _apply_roles(normalized)
 
 
 # ---------------------------------------------------------------------------

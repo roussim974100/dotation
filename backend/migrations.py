@@ -41,9 +41,49 @@ def _m_field_ids(connection):
             connection.execute("UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?", (json.dumps(schema, ensure_ascii=False), row["id"]))
 
 
+def _m_field_roles(connection):
+    """Pose explicitement le role (identifiant / quantite / variante) que le code deduisait jusqu'ici des NOMS de cle : le comportement
+    existant est ffige, puis ne depend plus des noms (renommer un champ ne change plus le calcul des stocks)."""
+    from models.inventory import resolve_identifier_key
+    from models.resource_rules import effective_tracking_mode
+    from models.stock import QUANTITY_KEYS, VARIANT_KEYS
+    columns = {r[1] for r in connection.execute("PRAGMA table_info(resource_catalog)").fetchall()}
+    if not {"category", "tracking_mode", "field_schema_json"} <= columns:
+        return  # base tres ancienne / incomplete : rien a figer
+    for row in connection.execute("SELECT id, category, tracking_mode, field_schema_json FROM resource_catalog").fetchall():
+        try:
+            schema = json.loads(row["field_schema_json"] or "[]")
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(schema, list):
+            continue
+        mode = effective_tracking_mode(row["tracking_mode"], row["category"], schema)
+        changed = False
+
+        def assign(key, role):
+            nonlocal changed
+            if not key or any(isinstance(f, dict) and f.get("role") == role for f in schema):
+                return
+            for field in schema:
+                if isinstance(field, dict) and field.get("key") == key and not field.get("role"):
+                    field["role"] = role
+                    field[role] = True
+                    changed = True
+
+        if mode == "unit":
+            assign(resolve_identifier_key(schema), "identifier")
+        elif mode == "quantity":
+            keys = [f.get("key") for f in schema if isinstance(f, dict)]
+            assign(next((k for k in keys if k in QUANTITY_KEYS), None), "quantity")
+            assign(next((k for k in keys if k in VARIANT_KEYS), None), "variant")
+        if changed:
+            connection.execute("UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?", (json.dumps(schema, ensure_ascii=False), row["id"]))
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
+    (3, "roles_de_champs", _m_field_roles),
 ]
 
 

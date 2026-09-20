@@ -64,7 +64,7 @@ def validate_resource(data):
             issues.append(_issue(blocking, "quantity_needs_material", "Le suivi par quantité est réservé aux ressources de catégorie matériel."))
         has_quantity = any(isinstance(f, dict) and (f.get("quantity") or f.get("key") in ("quantite", "quantity", "nombre")) for f in schema)
         if not has_quantity:
-            issues.append(_issue("info", "no_quantity_field", "Sans champ « Quantité », chaque remise compte pour 1 unité."))
+            issues.append(_issue("info", "no_quantity_field", "Aucun champ n'a le rôle « Quantité » : chaque remise compte pour 1 unité (choisissez le rôle dans l'éditeur de champs)."))
     elif mode == "none" and data.get("category") == "materiel" and data.get("requires_return", True):
         issues.append(_issue("info", "no_history", "Sans suivi individuel : on sait qu'une ressource a été remise, pas laquelle."))
 

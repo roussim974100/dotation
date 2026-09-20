@@ -1,5 +1,20 @@
 # Historique des versions — À Quai
 
+## [3.59.0] - 2026-09-20
+
+Ressources personnalisées saines quel que soit leur schéma (pré-mortem du 20/09).
+
+### 🧩 Rôles de champs explicites
+- Chaque champ peut avoir un **rôle** dans le suivi : *identifiant de l'objet*, *quantité* (stock) ou *variante* (taille, pointure…), choisi dans l'éditeur de champs. Un seul champ par rôle. Avant, le stock et le parc devinaient ces champs d'après leur **nom** (« quantite », « taille »…) : une ressource dont le champ s'appelait « Nombre de pièces » ou « Qté » comptait 1 par remise, en silence.
+- **Migration numéro 3** : pour les ressources existantes, le rôle actuellement déduit des noms est écrit explicitement (le comportement ne change pas), puis ne dépend plus des noms : renommer un champ ne fausse plus les stocks.
+- **Stock** : la variante d'un article est celle de la **remise** ; un changement de taille après signature ne fausse plus les soldes par taille.
+
+### 🩺 Contrôle de santé enrichi
+- Invariants des stocks et du parc : soldes négatifs, mouvements ou objets d'une ressource inconnue, objets sans identifiant, ressource saisie sur plusieurs lignes dans un même dossier (risque de calcul de stock faussé). Ils apparaissent dans le contrôle général et dans le paquet de diagnostic.
+
+### 🧪 Tests
+- Batterie de propriétés : 200 descriptions de champs hostiles (unicode, emoji, doublons, types et rôles invalides, 200 champs…) sans erreur, normalisation idempotente, un seul champ par rôle ; 100 allers-retours du catalogue sans perte ni changement d'identifiant ; stock avec noms de champs libres ; migration des rôles (idempotente, schémas cassés tolérés) ; invariants de santé.
+
 ## [3.58.0] - 2026-09-20
 
 Support à distance sans jamais recevoir la base d'un client.

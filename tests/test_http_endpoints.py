@@ -187,7 +187,7 @@ def test_resource_used_by_dossiers_cannot_be_deleted(http):
 
 def test_database_health_report(http):
     assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
-    assert http["health_report_has_schema_version"] == 2
+    assert http["health_report_has_schema_version"] == 3
     assert http["health_report_status_known"] is True
 
 
@@ -195,11 +195,11 @@ def test_db_export_then_import_keeps_data_and_schema(http):
     assert http["db_export_is_sqlite"] is True
     assert http["db_import_status"] == 200
     assert http["db_import_keeps_forms"] is True
-    assert http["db_import_health"] == ["ok", 2]
+    assert http["db_import_health"] == ["ok", 3]
 
 
 def test_importing_an_older_database_upgrades_its_schema_immediately(http):
-    assert http["old_db_import"] == [200, 2, True]
+    assert http["old_db_import"] == [200, 3, True]
 
 
 def test_configured_beneficiary_types_and_status_labels_are_served(http):
@@ -257,3 +257,8 @@ def test_diagnostic_pack_contains_no_personal_data(http):
 def test_diagnostic_guard_refuses_personal_looking_content_and_is_admin_only(http):
     assert http["diag_guard_misses"] == []  # e-mail, chemin reseau, IP, URL, chemin de fichier : tous refuses
     assert http["diag_forbidden_for_anonymous"] in (401, 403)
+
+
+def test_stock_uses_explicit_field_roles_not_key_names(http):
+    assert http["stock_roles_kept"] == [["qte_en_stock", "quantity", True, False], ["taille_pointure", "variant", False, True]]
+    assert http["stock_libre_levels"] == [True, True, [["42", 5]]]  # 5 unites reservees en pointure 42, malgre des noms de cle libres

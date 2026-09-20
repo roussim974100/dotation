@@ -31,7 +31,7 @@ with Instance() as inst:
     driver.get(inst.url("/admin-ressources.html"))
     time.sleep(2.5)
     fields = [{"key": "numero_serie", "label": "N° de série", "type": "text", "aliases": ["serial"], "placeholder": "SN-0000", "identifier": True, "required": True},
-              {"key": "zones", "label": "Zones", "type": "list"},
+              {"key": "zones", "label": "Zones", "type": "list", "role": "variant"},
               {"key": "mail", "label": "E-mail", "type": "email_with_domain"}]
     out = driver.execute_script("""renderResourceFieldSchema(arguments[0]);
         const types = [...document.querySelectorAll('.resource-field-type')].map(s => [...s.options].map(o => o.value));
@@ -39,6 +39,7 @@ with Instance() as inst:
     got = {f["key"]: f for f in out["collected"]}
     check("le sélecteur de type propose « liste » et « e-mail avec domaine »", all("list" in t and "email_with_domain" in t for t in out["types"]), str(out["types"][:1]))
     check("type liste conservé (ne repasse pas en « Texte »)", got.get("zones", {}).get("type") == "list")
+    check("rôle du champ conservé à l'aller-retour de l'éditeur", got.get("zones", {}).get("role") == "variant" and got.get("numero_serie", {}).get("role") in ("", None), str(got.get("zones")))
     check("type e-mail avec domaine conservé", got.get("mail", {}).get("type") == "email_with_domain")
     check("alias conservés à l'aller-retour de l'éditeur", got.get("numero_serie", {}).get("aliases") == ["serial"], str(got.get("numero_serie")))
     check("aide à la saisie conservée", got.get("numero_serie", {}).get("placeholder") == "SN-0000")

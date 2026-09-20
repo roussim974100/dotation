@@ -150,6 +150,8 @@ def sync_stock_for_form(connection, form_id, config=None):
             "SELECT COALESCE(SUM(quantity), 0) AS net, MIN(variant) AS variant, COUNT(*) AS n FROM resource_stock_movements"
             " WHERE form_id = ? AND resource_code = ? AND movement_type IN ('assigned', 'assign_correction')", (form_id, code)
         ).fetchone()
+        if existing["n"]:
+            variant = existing["variant"] or ""  # la variante est celle de la REMISE : un changement de taille apres signature ne fausse pas les soldes
         if not existing["n"]:
             added += _move(connection, code, variant, -quantity, "assigned", when, f"assign:{form_id}:{code}", form_id, label)
         elif existing["net"] != -quantity:

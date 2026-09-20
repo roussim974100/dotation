@@ -485,6 +485,26 @@ for _bad in ("contact jean.dupont@ville.fr", "\\\\srv\\partage\\dossier", "ip 19
 results["diag_guard_misses"] = _unsafe
 results["diag_forbidden_for_anonymous"] = anonymous.get("/api/admin/diagnostic").status_code
 
+# ---- Stock par quantite avec des noms de champs LIBRES : les roles explicites font foi (plus de noms de cle en dur) ----
+admin.post("/api/admin/resources", json={"code": "stock_libre", "label": "Stock libre", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+                                          "tracking_mode": "quantity", "display_order": 980, "is_active": True,
+                                          "field_schema": [{"key": "qte_en_stock", "label": "Combien", "type": "number", "role": "quantity"},
+                                                           {"key": "taille_pointure", "label": "Pointure", "type": "text", "role": "variant"}]}, headers=H)
+_sl = next((r for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "stock_libre"), {})
+results["stock_roles_kept"] = [(f["key"], f["role"], f["quantity"], f["variant"]) for f in (_sl.get("field_schema") or _sl.get("fieldSchema") or [])]
+admin.post("/api/forms", json={"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "STOCK", "prenom": "Libre", "qualite": "agent"},
+                               "resources": {"additional": [{"id": _sl.get("id"), "code": "stock_libre", "label": "Stock libre", "category": "materiel", "requiresReturn": True,
+                                                             "selected": True, "fields": {"qte_en_stock": "5", "taille_pointure": "42"}, "details": ""}]},
+                               "workflow": {"status": "draft"}, "meta": {}}, headers=H)
+_lvl = next((x for x in (admin.get("/api/stock").get_json() or {}).get("resources", []) if x["resource_code"] == "stock_libre"), {})
+results["stock_libre_levels"] = [_lvl.get("has_quantity_field"), _lvl.get("has_variant"), [(v["variant"], v["reserved"]) for v in _lvl.get("variants", [])]]
+# sans role explicite ni nom habituel : reste a 1 par remise, et le catalogue l'explique
+admin.post("/api/admin/resources", json={"code": "stock_sans_role", "label": "Stock sans role", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+                                          "tracking_mode": "quantity", "display_order": 981, "is_active": True,
+                                          "field_schema": [{"key": "nombre_de_pieces", "label": "Nombre de pieces", "type": "number"}]}, headers=H)
+_q = admin.get("/api/admin/catalog/quality").get_json() or {}
+results["stock_sans_role_issue"] = any(r.get("code") == "stock_sans_role" for r in (_q.get("resources") or _q.get("items") or [])) or "stock_sans_role" in json.dumps(_q)
+
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
 admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)

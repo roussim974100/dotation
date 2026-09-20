@@ -46,6 +46,23 @@ def resync_flat_copies(connection):
     return len(ids)
 
 
+def stock_and_unit_invariants(connection):
+    """Invariants des stocks et du parc (comptages seulement) : soldes négatifs, mouvements d'une ressource inconnue, objets sans
+    identifiant, ressources de stock saisies sur plusieurs lignes dans un même dossier."""
+    def count(sql):
+        try:
+            return connection.execute(sql).fetchone()[0]
+        except Exception:  # noqa: BLE001 - table absente (base ancienne) : rien a controler
+            return 0
+    return {
+        "stockNegativeBalances": count("SELECT COUNT(*) FROM (SELECT 1 FROM resource_stock_movements GROUP BY resource_code, variant HAVING SUM(quantity) < 0)"),
+        "stockMovementsUnknownResource": count("SELECT COUNT(*) FROM resource_stock_movements WHERE resource_code NOT IN (SELECT code FROM resource_catalog)"),
+        "unitsWithoutIdentifier": count("SELECT COUNT(*) FROM resource_units WHERE TRIM(COALESCE(identifier, '')) = ''"),
+        "unitsUnknownResource": count("SELECT COUNT(*) FROM resource_units WHERE resource_code NOT IN (SELECT code FROM resource_catalog)"),
+        "duplicateItemLines": count("SELECT COUNT(*) FROM (SELECT 1 FROM dotation_items WHERE assigned = 1 GROUP BY form_id, item_key HAVING COUNT(*) > 1)"),
+    }
+
+
 def database_health(connection):
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
     broken_refs = len(connection.execute("PRAGMA foreign_key_check").fetchall())
@@ -64,8 +81,15 @@ def database_health(connection):
         problems.append(f"{len(orphans['orphans'])} nom(s) de champ à examiner dans les dossiers ({orphans['repairable']} rattachable(s)).")
     if drift:
         problems.append(f"{drift} dossier(s) dont la copie à plat diffère du dossier.")
+    invariants = stock_and_unit_invariants(connection)
+    labels = {"stockNegativeBalances": "solde(s) de stock négatif(s)", "stockMovementsUnknownResource": "mouvement(s) de stock d'une ressource inconnue",
+              "unitsWithoutIdentifier": "objet(s) du parc sans identifiant", "unitsUnknownResource": "objet(s) du parc d'une ressource inconnue",
+              "duplicateItemLines": "ressource(s) saisie(s) sur plusieurs lignes dans un même dossier (risque de calcul de stock faussé)"}
+    for key, label in labels.items():
+        if invariants[key]:
+            problems.append(f"{invariants[key]} {label}.")
     return {"status": "ok" if not problems else "attention", "problems": problems, "integrity": integrity, "brokenReferences": broken_refs,
-            "schemaVersion": version, "orphanFields": len(orphans["orphans"]), "copyDrift": drift}
+            "schemaVersion": version, "orphanFields": len(orphans["orphans"]), "copyDrift": drift, "invariants": invariants}
 
 
 _HEALTH_LOCK = None
