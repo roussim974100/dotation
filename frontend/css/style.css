@@ -5223,3 +5223,28 @@ section.content-card[id^="db-"] {
   color: var(--muted, #607080);
   list-style: none;
 }
+
+
+/* Personnalisation : barre d'enregistrement unique, fixée en bas de la zone de contenu. */
+.branding-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d4dde6);
+  border-radius: 14px;
+  box-shadow: 0 -6px 18px rgba(15, 35, 55, 0.08);
+}
+
+.branding-savebar__text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted, #607080);
+}

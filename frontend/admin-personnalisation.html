@@ -183,11 +183,6 @@
             <label class="form-label" for="brandingSupportEmail">Email support</label>
             <input class="form-control" id="brandingSupportEmail" type="email" placeholder="support@organisation.fr">
           </div>
-          <div class="col-12">
-            <div class="header-actions">
-              <button class="btn btn-primary" id="saveBrandingBtn" type="button">Enregistrer la personnalisation</button>
-            </div>
-          </div>
         </div>
 
         <div class="section-heading mt-4">
@@ -225,6 +220,12 @@
           </div>
         </div>
       </section>
+
+      <!-- Un seul bouton pour toute la page : fixé en bas, toujours visible quel que soit le champ modifié. -->
+      <div class="branding-savebar">
+        <p class="branding-savebar__text">Les modifications de toutes les sections de cette page sont enregistrées ensemble.</p>
+        <button class="btn btn-primary" id="saveBrandingBtn" type="button">Enregistrer la personnalisation</button>
+      </div>
     </div>
   </div>
 </main>
