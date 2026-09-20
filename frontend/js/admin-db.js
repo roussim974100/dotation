@@ -133,3 +133,50 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
+// Santé des champs : valeurs de dossiers dont le nom de champ n'existe plus dans le catalogue.
+document.addEventListener("DOMContentLoaded", () => {
+  const scanBtn = document.getElementById("fieldHealthScanBtn");
+  const repairBtn = document.getElementById("fieldHealthRepairBtn");
+  if (!scanBtn || !repairBtn) return;
+
+  async function scan() {
+    scanBtn.disabled = true;
+    try {
+      const response = await fetch("/api/admin/field-health", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Analyse impossible.");
+      const report = await response.json();
+      const rows = (report.orphans || []).map((o) => `<tr><td>${escapeHtml(o.resource)}</td><td><code>${escapeHtml(o.field)}</code></td><td>${o.target ? `<code>${escapeHtml(o.target)}</code>` : "<span class=\"text-muted\">aucun champ identifié</span>"}</td><td class="text-end">${Number(o.dossiers) || 0}</td></tr>`).join("");
+      if (!rows) {
+        showDbResult("fieldHealthResult", "ok", "Aucune valeur orpheline : tous les dossiers correspondent aux champs actuels.", "");
+      } else {
+        showDbResult("fieldHealthResult", report.repairable ? "warning" : "info",
+          `${report.orphans.length} nom(s) de champ à examiner (${report.repairable} rattachable(s), ${report.unmatched} sans correspondance sûre).`,
+          `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Ressource</th><th>Ancien nom</th><th>Champ actuel</th><th class="text-end">Dossiers</th></tr></thead><tbody>${rows}</tbody></table></div><p class="small text-muted mt-2 mb-0">Les valeurs sans correspondance sûre ne sont pas modifiées : elles restent visibles dans « Autres informations enregistrées » du formulaire.</p>`);
+      }
+      repairBtn.classList.toggle("d-none", !report.repairable);
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Analyse impossible.", "");
+    } finally {
+      scanBtn.disabled = false;
+    }
+  }
+
+  scanBtn.addEventListener("click", scan);
+  repairBtn.addEventListener("click", async () => {
+    repairBtn.disabled = true;
+    try {
+      const csrf = await getCsrfToken();
+      const response = await fetch("/api/admin/field-health/repair", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrf } });
+      if (!response.ok) throw new Error("Rattachement impossible.");
+      const report = await response.json();
+      await scan();
+      showDbResult("fieldHealthResult", "ok", `${report.repairedFields} valeur(s) rattachée(s) dans ${report.repairedForms} dossier(s). Copie de sécurité faite avant.`, "");
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Rattachement impossible.", "");
+    } finally {
+      repairBtn.disabled = false;
+    }
+  });
+});

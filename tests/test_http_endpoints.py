@@ -144,3 +144,30 @@ def test_legacy_field_names_are_shown_under_the_current_catalog_names(http):
     assert http["legacy_fields_aligned"] == {"nom_du_poste": "PC-ANCIEN-1", "numero_de_serie": "SN-ANCIEN-1", "adresse_email": "ancien@exemple.fr", "marque": "HP"}
     # rien n'est retire : les anciens noms restent presents (aucune perte de donnees)
     assert http["legacy_fields_old_keys_kept"] == {"nomPoste": "PC-ANCIEN-1", "numeroSerie": "SN-ANCIEN-1", "adresse": "ancien@exemple.fr"}
+
+
+def test_field_health_scan_and_repair_only_adds_current_names(http):
+    """Diagnostic : les valeurs orphelines sont listees avec leur cible ; la reparation les rattache (ajout seulement) et un second passage ne trouve plus rien."""
+    assert [tuple(x) for x in http["health_scan_before"]] == [("adresse", "adresse_email"), ("nomPoste", "nom_du_poste"), ("numeroSerie", "numero_de_serie")]
+    assert http["health_repaired_fields"] == 3
+    assert http["health_scan_after"] == []
+
+
+def test_custom_resource_end_to_end_no_data_loss(http):
+    """Ressource creee de toutes pieces (tous types de champs, libelles atypiques) : saisie, relecture, PUT(GET) idempotent, valeur orpheline conservee, renommage de cle, alias, masquage, PDF, export."""
+    assert http["e2e_create_status"] in (200, 201)
+    assert "n_de_serie" in http["e2e_keys"], http["e2e_keys"]  # « N° de série » -> un seul « _ », comme cote JS
+    assert "numeroInventaire" in http["e2e_keys"]  # cle valide gardee telle quelle (pas de mise en minuscules)
+    assert http["e2e_roundtrip_lossless"] is True
+    assert http["e2e_put_get_idempotent"] is True
+    assert http["e2e_orphan_kept_on_save"] is True
+
+
+def test_custom_resource_rename_hide_and_exports(http):
+    assert [a.lower() for a in http["e2e_alias_after_rename"]] == ["numeroinventaire"]  # alias compare sans casse (canonical_key)
+    assert [a.lower() for a in http["e2e_alias_survives_next_save"]] == ["numeroinventaire"]  # l'editeur ne renvoie pas les alias : ils ne se perdent pas
+    assert http["e2e_value_visible_after_rename"] is True
+    assert http["e2e_hidden_field_still_in_schema"] is True
+    assert http["e2e_hidden_value_kept"] is True
+    assert http["e2e_pdf_status"] == 200
+    assert http["e2e_export_contains_values"] is True

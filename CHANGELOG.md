@@ -1,5 +1,23 @@
 # Historique des versions — À Quai
 
+## [3.51.0] - 2026-09-20
+
+Chantier « ne plus jamais perdre une valeur de champ » (audit et comité du 20/09 : `docs/audit/`).
+
+### 🛡️ Données de dossiers
+- **Le formulaire n'efface plus les valeurs qu'il ne reconnaît pas** : toute valeur dont le nom de champ n'existe plus dans le catalogue est affichée dans « Autres informations enregistrées » et renvoyée telle quelle à l'enregistrement (avant, elle disparaissait au premier enregistrement).
+- **Correspondance exacte** : chaque dossier embarque la description de ses champs ; un champ actuel est rattaché à l'ancien champ de **même libellé**, sans deviner. La ressemblance de noms ne sert plus qu'en dernier recours.
+- **Alias de champ** : quand la clé d'un champ change, l'ancienne devient un alias (libellé identique uniquement, jamais « par position ») ; les alias sont conservés aux sauvegardes suivantes.
+- **Clés de champ** : une clé déjà valide est gardée telle quelle (fin de la mise en minuscules qui faisait dériver `numeroSerie`) ; un seul générateur de clés côté Python et JS.
+- **Suggestions de saisie** pilotées aussi par le réglage « suggérer » des champs des ressources personnalisées.
+
+### 🩺 Santé des champs (Administration > Base de données)
+- Analyse des valeurs de dossiers sans champ correspondant, puis rattachement aux noms actuels : ajout seulement (rien n'est supprimé ni écrasé), dossier **et** copie à plat mis à jour, copie de sécurité de la base par l'API SQLite (fiable en mode WAL), entrée au journal.
+
+### 🧪 Tests
+- Ressource personnalisée de bout en bout (tous types de champs, libellés atypiques) : saisie, relecture, PUT(GET) idempotent, valeur orpheline conservée, renommage de clé, alias, masquage, PDF, export.
+- `tests/browser/check_field_health.py` (formulaire d'ancien dossier + page Santé des champs), tests unitaires des alias et de la réparation.
+
 ## [3.50.2] - 2026-09-20
 
 ### 🐛 Correctifs

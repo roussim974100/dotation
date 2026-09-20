@@ -1680,6 +1680,41 @@ def db_diagnose():
     return jsonify(report)
 
 
+@bp.route("/api/admin/field-health", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def field_health_scan():
+    """Valeurs de dossiers saisies sous un nom de champ que le catalogue ne connait plus (lecture seule)."""
+    from models.field_health import scan_orphan_fields
+    with get_db() as conn:
+        return jsonify(scan_orphan_fields(conn))
+
+
+@bp.route("/api/admin/field-health/repair", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=3, window_seconds=600, scope="field_health_repair")
+def field_health_repair():
+    """Rattache aux noms actuels les valeurs dont la correspondance est sure (ajout seulement, copie de la base avant)."""
+    from models.field_health import repair_orphan_fields
+    os.makedirs(_BACKUP_DIR, exist_ok=True)
+    from datetime import datetime as _dt, timezone as _tz
+    backup_path = os.path.join(_BACKUP_DIR, f"dotation_avant_reparation_champs_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db")
+    if os.path.exists(DB_PATH):
+        # API de sauvegarde SQLite : copie coherente meme si la base est en mode WAL (une copie de fichier ne l'est pas).
+        source = sqlite3.connect(DB_PATH)
+        target = sqlite3.connect(backup_path)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
+    with get_db() as conn:
+        report = repair_orphan_fields(conn)
+        insert_app_log(conn, "admin", "field_health_repaired", "Reparation des champs de ressources", details=report)
+    return jsonify(report)
+
+
 @bp.route("/api/admin/db/import", methods=["POST"])
 @login_required
 @permission_required("db.manage")

@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 
 from models.resource_rules import effective_tracking_mode
-from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields
+from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields, schema_key_set
 from models.units import EFFECTIVE_ASSIGNMENT_STATUSES, _holder_label, _when
 from utils import mask_text, utc_now
 
@@ -89,7 +89,7 @@ def stock_resource_config(connection):
             "label": row["label"],
             "quantity": _pick_key(schema, "quantity", QUANTITY_KEYS),
             "variant": _pick_key(schema, "variant", VARIANT_KEYS),
-            "fields": {f["key"] for f in schema if isinstance(f, dict) and f.get("key")},
+            "fields": schema_key_set(schema),
         }
     return config
 

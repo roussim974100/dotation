@@ -39,10 +39,43 @@ def canonical_key(key):
     return "".join(w.lower() for w in words if w.lower() not in _KEY_STOPWORDS)
 
 
+class SchemaKeys(set):
+    """Cles des champs d'une ressource + anciens noms declares (alias) : {ancien nom: cle actuelle}."""
+    aliases = {}
+
+
+def schema_key_set(schema):
+    keys = SchemaKeys(f["key"] for f in (schema or []) if isinstance(f, dict) and f.get("key"))
+    keys.aliases = {canonical_key(a): f["key"] for f in (schema or []) if isinstance(f, dict) and f.get("key")
+                    for a in (f.get("aliases") or []) if canonical_key(a)}
+    return keys
+
+
+def align_with_embedded_schema(fields, embedded_schema, current_schema):
+    """Correspondance EXACTE, sans devinette : chaque dossier embarque la description des champs telle qu'elle etait
+    a l'enregistrement (cle + libelle). Un champ actuel absent des valeurs est rattache a l'ancien champ de meme
+    LIBELLE, dont la cle est connue avec certitude."""
+    if not isinstance(fields, dict) or not isinstance(embedded_schema, list):
+        return {}
+    by_label = {}
+    for f in embedded_schema:
+        if isinstance(f, dict) and f.get("key") and f.get("label"):
+            by_label.setdefault(canonical_key(f["label"]), []).append(f["key"])
+    result = {}
+    for f in current_schema or []:
+        if not isinstance(f, dict) or not f.get("key") or f["key"] in fields:
+            continue
+        keys = [k for k in by_label.get(canonical_key(f.get("label")), []) if str(fields.get(k) or "").strip()]
+        if len(keys) == 1:
+            result[f["key"]] = fields[keys[0]]
+    return result
+
+
 def align_fields(fields, schema_keys, loose=False):
     """Renvoie les champs d'une ligne de dossier sous les noms du CATALOGUE actuel. Les anciens dossiers ont ete
     saisis avec d'autres noms de champs (numeroSerie) que ceux du catalogue (numero_de_serie) : sans cette
     correspondance, l'identifiant serait ignore. Un nom deja present dans le catalogue est garde tel quel."""
+    alias_map = getattr(schema_keys, "aliases", None) or {}
     schema_keys = set(schema_keys)
     by_canonical = {}
     for key in schema_keys:
@@ -53,6 +86,8 @@ def align_fields(fields, schema_keys, loose=False):
             aligned[key] = value
             continue
         candidates = by_canonical.get(canonical_key(key), [])
+        if not candidates and canonical_key(key) in alias_map:
+            candidates = [alias_map[canonical_key(key)]]  # ancien nom declare a la modification du catalogue : correspondance exacte
         if not candidates and loose:
             # Repli (affichage du formulaire seulement) : ancien nom plus court que le nom du catalogue (« adresse » -> « adresse_email »).
             # « numero » et « n° » sont equivalents (numeroSerie ~ n_de_serie_sn).

@@ -172,6 +172,30 @@ DEFAULT_SERVICE_REFERENCES = [
 ]
 
 
+def carry_over_field_aliases(old_schema, new_schema):
+    """Garde les anciens noms d'un champ (alias) pour retrouver les valeurs des dossiers deja saisis.
+    1) Les alias deja connus d'un champ sont conserves a chaque sauvegarde (l'editeur ne les renvoie pas).
+    2) Si la cle d'un champ change (l'ancienne disparait), elle devient un alias du champ ajoute qui porte le MEME LIBELLE.
+    Jamais d'appariement « au jugé » (par position) : sans libelle identique, on ne rattache rien."""
+    old_by_key = {f["key"]: f for f in old_schema if isinstance(f, dict) and f.get("key")}
+    for f in new_schema:
+        previous = old_by_key.get(f["key"])
+        if previous:
+            f["aliases"] = list(dict.fromkeys([*(previous.get("aliases") or []), *(f.get("aliases") or [])]))
+    new_keys = {f["key"] for f in new_schema}
+    removed = [f for k, f in old_by_key.items() if k not in new_keys]
+    added = [f for f in new_schema if f["key"] not in old_by_key]
+    for old in removed:
+        label = str(old.get("label") or "").strip().lower()
+        same = [f for f in added if str(f.get("label") or "").strip().lower() == label]
+        if len(same) == 1:
+            target = same[0]
+            for alias in [old["key"], *(old.get("aliases") or [])]:
+                if alias != target["key"] and alias not in (target.get("aliases") or []):
+                    target["aliases"] = [*(target.get("aliases") or []), alias]
+    return new_schema
+
+
 def normalize_resource_catalog_payload(payload, existing_row=None):
     existing = dict(existing_row) if existing_row else {}
     code = str(payload.get("code") if payload.get("code") is not None else existing.get("code") or "").strip()
@@ -189,6 +213,11 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
         except (TypeError, json.JSONDecodeError):
             raw_field_schema = []
     field_schema = normalize_resource_field_schema(raw_field_schema)
+    if existing and "field_schema_json" in existing and raw_field_schema is not None:
+        try:
+            field_schema = carry_over_field_aliases(normalize_resource_field_schema(json.loads(existing.get("field_schema_json") or "[]")), field_schema)
+        except (TypeError, json.JSONDecodeError):
+            pass
     display_order = payload.get("display_order") if payload.get("display_order") is not None else existing.get("display_order", 100)
     try:
         display_order = int(display_order)

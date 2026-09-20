@@ -176,6 +176,17 @@
         <div id="backupHistoryList" class="text-muted small">Chargement…</div>
       </section>
 
+      <section class="content-card mt-4" id="db-fieldhealth">
+        <p class="panel-eyebrow">Santé des données</p>
+        <h3 class="h5">Valeurs de dossiers sans champ correspondant</h3>
+        <p class="text-muted small">Quand un champ d'une ressource est renommé, les anciens dossiers gardent l'ancien nom et l'écran peut ne plus afficher la valeur. Cette analyse les liste. Le rattachement <strong>ajoute</strong> la valeur sous le nom actuel du champ : rien n'est supprimé ni écrasé, et une copie de sécurité de la base est faite avant.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-primary" id="fieldHealthScanBtn" type="button">Analyser les dossiers</button>
+          <button class="btn btn-primary d-none" id="fieldHealthRepairBtn" type="button">Rattacher les valeurs aux champs actuels</button>
+        </div>
+        <div id="fieldHealthResult" class="mt-3 d-none" role="status"></div>
+      </section>
+
       <section class="content-card mt-4" id="db-schedule">
         <div class="section-heading">
           <div>

@@ -18,7 +18,7 @@ from models.workflow import (
     describe_assignment_condition, extract_items,
 )
 from models.dossier import sync_person_and_dossier
-from models.inventory import align_fields
+from models.inventory import align_fields, align_with_embedded_schema, schema_key_set
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS, get_dpo_email
 from utils import generate_id
 
@@ -36,7 +36,9 @@ def _upsert_field_suggestions(connection, payload):
     # Champs texte des ressources additionnelles
     for resource in (payload.get("resources") or {}).get("additional") or []:
         fields = resource.get("fields") or {}
-        for key in _SUGGEST_FIELD_KEYS:
+        # Cles proposees en suggestion : liste historique + champs que la ressource marque « suggest » (ressources personnalisees).
+        suggest_keys = set(_SUGGEST_FIELD_KEYS) | {f.get("key") for f in (resource.get("fieldSchema") or []) if isinstance(f, dict) and f.get("suggest") and f.get("key")}
+        for key in suggest_keys:
             val = str(fields.get(key) or "").strip()
             if val:
                 to_upsert.append(("", key, val, ""))
@@ -445,16 +447,20 @@ def align_payload_field_names(connection, payload):
     schemas = {}
     for row in connection.execute("SELECT code, field_schema_json FROM resource_catalog").fetchall():
         try:
-            schemas[row["code"]] = [f["key"] for f in json.loads(row["field_schema_json"] or "[]") if isinstance(f, dict) and f.get("key")]
+            schema = json.loads(row["field_schema_json"] or "[]")
+            schemas[row["code"]] = (schema_key_set(schema), schema)
         except (TypeError, ValueError):
             continue
     for entry in additional:
         fields = entry.get("fields") if isinstance(entry, dict) else None
-        keys = schemas.get(entry.get("code")) if isinstance(entry, dict) else None
+        keys, schema = schemas.get(entry.get("code")) or (None, None) if isinstance(entry, dict) else (None, None)
         if not isinstance(fields, dict) or not keys:
             continue
         merged = dict(fields)
-        for key, value in align_fields(fields, keys, loose=True).items():
+        # 1) exact : description des champs embarquee dans le dossier ; 2) sinon correspondance de noms (a defaut)
+        aligned = align_fields(fields, keys, loose=True)
+        aligned.update(align_with_embedded_schema(fields, entry.get("fieldSchema"), schema))
+        for key, value in aligned.items():
             if not str(merged.get(key) or "").strip():
                 merged[key] = value
         entry["fields"] = merged

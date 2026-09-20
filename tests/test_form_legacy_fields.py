@@ -31,3 +31,12 @@ def test_une_valeur_deja_presente_sous_le_nom_actuel_est_gardee():
 
 def test_numero_et_n_sont_equivalents():
     assert align_fields({"numeroSerie": "SN9"}, ["nom_du_telephone", "n_de_serie_sn"], loose=True) == {"n_de_serie_sn": "SN9"}
+
+
+def test_schema_embarque_dans_le_dossier_rattache_par_libelle_sans_devinette():
+    from models.inventory import align_with_embedded_schema
+    embedded = [{"key": "sn", "label": "Numéro de série"}, {"key": "x", "label": "Autre"}]
+    current = [{"key": "identifiant_machine", "label": "Numero de serie"}, {"key": "marque", "label": "Marque"}]
+    assert align_with_embedded_schema({"sn": "123", "x": "y"}, embedded, current) == {"identifiant_machine": "123"}
+    # deux anciens champs de meme libelle : ambigu, on ne rattache pas
+    assert align_with_embedded_schema({"a": "1", "b": "2"}, [{"key": "a", "label": "N"}, {"key": "b", "label": "N"}], [{"key": "n", "label": "N"}]) == {}

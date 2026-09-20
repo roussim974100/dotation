@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime
 
 from utils import (
@@ -17,7 +18,10 @@ def normalize_resource_field_schema(raw_schema):
     normalized = []
     for index, field in enumerate(raw_schema or []):
         label = str(field.get("label") or "").strip()
-        key = slugify_field_key(field.get("key") or label or f"champ_{index + 1}")
+        raw_key = str(field.get("key") or "").strip()
+        # Une cle technique deja valide est gardee TELLE QUELLE (casse comprise) : la re-slugifier la ferait deriver
+        # (numeroSerie -> numeroserie) et rendrait invisibles les valeurs deja saisies dans les dossiers.
+        key = raw_key if re.fullmatch(r"[A-Za-z0-9_]+", raw_key) else slugify_field_key(raw_key or label or f"champ_{index + 1}")
         if not label or not key:
             continue
         field_type = str(field.get("type") or "text").strip().lower() or "text"
@@ -40,6 +44,8 @@ def normalize_resource_field_schema(raw_schema):
             # les dossiers existants et les exports) mais disparait du formulaire de saisie.
             # Alternative a la suppression reelle pour ne pas perdre les valeurs deja saisies.
             "hidden": bool(field.get("hidden", False)),
+            # Anciens noms de ce champ (renommage) : permettent de retrouver les valeurs des dossiers deja saisis.
+            "aliases": [a for a in dict.fromkeys(slugify_field_key(x) for x in (field.get("aliases") or []) if isinstance(x, str)) if a and a != key],
         })
     return normalized
 

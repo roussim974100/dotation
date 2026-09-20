@@ -220,6 +220,90 @@ _fields = (((_read.get("resources") or {}).get("additional") or [{}])[0]).get("f
 results["legacy_fields_aligned"] = {k: _fields.get(k) for k in ("nom_du_poste", "numero_de_serie", "adresse_email", "marque")}
 results["legacy_fields_old_keys_kept"] = {k: _fields.get(k) for k in ("nomPoste", "numeroSerie", "adresse")}
 results["legacy_form_id"] = _fid
+_scan = admin.get("/api/admin/field-health").get_json() or {}
+results["health_scan_before"] = sorted((o["field"], o["target"]) for o in _scan.get("orphans", []) if o["code"] == "poste_ancien")
+_rep = admin.post("/api/admin/field-health/repair", headers=H).get_json() or {}
+results["health_repaired_fields"] = _rep.get("repairedFields")
+_scan2 = admin.get("/api/admin/field-health").get_json() or {}
+results["health_scan_after"] = [o for o in _scan2.get("orphans", []) if o["code"] == "poste_ancien"]
+
+# ---- Ressources personnalisees de bout en bout : creation, saisie, aller-retour sans perte, renommage de cle, masquage ----
+_types = [{"key": "N° de série", "label": "N° de série", "type": "text", "required": True, "identifier": True},
+          {"key": "numeroInventaire", "label": "Numéro d'inventaire", "type": "text"},
+          {"key": "Adresse e-mail", "label": "Adresse e-mail", "type": "email_with_domain"},
+          {"key": "couleur", "label": "Couleur", "type": "select", "options": ["Rouge", "Bleu"]},
+          {"key": "achete_le", "label": "Acheté le", "type": "date"},
+          {"key": "prix", "label": "Prix", "type": "number"},
+          {"key": "garantie", "label": "Garantie", "type": "checkbox"},
+          {"key": "notes", "label": "Notes", "type": "textarea"},
+          {"key": "libellé étrange !", "label": "Libellé étrange !", "type": "text"}]
+_r = admin.post("/api/admin/resources", json={
+    "code": "custom_e2e", "label": "Ressource E2E", "description": "", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+    "has_assignment_date": True, "has_assignment_condition": True, "has_assignment_notes": True, "display_order": 901, "is_active": True,
+    "tracking_mode": "unit", "field_schema": _types}, headers=H)
+results["e2e_create_status"] = _r.status_code
+_rid = next((r["id"] for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "custom_e2e"), None)
+
+
+def _schema_now():
+    row = next((r for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "custom_e2e"), {})
+    return row.get("field_schema") or row.get("fieldSchema") or []
+
+
+_sch = _schema_now()
+results["e2e_keys"] = [f["key"] for f in _sch]
+_values = {f["key"]: {"text": "V-" + f["key"], "email_with_domain": "a@ville.fr", "select": "Rouge", "date": "2026-01-02",
+                      "number": "12.5", "checkbox": "true", "textarea": "ligne1 ligne2"}.get(f["type"], "x") for f in _sch}
+_body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "E2E", "prenom": "Test", "qualite": "agent"},
+         "resources": {"additional": [{"id": _rid, "code": "custom_e2e", "label": "Ressource E2E", "category": "materiel", "requiresReturn": True,
+                                       "selected": True, "fieldSchema": _sch, "fields": dict(_values), "details": ""}]},
+         "workflow": {"status": "draft"}, "meta": {}}
+_c = admin.post("/api/forms", json=_body, headers=H).get_json() or {}
+_id = (_c.get("summary") or {}).get("id")
+
+
+def _fields_of_form():
+    data = (admin.get(f"/api/forms/{_id}").get_json() or {}).get("data", {})
+    return (((data.get("resources") or {}).get("additional") or [{}])[0]).get("fields", {}), data
+
+
+_f1, _d1 = _fields_of_form()
+results["e2e_roundtrip_lossless"] = all(_f1.get(k) == v for k, v in _values.items())
+# PUT(GET) : renvoyer tel quel ce qu'on a lu ne change aucune valeur (idempotence)
+admin.put(f"/api/forms/{_id}", json=_d1, headers=H)
+_f2, _ = _fields_of_form()
+results["e2e_put_get_idempotent"] = _f2 == _f1
+# une valeur inconnue du catalogue (ancien nom) survit a un enregistrement
+_d1["resources"]["additional"][0]["fields"]["ancienChamp"] = "VALEUR-ORPHELINE"
+admin.put(f"/api/forms/{_id}", json=_d1, headers=H)
+results["e2e_orphan_kept_on_save"] = _fields_of_form()[0].get("ancienChamp") == "VALEUR-ORPHELINE"
+# renommage de la cle d'un champ (meme libelle) : la valeur reste retrouvable, l'alias est memorise, et survit a une sauvegarde sans alias
+_new = [dict(f) for f in _sch]
+for f in _new:
+    f.pop("aliases", None)
+    if f["key"] == "numeroinventaire" or f["key"] == "numeroInventaire":
+        f["key"] = "inventaire_num"
+admin.put(f"/api/admin/resources/{_rid}", json={"field_schema": _new}, headers=H)
+_after = _schema_now()
+_inv = next((f for f in _after if f["key"] == "inventaire_num"), {})
+results["e2e_alias_after_rename"] = _inv.get("aliases")
+admin.put(f"/api/admin/resources/{_rid}", json={"field_schema": [{k: v for k, v in f.items() if k != "aliases"} for f in _after]}, headers=H)
+results["e2e_alias_survives_next_save"] = next((f for f in _schema_now() if f["key"] == "inventaire_num"), {}).get("aliases")
+_f3, _ = _fields_of_form()
+results["e2e_value_visible_after_rename"] = _f3.get("inventaire_num") == _values.get("numeroInventaire", _values.get("numeroinventaire"))
+# cle deja valide : gardee telle quelle (casse comprise), pas de derive
+results["e2e_key_case_preserved"] = "numeroInventaire" in results["e2e_keys"] or "numeroinventaire" in results["e2e_keys"]
+# masquage : le champ reste dans le schema
+_hid = [dict(f) for f in _after]
+for f in _hid:
+    if f["key"] == "notes":
+        f["hidden"] = True
+admin.put(f"/api/admin/resources/{_rid}", json={"field_schema": _hid}, headers=H)
+results["e2e_hidden_field_still_in_schema"] = any(f["key"] == "notes" and f.get("hidden") for f in _schema_now())
+results["e2e_hidden_value_kept"] = _fields_of_form()[0].get("notes") == "ligne1 ligne2"
+results["e2e_pdf_status"] = admin.get(f"/api/forms/{_id}/pdf").status_code
+_exp = admin.get("/api/forms/export")
+results["e2e_export_contains_values"] = _exp.status_code == 200 and (b"V-" in _exp.data or "V-" in _exp.get_data(as_text=True))
 
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None

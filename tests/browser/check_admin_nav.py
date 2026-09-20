@@ -47,7 +47,7 @@ if __name__ == "__main__":
         driver.get(inst.url("/admin-comptes.html"))
         time.sleep(1.8)
         data = json.loads(driver.execute_script(JS))
-        check("admin-comptes : les ancres propres à la page sont conservées", data.get("local") == ["Nouveau compte", "Utilisateurs existants", "Groupes disponibles"], str(data.get("local")))
+        check("admin-comptes : les ancres propres à la page sont conservées", data.get("local") == ["Nouveau compte", "Utilisateurs existants", "Les groupes"], str(data.get("local")))
         driver.get(inst.url("/admin-personnalisation.html"))
         time.sleep(1.8)
         visible = driver.execute_script("const b = document.getElementById('saveBrandingBtn').getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight")

@@ -1,6 +1,7 @@
 import base64
 import json
 import struct
+import re
 import unicodedata
 import uuid
 from datetime import datetime, timezone
@@ -55,12 +56,11 @@ def mask_payload(payload):
 
 
 def slugify_field_key(value):
+    """Cle technique d'un champ a partir d'un libelle. Meme resultat que slugifyFieldKey (frontend/js/admin.js) :
+    accents retires, minuscules, toute suite de caracteres non alphanumeriques devient UN seul « _ »."""
     normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
-    return "".join(
-        character if character.isalnum() else "_"
-        for character in normalized
-        if unicodedata.category(character) != "Mn"
-    ).strip("_")
+    without_marks = "".join(character for character in normalized if unicodedata.category(character) != "Mn")
+    return re.sub(r"[^a-z0-9]+", "_", without_marks).strip("_")
 
 
 def normalize_pdf_text(value):
