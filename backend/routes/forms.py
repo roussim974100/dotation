@@ -32,6 +32,15 @@ from pdf.attribution import build_pdf_bytes
 from pdf.restitution import build_restitution_pdf_bytes
 import urllib.parse
 
+
+def csv_cell(value):
+    """Cellule CSV (separateur « ; ») : formule neutralisee, et guillemets si elle contient ; " ou un retour a la ligne."""
+    from utils import csv_safe
+    text = csv_safe(value)
+    if any(ch in text for ch in (";", '"', chr(10), chr(13))):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
 bp = Blueprint("forms", __name__)
 
 
@@ -361,7 +370,7 @@ def export_unc_access():
             chemin = (e.get("chemin") or "").strip()
             if not chemin:
                 continue
-            csv_rows.append(";".join([
+            csv_rows.append(";".join(csv_cell(cell) for cell in [
                 row["nom"] or "",
                 row["prenom"] or "",
                 row["service"] or "",
@@ -536,8 +545,8 @@ def get_retraits_pdf(form_id):
         beneficiaire = form_data.get("data", {}).get("beneficiaire", {})
         filename = slugify_filename(f"retraits_{beneficiaire.get('nom')}_{beneficiaire.get('prenom')}")
         return download_response(pdf_bytes, f"{filename}.pdf", "application/pdf")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        raise  # gestionnaire global : code d'erreur communicable, jamais le message brut (qui peut contenir une valeur)
 
 
 @bp.route("/api/forms/<form_id>", methods=["GET"])
@@ -592,7 +601,9 @@ def create_regularisation_restitution():
     prenom = (data.get("prenom") or "").strip()
     if not nom or not prenom:
         return jsonify({"error": "nom_prenom_required"}), 400
-    qualite = "elu" if data.get("qualite") == "elu" else "agent"
+    from models.vocab import configured_beneficiary_values, has_mandate
+    # tout type de bénéficiaire configuré est accepté (avant : tout autre type que « élu » était ramené à « agent »)
+    qualite = data.get("qualite") if data.get("qualite") in configured_beneficiary_values() else "agent"
     service = (data.get("service") or "").strip() or None
     raw_ids = data.get("resourceIds")
     resource_ids = [r for r in raw_ids if isinstance(r, str) and r] if isinstance(raw_ids, list) else []
@@ -615,7 +626,7 @@ def create_regularisation_restitution():
         "dossier": {"type": "sortie", "objet": note, "regularisation": True},
         "beneficiaire": {
             "nom": nom, "prenom": prenom, "service": service, "qualite": qualite,
-            "mandat": (data.get("mandat") or "").strip() if qualite == "elu" else "",
+            "mandat": (data.get("mandat") or "").strip() if has_mandate(qualite) else "",
         },
         "resources": {"additional": [
             {
@@ -659,8 +670,23 @@ def create_form():
 def update_form(form_id):
     if not has_permission("forms.edit"):
         return jsonify({"error": "forbidden"}), 403
+    viewer = current_user()
+    if viewer and viewer.get("data_scope") == "masked":
+        # Un profil dont les donnees sont masquees a la lecture ne peut pas enregistrer : il renverrait les valeurs masquees
+        # (« ***… ») a la place des vraies.
+        return jsonify({"error": "masked_scope_read_only"}), 403
     payload = request.get_json(silent=True) or {}
     payload.setdefault("meta", {})["id"] = form_id
+    # Verrou optimiste : le client indique la version du dossier qu'il a chargee (meta.baseSavedAt). Si quelqu'un l'a
+    # enregistre entre-temps, on refuse plutot que d'ecraser ses modifications (le dernier n'ecrase plus l'autre en silence).
+    base_saved_at = payload["meta"].pop("baseSavedAt", "")
+    if base_saved_at:
+        with get_db() as connection:
+            stored = connection.execute("SELECT updated_at FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+        # meme valeur que celle renvoyee au client par GET (meta.savedAt = updated_at)
+        stored_saved_at = (stored["updated_at"] or "") if stored else ""
+        if stored_saved_at and stored_saved_at != base_saved_at:
+            return jsonify({"error": "form_conflict"}), 409
     try:
         form_data = persist_form(payload)
     except AppError as error:

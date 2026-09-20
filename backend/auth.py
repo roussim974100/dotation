@@ -7,6 +7,7 @@ from functools import wraps
 from flask import has_request_context, jsonify, redirect, request, session
 
 import rate_store
+from utils import safe_json
 from config import BASE_DIR
 from database import get_db, get_users_db
 
@@ -254,7 +255,7 @@ def build_user_context(username):
     except Exception:
         group_rows = []
 
-    permissions = sorted({p for row in group_rows for p in json.loads(row["permissions_json"] or "[]")})
+    permissions = sorted({p for row in group_rows for p in (safe_json(row["permissions_json"], []) or []) if isinstance(p, str)})
     data_scope = "masked" if group_rows and all(r["data_scope"] == "masked" for r in group_rows) else "full"
     return {
         "username": username,

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from database import get_db
 from utils import utc_now, generate_id, normalize_dossier_type
@@ -125,18 +126,26 @@ def sync_person_and_dossier(connection, payload, existing_row=None):
     return person_id, dossier_id
 
 
-def migrate_forms_to_dossiers(connection):
+def migrate_forms_to_dossiers(connection):  # noqa: C901
     rows = connection.execute(
         "SELECT id, dossier_id, payload_json, created_at, updated_at FROM dotation_forms"
     ).fetchall()
     for row in rows:
-        payload = json.loads(row["payload_json"])
+        try:
+            payload = json.loads(row["payload_json"])
+            if not isinstance(payload, dict):
+                raise ValueError("payload non objet")
+        except (TypeError, ValueError):
+            logging.getLogger(__name__).warning("Dossier %s : contenu illisible, ignoré au démarrage", row["id"])
+            continue  # un dossier abime ne doit jamais empecher l'application de demarrer
         payload.setdefault("meta", {})
         payload["meta"].setdefault("id", row["id"])
         payload["meta"].setdefault("createdAt", row["created_at"])
         payload["meta"].setdefault("savedAt", row["updated_at"])
         _, dossier_id = sync_person_and_dossier(connection, payload, row)
-        connection.execute(
-            "UPDATE dotation_forms SET dossier_id = ?, payload_json = ? WHERE id = ?",
-            (dossier_id, json.dumps(payload, ensure_ascii=False), row["id"]),
-        )
+        new_json = json.dumps(payload, ensure_ascii=False)
+        if new_json != row["payload_json"] or dossier_id != row["dossier_id"]:  # sinon rien a ecrire (demarrage rapide, peu de verrous)
+            connection.execute(
+                "UPDATE dotation_forms SET dossier_id = ?, payload_json = ? WHERE id = ?",
+                (dossier_id, new_json, row["id"]),
+            )

@@ -133,3 +133,158 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
+// Santé des champs : valeurs de dossiers dont le nom de champ n'existe plus dans le catalogue.
+document.addEventListener("DOMContentLoaded", () => {
+  const scanBtn = document.getElementById("fieldHealthScanBtn");
+  const repairBtn = document.getElementById("fieldHealthRepairBtn");
+  if (!scanBtn || !repairBtn) return;
+
+  async function scan() {
+    scanBtn.disabled = true;
+    try {
+      const response = await fetch("/api/admin/field-health", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Analyse impossible.");
+      const report = await response.json();
+      const rows = (report.orphans || []).map((o) => `<tr><td>${escapeHtml(o.resource)}</td><td><code>${escapeHtml(o.field)}</code></td><td>${o.target ? `<code>${escapeHtml(o.target)}</code>` : "<span class=\"text-muted\">aucun champ identifié</span>"}</td><td class="text-end">${Number(o.dossiers) || 0}</td></tr>`).join("");
+      if (!rows) {
+        showDbResult("fieldHealthResult", "ok", "Aucune valeur orpheline : tous les dossiers correspondent aux champs actuels.", "");
+      } else {
+        showDbResult("fieldHealthResult", report.repairable ? "warning" : "info",
+          `${report.orphans.length} nom(s) de champ à examiner (${report.repairable} rattachable(s), ${report.unmatched} sans correspondance sûre).`,
+          `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Ressource</th><th>Ancien nom</th><th>Champ actuel</th><th class="text-end">Dossiers</th></tr></thead><tbody>${rows}</tbody></table></div><p class="small text-muted mt-2 mb-0">Les valeurs sans correspondance sûre ne sont pas modifiées : elles restent visibles dans « Autres informations enregistrées » du formulaire.</p>`);
+      }
+      repairBtn.classList.toggle("d-none", !report.repairable);
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Analyse impossible.", "");
+    } finally {
+      scanBtn.disabled = false;
+    }
+  }
+
+  document.getElementById("dbHealthBtn")?.addEventListener("click", async () => {
+    try {
+      const response = await fetch("/api/admin/health", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Contrôle impossible.");
+      const report = await response.json();
+      if (report.status === "ok") {
+        showDbResult("fieldHealthResult", "ok", "Base en bon état.", `Intégrité : ${escapeHtml(report.integrity)} · migrations appliquées jusqu'à la version ${escapeHtml(String(report.schemaVersion ?? "—"))}.`);
+      } else {
+        showDbResult("fieldHealthResult", "warning", "Points à examiner", `<ul class="mb-0">${(report.problems || []).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`);
+      }
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Contrôle impossible.", "");
+    }
+  });
+
+  scanBtn.addEventListener("click", scan);
+  repairBtn.addEventListener("click", async () => {
+    repairBtn.disabled = true;
+    try {
+      const csrf = await getCsrfToken();
+      const response = await fetch("/api/admin/field-health/repair", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrf } });
+      if (!response.ok) throw new Error("Rattachement impossible.");
+      const report = await response.json();
+      await scan();
+      showDbResult("fieldHealthResult", "ok", `${report.repairedFields} valeur(s) rattachée(s) dans ${report.repairedForms} dossier(s) ; copie à plat recalculée pour ${report.resyncedForms || 0} dossier(s). Copie de sécurité faite avant.`, "");
+    } catch (error) {
+      showDbResult("fieldHealthResult", "error", error.message || "Rattachement impossible.", "");
+    } finally {
+      repairBtn.disabled = false;
+    }
+  });
+});
+
+
+// Paramétrage : aperçu puis application (import additif).
+document.addEventListener("DOMContentLoaded", () => {
+  const fileInput = document.getElementById("configImportFile");
+  const previewBtn = document.getElementById("configPreviewBtn");
+  const applyBtn = document.getElementById("configApplyBtn");
+  if (!fileInput || !previewBtn || !applyBtn) return;
+  let pendingConfig = null;
+
+  async function readFile() {
+    const file = fileInput.files?.[0];
+    if (!file) throw new Error("Choisissez d'abord un fichier de paramétrage.");
+    try { return JSON.parse(await file.text()); } catch { throw new Error("Ce fichier n'est pas un JSON valide."); }
+  }
+
+  async function send(config, apply) {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`/api/admin/config-import${apply ? "?apply=1" : ""}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify(config)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || "Import impossible.");
+    return body.plan;
+  }
+
+  function summary(plan) {
+    const li = (text) => `<li>${escapeHtml(text)}</li>`;
+    const items = [];
+    if (plan.settings.length) items.push(li(`${plan.settings.length} réglage(s) modifié(s) : ${plan.settings.join(", ")}`));
+    if (plan.servicesToCreate.length) items.push(li(`${plan.servicesToCreate.length} service(s) à créer`));
+    if (plan.resourcesToCreate.length) items.push(li(`${plan.resourcesToCreate.length} ressource(s) à créer : ${plan.resourcesToCreate.join(", ")}`));
+    if (plan.resourcesSkipped.length) items.push(li(`${plan.resourcesSkipped.length} ressource(s) déjà présente(s), laissée(s) telle(s) quelle(s)`));
+    (plan.errors || []).forEach((e) => items.push(li(`À corriger : ${e}`)));
+    return items.length ? `<ul class="mb-0">${items.join("")}</ul>` : "";
+  }
+
+  previewBtn.addEventListener("click", async () => {
+    applyBtn.classList.add("d-none");
+    try {
+      pendingConfig = await readFile();
+      const plan = await send(pendingConfig, false);
+      const nothing = !plan.settings.length && !plan.servicesToCreate.length && !plan.resourcesToCreate.length;
+      showDbResult("configImportResult", nothing ? "ok" : "info", nothing ? "Rien à importer : ce paramétrage est déjà en place." : "Voici ce que l'import ferait (rien n'est encore écrit).", summary(plan));
+      applyBtn.classList.toggle("d-none", nothing);
+    } catch (error) {
+      pendingConfig = null;
+      showDbResult("configImportResult", "error", error.message || "Import impossible.", "");
+    }
+  });
+
+  applyBtn.addEventListener("click", async () => {
+    if (!pendingConfig) return;
+    applyBtn.disabled = true;
+    try {
+      const plan = await send(pendingConfig, true);
+      showDbResult("configImportResult", "ok", "Paramétrage importé.", summary(plan));
+      applyBtn.classList.add("d-none");
+      pendingConfig = null;
+    } catch (error) {
+      showDbResult("configImportResult", "error", error.message || "Import impossible.", "");
+    } finally {
+      applyBtn.disabled = false;
+    }
+  });
+});
+
+
+// Paquet de diagnostic : aperçu du contenu avant téléchargement (rien n'est envoyé automatiquement).
+document.addEventListener("DOMContentLoaded", () => {
+  const button = document.getElementById("diagPreviewBtn");
+  const preview = document.getElementById("diagPreview");
+  if (!button || !preview) return;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/admin/diagnostic", { credentials: "same-origin" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || "Diagnostic impossible.");
+      preview.textContent = JSON.stringify(body, null, 2);
+      preview.classList.remove("d-none");
+      const health = body.health || {};
+      showDbResult("diagResult", health.status === "ok" ? "ok" : "info",
+        `Paquet prêt : version ${escapeHtml(String(body.versions?.app || "?"))}, ${Object.keys(body.schema?.tables || {}).length} tables, ${(body.resources || []).length} ressources.`,
+        health.status === "ok" ? "Aucun point à examiner." : `<ul class="mb-0">${(health.problems || []).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`);
+    } catch (error) {
+      showDbResult("diagResult", "error", error.message || "Diagnostic impossible.", "");
+    } finally {
+      button.disabled = false;
+    }
+  });
+});

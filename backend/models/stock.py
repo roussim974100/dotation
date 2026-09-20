@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 
 from models.resource_rules import effective_tracking_mode
-from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields
+from models.inventory import DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields, schema_key_set
 from models.units import EFFECTIVE_ASSIGNMENT_STATUSES, _holder_label, _when
 from utils import mask_text, utc_now
 
@@ -89,18 +89,21 @@ def stock_resource_config(connection):
             "label": row["label"],
             "quantity": _pick_key(schema, "quantity", QUANTITY_KEYS),
             "variant": _pick_key(schema, "variant", VARIANT_KEYS),
-            "fields": {f["key"] for f in schema if isinstance(f, dict) and f.get("key")},
+            "fields": schema_key_set(schema),
         }
     return config
+
+
+MAX_QUANTITY = 1_000_000
 
 
 def _as_quantity(value):
     """Quantite d'une ligne de dossier : entier >= 1 (defaut 1 si vide ou illisible)."""
     try:
         number = int(float(str(value).replace(",", ".").strip()))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # « inf », « 1e999 » : illisible, jamais une erreur
         return 1
-    return number if number >= 1 else 1
+    return min(number, MAX_QUANTITY) if number >= 1 else 1
 
 
 def _move(connection, code, variant, quantity, movement_type, occurred_at, dedupe_key, form_id=None,
@@ -147,6 +150,8 @@ def sync_stock_for_form(connection, form_id, config=None):
             "SELECT COALESCE(SUM(quantity), 0) AS net, MIN(variant) AS variant, COUNT(*) AS n FROM resource_stock_movements"
             " WHERE form_id = ? AND resource_code = ? AND movement_type IN ('assigned', 'assign_correction')", (form_id, code)
         ).fetchone()
+        if existing["n"]:
+            variant = existing["variant"] or ""  # la variante est celle de la REMISE : un changement de taille apres signature ne fausse pas les soldes
         if not existing["n"]:
             added += _move(connection, code, variant, -quantity, "assigned", when, f"assign:{form_id}:{code}", form_id, label)
         elif existing["net"] != -quantity:

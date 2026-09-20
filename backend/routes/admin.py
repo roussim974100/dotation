@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, jsonify, make_response, request, session
 
-from utils import utc_now, generate_id, bool_to_int, mask_text
+from utils import utc_now, generate_id, bool_to_int, mask_text, csv_safe
 from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
@@ -164,16 +164,19 @@ def dashboard_stats():
     svc_conds = [c for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else conditions
     svc_params = [p for c, p in zip(conditions, base_params) if "service" not in c] if service_filter else base_params
     svc_where = ("WHERE " + " AND ".join(svc_conds)) if svc_conds else ""
+    from models.vocab import mandate_values
+    mandate_ids = sorted(mandate_values(db)) or ["elu"]
+    mandate_placeholders = ",".join("?" * len(mandate_ids))
     by_service_rows = db.execute(
         f"""SELECT
-            CASE WHEN beneficiary_type = 'elu'
+            CASE WHEN beneficiary_type IN ({mandate_placeholders})
                  THEN 'Élu(e)'
                  ELSE COALESCE(NULLIF(service,''), '—')
             END as service,
             COUNT(*) as count
             FROM dotation_forms {svc_where}
             GROUP BY 1 ORDER BY count DESC LIMIT 10""",
-        svc_params,
+        [*mandate_ids, *svc_params],
     ).fetchall()
     by_service = [{"service": row["service"], "count": row["count"]} for row in by_service_rows]
 
@@ -1100,7 +1103,7 @@ def export_services_csv():
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["label", "is_active"])
     for row in rows:
-        writer.writerow([row["label"], row["is_active"]])
+        writer.writerow([csv_safe(row["label"]), row["is_active"]])
     resp = make_response(output.getvalue())
     resp.headers["Content-Type"] = "text/csv; charset=utf-8"
     resp.headers["Content-Disposition"] = "attachment; filename=services.csv"
@@ -1354,6 +1357,10 @@ def delete_admin_resource(resource_id):
             (resource_id,),
         ).fetchone()
         if row:
+            # Une ressource portee par des dossiers ne se supprime pas (ils perdraient leur description) : la desactiver suffit.
+            used = connection.execute("SELECT COUNT(*) FROM dotation_forms WHERE payload_json LIKE ? OR payload_json LIKE ?", (f'%"code": "{row["code"]}"%', f'%"code":"{row["code"]}"%')).fetchone()[0]
+            if used:
+                return jsonify({"error": "resource_in_use", "dossiers": used}), 409
             insert_deleted_item(
                 connection,
                 "resource",
@@ -1646,8 +1653,23 @@ def db_export():
     filename = f"aquai_db_{date_str}.db"
     with get_db() as conn:
         insert_app_log(conn, "admin", "db_exported", "Export base de donnees", details={"filename": filename})
-    with open(DB_PATH, "rb") as fh:
-        data = fh.read()
+    # Copie coherente par l'API de sauvegarde SQLite : lire le fichier brut d'une base en mode WAL peut omettre les ecritures recentes.
+    snapshot_path = os.path.join(tempfile.gettempdir(), f"aquai_export_{uuid.uuid4().hex}.db")
+    source = sqlite3.connect(DB_PATH)
+    target = sqlite3.connect(snapshot_path)
+    try:
+        source.backup(target)
+    finally:
+        target.close()
+        source.close()
+    try:
+        with open(snapshot_path, "rb") as fh:
+            data = fh.read()
+    finally:
+        try:
+            os.unlink(snapshot_path)
+        except OSError:
+            pass
     resp = make_response(data)
     resp.headers["Content-Type"] = "application/octet-stream"
     resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1680,6 +1702,139 @@ def db_diagnose():
     return jsonify(report)
 
 
+@bp.route("/api/admin/diagnostic", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=60, scope="diagnostic")
+def diagnostic_preview():
+    """Aperçu du paquet de diagnostic (aucune donnée personnelle : liste blanche + verrou final)."""
+    from models.diagnostic import UnsafeDiagnosticError, assert_safe, collect_diagnostic
+    with get_db() as conn:
+        pack = collect_diagnostic(conn)
+    try:
+        assert_safe(pack)
+    except UnsafeDiagnosticError as error:
+        return jsonify({"error": "diagnostic_unsafe", "message": str(error)}), 500
+    return jsonify(pack)
+
+
+@bp.route("/api/admin/diagnostic/download", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=60, scope="diagnostic")
+def diagnostic_download():
+    """Archive zip à envoyer au support : diagnostic.json + LISEZMOI.txt + empreinte SHA-256."""
+    import hashlib
+    import zipfile
+    from models.diagnostic import UnsafeDiagnosticError, assert_safe, collect_diagnostic
+    with get_db() as conn:
+        pack = collect_diagnostic(conn)
+        try:
+            assert_safe(pack)
+        except UnsafeDiagnosticError as error:
+            return jsonify({"error": "diagnostic_unsafe", "message": str(error)}), 500
+        insert_app_log(conn, "admin", "diagnostic_generated", "Paquet de diagnostic genere")
+    content = json.dumps(pack, ensure_ascii=False, indent=2).encode("utf-8")
+    readme = "\n".join([
+        "Paquet de diagnostic A quai", "",
+        "Contenu : versions, schema de la base, volumes, sante, structure des ressources (codes et cles techniques),",
+        "statistiques d'usage, evenements d'erreur techniques.",
+        "Ne contient AUCUNE donnee personnelle (noms, e-mails, numeros de serie, chemins reseau, signatures) ni libelle saisi.",
+        "Vous pouvez ouvrir diagnostic.json pour le relire avant de l'envoyer.", ""]).encode("utf-8")
+    checksums = f"sha256  diagnostic.json  {hashlib.sha256(content).hexdigest()}".encode("utf-8") + b"\n"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("diagnostic.json", content)
+        archive.writestr("LISEZMOI.txt", readme)
+        archive.writestr("checksums.txt", checksums)
+    response = make_response(buffer.getvalue())
+    response.headers["Content-Type"] = "application/zip"
+    response.headers["Content-Disposition"] = 'attachment; filename="aquai_diagnostic.zip"'
+    return response
+
+
+@bp.route("/api/admin/config-export", methods=["GET"])
+@login_required
+@permission_required("users.manage")
+def config_export():
+    """Paramétrage (réglages d'organisation, services, ressources et champs) sans aucun dossier ni donnée personnelle."""
+    from models.config_transfer import export_config
+    with get_db() as conn:
+        data = export_config(conn)
+        insert_app_log(conn, "admin", "config_exported", "Export du parametrage", details={"resources": len(data["resources"]), "services": len(data["services"])})
+    response = make_response(json.dumps(data, ensure_ascii=False, indent=2))
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="aquai_parametrage.json"'
+    return response
+
+
+@bp.route("/api/admin/config-import", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+@rate_limit(max_requests=10, window_seconds=600, scope="config_import")
+def config_import():
+    """Import ADDITIF du paramétrage. ?apply=1 pour appliquer ; sinon simple aperçu du plan (rien n'est écrit)."""
+    from models.config_transfer import import_config
+    from models.settings import SettingsValidationError
+    apply = request.args.get("apply") == "1"
+    data = request.get_json(silent=True)
+    try:
+        with get_db() as conn:
+            plan = import_config(conn, data, apply=apply)
+            if apply:
+                insert_app_log(conn, "admin", "config_imported", "Import du parametrage", details={k: (len(v) if isinstance(v, list) else v) for k, v in plan.items()})
+    except SettingsValidationError as error:
+        return jsonify({"error": "invalid_config", "message": str(error)}), 400
+    return jsonify({"applied": apply, "plan": plan})
+
+
+@bp.route("/api/admin/health", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def database_health_report():
+    """Contrôle de santé de la base (lecture seule) : intégrité, références, migrations, champs orphelins, copies à plat."""
+    from models.health import database_health
+    with get_db() as conn:
+        return jsonify(database_health(conn))
+
+
+@bp.route("/api/admin/field-health", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def field_health_scan():
+    """Valeurs de dossiers saisies sous un nom de champ que le catalogue ne connait plus (lecture seule)."""
+    from models.field_health import scan_orphan_fields
+    with get_db() as conn:
+        return jsonify(scan_orphan_fields(conn))
+
+
+@bp.route("/api/admin/field-health/repair", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=3, window_seconds=600, scope="field_health_repair")
+def field_health_repair():
+    """Rattache aux noms actuels les valeurs dont la correspondance est sure (ajout seulement, copie de la base avant)."""
+    from models.field_health import repair_orphan_fields
+    os.makedirs(_BACKUP_DIR, exist_ok=True)
+    from datetime import datetime as _dt, timezone as _tz
+    backup_path = os.path.join(_BACKUP_DIR, f"dotation_avant_reparation_champs_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db")
+    if os.path.exists(DB_PATH):
+        # API de sauvegarde SQLite : copie coherente meme si la base est en mode WAL (une copie de fichier ne l'est pas).
+        source = sqlite3.connect(DB_PATH)
+        target = sqlite3.connect(backup_path)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
+    with get_db() as conn:
+        report = repair_orphan_fields(conn)
+        from models.health import resync_flat_copies
+        report["resyncedForms"] = resync_flat_copies(conn)
+        insert_app_log(conn, "admin", "field_health_repaired", "Reparation des champs de ressources", details=report)
+    return jsonify(report)
+
+
 @bp.route("/api/admin/db/import", methods=["POST"])
 @login_required
 @permission_required("db.manage")
@@ -1704,8 +1859,20 @@ def db_import():
         backup_name = f"dotation_backup_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db"
         backup_path = os.path.join(_BACKUP_DIR, backup_name)
         if os.path.exists(DB_PATH):
-            shutil.copy2(DB_PATH, backup_path)
-        shutil.move(tmp_path, DB_PATH)
+            # copie de securite coherente (API SQLite, fiable en mode WAL), puis remplacement EN PLACE : pas de fichier
+            # deplace sous la base ouverte, et aucun ancien journal WAL ne peut etre rejoue sur la nouvelle base.
+            live = sqlite3.connect(DB_PATH)
+            saved = sqlite3.connect(backup_path)
+            try:
+                live.backup(saved)
+            finally:
+                saved.close()
+                live.close()
+        import backup as _backup
+        _backup.restore_sqlite(tmp_path, DB_PATH)
+        os.unlink(tmp_path)
+        from migrations import upgrade_after_restore
+        upgrade_after_restore()
     except Exception as exc:
         try:
             os.unlink(tmp_path)
