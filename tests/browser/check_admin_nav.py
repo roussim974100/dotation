@@ -56,6 +56,19 @@ if __name__ == "__main__":
         time.sleep(0.4)
         visible = driver.execute_script("const b = document.getElementById('saveBrandingBtn').getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight")
         check("... et en bas de page", visible)
+        # Mode sombre : les titres et sous-titres du menu latéral restent lisibles (contraste >= 4,5).
+        driver.execute_script("localStorage.setItem('userDarkModePreference','dark')")
+        driver.refresh()
+        time.sleep(2.5)
+        worst = driver.execute_script(r"""
+          const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number).slice(0, 3).map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+          const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+          let worst = 99;
+          document.querySelectorAll('.admin-nav__link').forEach((a) => { if (a.hidden) return; const bg = getComputedStyle(a).backgroundColor;
+            ['span', 'small'].forEach((t) => { worst = Math.min(worst, ratio(getComputedStyle(a.querySelector(t)).color, bg)); }); });
+          return worst;""")
+        check("mode sombre : menu latéral lisible (contraste >= 4,5)", worst >= 4.5, str(worst))
+        driver.execute_script("localStorage.removeItem('userDarkModePreference')")
         driver.get(inst.url("/admin.html"))
         time.sleep(1.8)
         crumbs = driver.execute_script("return [...document.querySelectorAll('.admin-breadcrumb li')].map(li => li.textContent.trim())")

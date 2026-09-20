@@ -3564,6 +3564,7 @@ button.export-menu__item {
 [data-color-mode="dark"] .admin-nav__link {
   color: var(--text);
   border-color: var(--border);
+  background: var(--surface-alt);  /* le fond clair par défaut rendait le titre (clair) illisible */
 }
 
 [data-color-mode="dark"] .admin-nav__link:hover,
@@ -4453,7 +4454,7 @@ button.export-menu__item {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
+  max-height: 85vh;
 }
 
 .global-search__header {
@@ -4497,7 +4498,7 @@ button.export-menu__item {
   padding: 6px 0;
   overflow-y: auto;
   flex: 1;
-  min-height: 60px;
+  min-height: 200px;  /* les filtres ne doivent pas écraser la liste des pages et actions */
 }
 
 .global-search__result {
@@ -5247,4 +5248,14 @@ section.content-card[id^="db-"] {
   margin: 0;
   font-size: 0.9rem;
   color: var(--muted, #607080);
+}
+
+/* Mode sombre : fil d'Ariane, barre d'enregistrement et palette lisibles. */
+[data-color-mode="dark"] .admin-breadcrumb .breadcrumb {
+  --bs-breadcrumb-divider-color: var(--muted);
+  --bs-breadcrumb-item-active-color: var(--muted);
+}
+
+[data-color-mode="dark"] .admin-breadcrumb a {
+  color: var(--brand);
 }

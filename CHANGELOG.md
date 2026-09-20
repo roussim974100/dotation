@@ -17,6 +17,7 @@ Chantier « Assistant d'organisation » : configuration de démarrage rejouable,
 - **Palette Ctrl+K étendue** : en plus des dossiers, on y trouve les **pages et actions** (Nouvelle attribution, Administration, Créer un compte, Ajouter une ressource, Assistant d'organisation, Sauvegarder maintenant, Restaurer une sauvegarde, Journal, Corbeille, Mon profil, Aide…), filtrées par droits, insensibles aux accents, avec des raccourcis dès l'ouverture. Ce sont de simples liens : aucune action sensible ne s'exécute depuis la palette. Toute tâche courante : 2 actions au clavier (Ctrl+K puis Entrée).
 - **Portail d'administration regroupé** en trois sections identiques au menu latéral (Comptes et droits, Votre organisation, Suivi et exploitation), avec l'assistant d'organisation, le Parc, la Base de données, le Journal, la Corbeille et la Synthèse en cartes.
 - **Personnalisation** : le bouton « Enregistrer la personnalisation », qui enregistre toute la page, n'est plus au milieu (sous la section Contact) mais dans une barre fixée en bas, toujours visible.
+- **Mode sombre** : correction du menu latéral d'administration (titres blancs sur fond clair, illisibles) et du fil d'Ariane ; la liste de la palette Ctrl+K n'est plus écrasée par les filtres.
 - Accessibilité : focus clavier visible, cibles de 44 px, onglets défilants sur mobile.
 
 ### 🔒 Sprint 1 : sécurité des réglages
