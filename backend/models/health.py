@@ -68,6 +68,9 @@ def database_health(connection):
             "schemaVersion": version, "orphanFields": len(orphans["orphans"]), "copyDrift": drift}
 
 
+_HEALTH_LOCK = None
+
+
 def run_health_check_and_log():
     """Un controle : consigne au journal (app_logs) seulement quand quelque chose est a examiner."""
     from database import get_db
@@ -87,6 +90,11 @@ def start_daily_health_check(interval_hours=24, first_delay_seconds=600):
     import time
 
     if not interval_hours or interval_hours <= 0:
+        return None
+    from utils import single_instance_lock
+    global _HEALTH_LOCK
+    _HEALTH_LOCK = single_instance_lock("health")  # un seul worker lance le controle (pas 4 fois la charge ni 4 lignes de journal)
+    if _HEALTH_LOCK is None:
         return None
 
     def loop():

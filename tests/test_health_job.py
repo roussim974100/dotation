@@ -15,5 +15,13 @@ def test_desactive_quand_intervalle_nul():
 
 
 def test_fil_daemon_demarre_sans_bloquer(monkeypatch):
+    import utils
+    monkeypatch.setattr(utils, "single_instance_lock", lambda name, wait_seconds=0: object())  # verrou obtenu
     thread = start_daily_health_check(24, first_delay_seconds=3600)
     assert thread is not None and thread.daemon is True and thread.is_alive()
+
+
+def test_un_seul_processus_lance_le_controle(monkeypatch):
+    import utils
+    monkeypatch.setattr(utils, "single_instance_lock", lambda name, wait_seconds=0: None)  # un autre worker le detient
+    assert start_daily_health_check(24, first_delay_seconds=3600) is None

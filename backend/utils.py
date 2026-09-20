@@ -55,6 +55,40 @@ def mask_payload(payload):
     return data
 
 
+def single_instance_lock(name, wait_seconds=0):
+    """Verrou de fichier entre processus (plusieurs workers gunicorn). Renvoie un objet a GARDER (le verrou tient tant qu'il vit),
+    ou None si un autre processus le detient et que `wait_seconds` est ecoule."""
+    import os
+    import time
+    from config import DATA_DIR
+    handle = open(os.path.join(DATA_DIR, f".{name}.lock"), "a+")
+    deadline = time.time() + wait_seconds
+    while True:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return handle
+        except OSError:
+            if time.time() >= deadline:
+                handle.close()
+                return None
+            time.sleep(0.25)
+
+
+def safe_json(text, default=None):
+    """json.loads qui ne leve jamais : une donnee illisible ne doit pas empecher l'application de demarrer ni une page de s'afficher."""
+    import json as _json
+    try:
+        return _json.loads(text) if text not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+
+
 def csv_safe(value):
     """Neutralise l'injection de formules dans un export CSV : une cellule qui commence par = + - @ (ou tabulation / retour)
     serait executee par Excel ; on la precede d'une apostrophe."""

@@ -10,8 +10,7 @@ let formDirty = false;
 // de donnees personnelles via les /api/debug/logs.
 const DEBUG_LOGS_ENABLED = (function () {
   try {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    // Jamais automatique : meme en local, la console peut contenir des donnees personnelles (base copiee de la production).
     if (new URLSearchParams(window.location.search).has('debug')) return true;
   } catch (_) { /* ignore */ }
   return false;

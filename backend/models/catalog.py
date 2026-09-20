@@ -173,6 +173,13 @@ DEFAULT_SERVICE_REFERENCES = [
 ]
 
 
+def _schema_list(text):
+    """Description des champs lue sans jamais lever : `null`, un objet ou du texte abime donnent une liste vide."""
+    from utils import safe_json
+    value = safe_json(text, [])
+    return value if isinstance(value, list) else []
+
+
 def carry_over_field_aliases(old_schema, new_schema):
     """Garde les anciens noms d'un champ (alias) pour retrouver les valeurs des dossiers deja saisis.
     1) Les alias deja connus d'un champ sont conserves a chaque sauvegarde (l'editeur ne les renvoie pas).
@@ -216,13 +223,13 @@ def normalize_resource_catalog_payload(payload, existing_row=None):
     raw_field_schema = payload.get("field_schema") if "field_schema" in payload else payload.get("fieldSchema")
     if raw_field_schema is None:
         try:
-            raw_field_schema = json.loads(existing.get("field_schema_json") or "[]")
+            raw_field_schema = _schema_list(existing.get("field_schema_json"))
         except (TypeError, json.JSONDecodeError):
             raw_field_schema = []
     field_schema = normalize_resource_field_schema(raw_field_schema)
     if existing and "field_schema_json" in existing and raw_field_schema is not None:
         try:
-            field_schema = carry_over_field_aliases(normalize_resource_field_schema(json.loads(existing.get("field_schema_json") or "[]")), field_schema)
+            field_schema = carry_over_field_aliases(normalize_resource_field_schema(_schema_list(existing.get("field_schema_json"))), field_schema)
         except (TypeError, json.JSONDecodeError):
             pass
     for f in field_schema:
@@ -344,7 +351,7 @@ def migrate_builtin_resource_schemas(connection):
         if code not in seed_by_code:
             continue
         try:
-            current = json.loads(row["field_schema_json"] or "[]")
+            current = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             current = []
         if current:
@@ -441,7 +448,7 @@ def migrate_telephone_imei_field(connection):
     ).fetchall()
     for row in rows:
         try:
-            schema = json.loads(row["field_schema_json"] or "[]")
+            schema = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             continue
         changed = False
@@ -478,7 +485,7 @@ def migrate_suggest_flags(connection):
         if code not in SUGGEST_KEYS:
             continue
         try:
-            schema = json.loads(row["field_schema_json"] or "[]")
+            schema = _schema_list(row["field_schema_json"])
         except (TypeError, ValueError):
             continue
         changed = False
@@ -501,7 +508,7 @@ def migrate_cartes_visite_quantite(connection):
     if not row:
         return
     try:
-        schema = json.loads(row["field_schema_json"] or "[]")
+        schema = _schema_list(row["field_schema_json"])
     except (TypeError, ValueError):
         return
     if any(f.get("key") == "quantite" for f in schema):

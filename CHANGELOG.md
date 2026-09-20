@@ -1,5 +1,21 @@
 # Historique des versions — À Quai
 
+## [3.57.0] - 2026-09-20
+
+Pré-crise : l'application ne doit jamais être empêchée de démarrer ni de fonctionner par une donnée atypique chez un client (réunion de pré-mortem du 20/09).
+
+### 🛡️ Démarrage et données
+- **Un dossier ou une description de champs abîmés n'empêchent plus le démarrage** : JSON illisible, `null`, liste au lieu d'objet, droits de groupe illisibles sont ignorés et consignés au journal. Chaque correction de données historique s'exécute isolément : l'échec de l'une n'arrête ni l'application ni les suivantes.
+- **Démarrage plus rapide et moins bloquant** : les dossiers ne sont réécrits que s'ils changent ; l'initialisation est verrouillée entre processus (plusieurs workers), attente des verrous SQLite portée à 30 s ; le contrôle de santé quotidien ne tourne que dans un seul worker.
+- **Base plus récente que l'application refusée** avec un message clair (au lieu d'être abîmée par une version plus ancienne).
+- **Copie de sécurité avant migration** : contrôle de l'espace disque, jamais bloquante (erreur consignée si impossible), purge automatique (5 copies conservées par famille).
+- **Quantités illisibles** (« inf », « 1e999 ») : plus d'erreur, bornées.
+- **Descriptions de champs hostiles** : libellé sans lettre latine (cyrillique, arabe, chinois, emoji) conservé avec une clé `champ_N` (avant : champ supprimé en silence) ; 60 champs, 120 caractères de libellé et 200 options maximum ; description mal formée = vide plutôt qu'erreur 500.
+- **Routes `/api/debug/*` fermées** (404) sauf `APP_DEBUG_ENDPOINTS=1` ; la collecte de la console du navigateur n'est plus automatique en local (elle pouvait écrire des données personnelles dans des fichiers).
+
+### 🧪 Tests
+- `tests/test_startup_robustness.py` : démarrage sur base empoisonnée (dossiers illisibles, schémas `null`/objet, droits illisibles, migrations rejouées), refus d'une base du futur, quantités et schémas hostiles.
+
 ## [3.56.0] - 2026-09-20
 
 Finitions du chantier « champs et personnalisation » (décisions D8, D11, D14, D15, D17).

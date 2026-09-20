@@ -47,7 +47,8 @@ for rule in rules:
         continue
     for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
         response = anonymous.open(path, method=method, json={} if method != "GET" else None)
-        if response.status_code not in (301, 302, 303, 307, 308, 401, 403):
+        # 404 accepte pour /api/debug : routes fermees en production (aucune information, meme pas leur existence)
+        if response.status_code not in (301, 302, 303, 307, 308, 401, 403) and not (path.startswith("/api/debug/") and response.status_code == 404):
             leaks.append("%s %s -> %s" % (method, rule.rule, response.status_code))
 results["anonymous_leaks"] = leaks
 

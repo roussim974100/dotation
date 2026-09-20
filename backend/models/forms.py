@@ -81,7 +81,8 @@ def migrate_field_suggestions_from_history(connection):
             payload = json.loads(row["payload_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        _upsert_field_suggestions(connection, payload)
+        if isinstance(payload, dict):
+            _upsert_field_suggestions(connection, payload)
 
 
 def _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items):

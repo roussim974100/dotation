@@ -94,13 +94,16 @@ def stock_resource_config(connection):
     return config
 
 
+MAX_QUANTITY = 1_000_000
+
+
 def _as_quantity(value):
     """Quantite d'une ligne de dossier : entier >= 1 (defaut 1 si vide ou illisible)."""
     try:
         number = int(float(str(value).replace(",", ".").strip()))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # « inf », « 1e999 » : illisible, jamais une erreur
         return 1
-    return number if number >= 1 else 1
+    return min(number, MAX_QUANTITY) if number >= 1 else 1
 
 
 def _move(connection, code, variant, quantity, movement_type, occurred_at, dedupe_key, form_id=None,

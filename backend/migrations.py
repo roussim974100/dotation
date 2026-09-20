@@ -30,6 +30,8 @@ def _m_field_ids(connection):
             schema = json.loads(row["field_schema_json"] or "[]")
         except (TypeError, ValueError):
             continue
+        if not isinstance(schema, list):
+            continue
         changed = False
         for field in schema:
             if isinstance(field, dict) and field.get("key") and not field.get("id"):
@@ -52,13 +54,43 @@ def _has_data(connection):
         return False
 
 
+class DatabaseTooNewError(RuntimeError):
+    """La base a ete migree par une version PLUS RECENTE de l'application : demarrer risquerait de l'abimer."""
+
+
+def purge_old_safety_copies(directory, keep=5):
+    """Ne garde que les `keep` copies de securite les plus recentes de chaque famille (evite le disque plein a terme)."""
+    import glob
+    for pattern in ("dotation_avant_migration_*.db", "dotation_avant_reparation_champs_*.db"):
+        files = sorted(glob.glob(os.path.join(directory, pattern)), key=os.path.getmtime, reverse=True)
+        for old in files[keep:]:
+            try:
+                os.unlink(old)
+            except OSError:
+                pass
+
+
 def _safety_copy(connection, version):
+    try:
+        return _safety_copy_unchecked(connection, version)
+    except (OSError, sqlite3.Error) as error:
+        # Pas de copie possible (droits, disque plein) : on le dit tres clairement, mais la migration, additive et idempotente, continue.
+        import logging
+        logging.getLogger(__name__).error("Copie de securite avant migration IMPOSSIBLE (%s) : migration poursuivie sans copie", error)
+        return None
+
+
+def _safety_copy_unchecked(connection, version):
     file_path = next((row[2] for row in connection.execute("PRAGMA database_list").fetchall() if row[1] == "main"), "") or DB_PATH
     if not file_path or not os.path.exists(file_path):
         return None
     directory = os.path.join(os.path.dirname(file_path) or DATA_DIR, "db_backups")
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"dotation_avant_migration_{version}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.db")
+    import shutil
+    free = shutil.disk_usage(directory).free
+    if free < 2 * os.path.getsize(file_path):
+        raise OSError(f"espace disque insuffisant ({free // (1024 * 1024)} Mo libres)")
     source = sqlite3.connect(file_path)
     target = sqlite3.connect(path)
     try:
@@ -66,6 +98,7 @@ def _safety_copy(connection, version):
     finally:
         target.close()
         source.close()
+    purge_old_safety_copies(directory)
     return path
 
 
@@ -73,6 +106,11 @@ def run_pending_migrations(connection):
     """Applique les migrations en attente. Renvoie la liste des numeros appliques."""
     connection.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)")
     done = {row[0] for row in connection.execute("SELECT version FROM schema_migrations").fetchall()}
+    newest_known = max(m[0] for m in MIGRATIONS)
+    if done and max(done) > newest_known:
+        raise DatabaseTooNewError(
+            f"Cette base a ete migree par une version plus recente de l'application (schema {max(done)}, cette version connait {newest_known}). "
+            "Mettez l'application a jour, ou restaurez une sauvegarde compatible : demarrer avec cette version risquerait d'abimer les donnees.")
     pending = [m for m in MIGRATIONS if m[0] not in done]
     if not pending:
         return []

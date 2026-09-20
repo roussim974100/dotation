@@ -13,17 +13,28 @@ from models.settings import DEFAULT_APP_SETTINGS
 # Normalisation du schema de champs dynamiques
 # ---------------------------------------------------------------------------
 
+MAX_FIELDS_PER_RESOURCE = 60
+MAX_FIELD_LABEL = 120
+MAX_FIELD_OPTIONS = 200
+
+
 def normalize_resource_field_schema(raw_schema):
     allowed_types = {"text", "textarea", "select", "date", "number", "checkbox", "list", "email_with_domain"}
     normalized = []
-    for index, field in enumerate(raw_schema or []):
+    if not isinstance(raw_schema, list):
+        raw_schema = []  # schema mal forme : vide plutot qu'une erreur 500
+    for index, field in enumerate(raw_schema[:MAX_FIELDS_PER_RESOURCE]):
+        if not isinstance(field, dict):
+            continue
         label = str(field.get("label") or "").strip()
         raw_key = str(field.get("key") or "").strip()
         # Une cle technique deja valide est gardee TELLE QUELLE (casse comprise) : la re-slugifier la ferait deriver
         # (numeroSerie -> numeroserie) et rendrait invisibles les valeurs deja saisies dans les dossiers.
-        key = raw_key if re.fullmatch(r"[A-Za-z0-9_]+", raw_key) else slugify_field_key(raw_key or label or f"champ_{index + 1}")
+        # Un libelle sans lettre latine (cyrillique, arabe, CJK, emoji) ne donne pas de cle : « champ_N » (jamais de champ supprime en silence).
+        key = raw_key if re.fullmatch(r"[A-Za-z0-9_]+", raw_key) else (slugify_field_key(raw_key) or slugify_field_key(label) or f"champ_{index + 1}")
         if not label or not key:
             continue
+        label = label[:MAX_FIELD_LABEL]
         field_type = str(field.get("type") or "text").strip().lower() or "text"
         if field_type not in allowed_types:
             field_type = "text"
@@ -39,7 +50,7 @@ def normalize_resource_field_schema(raw_schema):
             "type": field_type,
             "placeholder": str(field.get("placeholder") or "").strip(),
             "required": bool(field.get("required", False)),
-            "options": [str(option).strip() for option in options if str(option or "").strip()],
+            "options": list(dict.fromkeys(str(option).strip() for option in options if str(option or "").strip()))[:MAX_FIELD_OPTIONS],
             "suggest": bool(field.get("suggest", False)),
             # Champ qui identifie l'objet (n° de serie...) : permet de re-selectionner un materiel restitue.
             "identifier": bool(field.get("identifier", False)),
