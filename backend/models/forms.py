@@ -18,6 +18,7 @@ from models.workflow import (
     describe_assignment_condition, extract_items,
 )
 from models.dossier import sync_person_and_dossier
+from models.inventory import align_fields, align_with_embedded_schema, schema_key_set
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS, get_dpo_email
 from utils import generate_id
 
@@ -35,7 +36,9 @@ def _upsert_field_suggestions(connection, payload):
     # Champs texte des ressources additionnelles
     for resource in (payload.get("resources") or {}).get("additional") or []:
         fields = resource.get("fields") or {}
-        for key in _SUGGEST_FIELD_KEYS:
+        # Cles proposees en suggestion : liste historique + champs que la ressource marque « suggest » (ressources personnalisees).
+        suggest_keys = set(_SUGGEST_FIELD_KEYS) | {f.get("key") for f in (resource.get("fieldSchema") or []) if isinstance(f, dict) and f.get("suggest") and f.get("key")}
+        for key in suggest_keys:
             val = str(fields.get(key) or "").strip()
             if val:
                 to_upsert.append(("", key, val, ""))
@@ -78,7 +81,8 @@ def migrate_field_suggestions_from_history(connection):
             payload = json.loads(row["payload_json"] or "{}")
         except (TypeError, ValueError):
             continue
-        _upsert_field_suggestions(connection, payload)
+        if isinstance(payload, dict):
+            _upsert_field_suggestions(connection, payload)
 
 
 def _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items):
@@ -138,6 +142,21 @@ def _apply_retraits_to_source(connection, form_id, source_form_id, retraits_item
                 f"Ressources retirees via dossier de mise a jour #{form_id}",
                 {"source_form_id": form_id, "items": list(retraits_items.keys())},
             )
+        # Le dossier source vient d'etre modifie directement (hors persist_form) : sans ceci, le parc et le stock
+        # continuent d'afficher les objets retires comme toujours detenus (bug 3.60.1). Meme garde que persist_form :
+        # ne doit jamais empecher l'enregistrement du dossier de mise a jour.
+        try:
+            from models.units import sync_units_for_form
+            sync_units_for_form(connection, source_form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du parc impossible pour le dossier source %s", source_form_id, exc_info=True)
+        try:
+            from models.stock import sync_stock_for_form
+            sync_stock_for_form(connection, source_form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du stock impossible pour le dossier source %s", source_form_id, exc_info=True)
 
 
 def build_form_export_lines(payload):
@@ -433,6 +452,55 @@ def persist_form(payload, allow_locked_update=False):
     return get_form(form_id)
 
 
+def resync_items_for_form(connection, form_id):
+    """Recalcule la copie a plat (dotation_items) d'un dossier depuis son payload, qui fait foi : meme operation que
+    l'enregistrement, sans rien modifier d'autre (ni dossier, ni parc)."""
+    row = connection.execute("SELECT payload_json FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+    if not row:
+        return 0
+    items = extract_items(json.loads(row["payload_json"] or "{}"))
+    connection.execute("DELETE FROM dotation_items WHERE form_id = ?", (form_id,))
+    connection.executemany(
+        """
+        INSERT INTO dotation_items (form_id, item_key, category, label, assigned, returned, returned_at, return_condition, notes, details_json)
+        VALUES (:form_id, :item_key, :category, :label, :assigned, :returned, :returned_at, :return_condition, :notes, :details_json)
+        """,
+        [{"form_id": form_id, **item, "assigned": bool_to_int(item["assigned"]), "returned": bool_to_int(item["returned"])} for item in items],
+    )
+    return len(items)
+
+
+def align_payload_field_names(connection, payload):
+    """Anciens dossiers : les valeurs des ressources sont stockees sous d'anciens noms de champs (nomPoste, numeroSerie, adresse)
+    alors que le catalogue actuel attend nom_du_poste, numero_de_serie, adresse_email. Sans correspondance, le formulaire les
+    affiche VIDES (et un enregistrement pourrait les perdre). On ajoute les valeurs sous les noms du catalogue, sans jamais rien
+    retirer ni ecraser une valeur deja saisie."""
+    additional = ((payload.get("resources") or {}).get("additional")) or []
+    if not additional:
+        return payload
+    schemas = {}
+    for row in connection.execute("SELECT code, field_schema_json FROM resource_catalog").fetchall():
+        try:
+            schema = json.loads(row["field_schema_json"] or "[]")
+            schemas[row["code"]] = (schema_key_set(schema), schema)
+        except (TypeError, ValueError):
+            continue
+    for entry in additional:
+        fields = entry.get("fields") if isinstance(entry, dict) else None
+        keys, schema = schemas.get(entry.get("code")) or (None, None) if isinstance(entry, dict) else (None, None)
+        if not isinstance(fields, dict) or not keys:
+            continue
+        merged = dict(fields)
+        # 1) exact : description des champs embarquee dans le dossier ; 2) sinon correspondance de noms (a defaut)
+        aligned = align_fields(fields, keys, loose=True)
+        aligned.update(align_with_embedded_schema(fields, entry.get("fieldSchema"), schema))
+        for key, value in aligned.items():
+            if not str(merged.get(key) or "").strip():
+                merged[key] = value
+        entry["fields"] = merged
+    return payload
+
+
 def row_to_summary(row, warning_days=None):
     payload = {}
     try:
@@ -472,7 +540,8 @@ def row_to_summary(row, warning_days=None):
         summary["nom"] = mask_text(summary["nom"])
         summary["prenom"] = mask_text(summary["prenom"])
         type_label = DOSSIER_TYPE_LABELS.get(summary["dossierType"], "Dossier")
-        if summary["beneficiaryType"] == "elu":
+        from models.vocab import has_mandate
+        if has_mandate(summary["beneficiaryType"]):
             prefix = summary["mandat"] or type_label
         else:
             prefix = summary["service"] or type_label
@@ -529,6 +598,7 @@ def get_form(form_id):
         # Seulement mettre lockedAt vide si c'était déjà vide (dossier non finalisé)
         if payload["workflow"]["status"] != "active":
             payload["meta"]["lockedAt"] = ""
+    align_payload_field_names(connection, payload)
     user = current_user()
     if user and user.get("data_scope") == "masked":
         payload = mask_payload(payload)

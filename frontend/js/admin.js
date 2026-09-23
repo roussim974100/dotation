@@ -558,7 +558,7 @@ function createResourceFieldRow(field = {}) {
   // formulaire de dossier, alternative a la suppression reelle pour ne pas perdre les
   // valeurs deja saisies.
   return `
-    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}">
+    <div class="resource-field-row ${isHidden ? "resource-field-row--hidden" : ""}" data-field-key="${escapeHtml(field.key || "")}" data-field-hidden="${isHidden ? "true" : "false"}" data-field-suggest="${field.suggest ? "true" : "false"}" data-field-identifier="${field.identifier ? "true" : "false"}" data-field-id="${escapeHtml(field.id || "")}" data-field-role="${escapeHtml(field.role || "")}" data-field-placeholder="${escapeHtml(field.placeholder || "")}" data-field-aliases="${escapeHtml(JSON.stringify(Array.isArray(field.aliases) ? field.aliases : []))}">
       <div class="row g-3 align-items-end">
         <div class="col-md-5">
           <label class="form-label">Libellé</label>
@@ -573,6 +573,17 @@ function createResourceFieldRow(field = {}) {
             <option value="date" ${field.type === "date" ? "selected" : ""}>Date</option>
             <option value="number" ${field.type === "number" ? "selected" : ""}>Nombre</option>
             <option value="checkbox" ${field.type === "checkbox" ? "selected" : ""}>Case à cocher</option>
+            <option value="list" ${field.type === "list" ? "selected" : ""}>Liste de valeurs (lignes répétables)</option>
+            <option value="email_with_domain" ${field.type === "email_with_domain" ? "selected" : ""}>Adresse e-mail avec domaine</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Rôle dans le suivi</label>
+          <select class="form-select resource-field-role" aria-label="Rôle du champ dans le suivi" ${isHidden ? "disabled" : ""}>
+            <option value="" ${!field.role ? "selected" : ""}>Aucun</option>
+            <option value="identifier" ${field.role === "identifier" ? "selected" : ""}>Identifiant de l'objet (n° de série…)</option>
+            <option value="quantity" ${field.role === "quantity" ? "selected" : ""}>Quantité (stock)</option>
+            <option value="variant" ${field.role === "variant" ? "selected" : ""}>Variante (taille, pointure…)</option>
           </select>
         </div>
         <div class="col-md-3">
@@ -703,15 +714,19 @@ function collectResourceFieldSchema(containerId = "resourceFieldRows") {
         .filter(Boolean)
       : [];
     return {
+      id: row.dataset.fieldId || "",
       label,
       key,
       type,
-      placeholder: "",
+      // Aide a la saisie et anciens noms : sans controle dans l'editeur, reportes tels quels pour ne pas les perdre.
+      placeholder: row.dataset.fieldPlaceholder || "",
+      aliases: (() => { try { const a = JSON.parse(row.dataset.fieldAliases || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } })(),
       required: Boolean(row.querySelector(".resource-field-required")?.checked),
       hidden: row.dataset.fieldHidden === "true",
       // Indicateurs sans controle dans l'editeur : on les reporte tels quels pour ne pas les perdre.
       suggest: row.dataset.fieldSuggest === "true",
       identifier: row.dataset.fieldIdentifier === "true",
+      role: row.querySelector(".resource-field-role")?.value ?? (row.dataset.fieldRole || ""),
       options
     };
   }).filter((field) => field.label && field.key);

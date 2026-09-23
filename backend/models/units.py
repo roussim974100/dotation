@@ -11,7 +11,7 @@ Les transitions (next_status) sont pures : elles ne bloquent jamais un evenement
 import json
 
 from models.inventory import (
-    DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields, normalize_identifier, resolve_identifier_key,
+    DEGRADED_CONDITIONS, READY_CONDITIONS, _fields_of, align_fields, normalize_identifier, resolve_identifier_key, schema_key_set,
 )
 from models.resource_rules import effective_tracking_mode
 from utils import generate_id, utc_now
@@ -185,7 +185,7 @@ def unit_identifier_keys(connection):
         if effective_tracking_mode(row["tracking_mode"], row["category"], schema) == "unit":
             key = resolve_identifier_key(schema)
             if key:
-                keys[row["code"]] = {"identifier": key, "fields": {f["key"] for f in schema if isinstance(f, dict) and f.get("key")}}
+                keys[row["code"]] = {"identifier": key, "fields": schema_key_set(schema)}
     return keys
 
 

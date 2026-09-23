@@ -3,7 +3,7 @@
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 // Numéro de version, IDENTIQUE dans toutes les branches (dev, preprod, prod) : l'environnement est décidé par le serveur.
-const APP_BUILD_VERSION = "3.50.1";
+const APP_BUILD_VERSION = "3.60.1";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-logo.png";
 const COOKIECONSENT_VERSION = "3.1.0";
@@ -134,6 +134,14 @@ const BRAND_THEME_PRESETS = {
 };
 
 window.APP_BRANDING = null;
+
+// Un type de bénéficiaire « porte un mandat » (titre affiché à la place du service, champ Mandat demandé) selon la configuration
+// (Personnalisation > types, drapeau « |mandat ») ; « elu » par défaut tant que rien n'est chargé.
+function isMandateType(value) {
+  const found = (window.APP_BRANDING?.beneficiaryTypes || []).find((t) => t.value === value);
+  return found ? Boolean(found.mandate) : value === "elu";
+}
+window.isMandateType = isMandateType;
 let clientContextBootPromise = null;
 let cookieConsentBootPromise = null;
 let cookieConsentScheduled = false;
@@ -825,8 +833,8 @@ function applyBrandingContent(settings) {
 
   // Radios qualité dynamiques
   const beneficiaryTypes = settings?.beneficiaryTypes || [
-    { value: "agent", label: "Agent" },
-    { value: "elu", label: "Élu(e)" }
+    { value: "agent", label: "Agent", mandate: false },
+    { value: "elu", label: "Élu(e)", mandate: true }
   ];
   const orgContext = settings?.orgContext || "public_collectivite";
 
