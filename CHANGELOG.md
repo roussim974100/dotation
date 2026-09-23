@@ -1,5 +1,16 @@
 # Historique des versions — À Quai
 
+## [3.61.0] - 2026-09-23
+
+Première étape du chantier « ajuster les ressources d'un dossier déjà actif » (plan cadré avec 3 experts — process métier, base de données, architecture — voir `docs` et la mémoire du projet).
+
+### 🧩 Identifiant de personne stable
+- Nouvelle colonne `dotation_forms.person_id`, indexée : elle ne fait qu'exposer une valeur déjà calculée à chaque enregistrement (`meta.personId`), jamais devinée ni fusionnée. Migration 5, appliquée sans incident sur la copie de production (34 dossiers, 47 fiches « personne » existantes — la duplication déjà présente est désormais visible et interrogeable, pas encore corrigée : ce sera un chantier à part, optionnel).
+- **Le formulaire « Mise à jour de ressources » transmet maintenant l'identité de la personne du dossier source** : rechercher et choisir un dossier existant relie le nouveau dossier à la **même** fiche « personne » au lieu d'en créer une nouvelle à chaque mise à jour. Un dossier sans rapport (nouvelle arrivée) continue de créer sa propre fiche, normalement.
+
+### 🧪 Tests
+- `tests/test_person_id_migration.py` (backfill, idempotence, tolérance à un schéma minimal), scénario HTTP (même personne entre un dossier et sa mise à jour, personne différente pour un dossier sans rapport), `tests/browser/check_person_id.py` (parcours réel : recherche, transmission, bouton « Changer »).
+
 ## [3.60.2] - 2026-09-23
 
 ### 🐛 Correctif

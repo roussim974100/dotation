@@ -1864,6 +1864,8 @@ function initRetraitsSection() {
       if (formResp.ok) {
         const formData = await formResp.json();
         const bene = formData.data?.beneficiaire || {};
+        // Meme identite de personne que le dossier source (pas une nouvelle fiche « personne » a chaque mise a jour).
+        document.getElementById("retraitsSourcePersonId").value = formData.data?.meta?.personId || "";
 
         // Fonction helper pour marquer les champs comme venant du source
         const lockIdentityFields = () => {
@@ -1994,6 +1996,7 @@ function initRetraitsSection() {
 
   clearBtn?.addEventListener("click", () => {
     formIdInput.value = "";
+    document.getElementById("retraitsSourcePersonId").value = "";
     chosenDiv.classList.add("d-none");
     itemsContainer.classList.add("d-none");
     signatureBlock.classList.add("d-none");
@@ -2345,7 +2348,10 @@ function getFormData(signaturePad) {
       baseSavedAt: form.dataset.baseSavedAt || "",
       lockedAt,
       assignedAt,
-      startAt
+      startAt,
+      // Identite de la personne du dossier source, quand on en reselectionne un (mise a jour) : evite de recreer
+      // une nouvelle fiche « personne » pour quelqu'un deja connu. Vide pour un dossier tout nouveau.
+      personId: document.getElementById("retraitsSourcePersonId")?.value || ""
     },
       workflow: {
         status
@@ -2430,6 +2436,7 @@ function populateForm(data, signaturePad) {
   const retraitsData = data.retraits || {};
   if (sourceFormId && Object.keys(retraitsData.items || {}).length > 0) {
     document.getElementById("retraitsSourceFormId").value = sourceFormId;
+    document.getElementById("retraitsSourcePersonId").value = data.meta?.personId || "";
     // Need to load retraits items to restore state
     (async () => {
       try {

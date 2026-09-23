@@ -187,7 +187,7 @@ def test_resource_used_by_dossiers_cannot_be_deleted(http):
 
 def test_database_health_report(http):
     assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
-    assert http["health_report_has_schema_version"] == 4
+    assert http["health_report_has_schema_version"] == 5
     assert http["health_report_status_known"] is True
 
 
@@ -195,11 +195,11 @@ def test_db_export_then_import_keeps_data_and_schema(http):
     assert http["db_export_is_sqlite"] is True
     assert http["db_import_status"] == 200
     assert http["db_import_keeps_forms"] is True
-    assert http["db_import_health"] == ["ok", 4]
+    assert http["db_import_health"] == ["ok", 5]
 
 
 def test_importing_an_older_database_upgrades_its_schema_immediately(http):
-    assert http["old_db_import"] == [200, 4, True]
+    assert http["old_db_import"] == [200, 5, True]
 
 
 def test_configured_beneficiary_types_and_status_labels_are_served(http):
@@ -271,3 +271,13 @@ def test_retrait_via_mise_a_jour_resynchronise_le_parc_du_dossier_source(http):
     assert http["retrait360_unit_status_before"] == ["assigned"]
     assert http["retrait360_unit_status_after"] == ["in_stock"]
     assert http["retrait360_source_items_returned"].get("poste_retrait360", {}).get("state") == "conforme"
+
+
+def test_person_id_is_stable_across_a_resource_update_dossier(http):
+    """3.61.0 : creer un dossier « mise a jour » en transmettant meta.personId du dossier source relie a la MEME
+    personne (pas une nouvelle fiche), alors qu'un dossier tout nouveau sans lien en cree bien une autre."""
+    assert http["person_source_has_id"] is True
+    assert http["person_source_db_column"] == http["person_maj_db_column"]
+    assert http["person_count_for_id"] == 1  # une seule fiche « personne », pas une par dossier
+    assert http["person_maj_own_dossier_id"] is True  # deux dossiers distincts, meme personne
+    assert http["person_unrelated_dossier_gets_new_person"] is True

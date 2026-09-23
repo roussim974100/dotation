@@ -560,6 +560,31 @@ _units_after = (admin.get("/api/units?resource=poste_retrait360").get_json() or 
 results["retrait360_unit_status_after"] = [u.get("status") for u in _units_after if u.get("identifier") == "SN-RETRAIT-360"]
 results["retrait360_source_items_returned"] = ((admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {}).get("restitution", {}).get("items", {}))
 
+# ---- 3.61.0 : identifiant de personne stable transmis a une mise a jour (pas de nouvelle fiche « personne ») ----
+_src_person_id = (admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {}).get("meta", {}).get("personId")
+results["person_source_has_id"] = bool(_src_person_id)
+with _gdb() as _pc:
+    results["person_source_db_column"] = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_src_id,)).fetchone()[0]
+    _persons_before = _pc.execute("SELECT COUNT(*) FROM persons WHERE id = ?", (_src_person_id,)).fetchone()[0]
+_maj2_body = {"dossier": {"type": "mise_a_jour", "sourceFormId": _src_id}, "beneficiaire": {"nom": "RETRAIT360", "prenom": "Source", "qualite": "agent"},
+              "resources": {"additional": []}, "retraits": {"items": {}}, "workflow": {"status": "draft"},
+              "meta": {"personId": _src_person_id}}
+_maj2_created = admin.post("/api/forms", json=_maj2_body, headers=H).get_json() or {}
+_maj2_id = (_maj2_created.get("summary") or {}).get("id")
+with _gdb() as _pc:
+    results["person_maj_db_column"] = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_maj2_id,)).fetchone()[0]
+    results["person_count_for_id"] = _pc.execute("SELECT COUNT(*) FROM persons WHERE id = ?", (_src_person_id,)).fetchone()[0]
+    results["person_maj_own_dossier_id"] = _pc.execute("SELECT dossier_id FROM dotation_forms WHERE id = ?", (_maj2_id,)).fetchone()[0] != \
+        _pc.execute("SELECT dossier_id FROM dotation_forms WHERE id = ?", (_src_id,)).fetchone()[0]
+# sans transmettre personId (dossier tout nouveau, sans rapport) : une AUTRE personne est creee
+_new_body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "AUTREPERSONNE", "prenom": "Neuve", "qualite": "agent"},
+             "resources": {"additional": []}, "workflow": {"status": "draft"}, "meta": {}}
+_new_created = admin.post("/api/forms", json=_new_body, headers=H).get_json() or {}
+_new_id = (_new_created.get("summary") or {}).get("id")
+with _gdb() as _pc:
+    _new_person_id = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_new_id,)).fetchone()[0]
+results["person_unrelated_dossier_gets_new_person"] = bool(_new_person_id) and _new_person_id != _src_person_id
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):

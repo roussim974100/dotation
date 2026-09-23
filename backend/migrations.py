@@ -80,6 +80,27 @@ def _m_field_roles(connection):
             connection.execute("UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?", (json.dumps(schema, ensure_ascii=False), row["id"]))
 
 
+def _m_person_id_column(connection):
+    """Colonne `person_id` (identifiant de personne stable) sur dotation_forms, pour retrouver directement les dossiers
+    d'une meme personne sans passer par onboarding_dossiers. `sync_person_and_dossier` (models/dossier.py) calcule deja
+    ce person_id a chaque enregistrement et l'ecrit dans payload_json (meta.personId) depuis longtemps : cette migration
+    ne fait qu'exposer cette valeur DEJA CONNUE dans une colonne interrogeable, elle ne devine ni ne fusionne rien."""
+    columns = {r[1] for r in connection.execute("PRAGMA table_info(dotation_forms)").fetchall()}
+    if "person_id" not in columns:
+        connection.execute("ALTER TABLE dotation_forms ADD COLUMN person_id TEXT")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_dotation_forms_person ON dotation_forms (person_id)")
+    if "payload_json" not in columns:
+        return  # schema minimal/incomplet (tests, base tres ancienne) : rien a retrouver
+    for row in connection.execute("SELECT id, payload_json FROM dotation_forms WHERE person_id IS NULL").fetchall():
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        person_id = payload.get("meta", {}).get("personId") if isinstance(payload, dict) else None
+        if person_id:
+            connection.execute("UPDATE dotation_forms SET person_id = ? WHERE id = ?", (person_id, row["id"]))
+
+
 INDEXES = (
     ("idx_dotation_items_form_key", "dotation_items", "form_id, item_key"),
     ("idx_dotation_forms_status_updated", "dotation_forms", "status, updated_at"),
@@ -108,6 +129,7 @@ MIGRATIONS = [
     (2, "identifiants_de_champs", _m_field_ids),
     (3, "roles_de_champs", _m_field_roles),
     (4, "index_de_performance", _m_indexes),
+    (5, "identifiant_de_personne", _m_person_id_column),
 ]
 
 
