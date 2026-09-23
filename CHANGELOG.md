@@ -1,5 +1,12 @@
 # Historique des versions — À Quai
 
+## [3.60.2] - 2026-09-23
+
+### 🐛 Correctif
+- **Limiteur de tentatives de connexion : la limite globale pouvait être dépassée sous forte charge concurrente.** `rate_store.hit()` compte les tentatives dans une base partagée entre les processus (verrou d'écriture SQLite) ; si ce verrou échouait momentanément à cause d'un afflux de connexions simultanées, le code basculait silencieusement sur un compteur propre à chaque processus, qui ne voit pas les tentatives déjà comptées ailleurs — la limite pouvait alors être dépassée précisément quand elle sert le plus. Découvert lors du tout premier passage réel de la CI GitHub Actions (`.github/workflows/tests.yml`), jamais exécutée jusqu'ici.
+- Corrigé en réessayant quelques fois le verrou d'écriture (quelques dixièmes de seconde au total) avant de considérer la base réellement indisponible ; le repli en mémoire reste en place pour les vraies pannes (disque plein, verrou prolongé).
+- Vérifié par une charge plus forte que le test existant (8 processus × 10 tentatives) : comptage exact à chaque essai.
+
 ## [3.60.1] - 2026-09-23
 
 ### 🐛 Correctif
