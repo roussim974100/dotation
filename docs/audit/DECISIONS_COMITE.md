@@ -1,6 +1,6 @@
 # Décisions du comité — data management × full stack × qualité (20 septembre 2026)
 
-Statut : **propositions du comité**, en attente de validation de l'utilisateur. Rien de ce qui suit (sauf la correction des alias, voir D2) n'est appliqué.
+Statut initial : propositions du comité. **Mise à jour du 20/09/2026 (fin de journée) : les décisions D1 à D15 sont appliquées sur `dev` (versions 3.51.0 à 3.60.0) ; D16 (ancien modèle matériel / immatériel), la police PDF Unicode et le moteur de workflow ne sont pas faits.** État détaillé, suite et reprise : `docs/REPRISE_MAJ.md`. Une réunion de pré-crise (démarrage insensible aux données, support à distance, rôles de champs, performance, restauration) a ajouté les versions 3.57.0 à 3.60.0.
 
 ## Où les équipes convergent (adopté)
 - Cause racine unique : la clé technique du champ sert à la fois de nom, d'identifiant et de clé de stockage, et elle peut changer.

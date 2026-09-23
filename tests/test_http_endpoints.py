@@ -262,3 +262,12 @@ def test_diagnostic_guard_refuses_personal_looking_content_and_is_admin_only(htt
 def test_stock_uses_explicit_field_roles_not_key_names(http):
     assert http["stock_roles_kept"] == [["qte_en_stock", "quantity", True, False], ["taille_pointure", "variant", False, True]]
     assert http["stock_libre_levels"] == [True, True, [["42", 5]]]  # 5 unites reservees en pointure 42, malgre des noms de cle libres
+
+
+def test_retrait_via_mise_a_jour_resynchronise_le_parc_du_dossier_source(http):
+    """3.60.1 : avant le correctif, un objet retire via un dossier « mise a jour » restait affiche comme detenu
+    dans le parc (resource_units jamais resynchronise pour le dossier SOURCE). Verifie que l'objet redevient disponible."""
+    assert http["retrait360_source_status_active"] == "active"
+    assert http["retrait360_unit_status_before"] == ["assigned"]
+    assert http["retrait360_unit_status_after"] == ["in_stock"]
+    assert http["retrait360_source_items_returned"].get("poste_retrait360", {}).get("state") == "conforme"
