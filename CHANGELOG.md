@@ -1,5 +1,11 @@
 # Historique des versions — À Quai
 
+## [3.60.1] - 2026-09-23
+
+### 🐛 Correctif
+- **Retrait de ressource via un dossier « mise à jour » : le parc et le stock du dossier d'origine n'étaient jamais resynchronisés.** L'objet ou la quantité rendus restaient affichés comme toujours détenus dans Parc/Stock alors que le dossier disait « restitué ». `_apply_retraits_to_source` modifiait le dossier source directement, en dehors du chemin habituel (`persist_form`), sans jamais appeler la resynchronisation du parc (`sync_units_for_form`) ni du stock (`sync_stock_for_form`) sur ce dossier. Corrigé en appelant les deux, avec la même garde qu'ailleurs dans le projet : une resynchronisation impossible ne doit jamais empêcher l'enregistrement.
+- Test ajouté (`tests/_http_scenarios.py`, `test_retrait_via_mise_a_jour_resynchronise_le_parc_du_dossier_source`) : un objet suivi par numéro de série redevient bien « disponible » après un retrait via ce mécanisme.
+
 ## [3.60.0] - 2026-09-20
 
 Performance mesurée et sûreté des mises à jour / restaurations (`tools/load_test.py` : base synthétique de 3 000 dossiers).

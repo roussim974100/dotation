@@ -142,6 +142,21 @@ def _apply_retraits_to_source(connection, form_id, source_form_id, retraits_item
                 f"Ressources retirees via dossier de mise a jour #{form_id}",
                 {"source_form_id": form_id, "items": list(retraits_items.keys())},
             )
+        # Le dossier source vient d'etre modifie directement (hors persist_form) : sans ceci, le parc et le stock
+        # continuent d'afficher les objets retires comme toujours detenus (bug 3.60.1). Meme garde que persist_form :
+        # ne doit jamais empecher l'enregistrement du dossier de mise a jour.
+        try:
+            from models.units import sync_units_for_form
+            sync_units_for_form(connection, source_form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du parc impossible pour le dossier source %s", source_form_id, exc_info=True)
+        try:
+            from models.stock import sync_stock_for_form
+            sync_stock_for_form(connection, source_form_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Synchronisation du stock impossible pour le dossier source %s", source_form_id, exc_info=True)
 
 
 def build_form_export_lines(payload):
