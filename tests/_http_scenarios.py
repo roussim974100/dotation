@@ -529,6 +529,37 @@ _nobase = dict(_loaded)
 _nobase["meta"] = {k: v for k, v in _loaded["meta"].items() if k != "baseSavedAt"}
 results["lock_without_base_still_saves"] = admin.put(f"/api/forms/{_lid}", json=_nobase, headers=H).status_code
 
+# ---- 3.60.1 : un retrait via un dossier « mise a jour » resynchronise le parc du dossier SOURCE (bug corrige) ----
+admin.post("/api/admin/resources", json={
+    "code": "poste_retrait360", "label": "Poste retrait 360", "description": "", "category": "materiel", "issuer_service": "DSI",
+    "requires_return": True, "has_assignment_date": False, "has_assignment_condition": False, "has_assignment_notes": False,
+    "display_order": 990, "is_active": True, "tracking_mode": "unit",
+    "field_schema": [{"key": "numero_de_serie", "label": "N° de série", "type": "text", "required": True, "identifier": True}],
+}, headers=H)
+_r360 = next((r for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "poste_retrait360"), {})
+_r360_schema = _r360.get("field_schema") or _r360.get("fieldSchema") or []
+_src_draft = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "RETRAIT360", "prenom": "Source", "qualite": "agent"},
+              "resources": {"additional": [{"id": _r360.get("id"), "code": "poste_retrait360", "label": "Poste retrait 360", "category": "materiel",
+                                            "requiresReturn": True, "hasAssignmentDate": False, "selected": True, "fieldSchema": _r360_schema,
+                                            "fields": {"numero_de_serie": "SN-RETRAIT-360"}, "details": ""}]},
+              "workflow": {"status": "draft"}, "meta": {}}
+_src_created = admin.post("/api/forms", json=_src_draft, headers=H).get_json() or {}
+_src_id = (_src_created.get("summary") or {}).get("id")
+_src_loaded = (admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {})
+_src_active = dict(_src_loaded, workflow={"status": "active"}, validation={"signatureDataUrl": "data:image/png;base64,x", "rgpdAccepted": True})
+admin.put(f"/api/forms/{_src_id}", json=_src_active, headers=H)
+results["retrait360_source_status_active"] = (admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("summary", {}).get("status")
+_units_before = (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", [])
+results["retrait360_unit_status_before"] = [u.get("status") for u in _units_before if u.get("identifier") == "SN-RETRAIT-360"]
+_maj_body = {"dossier": {"type": "mise_a_jour", "sourceFormId": _src_id}, "beneficiaire": {"nom": "RETRAIT360", "prenom": "Source", "qualite": "agent"},
+             "resources": {"additional": []},
+             "retraits": {"items": {"poste_retrait360": {"selected": True, "etat": "Bon", "notes": "Retour materiel"}}},
+             "workflow": {"status": "draft"}, "meta": {}}
+admin.post("/api/forms", json=_maj_body, headers=H)
+_units_after = (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", [])
+results["retrait360_unit_status_after"] = [u.get("status") for u in _units_after if u.get("identifier") == "SN-RETRAIT-360"]
+results["retrait360_source_items_returned"] = ((admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {}).get("restitution", {}).get("items", {}))
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):
