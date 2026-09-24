@@ -2954,8 +2954,8 @@ async function renderLockedDossierActions(workflowStatus) {
   const user = await getSessionInfo();
   const can = (permission) => user?.permissions?.includes("*") || user?.permissions?.includes(permission);
   const actions = [
-    can("forms.export") && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
-    can("forms.export") && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
+    canExportUnmasked(user) && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
+    canExportUnmasked(user) && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
     can("forms.restitution") && workflowStatus === "active" && { label: "Restituer", tone: "btn-primary", run: () => openRestitution(id) }
   ].filter(Boolean);
   const anchor = document.getElementById("saveDraftBtn");

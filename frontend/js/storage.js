@@ -1083,6 +1083,13 @@ async function requestJson(url, options = {}) {
   return payload;
 }
 
+// Même règle que can_export_unmasked (backend/routes/forms.py) : les PDF et exports ne sont pas masqués, donc un
+// groupe à portée « masked » (RGPD) ne peut pas les générer, même avec forms.export.
+function canExportUnmasked(user) {
+  const allowed = user?.permissions?.includes("*") || user?.permissions?.includes("forms.export");
+  return Boolean(allowed && user?.data_scope !== "masked");
+}
+
 async function getSessionInfo() {
   // Charge le contexte utilisateur une seule fois pour piloter les boutons affichés.
   if (sessionInfo) {
@@ -1568,7 +1575,7 @@ async function renderDraftList() {
     filterEmptyState?.classList.add("d-none");
     historyEmptyState?.classList.add("d-none");
     const user = await getSessionInfo();
-    const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
+    const canExport = canExportUnmasked(user);
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
@@ -2234,13 +2241,8 @@ async function prepareRestitutionInfoEmail(id) {
 
 // Écrans de restitution : actions de suite (PDF, e-mail) dans la barre du bas, comme pour un dossier signé
 // (renderLockedDossierActions). Sans droit d'export, l'e-mail proposé est l'information de restitution, sans PDF.
-async function canExportRestitutionPdf() {
-  const user = await getSessionInfo();
-  return Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
-}
-
 async function sendRestitutionEmail(id) {
-  if (await canExportRestitutionPdf()) {
+  if (canExportUnmasked(await getSessionInfo())) {
     await prepareRestitutionPdfEmail(id);
   } else {
     await prepareRestitutionInfoEmail(id);
@@ -2251,7 +2253,7 @@ async function renderRestitutionFollowUpActions(id, anchorId) {
   const bar = document.querySelector(".action-bar__buttons");
   if (!bar || !id) return;
   bar.querySelectorAll("[data-restitution-action]").forEach((btn) => btn.remove());
-  const canExport = await canExportRestitutionPdf();
+  const canExport = canExportUnmasked(await getSessionInfo());
   const actions = [
     canExport && { label: "Télécharger le PDF", run: () => exportRestitutionPdf(id) },
     { label: "Envoyer par e-mail", run: () => sendRestitutionEmail(id) }
@@ -3066,7 +3068,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
     // « Administration » et « Synthèse » sont ajoutés au menu du compte par ui.js (renderUserMenuFeatureLinks), sur toutes les pages.
-    if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
+    if (canExportUnmasked(user)) {
       document.getElementById("exportMenu")?.classList.remove("d-none");
     }
     if (user && (user.permissions.includes("forms.create") || user.permissions.includes("*"))) {

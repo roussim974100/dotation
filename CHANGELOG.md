@@ -10,6 +10,7 @@
 
 ### 🐛 Correctif
 - **Export PDF hors des listes** : `showExportLoader` supposait la présence du chargeur d'export, qui n'existe que sur les listes. Hors de celles-ci (fiche d'attribution, écrans de restitution), l'export échouait avant même d'appeler le serveur — ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'une attribution signée. L'export fonctionne maintenant sans chargeur.
+- **Droit d'export et portée « masquée » (RGPD)** : l'interface proposait les PDF et exports à un groupe ayant `forms.export` mais une portée de données « masked », alors que le serveur les refuse toujours (`can_export_unmasked`). Une seule règle côté interface, `canExportUnmasked` (`storage.js`), alignée sur le serveur : liste des dossiers, menu Exporter, fiche d'attribution signée, écrans de restitution (qui se replient alors sur l'e-mail d'information, sans PDF). Signalé par la relecture automatique de la PR #24.
 
 ### 🧪 Tests
 - `tests/browser/check_restitution_email.py` : parcours réel Phase 1 → Phase 2 → enregistrement, e-mail avec PDF depuis la fiche d'attribution, absence d'envoi sur clic hors fenêtre.

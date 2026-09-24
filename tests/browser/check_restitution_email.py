@@ -86,6 +86,15 @@ with Instance() as inst:
     driver.execute_script("[...document.querySelectorAll('[data-restitution-action]')].find(b => b.textContent === 'Envoyer par e-mail').click()")
     check("le bouton prépare l'e-mail avec le PDF de restitution", wait_for(lambda: any(n.startswith("restitution_pdf_email") for n in saved(driver))), str(saved(driver)))
 
+    # Portée « masked » (RGPD) : le serveur refuse tout PDF (can_export_unmasked) → e-mail d'information, sans PDF
+    driver.execute_script(CAPTURE_DOWNLOADS + "sessionInfo = {...sessionInfo, data_scope: 'masked'};"
+                          f"void sendRestitutionEmail('{form_id}');")
+    check("portée masquée : repli sur l'e-mail d'information", wait_for(lambda: any(n.startswith("information_restitution") for n in saved(driver))), str(saved(driver)))
+    masked_labels = driver.execute_script(
+        f"return renderRestitutionFollowUpActions('{form_id}', 'saveRestitutionPendingBtn').then(() => [...document.querySelectorAll('[data-restitution-action]')].map(b => b.textContent))")
+    check("portée masquée : pas de bouton PDF", masked_labels == ["Envoyer par e-mail"], str(masked_labels))
+    driver.execute_script("sessionInfo = {...sessionInfo, data_scope: 'full'};")
+
     # Enregistrement final : l'envoi est proposé ; un clic hors du dialogue ne l'envoie pas
     driver.execute_script(CAPTURE_DOWNLOADS)
     driver.execute_script("document.querySelector('input[name=\"restitution_signature_status\"][value=\"deferred\"]').click()")

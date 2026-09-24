@@ -32,6 +32,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
+| Identifiant saisi journalisé en clair lors d'un échec de connexion (trouvé le 24/09) | `backend/routes/pages.py` (`login_failed`) enregistre tel quel ce qui a été tapé dans le champ identifiant. Si quelqu'un y tape son mot de passe par erreur, ce mot de passe apparaît en clair dans le journal d'administration (cas constaté sur la copie de production du 24/09). Piste : ne journaliser l'identifiant que s'il correspond à un compte existant, sinon une forme masquée ; purger les entrées déjà enregistrées | P1 |
 | Scan de vulnérabilités des dépendances | Jamais lancé (ex. `pip-audit` sur `backend/requirements.txt`) | P1 |
 | Police PDF Unicode | Le cyrillique, l'arabe, le chinois sortent en « ? ». Nécessite d'embarquer une police libre (ex. DejaVu Sans) — décision de l'utilisateur en attente | P2 |
 | Moteur de workflow déclaratif | Non commencé | P2 |
