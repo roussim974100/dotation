@@ -69,8 +69,11 @@ with Instance() as inst:
     driver.get(inst.url(f"/restitution-phase1.html?id={form_id}"))
     time.sleep(2.5)
     check("Phase 1 non validée : pas de bouton d'e-mail", driver.execute_script("return document.querySelectorAll('[data-restitution-action]').length") == 0)
-    driver.execute_script(CAPTURE_DOWNLOADS)
     driver.execute_script("document.getElementById('p1_returned_at').value = new Date().toISOString().slice(0, 10);")
+    driver.execute_script("document.getElementById('savePhase1Btn').click()")
+    check("Phase 1 : dates enregistrées → bouton « Informer par e-mail »", wait_for(lambda: "Informer par e-mail" in driver.execute_script(
+        "return [...document.querySelectorAll('[data-restitution-action]')].map(b => b.textContent)")))
+    driver.execute_script(CAPTURE_DOWNLOADS)
     driver.execute_script("document.getElementById('validatePhase1Btn').click()")
     check("la validation propose d'informer la personne", wait_for(lambda: dialog_visible(driver)
           and "informer" in driver.execute_script("return document.getElementById('workflowDialogText').textContent")))
@@ -82,9 +85,12 @@ with Instance() as inst:
     time.sleep(2.5)
     driver.execute_script(CAPTURE_DOWNLOADS)
     labels = driver.execute_script("return [...document.querySelectorAll('[data-restitution-action]')].map(b => b.textContent)")
-    check("Phase 2 : boutons PDF et e-mail présents", labels == ["Télécharger le PDF", "Envoyer par e-mail"], str(labels))
-    driver.execute_script("[...document.querySelectorAll('[data-restitution-action]')].find(b => b.textContent === 'Envoyer par e-mail').click()")
-    check("le bouton prépare l'e-mail avec le PDF de restitution", wait_for(lambda: any(n.startswith("restitution_pdf_email") for n in saved(driver))), str(saved(driver)))
+    check("Phase 2 : boutons PDF, information et PDF par e-mail présents", labels == ["Télécharger le PDF", "Informer par e-mail", "Envoyer le PDF par e-mail"], str(labels))
+    driver.execute_script("[...document.querySelectorAll('[data-restitution-action]')].find(b => b.textContent === 'Informer par e-mail').click()")
+    check("« Informer par e-mail » prépare l'e-mail d'information", wait_for(lambda: any(n.startswith("information_restitution") for n in saved(driver))), str(saved(driver)))
+    driver.execute_script(CAPTURE_DOWNLOADS)
+    driver.execute_script("[...document.querySelectorAll('[data-restitution-action]')].find(b => b.textContent === 'Envoyer le PDF par e-mail').click()")
+    check("« Envoyer le PDF par e-mail » prépare l'e-mail avec le PDF de restitution", wait_for(lambda: any(n.startswith("restitution_pdf_email") for n in saved(driver))), str(saved(driver)))
 
     # Portée « masked » (RGPD) : le serveur refuse tout PDF (can_export_unmasked) → e-mail d'information, sans PDF
     driver.execute_script(CAPTURE_DOWNLOADS + "sessionInfo = {...sessionInfo, data_scope: 'masked'};"
@@ -92,7 +98,7 @@ with Instance() as inst:
     check("portée masquée : repli sur l'e-mail d'information", wait_for(lambda: any(n.startswith("information_restitution") for n in saved(driver))), str(saved(driver)))
     masked_labels = driver.execute_script(
         f"return renderRestitutionFollowUpActions('{form_id}', 'saveRestitutionPendingBtn').then(() => [...document.querySelectorAll('[data-restitution-action]')].map(b => b.textContent))")
-    check("portée masquée : pas de bouton PDF", masked_labels == ["Envoyer par e-mail"], str(masked_labels))
+    check("portée masquée : pas de bouton PDF", masked_labels == ["Informer par e-mail"], str(masked_labels))
     driver.execute_script("sessionInfo = {...sessionInfo, data_scope: 'full'};")
 
     # Enregistrement final : l'envoi est proposé ; un clic hors du dialogue ne l'envoie pas
@@ -103,6 +109,23 @@ with Instance() as inst:
           and driver.execute_script("return document.getElementById('workflowDialogConfirmBtn').textContent") == "Envoyer par e-mail"))
     driver.execute_script("document.querySelector(\"[data-workflow-close='backdrop']\").click()")
     check("un clic hors du dialogue n'envoie rien et ramène à la liste", wait_for(lambda: "restitutions-pending" in driver.current_url) and not saved(driver), f"{driver.current_url} {saved(driver)}")
+
+    # Menu « ⋯ » de la liste : jamais rogné par le cadre du tableau, même sur la dernière ligne d'un tableau court
+    api(driver, "POST", "/api/forms", {**body, "beneficiaire": {**body["beneficiaire"], "nom": "SECONDE"}})
+    driver.get(inst.url("/restitutions-pending.html"))
+    time.sleep(3)
+    driver.set_window_size(1366, 700)
+    time.sleep(0.5)
+    clip = driver.execute_script("""const menus = [...document.querySelectorAll('.draft-table [data-action-menu]')];
+      const m = menus[menus.length - 1]; if (!m) return 'aucun menu';
+      m.scrollIntoView({block: 'center'}); m.open = true;
+      return new Promise(r => setTimeout(() => {
+        const p = document.querySelector('body > .draft-actions__menu-panel'); if (!p) return r('volet non rattaché au body'); const rect = p.getBoundingClientRect();
+        const visible = [...p.querySelectorAll('button')].every(b => { const q = b.getBoundingClientRect();
+          const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return hit && p.contains(hit); });
+        r({menus: menus.length, top: rect.top, bottom: rect.bottom, vh: innerHeight, visible});
+      }, 300));""")
+    check("menu « ⋯ » de la dernière ligne entièrement visible", isinstance(clip, dict) and clip["visible"] and clip["top"] >= 0 and clip["bottom"] <= clip["vh"], str(clip))
 
     # /api/debug/report-lock : sonde de débogage de la fiche, refusée hors APP_DEBUG_ENDPOINTS (sans rapport ici).
     errors = [e for e in inst.console_errors(driver) if "/api/debug/" not in e]

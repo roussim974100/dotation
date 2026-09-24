@@ -884,7 +884,60 @@ function buildDraftActionButtons(draft, options) {
     </div>
   `;
 }
+// Sur grand écran, le volet ouvert du menu « ⋯ » est rattaché au <body> et placé en position fixe : dans le tableau, il
+// était rogné par le cadre défilant (.table-responsive) et, le cadre ayant un backdrop-filter, une position fixe y reste
+// piégée sous l'en-tête. Il s'ouvre vers le bas, ou vers le haut s'il y a plus de place, et reste dans la fenêtre.
+const floatingActionMenus = new Map(); // volet -> menu d'origine
+
+function restoreActionMenuPanel(panel, menu) {
+  panel.style.cssText = "";
+  if (menu.isConnected) {
+    menu.appendChild(panel);
+  } else {
+    panel.remove();
+  }
+  floatingActionMenus.delete(panel);
+}
+
+function placeActionMenuPanel(menu) {
+  const summary = menu.querySelector("summary");
+  const panel = [...floatingActionMenus].find(([, owner]) => owner === menu)?.[0]
+    || menu.querySelector(".draft-actions__menu-panel");
+  if (!panel || !summary) return;
+  if (!menu.open || !window.matchMedia("(min-width: 768px)").matches) {
+    if (floatingActionMenus.has(panel)) restoreActionMenuPanel(panel, menu);
+    return;
+  }
+  if (!floatingActionMenus.has(panel)) {
+    floatingActionMenus.set(panel, menu);
+    document.body.appendChild(panel);
+  }
+  Object.assign(panel.style, { position: "fixed", right: "auto", bottom: "auto", margin: "0", zIndex: "1050" });
+  const anchor = summary.getBoundingClientRect();
+  const gap = 7;
+  const margin = 8;
+  const height = panel.offsetHeight;
+  const spaceBelow = window.innerHeight - anchor.bottom - gap - margin;
+  const spaceAbove = anchor.top - gap - margin;
+  const openUp = height > spaceBelow && spaceAbove > spaceBelow;
+  const top = openUp ? anchor.top - gap - height : anchor.bottom + gap;
+  panel.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - height - margin))}px`;
+  panel.style.left = `${Math.max(margin, anchor.right - panel.offsetWidth)}px`;
+}
+
+function replaceOpenActionMenus() {
+  // Liste re-rendue (actualisation automatique) : un volet dont le menu a disparu ou s'est fermé est rangé.
+  floatingActionMenus.forEach((menu, panel) => {
+    if (!menu.isConnected || !menu.open) restoreActionMenuPanel(panel, menu);
+  });
+  document.querySelectorAll("[data-action-menu][open]").forEach(placeActionMenuPanel);
+}
+
+window.addEventListener("resize", replaceOpenActionMenus);
+window.addEventListener("scroll", replaceOpenActionMenus, true);
+
 function bindDraftActionMenus() {
+  replaceOpenActionMenus();
   document.querySelectorAll("[data-action-menu]").forEach((menu) => {
     if (menu.dataset.boundActionMenu) {
       return;
@@ -908,6 +961,7 @@ function bindDraftActionMenus() {
           }
         });
       }
+      placeActionMenuPanel(menu);
       updateLabel();
     });
 
@@ -2239,8 +2293,8 @@ async function prepareRestitutionInfoEmail(id) {
   }
 }
 
-// Écrans de restitution : actions de suite (PDF, e-mail) dans la barre du bas, comme pour un dossier signé
-// (renderLockedDossierActions). Sans droit d'export, l'e-mail proposé est l'information de restitution, sans PDF.
+// Écrans de restitution : actions de suite (PDF, e-mails) dans la barre du bas, comme pour un dossier signé
+// (renderLockedDossierActions). Sans droit d'export effectif, seul l'e-mail d'information (sans PDF) est proposé.
 async function sendRestitutionEmail(id) {
   if (canExportUnmasked(await getSessionInfo())) {
     await prepareRestitutionPdfEmail(id);
@@ -2256,7 +2310,8 @@ async function renderRestitutionFollowUpActions(id, anchorId) {
   const canExport = canExportUnmasked(await getSessionInfo());
   const actions = [
     canExport && { label: "Télécharger le PDF", run: () => exportRestitutionPdf(id) },
-    { label: "Envoyer par e-mail", run: () => sendRestitutionEmail(id) }
+    { label: "Informer par e-mail", run: () => prepareRestitutionInfoEmail(id) },
+    canExport && { label: "Envoyer le PDF par e-mail", run: () => prepareRestitutionPdfEmail(id) }
   ].filter(Boolean);
   const anchor = document.getElementById(anchorId);
   actions.forEach((action) => {

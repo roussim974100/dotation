@@ -4,12 +4,13 @@
 
 ### ✉️ E-mails depuis les écrans de restitution
 - **Phase 1** : à la validation (« Valider et transmettre aux services »), l'application propose de préparer un e-mail informant la personne de la restitution (« Préparer l'e-mail » / « Plus tard »).
-- **Phase 2** (et Phase 1 en consultation) : boutons « Télécharger le PDF » et « Envoyer par e-mail » dans la barre du bas, comme sur une attribution signée. L'e-mail joint le PDF de restitution ; sans droit d'export, c'est l'e-mail d'information (sans PDF) qui est préparé.
+- **Barre du bas des écrans de restitution** (Phase 1 dès que les dates sont enregistrées, Phase 2) : « Télécharger le PDF », « Informer par e-mail » (équivalent de « Informer de la création » d'une attribution) et « Envoyer le PDF par e-mail ». Sans droit d'export effectif, seul « Informer par e-mail » est proposé.
 - **Après « Enregistrer la restitution »** : l'envoi par e-mail est proposé (« Envoyer par e-mail » / « Terminer ») ; un clic hors de la fenêtre vaut « Terminer ».
 - Les deux écrans chargent désormais `storage.js`, qui porte déjà les fonctions d'e-mail et de PDF du tableau de bord (aucune duplication).
 
 ### 🐛 Correctif
 - **Export PDF hors des listes** : `showExportLoader` supposait la présence du chargeur d'export, qui n'existe que sur les listes. Hors de celles-ci (fiche d'attribution, écrans de restitution), l'export échouait avant même d'appeler le serveur — ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'une attribution signée. L'export fonctionne maintenant sans chargeur.
+- **Menu « ⋯ » des listes rogné** : les deux dernières lignes ouvraient leur menu vers le haut (règle CSS fixe) et le cadre du tableau le coupait (section « Documents » invisible, ex. tableau de deux dossiers). Le volet ouvert est désormais rattaché à la page, placé vers le bas ou vers le haut selon la place disponible et toujours entièrement visible.
 - **Droit d'export et portée « masquée » (RGPD)** : l'interface proposait les PDF et exports à un groupe ayant `forms.export` mais une portée de données « masked », alors que le serveur les refuse toujours (`can_export_unmasked`). Une seule règle côté interface, `canExportUnmasked` (`storage.js`), alignée sur le serveur : liste des dossiers, menu Exporter, fiche d'attribution signée, écrans de restitution (qui se replient alors sur l'e-mail d'information, sans PDF). Signalé par la relecture automatique de la PR #24.
 
 ### 🧪 Tests

@@ -129,9 +129,11 @@ async function initPhase1Page() {
     const unlockDays = settings?.restitutionPhase1UnlockDays ?? 1;
 
     applyPhase1ValidatedState(currentRestitution, unlockDays, id);
-    if (currentRestitution.phase1ValidatedAt) {
-      void renderRestitutionFollowUpActions(id, "savePhase1Btn");
-    }
+    // Dès que la restitution existe (dates enregistrées), on peut en informer la personne ou envoyer le PDF.
+    const refreshFollowUpActions = () => {
+      if (currentRestitution?.returnedAt) void renderRestitutionFollowUpActions(id, "savePhase1Btn");
+    };
+    refreshFollowUpActions();
 
     // Bouton "Enregistrer" (sans valider)
     getEl("savePhase1Btn")?.addEventListener("click", async () => {
@@ -141,6 +143,7 @@ async function initPhase1Page() {
         const updated = await requestJson(`/api/forms/${encodeURIComponent(id)}`);
         currentRestitution = updated?.data?.restitution || currentRestitution;
         applyPhase1ValidatedState(currentRestitution, unlockDays, id);
+        refreshFollowUpActions();
       } catch (e) {
         alert(e.message || "Erreur lors de l'enregistrement.");
       }
