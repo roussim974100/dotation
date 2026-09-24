@@ -1,5 +1,19 @@
 # Historique des versions — À Quai
 
+## [3.62.0] - 2026-09-24
+
+### ✉️ E-mails depuis les écrans de restitution
+- **Phase 1** : à la validation (« Valider et transmettre aux services »), l'application propose de préparer un e-mail informant la personne de la restitution (« Préparer l'e-mail » / « Plus tard »).
+- **Phase 2** (et Phase 1 en consultation) : boutons « Télécharger le PDF » et « Envoyer par e-mail » dans la barre du bas, comme sur une attribution signée. L'e-mail joint le PDF de restitution ; sans droit d'export, c'est l'e-mail d'information (sans PDF) qui est préparé.
+- **Après « Enregistrer la restitution »** : l'envoi par e-mail est proposé (« Envoyer par e-mail » / « Terminer ») ; un clic hors de la fenêtre vaut « Terminer ».
+- Les deux écrans chargent désormais `storage.js`, qui porte déjà les fonctions d'e-mail et de PDF du tableau de bord (aucune duplication).
+
+### 🐛 Correctif
+- **Export PDF hors des listes** : `showExportLoader` supposait la présence du chargeur d'export, qui n'existe que sur les listes. Hors de celles-ci (fiche d'attribution, écrans de restitution), l'export échouait avant même d'appeler le serveur — ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'une attribution signée. L'export fonctionne maintenant sans chargeur.
+
+### 🧪 Tests
+- `tests/browser/check_restitution_email.py` : parcours réel Phase 1 → Phase 2 → enregistrement, e-mail avec PDF depuis la fiche d'attribution, absence d'envoi sur clic hors fenêtre.
+
 ## [3.61.0] - 2026-09-23
 
 Première étape du chantier « ajuster les ressources d'un dossier déjà actif » (plan cadré avec 3 experts — process métier, base de données, architecture — voir `docs` et la mémoire du projet).

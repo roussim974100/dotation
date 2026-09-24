@@ -6,28 +6,29 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` = **3.61.0**, non encore poussée vers `preprod`/`prod` (à faire à la reprise). `preprod` et `prod` sont synchronisées à 3.60.2.
+`dev` = **3.62.0**, non encore poussée vers `preprod`/`prod` (à faire à la reprise). `preprod` et `prod` sont synchronisées à 3.60.2.
 
 ## Sprint en cours — « Ajuster les ressources d'un dossier déjà actif »
 
 Cadré le 21-22/09 avec trois experts (process métier, base de données, architecture) : voir `docs/REPRISE_MAJ.md` et la mémoire `feature_ajustement_dossier_actif`.
 
-**Fait** : 3.60.1 (bug parc/stock sur retrait), 3.60.2 (limiteur de connexion sous charge, trouvé par la CI), 3.61.0 (identifiant de personne stable).
+**Fait** : 3.60.1 (bug parc/stock sur retrait), 3.60.2 (limiteur de connexion sous charge, trouvé par la CI), 3.61.0 (identifiant de personne stable), 3.62.0 (e-mails de restitution, inséré avant la suite du sprint).
 
 **Reste, dans l'ordre** :
 
 | # | Contenu | Effort | Priorité |
 |---|---|---|---|
-| 3.62.0 | Route unique `PATCH /api/forms/<id>/ajustement` (ajout + retrait + service en une transaction), permission dédiée assignée à Administrateur/Administration, statut de workflow distinct (ne pas réutiliser celui de la restitution finale), signature par geste en présentiel ou à distance, signature impossible → un responsable signe à la place | M/L | P0 |
-| 3.63.0 | Migration de rattrapage sur les 34 dossiers « mise à jour » déjà en base (resynchronisation parc/stock historique) + invariant de santé associé | S | P0 |
-| 3.64.0 | Interface : bouton « Ajuster les ressources / le service » sur un dossier actif, retrait de l'option « Mise à jour » du sélecteur de création (le type reste lisible pour les dossiers existants) | M | P1 |
-| 3.65.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
+| ✅ 3.62.0 (fait le 24/09) | E-mails de restitution : voir « Demandes utilisateur » ci-dessous | S | P1 |
+| 3.63.0 | Route unique `PATCH /api/forms/<id>/ajustement` (ajout + retrait + service en une transaction), permission dédiée assignée à Administrateur/Administration, statut de workflow distinct (ne pas réutiliser celui de la restitution finale), signature par geste en présentiel ou à distance, signature impossible → un responsable signe à la place | M/L | P0 |
+| 3.64.0 | Migration de rattrapage sur les 34 dossiers « mise à jour » déjà en base (resynchronisation parc/stock historique) + invariant de santé associé | S | P0 |
+| 3.65.0 | Interface : bouton « Ajuster les ressources / le service » sur un dossier actif, retrait de l'option « Mise à jour » du sélecteur de création (le type reste lisible pour les dossiers existants) | M | P1 |
+| 3.66.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 
 | Sujet | Détail | Priorité |
 |---|---|---|
-| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.65.0 | P1 |
+| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.66.0 | P1 |
 | Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
@@ -36,6 +37,15 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | Moteur de workflow déclaratif | Non commencé | P2 |
 | Effet des formules CSV dans Excel | Neutralisation faite côté code (3.52.0), jamais vérifiée avec un vrai Excel | P2 |
 | Pagination de `/api/forms` | Mesuré à ~1,7 ms/dossier (3000 dossiers synthétiques) : sans effet à l'échelle actuelle (34 dossiers), à surveiller si un client dépasse quelques centaines de dossiers | P2 |
+
+## Demandes utilisateur (non planifiées en version)
+
+| Sujet | Détail | Effort | Priorité |
+|---|---|---|---|
+| ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
+| ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
+| Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |
+| E-mail de la fiche de retraits | Le PDF de retraits (`/api/forms/<id>/retraits-pdf`) n'a pas d'équivalent « Envoyer par e-mail » ; à reprendre dans l'écran d'ajustement de 3.65.0 plutôt que sur l'ancien type « mise à jour » | S | P2 |
 
 ## Backlogs plus anciens : où ils en sont
 
@@ -53,7 +63,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 - Cartes empilées sur mobile (`backlog_ergonomie_sprints`) — jamais pu être testé par l'automatisation du navigateur (le redimensionnement de fenêtre ne change pas la largeur perçue).
 - Historique/cycle de vie du parc + assistant de création de ressource (`backlog_historique_parc`) : plan validé, rien codé.
 - Cohérence de la navigation, moins de clics (`backlog_navigation_audit`) : audit fait le 19/09, rien codé.
-- Case « Responsable de service » sur les comptes, pour de futurs e-mails automatiques (`feature_reprise_materiel_restitue`) : recoupe le signataire de substitution décidé pour le chantier en cours (3.62.0) — à concevoir ensemble plutôt que séparément.
+- Case « Responsable de service » sur les comptes, pour de futurs e-mails automatiques (`feature_reprise_materiel_restitue`) : recoupe le signataire de substitution décidé pour le chantier en cours (3.63.0) — à concevoir ensemble plutôt que séparément.
 - Blocage d'une saisie manuelle d'un n° de série déjà attribué ailleurs (`feature_reprise_materiel_restitue`).
 - Typage progressif (`@ts-check` + JSDoc) sur `storage.js`/`admin.js` (`backlog_typage_typescript`) : backlog de version future, faible priorité.
 

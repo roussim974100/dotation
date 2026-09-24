@@ -2231,6 +2231,58 @@ async function prepareRestitutionInfoEmail(id) {
     showToast(error.message || "Impossible de préparer l'e-mail d'information de restitution.", "error");
   }
 }
+
+// Écrans de restitution : actions de suite (PDF, e-mail) dans la barre du bas, comme pour un dossier signé
+// (renderLockedDossierActions). Sans droit d'export, l'e-mail proposé est l'information de restitution, sans PDF.
+async function canExportRestitutionPdf() {
+  const user = await getSessionInfo();
+  return Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
+}
+
+async function sendRestitutionEmail(id) {
+  if (await canExportRestitutionPdf()) {
+    await prepareRestitutionPdfEmail(id);
+  } else {
+    await prepareRestitutionInfoEmail(id);
+  }
+}
+
+async function renderRestitutionFollowUpActions(id, anchorId) {
+  const bar = document.querySelector(".action-bar__buttons");
+  if (!bar || !id) return;
+  bar.querySelectorAll("[data-restitution-action]").forEach((btn) => btn.remove());
+  const canExport = await canExportRestitutionPdf();
+  const actions = [
+    canExport && { label: "Télécharger le PDF", run: () => exportRestitutionPdf(id) },
+    { label: "Envoyer par e-mail", run: () => sendRestitutionEmail(id) }
+  ].filter(Boolean);
+  const anchor = document.getElementById(anchorId);
+  actions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-outline-secondary";
+    btn.dataset.restitutionAction = "true";
+    btn.textContent = action.label;
+    btn.addEventListener("click", action.run);
+    bar.insertBefore(btn, anchor && anchor.parentElement === bar ? anchor : null);
+  });
+}
+
+// Proposée juste après la validation de la Phase 1 : prévenir la personne que la restitution est engagée.
+async function offerRestitutionInfoEmail(id) {
+  const choice = await window.askWorkflowDialog({
+    title: "Restitution engagée",
+    text: "Souhaitez-vous préparer un e-mail pour informer la personne de la restitution ?",
+    steps: [],
+    hideSpinner: true,
+    showConfirm: true,
+    confirmLabel: "Préparer l'e-mail",
+    secondaryLabel: "Plus tard"
+  });
+  if (choice === "confirm") {
+    await prepareRestitutionInfoEmail(id);
+  }
+}
 function bindSignatureLinkNotice() {
   const notice = document.getElementById("signatureLinkNotice");
   if (!notice) {
@@ -2338,7 +2390,9 @@ function setExportLoaderProgress(value) {
 }
 
 function showExportLoader(title, text) {
+  // Le chargeur n'existe que sur les listes : la fiche et les écrans de restitution exportent sans lui.
   const overlay = document.getElementById("exportLoader");
+  if (!overlay) return;
   document.getElementById("exportLoaderTitle").textContent = title;
   document.getElementById("exportLoaderText").textContent = text;
   startFallbackExportProgress({ start: 4, cap: 28, step: 3, interval: 220 });
