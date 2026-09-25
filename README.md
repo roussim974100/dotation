@@ -178,6 +178,7 @@ La consultation est ouverte à qui voit les dossiers ; les actions de gestion de
 - [Sécurité initiale](#-sécurité-initiale)
 - [Mise à jour en production](#mise-à-jour-en-production)
 - [Configuration avancée](#avancé)
+- [Reprendre le développement (développeur ou assistant IA)](AGENTS.md) — où trouver l'information sans relire tout le code
 
 ---
 
