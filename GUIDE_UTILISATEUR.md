@@ -85,6 +85,26 @@ Quand un dossier encore modifiable est rouvert :
 - la date de derniere reouverture est conservee
 - l'utilisateur ayant rouvert le dossier est memorise
 
+## Ajuster un dossier actif (ajouter, retirer, changer de service)
+
+Pour une personne qui a déjà un dossier actif (signé), on n'ouvre plus de « mise à jour de ressources » : on **ajuste son dossier**.
+Le bouton **« Ajuster les ressources / le service »** est dans le menu « ⋯ » du dossier, et **« Ajuster »** dans la barre du bas de
+sa fiche (réservé aux profils qui ont le droit « Ajuster un dossier actif »).
+
+Dans la fenêtre :
+
+- **Ressources à retirer** : cocher la ressource, choisir son état à la reprise (conforme, dégradé, autre) et, si besoin, une remarque.
+- **Ressource à ajouter** : choisir la ressource, renseigner ses champs obligatoires.
+- **Service** : choisir le nouveau service (facultatif).
+- **Signature** de ce geste :
+  - *en présentiel* : la personne signe sur l'écran ;
+  - *à distance* : l'ajustement est enregistré « en attente » ; la signature est recueillie plus tard avec **« Signer l'ajustement en attente »** ;
+  - *impossible* : indiquer le motif et le nom (et la qualité) du responsable qui signe à la place.
+
+Le dossier reste actif. Le parc et les stocks sont mis à jour tout de suite. L'**historique des ajustements** (date, auteur,
+gestes, état de la signature) est visible dans la fenêtre d'ajustement et sur la fiche. Les anciens dossiers « mise à jour » restent
+consultables.
+
 ## Restitution
 
 La restitution se fait depuis le bouton `Restitution`.

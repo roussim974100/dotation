@@ -1,5 +1,28 @@
 # Historique des versions — À Quai
 
+## [3.65.0] - 2026-09-26
+
+Dernière étape du chantier « ajuster les ressources d'un dossier déjà actif » : l'interface.
+
+### 🖥️ Ajuster un dossier actif
+- **Bouton « Ajuster les ressources / le service »** dans le menu « ⋯ » des dossiers actifs et **« Ajuster »** dans la barre du bas de la fiche d'un dossier signé, pour les profils ayant la permission `forms.adjust` (jamais en portée « masquée »).
+- **Fenêtre d'ajustement** (`frontend/js/adjustment.js`, nouveau) : retirer des ressources détenues (état à la reprise + remarque), ajouter des ressources du catalogue (champs générés depuis leur description : texte, nombre, date, liste, choix, case à cocher), changer le service, et **signer le geste** (signature manuscrite à l'écran, « à distance », ou « impossible » avec motif et responsable signataire). Les refus du serveur sont affichés dans la fenêtre. Les modes de signature et les états de reprise sont décrits par des objets JavaScript et générés (pas de HTML recopié).
+- **« Signer l'ajustement en attente »** (menu du dossier et barre de la fiche) : recueille la signature d'un ajustement enregistré « à distance ».
+- **Historique des ajustements** (date, auteur, gestes, état de signature) dans la fenêtre et sur la fiche.
+- Aide intégrée et `GUIDE_UTILISATEUR.md` mis à jour.
+
+### 🧹 « Mise à jour de ressources » retiré du sélecteur de création
+- Le type n'est plus proposé à la création d'un dossier (on ajuste le dossier existant). Les dossiers « mise à jour » déjà en base restent lisibles et ouvrables avec leur type, comme pour « Sortie ».
+
+### 🐛 Correctif inclus
+- Le pad de signature de la fenêtre d'ajustement effaçait son dessin au redimensionnement sans remettre à zéro son indicateur « dessiné » : une signature vide aurait pu passer. Corrigé avant livraison (détecté par le scénario navigateur).
+
+### 🧪 Tests
+- `tests/browser/check_adjustment_ui.py` (29 vérifications en navigateur réel, dont une signature dessinée à la souris : liste, fenêtre, refus, à distance puis recueillie, fiche, sélecteur, droit). `check_person_id.py` adapté (il réinjecte l'option retirée, comme pour un ancien dossier).
+
+### 📌 Reste (backlog)
+- Lien public de signature à distance pour un ajustement (la personne signe elle-même depuis son poste) ; attribuer `forms.adjust` aux groupes des installations existantes ; PDF de l'ajustement.
+
 ## [3.64.0] - 2026-09-26
 
 Troisième étape du chantier « ajuster les ressources d'un dossier déjà actif » : rattrapage des données héritées du bug corrigé en 3.60.1.
@@ -7,6 +30,8 @@ Troisième étape du chantier « ajuster les ressources d'un dossier déjà acti
 ### 🔧 Migration 7 — rattrapage des retraits « mise à jour »
 - Avant 3.60.1, un retrait fait via un dossier « mise à jour » modifiait le dossier source **sans resynchroniser le parc ni le stock** : un objet rendu pouvait rester affiché comme détenu. La migration 7 (`rattrapage_retraits_dossiers_sources`) rejoue la synchronisation (idempotente, dédupliquée) de chaque dossier source concerné. Copie de sécurité automatique avant application, comme toute migration ; un dossier en échec est ignoré et journalisé sans bloquer le démarrage.
 - **Vérifié sur une copie de la base de production (34 dossiers) : 2 dossiers sources concernés, aucun changement** (parc `assigned` 14 / `degraded` 1 / `in_stock` 3 / `reserved` 4 avant et après, aucun solde de stock modifié, 2ᵉ passage identique). Aucun effet visible à annoncer sur cette base ; une autre installation pourrait voir réapparaître des objets « disponibles » dans le parc.
+
+- **Correction faite avant tout déploiement (26/09)** : la première version de la migration appelait `ensure_units_schema`, dont l'`executescript` valide la transaction en cours et détruit le point de sauvegarde du lanceur (`no such savepoint: migration` au démarrage sur une base contenant des dossiers « mise à jour »). Elle ne crée plus de table (sans tables du parc, il n'y a rien à rattraper). Le test d'origine appelait la fonction en direct et ne pouvait pas le voir : `tests/test_migration_7_runner.py` passe par le vrai lanceur (`run_pending_migrations`) ; elle est aussi couverte par les scénarios navigateur qui démarrent sur une copie de la base de production.
 
 ### 🩺 Invariant de santé
 - Le **Contrôle général de la base** signale désormais « objet(s) du parc encore attribué(s) alors que le dossier les indique rendus (retrait non répercuté) » (`retraitsNonRepercutes`, `backend/models/health.py`).

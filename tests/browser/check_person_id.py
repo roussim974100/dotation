@@ -1,4 +1,4 @@
-"""3.61.0 : le formulaire « Mise à jour de ressources » transmet l'identité de la personne du dossier source (pas de
+"""3.61.0 (option de création retirée du sélecteur en 3.65.0 : le scénario la réinjecte, comme pour un ancien dossier) : le formulaire « Mise à jour de ressources » transmet l'identité de la personne du dossier source (pas de
 nouvelle fiche « personne » créée à chaque mise à jour). Instance isolée, base vierge.
     python tests/browser/check_person_id.py
 """
@@ -53,7 +53,7 @@ with Instance() as inst:
 
     driver.get(inst.url("/form.html"))
     time.sleep(3)
-    driver.execute_script("document.getElementById('dossier_type').value = 'mise_a_jour'; document.getElementById('dossier_type').dispatchEvent(new Event('change', {bubbles: true}));")
+    driver.execute_script("const t = document.getElementById('dossier_type'); if (!t.querySelector('option[value=mise_a_jour]')) t.add(new Option('Mise à jour de ressources', 'mise_a_jour')); t.value = 'mise_a_jour'; t.dispatchEvent(new Event('change', {bubbles: true}));")
     time.sleep(0.5)
     search = driver.find_element("id", "retraitsSourceSearch")
     search.send_keys("PERSONID")
@@ -77,7 +77,7 @@ with Instance() as inst:
     # Bouton « Changer » : réinitialise l'identité transmise
     driver.get(inst.url("/form.html"))
     time.sleep(2.5)
-    driver.execute_script("document.getElementById('dossier_type').value = 'mise_a_jour'; document.getElementById('dossier_type').dispatchEvent(new Event('change', {bubbles: true}));")
+    driver.execute_script("const t = document.getElementById('dossier_type'); if (!t.querySelector('option[value=mise_a_jour]')) t.add(new Option('Mise à jour de ressources', 'mise_a_jour')); t.value = 'mise_a_jour'; t.dispatchEvent(new Event('change', {bubbles: true}));")
     time.sleep(0.5)
     driver.find_element("id", "retraitsSourceSearch").send_keys("PERSONID")
     wait_for(lambda: driver.execute_script("return document.querySelectorAll('.retrait-form-option').length") > 0)

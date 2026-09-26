@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` = **3.64.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
+`dev` = **3.65.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
 
 ## Sprint en cours — « Ajuster les ressources d'un dossier déjà actif »
 
@@ -21,7 +21,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | ✅ 3.62.0 (fait le 24/09) | E-mails de restitution : voir « Demandes utilisateur » ci-dessous | S | P1 |
 | ✅ 3.63.0 (fait le 26/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct. **Reste** : lien public de signature à distance pour un ajustement (aujourd'hui : signature recueillie ensuite depuis l'application), assigner `forms.adjust` aux groupes sur les installations existantes | M | P1 |
 | ✅ 3.64.0 (fait le 26/09) | Migration 7 de rattrapage + invariant de santé « retrait non répercuté ». Sur la copie de la base de production : 2 dossiers sources, aucun changement (rien à annoncer) | S | P0 |
-| 3.65.0 | Interface : bouton « Ajuster les ressources / le service » sur un dossier actif, retrait de l'option « Mise à jour » du sélecteur de création (le type reste lisible pour les dossiers existants) | M | P1 |
+| ✅ 3.65.0 (fait le 26/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique), « Mise à jour » retiré du sélecteur de création. **Reste** : lien public de signature à distance, PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
 | 3.66.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
@@ -34,6 +34,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
 | ✅ Identifiant saisi journalisé en clair lors d'un échec de connexion (trouvé le 24/09, corrigé en 3.62.1) | Corrigé : l'identifiant n'est conservé que s'il correspond à un compte ; migration 6 pour les entrées existantes. Reste à l'exploitation : faire changer le mot de passe concerné | P1 |
 | ✅ Scan de vulnérabilités des dépendances (fait le 26/09) | `pip-audit` : aucune vulnérabilité connue (détail dans `docs/AUDIT_SECURITE_2026-09.md`). À relancer avant chaque mise en production ; les bibliothèques chargées par CDN (Bootstrap, cookieconsent) restent à revoir à la main | P1 |
+| Défilement horizontal du tableau « Restitutions en cours » à 1100 px (constaté le 26/09) | `tests/browser/test_no_horizontal_scroll.py` échoue sur la copie de la base de production (tableau de 869 px dans un cadre de 852 px), **y compris avant les travaux du 24-26/09** : lié aux lignes « Sortie (régularisation) » ajoutées depuis la dernière mesure du 19/09. À reprendre avec les colonnes secondaires (`DASHBOARD_COLUMNS.secondary`) | P2 |
 | Police PDF Unicode | Le cyrillique, l'arabe, le chinois sortent en « ? ». Nécessite d'embarquer une police libre (ex. DejaVu Sans) — décision de l'utilisateur en attente | P2 |
 | Moteur de workflow déclaratif | Non commencé | P2 |
 | Effet des formules CSV dans Excel | Neutralisation faite côté code (3.52.0), jamais vérifiée avec un vrai Excel | P2 |
@@ -46,7 +47,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
 | ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
 | Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |
-| E-mail de la fiche de retraits | Le PDF de retraits (`/api/forms/<id>/retraits-pdf`) n'a pas d'équivalent « Envoyer par e-mail » ; à reprendre dans l'écran d'ajustement de 3.65.0 plutôt que sur l'ancien type « mise à jour » | S | P2 |
+| E-mail de la fiche de retraits | Le PDF de retraits (`/api/forms/<id>/retraits-pdf`) n'a pas d'équivalent « Envoyer par e-mail » ; à reprendre dans l'écran d'ajustement (livré en 3.65.0) plutôt que sur l'ancien type « mise à jour » | S | P2 |
 
 ## Backlogs plus anciens : où ils en sont
 

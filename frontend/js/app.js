@@ -2397,7 +2397,8 @@ function populateForm(data, signaturePad) {
 
   form.dataset.draftId = data.meta.id || "";
   form.dataset.lockedAt = data.meta.lockedAt || "";
-  void renderLockedDossierActions(data.workflow?.status);
+  void renderLockedDossierActions(data.workflow?.status, data.ajustements);
+  renderAdjustmentHistory(document.getElementById("ajustementsHistory"), data.ajustements);
   document.getElementById("nom").value = data.beneficiaire.nom || "";
     document.getElementById("prenom").value = data.beneficiaire.prenom || "";
     const loadedDossierType = normalizeDossierType(data.dossier.type || "arrivee");
@@ -2406,6 +2407,11 @@ function populateForm(data, signaturePad) {
     // mais les dossiers existants de ce type doivent rester ouvrables sans changer de type.
     if (loadedDossierType === "sortie" && !dossierTypeSelect.querySelector('option[value="sortie"]')) {
       dossierTypeSelect.add(new Option(DOSSIER_TYPE_LABELS.sortie, "sortie"));
+    }
+    // « Mise à jour de ressources » n'est plus proposé à la création (on ajuste désormais le dossier actif : bouton « Ajuster »),
+    // mais les dossiers existants de ce type restent ouvrables sans changer de type.
+    if (loadedDossierType === "mise_a_jour" && !dossierTypeSelect.querySelector('option[value="mise_a_jour"]')) {
+      dossierTypeSelect.add(new Option(DOSSIER_TYPE_LABELS.mise_a_jour, "mise_a_jour"));
     }
     dossierTypeSelect.value = loadedDossierType;
     setServiceValue(data.beneficiaire.service || "");
@@ -2944,7 +2950,7 @@ function scheduleRefreshFormSections() {
 }
 
 // Dossier signe : les actions de suite (PDF, e-mail, restitution) sont proposees dans la barre du bas.
-async function renderLockedDossierActions(workflowStatus) {
+async function renderLockedDossierActions(workflowStatus, adjustments = []) {
   const form = document.getElementById("dotationForm");
   const bar = document.querySelector(".action-bar__buttons");
   const id = form?.dataset.draftId;
@@ -2956,6 +2962,9 @@ async function renderLockedDossierActions(workflowStatus) {
   const actions = [
     canExportUnmasked(user) && { label: "Télécharger le PDF", tone: "btn-outline-secondary", run: () => exportDraftPdf(id) },
     canExportUnmasked(user) && { label: "Envoyer par e-mail", tone: "btn-outline-secondary", run: () => prepareDraftPdfEmail(id) },
+    canAdjustDossier(user) && workflowStatus === "active" && { label: "Ajuster", tone: "btn-outline-secondary", run: () => window.openAdjustment?.(id) },
+    canAdjustDossier(user) && workflowStatus === "active" && (adjustments || []).some((event) => event.status === "pending_signature")
+      && { label: "Signer l'ajustement", tone: "btn-outline-secondary", run: () => window.openAdjustmentSignature?.(id) },
     can("forms.restitution") && workflowStatus === "active" && { label: "Restituer", tone: "btn-primary", run: () => openRestitution(id) }
   ].filter(Boolean);
   const anchor = document.getElementById("saveDraftBtn");

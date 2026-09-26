@@ -870,6 +870,13 @@ function buildDraftActionButtons(draft, options) {
   const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
+  // Ajuster un dossier actif (ajouter / retirer des ressources, changer le service) ; signer un ajustement resté en attente.
+  if (canAdjustDossier(sessionInfo) && status === "active") {
+    personItems.push({ action: "openAdjustment", id, label: "Ajuster les ressources / le service" });
+    if ((draft.data?.ajustements || []).some((event) => event.status === "pending_signature")) {
+      personItems.push({ action: "openAdjustmentSignature", id, label: "Signer l'ajustement en attente" });
+    }
+  }
 
   const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
@@ -1140,6 +1147,11 @@ async function requestJson(url, options = {}) {
 
 // Même règle que can_export_unmasked (backend/routes/forms.py) : les PDF et exports ne sont pas masqués, donc un
 // groupe à portée « masked » (RGPD) ne peut pas les générer, même avec forms.export.
+function canAdjustDossier(user) {
+  const allowed = user?.permissions?.includes("*") || user?.permissions?.includes("forms.adjust");
+  return Boolean(allowed && user?.data_scope !== "masked");
+}
+
 function canExportUnmasked(user) {
   const allowed = user?.permissions?.includes("*") || user?.permissions?.includes("forms.export");
   return Boolean(allowed && user?.data_scope !== "masked");
@@ -3148,7 +3160,9 @@ document.addEventListener("DOMContentLoaded", () => {
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,
     prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail,
-    removeDraft
+    removeDraft,
+    openAdjustment: (id) => window.openAdjustment?.(id),
+    openAdjustmentSignature: (id) => window.openAdjustmentSignature?.(id)
   };
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
