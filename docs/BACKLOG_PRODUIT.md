@@ -33,7 +33,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
 | ✅ Identifiant saisi journalisé en clair lors d'un échec de connexion (trouvé le 24/09, corrigé en 3.62.1) | Corrigé : l'identifiant n'est conservé que s'il correspond à un compte ; migration 6 pour les entrées existantes. Reste à l'exploitation : faire changer le mot de passe concerné | P1 |
-| Scan de vulnérabilités des dépendances | Jamais lancé (ex. `pip-audit` sur `backend/requirements.txt`) | P1 |
+| ✅ Scan de vulnérabilités des dépendances (fait le 26/09) | `pip-audit` : aucune vulnérabilité connue (détail dans `docs/AUDIT_SECURITE_2026-09.md`). À relancer avant chaque mise en production ; les bibliothèques chargées par CDN (Bootstrap, cookieconsent) restent à revoir à la main | P1 |
 | Police PDF Unicode | Le cyrillique, l'arabe, le chinois sortent en « ? ». Nécessite d'embarquer une police libre (ex. DejaVu Sans) — décision de l'utilisateur en attente | P2 |
 | Moteur de workflow déclaratif | Non commencé | P2 |
 | Effet des formules CSV dans Excel | Neutralisation faite côté code (3.52.0), jamais vérifiée avec un vrai Excel | P2 |
