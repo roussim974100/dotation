@@ -1,5 +1,15 @@
 # Historique des versions — À Quai
 
+## [3.62.1] - 2026-09-26
+
+### 🔒 Sécurité — journal des échecs de connexion
+- **Un mot de passe tapé par erreur dans le champ « identifiant » restait lisible en clair dans le journal d'administration** (constaté le 24/09 sur la copie de production). L'échec de connexion enregistrait tel quel ce qui avait été saisi. Désormais, `loggable_login_identifier` (`backend/routes/pages.py`) ne garde l'identifiant que s'il correspond à un compte existant ; sinon il est remplacé par « (identifiant inconnu) » (dans la cible et dans `identifiant_tente`). L'adresse IP et le reste de la trace forensique sont conservés.
+- **Migration 6** (`masquer_identifiants_de_connexion`) : applique le même masquage aux entrées déjà enregistrées, avec la copie de sécurité habituelle avant migration. Idempotente. Si la base des comptes est illisible, elle s'annule (et sera retentée au démarrage) plutôt que de masquer à tort.
+- À faire côté exploitation : faire changer le mot de passe concerné (il a pu être lu dans le journal avant cette correction) ; le journal fichier `logs/aquai.log` ne contient pas de valeur saisie.
+
+### 🧪 Tests
+- `tests/test_login_journal_masking.py` (7 tests : journalisation, compte existant, migration, idempotence, base des comptes absente) et `tests/browser/check_login_journal.py` (saisie réelle dans la page de connexion, écran Journaux et API).
+
 ## [3.62.0] - 2026-09-24
 
 ### ✉️ E-mails depuis les écrans de restitution

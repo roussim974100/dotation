@@ -9,6 +9,11 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+from migrations import MIGRATIONS  # noqa: E402
+
+LATEST_SCHEMA = max(m[0] for m in MIGRATIONS)  # le numero de schema ne doit pas etre recopie a la main
+
 ROOT = Path(__file__).parent.parent
 
 
@@ -187,7 +192,7 @@ def test_resource_used_by_dossiers_cannot_be_deleted(http):
 
 def test_database_health_report(http):
     assert http["health_report"] == {"integrity": "ok", "brokenReferences": 0}
-    assert http["health_report_has_schema_version"] == 5
+    assert http["health_report_has_schema_version"] == LATEST_SCHEMA
     assert http["health_report_status_known"] is True
 
 
@@ -195,11 +200,11 @@ def test_db_export_then_import_keeps_data_and_schema(http):
     assert http["db_export_is_sqlite"] is True
     assert http["db_import_status"] == 200
     assert http["db_import_keeps_forms"] is True
-    assert http["db_import_health"] == ["ok", 5]
+    assert http["db_import_health"] == ["ok", LATEST_SCHEMA]
 
 
 def test_importing_an_older_database_upgrades_its_schema_immediately(http):
-    assert http["old_db_import"] == [200, 5, True]
+    assert http["old_db_import"] == [200, LATEST_SCHEMA, True]
 
 
 def test_configured_beneficiary_types_and_status_labels_are_served(http):

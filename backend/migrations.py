@@ -124,12 +124,48 @@ def _m_indexes(connection):
             continue
 
 
+def _m_mask_login_failed_identifiers(connection):
+    """Un echec de connexion journalisait l'identifiant tape tel quel : un mot de passe saisi par erreur dans ce champ restait
+    lisible dans le journal d'administration. Masque, dans les entrees deja enregistrees, tout identifiant qui ne correspond
+    a aucun compte existant. Idempotente ; sans aucune entree concernee, ne touche pas a la base des comptes."""
+    try:
+        rows = connection.execute("SELECT id, target_id, target_label, details_json FROM app_logs WHERE action_type = 'login_failed'").fetchall()
+    except sqlite3.OperationalError:  # base tres ancienne, sans journaux : rien a masquer
+        return
+    if not rows:
+        return
+    from config import DB_USERS_PATH
+    if not os.path.exists(DB_USERS_PATH):
+        raise RuntimeError("base des comptes introuvable : masquage des identifiants reporte")
+    users_connection = sqlite3.connect(f"file:{DB_USERS_PATH}?mode=ro", uri=True)
+    try:
+        known = {row[0] for row in users_connection.execute("SELECT username FROM users").fetchall()}
+    finally:
+        users_connection.close()
+    unknown_label = "(identifiant inconnu)"
+    for row in rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            details = {}
+        typed = details.get("identifiant_tente", row["target_id"])
+        if typed in known or typed in ("(vide)", unknown_label, None):
+            continue
+        details["identifiant_tente"] = unknown_label
+        label = unknown_label if row["target_label"] == row["target_id"] and row["target_label"] else row["target_label"]
+        connection.execute(
+            "UPDATE app_logs SET target_id = ?, target_label = ?, details_json = ? WHERE id = ?",
+            (unknown_label, label, json.dumps(details, ensure_ascii=False), row["id"]),
+        )
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
     (3, "roles_de_champs", _m_field_roles),
     (4, "index_de_performance", _m_indexes),
     (5, "identifiant_de_personne", _m_person_id_column),
+    (6, "masquer_identifiants_de_connexion", _m_mask_login_failed_identifiers),
 ]
 
 
