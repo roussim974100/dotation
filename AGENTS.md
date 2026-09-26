@@ -66,6 +66,7 @@ sur une même page. Chaque page HTML liste ses scripts en bas ; `?v=AAAAMMJJx` s
 | `js/storage.js` | appels API, listes des dossiers (4 tableaux de bord), menus d'actions, exports, **e-mails `.eml`** et PDF |
 | `js/app.js` | formulaire d'un dossier (`form.html`) : saisie, ressources, signature, actions d'un dossier signé |
 | `js/restitution-phase1.js`, `js/restitution.js` | restitution en deux phases : dates (`restitution-phase1.html`), état du matériel et signature (`restitution.html`) |
+| `js/signature-qr.js`, `js/vendor/qrcode-generator.js` | QR code d'un lien de signature (fenêtre, générateur embarqué MIT, aucun CDN) ; actions `showAssignmentSignatureQr` / `showRestitutionSignatureQr` dans `storage.js` |
 | `js/adjustment.js` | ajustement d'un dossier actif : fenêtre (retirer / ajouter / service / signature), signature d'un ajustement en attente, historique ; chargé après `storage.js` (listes et fiche) |
 | `js/ui.js` | composants partagés : `showToast`, `askConfirm`, dialogues de workflow (`askWorkflowDialog`), menu du compte |
 | `js/branding.js` | version, logo, pied de page, pastille d'environnement |

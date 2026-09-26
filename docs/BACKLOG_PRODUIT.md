@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` = **3.65.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
+`dev` = **3.66.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
 
 ## Sprint en cours — « Ajuster les ressources d'un dossier déjà actif »
 
@@ -22,13 +22,15 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | ✅ 3.63.0 (fait le 26/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct. **Reste** : lien public de signature à distance pour un ajustement (aujourd'hui : signature recueillie ensuite depuis l'application), assigner `forms.adjust` aux groupes sur les installations existantes | M | P1 |
 | ✅ 3.64.0 (fait le 26/09) | Migration 7 de rattrapage + invariant de santé « retrait non répercuté ». Sur la copie de la base de production : 2 dossiers sources, aucun changement (rien à annoncer) | S | P0 |
 | ✅ 3.65.0 (fait le 26/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique), « Mise à jour » retiré du sélecteur de création. **Reste** : lien public de signature à distance, PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
-| 3.66.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
+| 3.67.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
+
+**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. Restent : QR code aussi pour la signature à distance d'un ajustement (le lien public de cet ajustement n'existe pas encore) et sur les écrans de restitution après « Enregistrer en attente ».
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 
 | Sujet | Détail | Priorité |
 |---|---|---|
-| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.66.0 | P1 |
+| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.67.0 | P1 |
 | Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |

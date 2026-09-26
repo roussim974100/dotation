@@ -1,5 +1,17 @@
 # Historique des versions — À Quai
 
+## [3.66.0] - 2026-09-26
+
+### 📱 QR code du lien de signature
+- **Quand la personne est là, elle scanne un QR code au lieu de recevoir le lien par e-mail.** Nouveau menu « Signature en face à face » dans le « ⋯ » d'un dossier à signer : « QR code de signature (attribution) » ou « (restitution) » (mêmes conditions que la demande de signature par e-mail), et bouton « QR code » dans la bannière « Lien de signature prêt ».
+- La fenêtre affiche le QR code, le dossier concerné, la date de validité du lien, le lien lui-même et « Copier le lien ». Le lien existant est réutilisé, sinon il est créé (comme pour l'e-mail).
+- **Avertissement si l'application est ouverte en `localhost`** : un téléphone ne pourrait pas ouvrir ce lien ; il faut ouvrir l'application avec l'adresse du serveur.
+- **Aucun accès Internet nécessaire** : le QR code est généré dans le navigateur par une bibliothèque embarquée (`frontend/js/vendor/qrcode-generator.js`, MIT, voir `frontend/js/vendor/README.md`). Le code à afficher est dessiné avec un nombre entier de pixels par module (à une échelle fractionnaire il devenait illisible pour certains lecteurs : constaté à 7,8 px, lisible à 8 px) et reste sur fond blanc en mode sombre.
+- Fichiers : `frontend/js/signature-qr.js` (nouveau), `storage.js` (actions et menu).
+
+### 🧪 Tests
+- `tests/browser/check_signature_qr.py` (22 vérifications) : menu, fenêtre, bannière, lien affiché = lien du serveur, expiration, avertissement localhost, **décodage réel du QR code par OpenCV** (attribution, restitution, mode sombre), aucune requête externe. OpenCV n'est qu'un outil de vérification (`pip install opencv-python-headless`), hors dépendances de l'application. `tests/test_signature_qr_assets.py` (bibliothèque embarquée, ordre de chargement).
+
 ## [3.65.0] - 2026-09-26
 
 Dernière étape du chantier « ajuster les ressources d'un dossier déjà actif » : l'interface.

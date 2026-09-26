@@ -77,6 +77,14 @@ La personne qui ouvre ce lien peut uniquement :
 
 Le lien devient inutilisable apres validation.
 
+
+### Signature en face à face : QR code
+
+Si la personne est présente, inutile de lui envoyer le lien : dans le menu « ⋯ » du dossier, section **« Signature en face à face »**,
+choisir **« QR code de signature »**. Elle scanne le code avec l'appareil photo de son téléphone et la page de signature s'ouvre.
+Le même bouton « QR code » existe dans la bannière « Lien de signature prêt ». Si l'application est ouverte avec l'adresse
+`localhost`, un avertissement rappelle que le téléphone ne pourra pas ouvrir le lien : ouvrir l'application avec l'adresse du serveur.
+
 ## Reouverture d'un dossier
 
 Quand un dossier encore modifiable est rouvert :

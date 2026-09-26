@@ -878,6 +878,14 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
+  // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
+  const qrItems = [];
+  if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
+    qrItems.push({ action: "showRestitutionSignatureQr", id, label: "QR code de signature (restitution)" });
+  } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
+    qrItems.push({ action: "showAssignmentSignatureQr", id, label: "QR code de signature (attribution)" });
+  }
+
   const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
   return `
@@ -887,6 +895,7 @@ function buildDraftActionButtons(draft, options) {
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
         { title: "Envoyer par e-mail", items: emailItems },
+        { title: "Signature en face à face", items: qrItems },
         { title: "Dossier", items: personItems }
       ], dangerItems)}
     </div>
@@ -2262,6 +2271,32 @@ async function prepareAssignmentInfoEmail(id) {
   }
 }
 
+// QR code du lien de signature : la personne est là, elle scanne au lieu de recevoir un e-mail (voir signature-qr.js).
+async function showSignatureQr(id, kind) {
+  try {
+    const { link, absoluteUrl } = kind === "restitution"
+      ? await ensureRestitutionSignatureLink(id)
+      : await ensureAssignmentSignatureLink(id);
+    const draft = findDraftSummary(id);
+    showSignatureQrDialog({
+      url: absoluteUrl,
+      title: kind === "restitution" ? "Signature de la restitution" : "Signature de l'attribution",
+      subtitle: draft?.title || "",
+      expiresAt: link?.expiresAt
+    });
+  } catch (error) {
+    showToast(error.message || "Impossible de préparer le QR code de signature.", "error");
+  }
+}
+
+async function showAssignmentSignatureQr(id) {
+  await showSignatureQr(id, "assignment");
+}
+
+async function showRestitutionSignatureQr(id) {
+  await showSignatureQr(id, "restitution");
+}
+
 async function copyRestitutionSignatureLink(id) {
   try {
     const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
@@ -2374,6 +2409,11 @@ function bindSignatureLinkNotice() {
     });
     copyButton.dataset.boundCopyLink = "true";
   }
+  const qrButton = notice.querySelector("[data-signature-link-qr]");
+  if (qrButton && !qrButton.dataset.boundQrLink) {
+    qrButton.addEventListener("click", () => showSignatureQrDialog({ url: qrButton.dataset.link || "", title: "Lien de signature", subtitle: qrButton.dataset.title || "" }));
+    qrButton.dataset.boundQrLink = "true";
+  }
   const dismissButton = notice.querySelector("[data-signature-link-dismiss]");
   if (dismissButton && !dismissButton.dataset.boundDismissLink) {
     dismissButton.addEventListener("click", () => {
@@ -2437,6 +2477,7 @@ function renderDashboardSignatureLinkNotice() {
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button type="button" class="btn btn-sm btn-outline-primary" data-signature-link-copy data-link="${escapeHtml(payload.url)}">Copier le lien</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-signature-link-qr data-link="${escapeHtml(payload.url)}" data-title="${escapeHtml(payload.title || "")}">QR code</button>
         ${canRevoke ? `<button type="button" class="btn btn-sm btn-outline-danger" data-signature-link-revoke data-link-id="${escapeHtml(payload.linkId)}">Révoquer</button>` : ""}
         <button type="button" class="btn btn-sm btn-outline-secondary" data-signature-link-dismiss>Masquer</button>
       </div>
@@ -3161,6 +3202,7 @@ document.addEventListener("DOMContentLoaded", () => {
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,
     prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail,
     removeDraft,
+    showAssignmentSignatureQr, showRestitutionSignatureQr,
     openAdjustment: (id) => window.openAdjustment?.(id),
     openAdjustmentSignature: (id) => window.openAdjustmentSignature?.(id)
   };
