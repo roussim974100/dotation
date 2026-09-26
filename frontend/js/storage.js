@@ -703,7 +703,8 @@ function hasRestitutionData(draft) {
     || restitution.reason
     || restitution.signatureDataUrl
     || restitution.signatureReason
-    || Object.keys(restitution.items || {}).length
+    // Un retrait fait par un ajustement (adjustmentId) n'engage pas la restitution du dossier : il reste « en cours ».
+    || Object.values(restitution.items || {}).some((item) => !item?.adjustmentId)
   );
 }
 

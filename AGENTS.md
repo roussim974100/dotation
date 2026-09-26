@@ -47,6 +47,7 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `models/forms.py` | `persist_form` : **chemin unique d'enregistrement d'un dossier** (resynchronise parc et stock) |
 | `models/workflow.py` | calcul des statuts (attribution, restitution) |
 | `models/dossier.py` | personne ↔ dossier (`sync_person_and_dossier`) |
+| `models/adjustment.py` | ajustement d'un dossier actif (ajouts, retraits, service, signature par geste) : fonctions pures ; routes `PATCH /api/forms/<id>/ajustement` dans `routes/forms.py` |
 | `models/units.py`, `models/stock.py` | projections parc/stock (`sync_units_for_form`, `sync_stock_for_form`) |
 | `models/vocab.py` | libellés de statuts et types de bénéficiaires (source unique, publiés au navigateur) |
 | `models/settings.py` | paramètres de l'organisation |
@@ -94,7 +95,7 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   PDF ni export**, même avec `forms.export`. Serveur : `can_export_unmasked()` (`routes/forms.py`). Navigateur :
   `canExportUnmasked(user)` (`storage.js`). Garder les deux alignés.
 - **Permissions** : `forms.create`, `forms.edit`, `forms.delete`, `forms.export`, `forms.restitution`,
-  `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
+  `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
   (`permissions.py`).
 - **Signatures** : jamais exposées sans authentification ; affichage protégé par mot de passe.
 - **E-mails** : l'application ne les envoie pas ; elle prépare un fichier `.eml` que l'utilisateur ouvre dans sa

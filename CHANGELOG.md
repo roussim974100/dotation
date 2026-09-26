@@ -1,5 +1,26 @@
 # Historique des versions — À Quai
 
+## [3.63.0] - 2026-09-26
+
+Deuxième étape du chantier « ajuster les ressources d'un dossier déjà actif » (backend et règles ; le bouton arrive en 3.65.0).
+
+### 🔧 Route d'ajustement
+- **`PATCH /api/forms/<id>/ajustement`** : ajoute des ressources, en retire et/ou change le service d'un dossier **actif**, sur son dossier existant, en **une seule transaction** (`persist_form` : parc et stock se resynchronisent seuls). Refuse (et n'enregistre rien) : dossier non actif (`not_adjustable`), ressource déjà détenue (`already_held`), retrait d'une ressource non détenue (`not_held`), ajustement vide, état de reprise inconnu, ressource ajoutée incomplète (`resource_incomplete`, pour ne pas déverrouiller le dossier). Verrou optimiste `baseSavedAt` comme `update_form` (409 `form_conflict`).
+- **Permission dédiée `forms.adjust`** (« Ajuster un dossier actif »), proposée dans Administration > Comptes. Attribuée par défaut aux groupes Administrateur et Administration **des nouvelles installations** ; sur une installation existante, à cocher soi-même dans Administration > Comptes (les groupes ne sont pas modifiés automatiquement). Refusé aux profils à portée « masquée ».
+- **Le dossier reste `active` et verrouillé** : un ajustement n'est pas une restitution. Son état propre est porté par chaque événement de `payload.ajustements` (`signed`, `pending_signature`, `signed_by_substitute`), fonction dédiée `derive_adjustment_status` (`backend/models/adjustment.py`) ; `derive_restitution_workflow_status` n'est pas réutilisée.
+- **Une signature par geste** : `presentiel` (image de la signature, horodatée), `distance` (ajustement « en attente », signature recueillie ensuite par `POST /api/forms/<id>/ajustement/<id_evenement>/signature`), `impossible` (motif obligatoire et **signataire de substitution** : nom et qualité, tracés séparément du bénéficiaire). L'image de la signature n'est jamais renvoyée par ces routes et est masquée pour la portée « masquée ».
+- Journal et audit : `form_adjusted` / `form_adjustment_signed`.
+
+### 🖥️ Listes
+- Un retrait fait par un ajustement (`adjustmentId`) n'est plus pris pour un début de restitution : un dossier qui garde des ressources reste dans « Attributions finalisées » au lieu de passer en « Restitutions en cours ».
+
+### 📌 Limites connues (suite du chantier)
+- **Lien de signature à distance pour un ajustement** : le mode `distance` enregistre l'ajustement « en attente » et la signature se recueille ensuite depuis l'application (route ci-dessus) ; l'envoi d'un lien public à signer par la personne elle-même (comme pour une attribution) reste à faire (`docs/BACKLOG_PRODUIT.md`).
+- Aucune interface pour l'instant : arrive en 3.65.0. Les dossiers « mise à jour » existants ne sont pas touchés (3.64.0).
+
+### 🧪 Tests
+- `tests/test_adjustment.py` (17 tests : geste complet, refus, ressource incomplète, signature à distance puis recueillie, substitut, permission, verrou optimiste, fonctions pures) et `tests/browser/check_adjustment.py` (11 vérifications en navigateur réel : fiche, verrou, parc, listes, console).
+
 ## [3.62.1] - 2026-09-26
 
 ### 🔒 Sécurité — journal des échecs de connexion
