@@ -1,5 +1,114 @@
 # Historique des versions — À Quai
 
+## [3.66.0] - 2026-09-26
+
+### 📱 QR code du lien de signature
+- **Quand la personne est là, elle scanne un QR code au lieu de recevoir le lien par e-mail.** Nouveau menu « Signature en face à face » dans le « ⋯ » d'un dossier à signer : « QR code de signature (attribution) » ou « (restitution) » (mêmes conditions que la demande de signature par e-mail), et bouton « QR code » dans la bannière « Lien de signature prêt ».
+- La fenêtre affiche le QR code, le dossier concerné, la date de validité du lien, le lien lui-même et « Copier le lien ». Le lien existant est réutilisé, sinon il est créé (comme pour l'e-mail).
+- **Avertissement si l'application est ouverte en `localhost`** : un téléphone ne pourrait pas ouvrir ce lien ; il faut ouvrir l'application avec l'adresse du serveur.
+- **Aucun accès Internet nécessaire** : le QR code est généré dans le navigateur par une bibliothèque embarquée (`frontend/js/vendor/qrcode-generator.js`, MIT, voir `frontend/js/vendor/README.md`). Le code à afficher est dessiné avec un nombre entier de pixels par module (à une échelle fractionnaire il devenait illisible pour certains lecteurs : constaté à 7,8 px, lisible à 8 px) et reste sur fond blanc en mode sombre.
+- Fichiers : `frontend/js/signature-qr.js` (nouveau), `storage.js` (actions et menu).
+
+### 🧪 Tests
+- `tests/browser/check_signature_qr.py` (22 vérifications) : menu, fenêtre, bannière, lien affiché = lien du serveur, expiration, avertissement localhost, **décodage réel du QR code par OpenCV** (attribution, restitution, mode sombre), aucune requête externe. OpenCV n'est qu'un outil de vérification (`pip install opencv-python-headless`), hors dépendances de l'application. `tests/test_signature_qr_assets.py` (bibliothèque embarquée, ordre de chargement).
+
+## [3.65.0] - 2026-09-26
+
+Dernière étape du chantier « ajuster les ressources d'un dossier déjà actif » : l'interface.
+
+### 🖥️ Ajuster un dossier actif
+- **Bouton « Ajuster les ressources / le service »** dans le menu « ⋯ » des dossiers actifs et **« Ajuster »** dans la barre du bas de la fiche d'un dossier signé, pour les profils ayant la permission `forms.adjust` (jamais en portée « masquée »).
+- **Fenêtre d'ajustement** (`frontend/js/adjustment.js`, nouveau) : retirer des ressources détenues (état à la reprise + remarque), ajouter des ressources du catalogue (champs générés depuis leur description : texte, nombre, date, liste, choix, case à cocher), changer le service, et **signer le geste** (signature manuscrite à l'écran, « à distance », ou « impossible » avec motif et responsable signataire). Les refus du serveur sont affichés dans la fenêtre. Les modes de signature et les états de reprise sont décrits par des objets JavaScript et générés (pas de HTML recopié).
+- **« Signer l'ajustement en attente »** (menu du dossier et barre de la fiche) : recueille la signature d'un ajustement enregistré « à distance ».
+- **Historique des ajustements** (date, auteur, gestes, état de signature) dans la fenêtre et sur la fiche.
+- Aide intégrée et `GUIDE_UTILISATEUR.md` mis à jour.
+
+### 🧹 « Mise à jour de ressources » retiré du sélecteur de création
+- Le type n'est plus proposé à la création d'un dossier (on ajuste le dossier existant). Les dossiers « mise à jour » déjà en base restent lisibles et ouvrables avec leur type, comme pour « Sortie ».
+
+### 🐛 Correctif inclus
+- Le pad de signature de la fenêtre d'ajustement effaçait son dessin au redimensionnement sans remettre à zéro son indicateur « dessiné » : une signature vide aurait pu passer. Corrigé avant livraison (détecté par le scénario navigateur).
+
+### 🧪 Tests
+- `tests/browser/check_adjustment_ui.py` (29 vérifications en navigateur réel, dont une signature dessinée à la souris : liste, fenêtre, refus, à distance puis recueillie, fiche, sélecteur, droit). `check_person_id.py` adapté (il réinjecte l'option retirée, comme pour un ancien dossier).
+
+### 📌 Reste (backlog)
+- Lien public de signature à distance pour un ajustement (la personne signe elle-même depuis son poste) ; attribuer `forms.adjust` aux groupes des installations existantes ; PDF de l'ajustement.
+
+## [3.64.0] - 2026-09-26
+
+Troisième étape du chantier « ajuster les ressources d'un dossier déjà actif » : rattrapage des données héritées du bug corrigé en 3.60.1.
+
+### 🔧 Migration 7 — rattrapage des retraits « mise à jour »
+- Avant 3.60.1, un retrait fait via un dossier « mise à jour » modifiait le dossier source **sans resynchroniser le parc ni le stock** : un objet rendu pouvait rester affiché comme détenu. La migration 7 (`rattrapage_retraits_dossiers_sources`) rejoue la synchronisation (idempotente, dédupliquée) de chaque dossier source concerné. Copie de sécurité automatique avant application, comme toute migration ; un dossier en échec est ignoré et journalisé sans bloquer le démarrage.
+- **Vérifié sur une copie de la base de production (34 dossiers) : 2 dossiers sources concernés, aucun changement** (parc `assigned` 14 / `degraded` 1 / `in_stock` 3 / `reserved` 4 avant et après, aucun solde de stock modifié, 2ᵉ passage identique). Aucun effet visible à annoncer sur cette base ; une autre installation pourrait voir réapparaître des objets « disponibles » dans le parc.
+
+- **Correction faite avant tout déploiement (26/09)** : la première version de la migration appelait `ensure_units_schema`, dont l'`executescript` valide la transaction en cours et détruit le point de sauvegarde du lanceur (`no such savepoint: migration` au démarrage sur une base contenant des dossiers « mise à jour »). Elle ne crée plus de table (sans tables du parc, il n'y a rien à rattraper). Le test d'origine appelait la fonction en direct et ne pouvait pas le voir : `tests/test_migration_7_runner.py` passe par le vrai lanceur (`run_pending_migrations`) ; elle est aussi couverte par les scénarios navigateur qui démarrent sur une copie de la base de production.
+
+### 🩺 Invariant de santé
+- Le **Contrôle général de la base** signale désormais « objet(s) du parc encore attribué(s) alors que le dossier les indique rendus (retrait non répercuté) » (`retraitsNonRepercutes`, `backend/models/health.py`).
+
+### 🧪 Tests
+- Scénario HTTP `test_migration_7_rattrape_un_retrait_jamais_repercute_au_parc` (état hérité recréé, invariant avant/après, idempotence) et `tests/browser/check_retrait_rattrapage.py` (7 vérifications : page Base de données, signalement puis disparition, parc).
+
+## [3.63.0] - 2026-09-26
+
+Deuxième étape du chantier « ajuster les ressources d'un dossier déjà actif » (backend et règles ; le bouton arrive en 3.65.0).
+
+### 🔧 Route d'ajustement
+- **`PATCH /api/forms/<id>/ajustement`** : ajoute des ressources, en retire et/ou change le service d'un dossier **actif**, sur son dossier existant, en **une seule transaction** (`persist_form` : parc et stock se resynchronisent seuls). Refuse (et n'enregistre rien) : dossier non actif (`not_adjustable`), ressource déjà détenue (`already_held`), retrait d'une ressource non détenue (`not_held`), ajustement vide, état de reprise inconnu, ressource ajoutée incomplète (`resource_incomplete`, pour ne pas déverrouiller le dossier). Verrou optimiste `baseSavedAt` comme `update_form` (409 `form_conflict`).
+- **Permission dédiée `forms.adjust`** (« Ajuster un dossier actif »), proposée dans Administration > Comptes. Attribuée par défaut aux groupes Administrateur et Administration **des nouvelles installations** ; sur une installation existante, à cocher soi-même dans Administration > Comptes (les groupes ne sont pas modifiés automatiquement). Refusé aux profils à portée « masquée ».
+- **Le dossier reste `active` et verrouillé** : un ajustement n'est pas une restitution. Son état propre est porté par chaque événement de `payload.ajustements` (`signed`, `pending_signature`, `signed_by_substitute`), fonction dédiée `derive_adjustment_status` (`backend/models/adjustment.py`) ; `derive_restitution_workflow_status` n'est pas réutilisée.
+- **Une signature par geste** : `presentiel` (image de la signature, horodatée), `distance` (ajustement « en attente », signature recueillie ensuite par `POST /api/forms/<id>/ajustement/<id_evenement>/signature`), `impossible` (motif obligatoire et **signataire de substitution** : nom et qualité, tracés séparément du bénéficiaire). L'image de la signature n'est jamais renvoyée par ces routes et est masquée pour la portée « masquée ».
+- Journal et audit : `form_adjusted` / `form_adjustment_signed`.
+
+### 🖥️ Listes
+- Un retrait fait par un ajustement (`adjustmentId`) n'est plus pris pour un début de restitution : un dossier qui garde des ressources reste dans « Attributions finalisées » au lieu de passer en « Restitutions en cours ».
+
+### 📌 Limites connues (suite du chantier)
+- **Lien de signature à distance pour un ajustement** : le mode `distance` enregistre l'ajustement « en attente » et la signature se recueille ensuite depuis l'application (route ci-dessus) ; l'envoi d'un lien public à signer par la personne elle-même (comme pour une attribution) reste à faire (`docs/BACKLOG_PRODUIT.md`).
+- Aucune interface pour l'instant : arrive en 3.65.0. Les dossiers « mise à jour » existants ne sont pas touchés (3.64.0).
+
+### 🧪 Tests
+- `tests/test_adjustment.py` (17 tests : geste complet, refus, ressource incomplète, signature à distance puis recueillie, substitut, permission, verrou optimiste, fonctions pures) et `tests/browser/check_adjustment.py` (11 vérifications en navigateur réel : fiche, verrou, parc, listes, console).
+
+## [3.62.1] - 2026-09-26
+
+### 🔒 Sécurité — journal des échecs de connexion
+- **Un mot de passe tapé par erreur dans le champ « identifiant » restait lisible en clair dans le journal d'administration** (constaté le 24/09 sur la copie de production). L'échec de connexion enregistrait tel quel ce qui avait été saisi. Désormais, `loggable_login_identifier` (`backend/routes/pages.py`) ne garde l'identifiant que s'il correspond à un compte existant ; sinon il est remplacé par « (identifiant inconnu) » (dans la cible et dans `identifiant_tente`). L'adresse IP et le reste de la trace forensique sont conservés.
+- **Migration 6** (`masquer_identifiants_de_connexion`) : applique le même masquage aux entrées déjà enregistrées, avec la copie de sécurité habituelle avant migration. Idempotente. Si la base des comptes est illisible, elle s'annule (et sera retentée au démarrage) plutôt que de masquer à tort.
+- À faire côté exploitation : faire changer le mot de passe concerné (il a pu être lu dans le journal avant cette correction) ; le journal fichier `logs/aquai.log` ne contient pas de valeur saisie.
+
+### 🧪 Tests
+- `tests/test_login_journal_masking.py` (7 tests : journalisation, compte existant, migration, idempotence, base des comptes absente) et `tests/browser/check_login_journal.py` (saisie réelle dans la page de connexion, écran Journaux et API).
+
+## [3.62.0] - 2026-09-24
+
+### ✉️ E-mails depuis les écrans de restitution
+- **Phase 1** : à la validation (« Valider et transmettre aux services »), l'application propose de préparer un e-mail informant la personne de la restitution (« Préparer l'e-mail » / « Plus tard »).
+- **Barre du bas des écrans de restitution** (Phase 1 dès que les dates sont enregistrées, Phase 2) : « Télécharger le PDF », « Informer par e-mail » (équivalent de « Informer de la création » d'une attribution) et « Envoyer le PDF par e-mail ». Sans droit d'export effectif, seul « Informer par e-mail » est proposé.
+- **Après « Enregistrer la restitution »** : l'envoi par e-mail est proposé (« Envoyer par e-mail » / « Terminer ») ; un clic hors de la fenêtre vaut « Terminer ».
+- Les deux écrans chargent désormais `storage.js`, qui porte déjà les fonctions d'e-mail et de PDF du tableau de bord (aucune duplication).
+
+### 🐛 Correctif
+- **Export PDF hors des listes** : `showExportLoader` supposait la présence du chargeur d'export, qui n'existe que sur les listes. Hors de celles-ci (fiche d'attribution, écrans de restitution), l'export échouait avant même d'appeler le serveur — ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'une attribution signée. L'export fonctionne maintenant sans chargeur.
+- **Menu « ⋯ » des listes rogné** : les deux dernières lignes ouvraient leur menu vers le haut (règle CSS fixe) et le cadre du tableau le coupait (section « Documents » invisible, ex. tableau de deux dossiers). Le volet ouvert est désormais rattaché à la page, placé vers le bas ou vers le haut selon la place disponible et toujours entièrement visible.
+- **Droit d'export et portée « masquée » (RGPD)** : l'interface proposait les PDF et exports à un groupe ayant `forms.export` mais une portée de données « masked », alors que le serveur les refuse toujours (`can_export_unmasked`). Une seule règle côté interface, `canExportUnmasked` (`storage.js`), alignée sur le serveur : liste des dossiers, menu Exporter, fiche d'attribution signée, écrans de restitution (qui se replient alors sur l'e-mail d'information, sans PDF). Signalé par la relecture automatique de la PR #24.
+
+### 🧪 Tests
+- `tests/browser/check_restitution_email.py` : parcours réel Phase 1 → Phase 2 → enregistrement, e-mail avec PDF depuis la fiche d'attribution, absence d'envoi sur clic hors fenêtre.
+
+## [3.61.0] - 2026-09-23
+
+Première étape du chantier « ajuster les ressources d'un dossier déjà actif » (plan cadré avec 3 experts — process métier, base de données, architecture — voir `docs` et la mémoire du projet).
+
+### 🧩 Identifiant de personne stable
+- Nouvelle colonne `dotation_forms.person_id`, indexée : elle ne fait qu'exposer une valeur déjà calculée à chaque enregistrement (`meta.personId`), jamais devinée ni fusionnée. Migration 5, appliquée sans incident sur la copie de production (34 dossiers, 47 fiches « personne » existantes — la duplication déjà présente est désormais visible et interrogeable, pas encore corrigée : ce sera un chantier à part, optionnel).
+- **Le formulaire « Mise à jour de ressources » transmet maintenant l'identité de la personne du dossier source** : rechercher et choisir un dossier existant relie le nouveau dossier à la **même** fiche « personne » au lieu d'en créer une nouvelle à chaque mise à jour. Un dossier sans rapport (nouvelle arrivée) continue de créer sa propre fiche, normalement.
+
+### 🧪 Tests
+- `tests/test_person_id_migration.py` (backfill, idempotence, tolérance à un schéma minimal), scénario HTTP (même personne entre un dossier et sa mise à jour, personne différente pour un dossier sans rapport), `tests/browser/check_person_id.py` (parcours réel : recherche, transmission, bouton « Changer »).
+
 ## [3.60.2] - 2026-09-23
 
 ### 🐛 Correctif

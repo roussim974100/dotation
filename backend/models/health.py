@@ -62,6 +62,10 @@ def stock_and_unit_invariants(connection):
         "stockMovementsUnknownResource": count("SELECT COUNT(*) FROM resource_stock_movements WHERE resource_code NOT IN (SELECT code FROM resource_catalog)"),
         "unitsWithoutIdentifier": count("SELECT COUNT(*) FROM resource_units WHERE TRIM(COALESCE(identifier, '')) = ''"),
         "unitsUnknownResource": count("SELECT COUNT(*) FROM resource_units WHERE resource_code NOT IN (SELECT code FROM resource_catalog)"),
+        # un objet suivi encore « attribue » a un dossier dont la ligne correspondante est rendue (retrait non repercute au parc)
+        "retraitsNonRepercutes": count(
+            "SELECT COUNT(*) FROM resource_units u JOIN dotation_items i ON i.form_id = u.holder_form_id AND i.item_key = u.resource_code "
+            "WHERE u.status = 'assigned' AND i.returned = 1"),
         "duplicateItemLines": count("SELECT COUNT(*) FROM (SELECT 1 FROM dotation_items WHERE assigned = 1 GROUP BY form_id, item_key HAVING COUNT(*) > 1)"),
     }
 
@@ -86,6 +90,7 @@ def database_health(connection):
         problems.append(f"{drift} dossier(s) dont la copie à plat diffère du dossier.")
     invariants = stock_and_unit_invariants(connection)
     labels = {"stockNegativeBalances": "solde(s) de stock négatif(s)", "stockMovementsUnknownResource": "mouvement(s) de stock d'une ressource inconnue",
+              "retraitsNonRepercutes": "objet(s) du parc encore attribué(s) alors que le dossier les indique rendus (retrait non répercuté)",
               "unitsWithoutIdentifier": "objet(s) du parc sans identifiant", "unitsUnknownResource": "objet(s) du parc d'une ressource inconnue",
               "duplicateItemLines": "ressource(s) saisie(s) sur plusieurs lignes dans un même dossier (risque de calcul de stock faussé)"}
     for key, label in labels.items():

@@ -8,7 +8,7 @@ const HELP_CONTENT = {
     returnLabel: "Retour aux dossiers en cours",
     quickLinkLabel: "",
     summary: [
-      "Créer un nouveau dossier quand vous démarrez une arrivée, une mobilité interne ou une mise à jour.",
+      "Créer un nouveau dossier quand vous démarrez une arrivée ou une mobilité interne ; pour ajouter ou retirer des ressources d'un dossier actif, utiliser « Ajuster ».",
       "Retrouver rapidement une fiche grâce à la recherche, aux filtres et aux états métier.",
       "Ouvrir le dossier ou la restitution pour consulter et compléter les informations.",
       "Utiliser les menus d'actions pour les PDF, la signature et les opérations de gestion.",

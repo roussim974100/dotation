@@ -661,6 +661,7 @@ async function initRestitutionPage() {
       applyRestitutionReadOnlyMode();
     }
     bindRestitutionSignatureProtectionHandlers();
+    void renderRestitutionFollowUpActions(id, "saveRestitutionPendingBtn");
 
     // Hydratation du résumé Phase 1
     const phase1EditLink = document.getElementById("phase1EditLink");
@@ -839,14 +840,22 @@ async function initRestitutionPage() {
         if (["returned", "awaiting_signature"].includes(response?.summary?.status || "")) {
           await window.playCompletionCelebration("boat");
         }
-        await window.askWorkflowDialog({
+        const choice = await window.askWorkflowDialog({
           title: "Restitution enregistrée",
           text: "La restitution est maintenant à jour.",
           steps: workflowLabels.map((label) => ({ label, status: "done" })),
           hideSpinner: true,
           showConfirm: true,
-          confirmLabel: "OK"
+          // Un clic hors du dialogue vaut « secondaire » : l'envoi d'e-mail est donc l'action principale.
+          confirmLabel: "Envoyer par e-mail",
+          secondaryLabel: "Terminer"
         });
+        if (choice === "confirm") {
+          await sendRestitutionEmail(id);
+          // Laisse le téléchargement de l'e-mail démarrer avant de quitter la page.
+          setTimeout(() => { window.location.href = "restitutions-pending.html"; }, 800);
+          return;
+        }
         window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();

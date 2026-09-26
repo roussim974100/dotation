@@ -322,6 +322,7 @@ def persist_form(payload, allow_locked_update=False):
         "return_reason": restitution.get("reason"),
         "return_notes": restitution.get("notes"),
         "source_form_id": dossier.get("sourceFormId"),
+        "person_id": "",  # resolu plus bas, une fois sync_person_and_dossier passe (peut reprendre l'identite d'une personne deja connue)
         "payload_json": "",
         "created_at": payload.get("meta", {}).get("createdAt") or payload["meta"]["savedAt"],
         "updated_at": payload["meta"]["savedAt"],
@@ -339,8 +340,9 @@ def persist_form(payload, allow_locked_update=False):
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
                 raise AppError("form_locked", "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
             row["created_at"] = exists["created_at"]
-        _, dossier_id = sync_person_and_dossier(connection, payload, exists)
+        person_id, dossier_id = sync_person_and_dossier(connection, payload, exists)
         row["dossier_id"] = dossier_id
+        row["person_id"] = person_id
         row["assigned_at"] = payload.get("meta", {}).get("assignedAt") or row["assigned_at"]
         row["payload_json"] = json.dumps(payload, ensure_ascii=False)
 
@@ -365,6 +367,7 @@ def persist_form(payload, allow_locked_update=False):
                     return_reason = :return_reason,
                     return_notes = :return_notes,
                     source_form_id = :source_form_id,
+                    person_id = :person_id,
                     payload_json = :payload_json,
                     updated_at = :updated_at
                 WHERE id = :id
@@ -377,11 +380,11 @@ def persist_form(payload, allow_locked_update=False):
                 INSERT INTO dotation_forms (
                     id, dossier_id, dossier_type, title, status, beneficiary_type, nom, prenom, service, fonction, mandat,
                     rgpd_accepted, signature_data, assigned_at, returned_at, return_reason,
-                    return_notes, source_form_id, payload_json, created_at, updated_at
+                    return_notes, source_form_id, person_id, payload_json, created_at, updated_at
                 ) VALUES (
                     :id, :dossier_id, :dossier_type, :title, :status, :beneficiary_type, :nom, :prenom, :service, :fonction, :mandat,
                     :rgpd_accepted, :signature_data, :assigned_at, :returned_at, :return_reason,
-                    :return_notes, :source_form_id, :payload_json, :created_at, :updated_at
+                    :return_notes, :source_form_id, :person_id, :payload_json, :created_at, :updated_at
                 )
                 """,
                 row,

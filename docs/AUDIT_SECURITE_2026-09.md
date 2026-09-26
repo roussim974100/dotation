@@ -48,3 +48,12 @@ Tests : `tests/test_security_hardening.py` (9 tests). Suite complète : 202 pass
 - Relecture **outillée** des gabarits HTML : toutes les interpolations de données saisies dans `app.js`, `storage.js`, `admin.js`, `restitution.js`, `logs.js`, `parc*.js`, `dashboard-*.js`, `admin-backup*.js`, `admin-db.js` ont été passées en revue (20 fonctions de rendu) ; les cas trouvés sont corrigés (C6, C10). Un nouveau gabarit reste à relire à chaque ajout.
 - Recherche globale : s'appuie sur `/api/forms`, déjà masqué pour les groupes à portée `masked`. Journaux : réservés au droit `users.manage`, aucun mot de passe enregistré.
 - Vérification en conditions réelles du déploiement (proxy, HTTPS, permissions de `.app_secret_key` et `users.db`).
+
+## Scan des dépendances Python (26/09/2026)
+
+Commande : `python -m pip_audit -r backend/requirements.txt --progress-spinner off` (pip-audit 2.10.1, base de vulnérabilités
+PyPI). Résultat : **aucune vulnérabilité connue** sur `flask 3.1.3`, `bcrypt 5.0.0`, `fpdf2 2.8.7`, `werkzeug 3.1.7`,
+`pytest 9.0.3`, `cryptography 50.0.1` et leurs dépendances. À relancer avant chaque mise en production (le résultat dépend de
+la base de vulnérabilités du jour). Non couvert par cet outil : les bibliothèques chargées depuis un CDN par les pages
+(Bootstrap 5.3.2, cookieconsent 3.1.0) — à revoir manuellement lors d'une montée de version.
+

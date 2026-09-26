@@ -2,6 +2,9 @@
 
 Document de passage de relais (session du 20 septembre 2026). À lire en premier pour reprendre le travail sans rien redécouvrir.
 
+> Point d'entrée général : [`AGENTS.md`](../AGENTS.md). L'état courant (version, sprint, PR ouvertes) est tenu dans
+> [`BACKLOG_PRODUIT.md`](BACKLOG_PRODUIT.md) ; le §1 ci-dessous décrit la situation au 20/09.
+
 ## 1. Où on en est
 
 | Élément | État |
