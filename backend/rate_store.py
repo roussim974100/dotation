@@ -46,10 +46,12 @@ def _hit_memory(scope, key, max_requests, window_seconds, now):
         return False
 
 
-def hit(scope, key, max_requests, window_seconds, now=None, path=None):
-    """Enregistre une tentative et retourne True si la limite est depassee (la tentative n'est alors pas comptee)."""
-    global _calls
-    now = time.time() if now is None else now
+_LOCK_RETRIES = 3            # tentatives supplementaires si le verrou d'ecriture est momentanement pris par un autre processus
+_LOCK_RETRY_DELAY = 0.05     # secondes entre deux tentatives (delai total ajoute : quelques dixiemes de seconde au pire)
+
+
+def _hit_once(scope, key, max_requests, window_seconds, now, path):
+    """Une tentative de comptage partage. Leve sqlite3.Error si la base est indisponible (verrou, disque plein...)."""
     connection = None
     try:
         connection = _connect(path)
@@ -60,6 +62,7 @@ def hit(scope, key, max_requests, window_seconds, now=None, path=None):
         limited = count >= max_requests
         if not limited:
             connection.execute("INSERT INTO rate_limit_hits (scope, key, ts) VALUES (?, ?, ?)", (scope, key, now))
+        global _calls
         _calls += 1
         if _calls % _PURGE_EVERY == 0:
             connection.execute("DELETE FROM rate_limit_hits WHERE ts < ?", (now - _PURGE_AFTER_SECONDS,))
@@ -71,7 +74,31 @@ def hit(scope, key, max_requests, window_seconds, now=None, path=None):
                 connection.execute("ROLLBACK")
             except sqlite3.Error:
                 pass
-        return _hit_memory(scope, key, max_requests, window_seconds, now)
+        raise
     finally:
         if connection is not None:
             connection.close()
+
+
+def hit(scope, key, max_requests, window_seconds, now=None, path=None):
+    """Enregistre une tentative et retourne True si la limite est depassee (la tentative n'est alors pas comptee).
+
+    Sous forte charge concurrente, le verrou d'ecriture SQLite (BEGIN IMMEDIATE) peut echouer momentanement meme
+    quand la base va bien (plusieurs processus tentent d'ecrire au meme instant) : on reessaie quelques fois avant
+    de considerer que la base est reellement indisponible. Sans ce reessai, chaque echec bascule silencieusement
+    sur un compteur en memoire PROPRE AU PROCESSUS, qui ne voit pas les tentatives deja comptees par les autres —
+    la limite globale peut alors etre depassee, precisement quand elle sert le plus (afflux de connexions)."""
+    now = time.time() if now is None else now
+    last_error = None
+    for attempt in range(_LOCK_RETRIES + 1):
+        try:
+            return _hit_once(scope, key, max_requests, window_seconds, now, path)
+        except sqlite3.Error as error:
+            last_error = error
+            if attempt < _LOCK_RETRIES:
+                time.sleep(_LOCK_RETRY_DELAY * (attempt + 1))
+    import logging
+    logging.getLogger(__name__).warning(
+        "Compteur de limitation de debit indisponible apres %d tentatives (%s) : repli sur un compteur par processus", _LOCK_RETRIES + 1, last_error
+    )
+    return _hit_memory(scope, key, max_requests, window_seconds, now)

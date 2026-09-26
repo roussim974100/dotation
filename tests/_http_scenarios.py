@@ -560,6 +560,49 @@ _units_after = (admin.get("/api/units?resource=poste_retrait360").get_json() or 
 results["retrait360_unit_status_after"] = [u.get("status") for u in _units_after if u.get("identifier") == "SN-RETRAIT-360"]
 results["retrait360_source_items_returned"] = ((admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {}).get("restitution", {}).get("items", {}))
 
+# ---- 3.61.0 : identifiant de personne stable transmis a une mise a jour (pas de nouvelle fiche « personne ») ----
+_src_person_id = (admin.get(f"/api/forms/{_src_id}").get_json() or {}).get("data", {}).get("meta", {}).get("personId")
+results["person_source_has_id"] = bool(_src_person_id)
+with _gdb() as _pc:
+    results["person_source_db_column"] = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_src_id,)).fetchone()[0]
+    _persons_before = _pc.execute("SELECT COUNT(*) FROM persons WHERE id = ?", (_src_person_id,)).fetchone()[0]
+_maj2_body = {"dossier": {"type": "mise_a_jour", "sourceFormId": _src_id}, "beneficiaire": {"nom": "RETRAIT360", "prenom": "Source", "qualite": "agent"},
+              "resources": {"additional": []}, "retraits": {"items": {}}, "workflow": {"status": "draft"},
+              "meta": {"personId": _src_person_id}}
+_maj2_created = admin.post("/api/forms", json=_maj2_body, headers=H).get_json() or {}
+_maj2_id = (_maj2_created.get("summary") or {}).get("id")
+with _gdb() as _pc:
+    results["person_maj_db_column"] = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_maj2_id,)).fetchone()[0]
+    results["person_count_for_id"] = _pc.execute("SELECT COUNT(*) FROM persons WHERE id = ?", (_src_person_id,)).fetchone()[0]
+    results["person_maj_own_dossier_id"] = _pc.execute("SELECT dossier_id FROM dotation_forms WHERE id = ?", (_maj2_id,)).fetchone()[0] != \
+        _pc.execute("SELECT dossier_id FROM dotation_forms WHERE id = ?", (_src_id,)).fetchone()[0]
+# sans transmettre personId (dossier tout nouveau, sans rapport) : une AUTRE personne est creee
+_new_body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": "AUTREPERSONNE", "prenom": "Neuve", "qualite": "agent"},
+             "resources": {"additional": []}, "workflow": {"status": "draft"}, "meta": {}}
+_new_created = admin.post("/api/forms", json=_new_body, headers=H).get_json() or {}
+_new_id = (_new_created.get("summary") or {}).get("id")
+with _gdb() as _pc:
+    _new_person_id = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_new_id,)).fetchone()[0]
+results["person_unrelated_dossier_gets_new_person"] = bool(_new_person_id) and _new_person_id != _src_person_id
+
+# ---- 3.64.0 : la migration 7 rattrape un retrait « mise a jour » jamais repercute au parc (etat herite du bug 3.60.1) ----
+from migrations import _m_resync_retrait_sources  # noqa: E402
+from models.health import stock_and_unit_invariants  # noqa: E402
+with _gdb() as _mc:
+    # On recree l'etat d'avant le correctif : l'objet rendu est de nouveau « attribue » au dossier source.
+    _mc.execute("UPDATE resource_units SET status = 'assigned', holder_form_id = ? WHERE resource_code = 'poste_retrait360'", (_src_id,))
+with _gdb() as _mc:
+    results["rattrapage_invariant_before"] = stock_and_unit_invariants(_mc)["retraitsNonRepercutes"]
+with _gdb() as _mc:
+    _m_resync_retrait_sources(_mc)
+with _gdb() as _mc:
+    results["rattrapage_invariant_after"] = stock_and_unit_invariants(_mc)["retraitsNonRepercutes"]
+_units_fixed = (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", [])
+results["rattrapage_unit_status"] = [u.get("status") for u in _units_fixed if u.get("identifier") == "SN-RETRAIT-360"]
+with _gdb() as _mc:
+    _m_resync_retrait_sources(_mc)  # idempotente
+results["rattrapage_unit_status_second_run"] = [u.get("status") for u in (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", []) if u.get("identifier") == "SN-RETRAIT-360"]
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):

@@ -14,6 +14,7 @@ from utils import (
 )
 from database import get_db, normalize_reference_row
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
+from models.adjustment import apply_adjustment, complete_adjustment_signature, public_event
 def can_export_unmasked():
     """Export/PDF : droit forms.export ET portee de donnees complete. Les exports ne sont pas masques,
     donc un groupe a portee "masked" (RGPD) ne doit pas pouvoir les generer."""
@@ -798,6 +799,76 @@ def update_restitution(form_id):
             target_label=form_data.get("summary", {}).get("title"),
         )
     return jsonify(form_data)
+
+
+def _adjustment_guard(form_id):
+    """Controles communs aux routes d'ajustement. Renvoie (dossier, erreur) : erreur = reponse Flask ou None."""
+    if not has_permission("forms.adjust"):
+        return None, (jsonify({"error": "forbidden"}), 403)
+    viewer = current_user()
+    if viewer and viewer.get("data_scope") == "masked":
+        return None, (jsonify({"error": "masked_scope_read_only"}), 403)
+    existing = get_form(form_id)
+    if not existing:
+        return None, (jsonify({"error": "not_found"}), 404)
+    return existing, None
+
+
+def _summary_without_data(form_data):
+    """Resume du dossier SANS `data` (le dossier complet, image de signature comprise, n'est jamais renvoye par ces routes)."""
+    return {key: value for key, value in (form_data.get("summary") or {}).items() if key != "data"}
+
+
+def _log_adjustment(form_id, form_data, action_type, label, event):
+    with get_db() as connection:
+        insert_app_log(
+            connection, "dossier", action_type, label, "form", form_id,
+            {"ajustement": event.get("id"), "ajouts": len(event.get("ajouts") or []), "retraits": len(event.get("retraits") or []),
+             "service": bool(event.get("service")), "etat": event.get("status")},
+            target_label=form_data.get("summary", {}).get("title"),
+        )
+
+
+@bp.route("/api/forms/<form_id>/ajustement", methods=["PATCH"])
+@login_required
+def adjust_form(form_id):
+    """Ajoute et/ou retire des ressources et/ou change le service d'un dossier actif, en UNE transaction (persist_form)."""
+    existing, error = _adjustment_guard(form_id)
+    if error:
+        return error
+    body = request.get_json(silent=True) or {}
+    # Verrou optimiste, comme update_form : refuse si le dossier a ete enregistre depuis que le client l'a charge.
+    base_saved_at = str(body.get("baseSavedAt") or "")
+    if base_saved_at:
+        with get_db() as connection:
+            stored = connection.execute("SELECT updated_at FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+        stored_saved_at = (stored["updated_at"] or "") if stored else ""
+        if stored_saved_at and stored_saved_at != base_saved_at:
+            return jsonify({"error": "form_conflict"}), 409
+    actor = (current_user() or {}).get("username") or "inconnu"
+    try:
+        payload, event = apply_adjustment(existing["data"], body, actor)
+        form_data = persist_form(payload, allow_locked_update=True)
+    except AppError as app_error:
+        return jsonify({"error": app_error.code, "message": str(app_error)}), app_error.status
+    _log_adjustment(form_id, form_data, "form_adjusted", "Dossier ajusté (ressources / service)", event)
+    return jsonify({"ajustement": public_event(event), "summary": _summary_without_data(form_data)})
+
+
+@bp.route("/api/forms/<form_id>/ajustement/<event_id>/signature", methods=["POST"])
+@login_required
+def sign_adjustment(form_id, event_id):
+    """Recueille la signature d'un ajustement laisse « en attente » (mode a distance)."""
+    existing, error = _adjustment_guard(form_id)
+    if error:
+        return error
+    try:
+        payload, event = complete_adjustment_signature(existing["data"], event_id, request.get_json(silent=True) or {})
+        form_data = persist_form(payload, allow_locked_update=True)
+    except AppError as app_error:
+        return jsonify({"error": app_error.code, "message": str(app_error)}), app_error.status
+    _log_adjustment(form_id, form_data, "form_adjustment_signed", "Signature d'un ajustement recueillie", event)
+    return jsonify({"ajustement": public_event(event), "summary": _summary_without_data(form_data)})
 
 
 @bp.route("/api/forms/<form_id>/restitution-phase1-validate", methods=["POST"])

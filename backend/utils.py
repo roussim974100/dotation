@@ -52,6 +52,9 @@ def mask_payload(payload):
     if data.get("materiel", {}).get("vehicule", {}).get("immatriculation"):
         data["materiel"]["vehicule"]["immatriculation"] = mask_text(data["materiel"]["vehicule"]["immatriculation"])
     data.setdefault("validation", {})["signatureDataUrl"] = ""
+    for event in data.get("ajustements") or []:
+        if isinstance(event, dict) and isinstance(event.get("signature"), dict):
+            event["signature"].pop("signatureDataUrl", None)
     return data
 
 
