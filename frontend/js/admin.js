@@ -232,6 +232,7 @@ const PERMISSION_INFO = [
   { key: "forms.create", label: "Créer un nouveau dossier" },
   { key: "forms.edit", label: "Modifier un dossier" },
   { key: "forms.restitution", label: "Faire un retour de matériel (restitution)" },
+  { key: "forms.adjust", label: "Ajuster un dossier actif (ajouter ou retirer des ressources, changer le service)" },
   { key: "forms.export", label: "Télécharger des listes et des PDF" },
   { key: "forms.delete", label: "Mettre un dossier à la corbeille" },
   { key: "forms.view_all", label: "Voir les dossiers de tous les services (sinon : seulement ceux de son service)" },

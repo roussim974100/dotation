@@ -36,10 +36,26 @@ def test_invariants_violes_sont_comptes():
     c.executemany("INSERT INTO resource_units VALUES (?, ?)", [("veste", "  "), ("fantome", "X1")])
     c.executemany("INSERT INTO dotation_items VALUES (?, ?, ?)", [("f1", "veste", 1), ("f1", "veste", 1), ("f2", "veste", 1)])
     assert stock_and_unit_invariants(c) == {"stockNegativeBalances": 1, "stockMovementsUnknownResource": 1, "unitsWithoutIdentifier": 1,
-                                            "unitsUnknownResource": 1, "duplicateItemLines": 1}
+                                            "unitsUnknownResource": 1, "duplicateItemLines": 1, "retraitsNonRepercutes": 0}
 
 
 def test_tables_absentes_base_ancienne_ne_levent_pas_d_erreur():
     c = sqlite3.connect(":memory:")
     c.row_factory = sqlite3.Row
     assert set(stock_and_unit_invariants(c).values()) == {0}
+
+
+def test_retrait_non_repercute_au_parc_est_compte():
+    """3.64.0 : un objet encore « attribue » a un dossier dont la ligne correspondante est rendue."""
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    c.executescript("""
+        CREATE TABLE resource_units (resource_code TEXT, identifier TEXT, status TEXT, holder_form_id TEXT);
+        CREATE TABLE dotation_items (form_id TEXT, item_key TEXT, assigned INTEGER, returned INTEGER);
+        INSERT INTO resource_units VALUES ('pc', 'SN-1', 'assigned', 'f1');   -- rendu au dossier, mais parc inchange : a signaler
+        INSERT INTO resource_units VALUES ('pc', 'SN-2', 'in_stock', 'f1');   -- deja remis en stock : sain
+        INSERT INTO resource_units VALUES ('pc', 'SN-3', 'assigned', 'f2');   -- toujours detenu, ligne non rendue : sain
+        INSERT INTO dotation_items VALUES ('f1', 'pc', 1, 1);
+        INSERT INTO dotation_items VALUES ('f2', 'pc', 1, 0);
+    """)
+    assert stock_and_unit_invariants(c)["retraitsNonRepercutes"] == 1

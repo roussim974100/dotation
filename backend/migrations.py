@@ -80,6 +80,27 @@ def _m_field_roles(connection):
             connection.execute("UPDATE resource_catalog SET field_schema_json = ? WHERE id = ?", (json.dumps(schema, ensure_ascii=False), row["id"]))
 
 
+def _m_person_id_column(connection):
+    """Colonne `person_id` (identifiant de personne stable) sur dotation_forms, pour retrouver directement les dossiers
+    d'une meme personne sans passer par onboarding_dossiers. `sync_person_and_dossier` (models/dossier.py) calcule deja
+    ce person_id a chaque enregistrement et l'ecrit dans payload_json (meta.personId) depuis longtemps : cette migration
+    ne fait qu'exposer cette valeur DEJA CONNUE dans une colonne interrogeable, elle ne devine ni ne fusionne rien."""
+    columns = {r[1] for r in connection.execute("PRAGMA table_info(dotation_forms)").fetchall()}
+    if "person_id" not in columns:
+        connection.execute("ALTER TABLE dotation_forms ADD COLUMN person_id TEXT")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_dotation_forms_person ON dotation_forms (person_id)")
+    if "payload_json" not in columns:
+        return  # schema minimal/incomplet (tests, base tres ancienne) : rien a retrouver
+    for row in connection.execute("SELECT id, payload_json FROM dotation_forms WHERE person_id IS NULL").fetchall():
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        person_id = payload.get("meta", {}).get("personId") if isinstance(payload, dict) else None
+        if person_id:
+            connection.execute("UPDATE dotation_forms SET person_id = ? WHERE id = ?", (person_id, row["id"]))
+
+
 INDEXES = (
     ("idx_dotation_items_form_key", "dotation_items", "form_id, item_key"),
     ("idx_dotation_forms_status_updated", "dotation_forms", "status, updated_at"),
@@ -103,11 +124,82 @@ def _m_indexes(connection):
             continue
 
 
+def _m_mask_login_failed_identifiers(connection):
+    """Un echec de connexion journalisait l'identifiant tape tel quel : un mot de passe saisi par erreur dans ce champ restait
+    lisible dans le journal d'administration. Masque, dans les entrees deja enregistrees, tout identifiant qui ne correspond
+    a aucun compte existant. Idempotente ; sans aucune entree concernee, ne touche pas a la base des comptes."""
+    try:
+        rows = connection.execute("SELECT id, target_id, target_label, details_json FROM app_logs WHERE action_type = 'login_failed'").fetchall()
+    except sqlite3.OperationalError:  # base tres ancienne, sans journaux : rien a masquer
+        return
+    if not rows:
+        return
+    from config import DB_USERS_PATH
+    if not os.path.exists(DB_USERS_PATH):
+        raise RuntimeError("base des comptes introuvable : masquage des identifiants reporte")
+    users_connection = sqlite3.connect(f"file:{DB_USERS_PATH}?mode=ro", uri=True)
+    try:
+        known = {row[0] for row in users_connection.execute("SELECT username FROM users").fetchall()}
+    finally:
+        users_connection.close()
+    unknown_label = "(identifiant inconnu)"
+    for row in rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            details = {}
+        typed = details.get("identifiant_tente", row["target_id"])
+        if typed in known or typed in ("(vide)", unknown_label, None):
+            continue
+        details["identifiant_tente"] = unknown_label
+        label = unknown_label if row["target_label"] == row["target_id"] and row["target_label"] else row["target_label"]
+        connection.execute(
+            "UPDATE app_logs SET target_id = ?, target_label = ?, details_json = ? WHERE id = ?",
+            (unknown_label, label, json.dumps(details, ensure_ascii=False), row["id"]),
+        )
+
+
+def _m_resync_retrait_sources(connection):
+    """Rattrapage du bug corrige en 3.60.1 : un retrait fait via un dossier « mise a jour » modifiait le dossier SOURCE sans
+    resynchroniser le parc ni le stock, si bien qu'un objet rendu restait affiche comme detenu. Rejoue la synchronisation
+    (idempotente, dedupliquee) de chaque dossier source deja concerne. Un dossier en echec est ignore et journalise : il ne
+    doit jamais empecher le demarrage ni les migrations suivantes."""
+    try:
+        sources = [row[0] for row in connection.execute(
+            "SELECT DISTINCT source_form_id FROM dotation_forms WHERE dossier_type = 'mise_a_jour' AND source_form_id IS NOT NULL "
+            "AND source_form_id != '' AND source_form_id IN (SELECT id FROM dotation_forms)").fetchall()]
+    except sqlite3.OperationalError:  # base tres ancienne (colonnes absentes) : rien a rattraper
+        return
+    if not sources:
+        return
+    import logging
+    from models.stock import sync_stock_for_form
+    from models.units import sync_units_for_form, unit_identifier_keys
+    # Pas de ensure_units_schema ici : il utilise executescript, qui VALIDE la transaction en cours et detruit le point de
+    # sauvegarde (SAVEPOINT) du lanceur de migrations. Sans les tables du parc, il n'y a rien a rattraper.
+    existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    if not {"resource_units", "resource_unit_events"} <= existing:
+        return
+    try:
+        keys = unit_identifier_keys(connection)
+    except sqlite3.OperationalError:
+        return
+    for form_id in sources:
+        try:
+            sync_units_for_form(connection, form_id, keys)
+            sync_stock_for_form(connection, form_id)
+        except Exception as error:  # noqa: BLE001
+            logging.getLogger(__name__).warning("Rattrapage des retraits : dossier %s ignore (%s)", form_id, error)
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
     (3, "roles_de_champs", _m_field_roles),
     (4, "index_de_performance", _m_indexes),
+    (5, "identifiant_de_personne", _m_person_id_column),
+    (6, "masquer_identifiants_de_connexion", _m_mask_login_failed_identifiers),
+    (7, "rattrapage_retraits_dossiers_sources", _m_resync_retrait_sources),
 ]
 
 

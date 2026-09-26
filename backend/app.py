@@ -204,11 +204,11 @@ def seed_default_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
         ("gestion", "Gestion", "Gestion avancée avec restitution et export",
@@ -263,11 +263,11 @@ def migrate_missing_groups(connection):
     now = utc_now()
     default_groups = [
         ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "db.manage", "unc.view_all", "parc.manage"], "full"),
+         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
         ("user", "Utilisateur", "Accès aux formulaires et restitutions",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
         ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
+         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
         ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
          ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
         ("gestion", "Gestion", "Gestion avancée avec restitution et export",

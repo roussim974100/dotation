@@ -703,7 +703,8 @@ function hasRestitutionData(draft) {
     || restitution.reason
     || restitution.signatureDataUrl
     || restitution.signatureReason
-    || Object.keys(restitution.items || {}).length
+    // Un retrait fait par un ajustement (adjustmentId) n'engage pas la restitution du dossier : il reste « en cours ».
+    || Object.values(restitution.items || {}).some((item) => !item?.adjustmentId)
   );
 }
 
@@ -869,6 +870,21 @@ function buildDraftActionButtons(draft, options) {
   const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
+  // Ajuster un dossier actif (ajouter / retirer des ressources, changer le service) ; signer un ajustement resté en attente.
+  if (canAdjustDossier(sessionInfo) && status === "active") {
+    personItems.push({ action: "openAdjustment", id, label: "Ajuster les ressources / le service" });
+    if ((draft.data?.ajustements || []).some((event) => event.status === "pending_signature")) {
+      personItems.push({ action: "openAdjustmentSignature", id, label: "Signer l'ajustement en attente" });
+    }
+  }
+
+  // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
+  const qrItems = [];
+  if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
+    qrItems.push({ action: "showRestitutionSignatureQr", id, label: "QR code de signature (restitution)" });
+  } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
+    qrItems.push({ action: "showAssignmentSignatureQr", id, label: "QR code de signature (attribution)" });
+  }
 
   const dangerItems = options.canDelete ? [{ action: "removeDraft", id, label: "Supprimer le dossier" }] : [];
 
@@ -879,12 +895,66 @@ function buildDraftActionButtons(draft, options) {
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
         { title: "Envoyer par e-mail", items: emailItems },
+        { title: "Signature en face à face", items: qrItems },
         { title: "Dossier", items: personItems }
       ], dangerItems)}
     </div>
   `;
 }
+// Sur grand écran, le volet ouvert du menu « ⋯ » est rattaché au <body> et placé en position fixe : dans le tableau, il
+// était rogné par le cadre défilant (.table-responsive) et, le cadre ayant un backdrop-filter, une position fixe y reste
+// piégée sous l'en-tête. Il s'ouvre vers le bas, ou vers le haut s'il y a plus de place, et reste dans la fenêtre.
+const floatingActionMenus = new Map(); // volet -> menu d'origine
+
+function restoreActionMenuPanel(panel, menu) {
+  panel.style.cssText = "";
+  if (menu.isConnected) {
+    menu.appendChild(panel);
+  } else {
+    panel.remove();
+  }
+  floatingActionMenus.delete(panel);
+}
+
+function placeActionMenuPanel(menu) {
+  const summary = menu.querySelector("summary");
+  const panel = [...floatingActionMenus].find(([, owner]) => owner === menu)?.[0]
+    || menu.querySelector(".draft-actions__menu-panel");
+  if (!panel || !summary) return;
+  if (!menu.open || !window.matchMedia("(min-width: 768px)").matches) {
+    if (floatingActionMenus.has(panel)) restoreActionMenuPanel(panel, menu);
+    return;
+  }
+  if (!floatingActionMenus.has(panel)) {
+    floatingActionMenus.set(panel, menu);
+    document.body.appendChild(panel);
+  }
+  Object.assign(panel.style, { position: "fixed", right: "auto", bottom: "auto", margin: "0", zIndex: "1050" });
+  const anchor = summary.getBoundingClientRect();
+  const gap = 7;
+  const margin = 8;
+  const height = panel.offsetHeight;
+  const spaceBelow = window.innerHeight - anchor.bottom - gap - margin;
+  const spaceAbove = anchor.top - gap - margin;
+  const openUp = height > spaceBelow && spaceAbove > spaceBelow;
+  const top = openUp ? anchor.top - gap - height : anchor.bottom + gap;
+  panel.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - height - margin))}px`;
+  panel.style.left = `${Math.max(margin, anchor.right - panel.offsetWidth)}px`;
+}
+
+function replaceOpenActionMenus() {
+  // Liste re-rendue (actualisation automatique) : un volet dont le menu a disparu ou s'est fermé est rangé.
+  floatingActionMenus.forEach((menu, panel) => {
+    if (!menu.isConnected || !menu.open) restoreActionMenuPanel(panel, menu);
+  });
+  document.querySelectorAll("[data-action-menu][open]").forEach(placeActionMenuPanel);
+}
+
+window.addEventListener("resize", replaceOpenActionMenus);
+window.addEventListener("scroll", replaceOpenActionMenus, true);
+
 function bindDraftActionMenus() {
+  replaceOpenActionMenus();
   document.querySelectorAll("[data-action-menu]").forEach((menu) => {
     if (menu.dataset.boundActionMenu) {
       return;
@@ -908,6 +978,7 @@ function bindDraftActionMenus() {
           }
         });
       }
+      placeActionMenuPanel(menu);
       updateLabel();
     });
 
@@ -1081,6 +1152,18 @@ async function requestJson(url, options = {}) {
   }
 
   return payload;
+}
+
+// Même règle que can_export_unmasked (backend/routes/forms.py) : les PDF et exports ne sont pas masqués, donc un
+// groupe à portée « masked » (RGPD) ne peut pas les générer, même avec forms.export.
+function canAdjustDossier(user) {
+  const allowed = user?.permissions?.includes("*") || user?.permissions?.includes("forms.adjust");
+  return Boolean(allowed && user?.data_scope !== "masked");
+}
+
+function canExportUnmasked(user) {
+  const allowed = user?.permissions?.includes("*") || user?.permissions?.includes("forms.export");
+  return Boolean(allowed && user?.data_scope !== "masked");
 }
 
 async function getSessionInfo() {
@@ -1568,7 +1651,7 @@ async function renderDraftList() {
     filterEmptyState?.classList.add("d-none");
     historyEmptyState?.classList.add("d-none");
     const user = await getSessionInfo();
-    const canExport = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.export"));
+    const canExport = canExportUnmasked(user);
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
@@ -2188,6 +2271,32 @@ async function prepareAssignmentInfoEmail(id) {
   }
 }
 
+// QR code du lien de signature : la personne est là, elle scanne au lieu de recevoir un e-mail (voir signature-qr.js).
+async function showSignatureQr(id, kind) {
+  try {
+    const { link, absoluteUrl } = kind === "restitution"
+      ? await ensureRestitutionSignatureLink(id)
+      : await ensureAssignmentSignatureLink(id);
+    const draft = findDraftSummary(id);
+    showSignatureQrDialog({
+      url: absoluteUrl,
+      title: kind === "restitution" ? "Signature de la restitution" : "Signature de l'attribution",
+      subtitle: draft?.title || "",
+      expiresAt: link?.expiresAt
+    });
+  } catch (error) {
+    showToast(error.message || "Impossible de préparer le QR code de signature.", "error");
+  }
+}
+
+async function showAssignmentSignatureQr(id) {
+  await showSignatureQr(id, "assignment");
+}
+
+async function showRestitutionSignatureQr(id) {
+  await showSignatureQr(id, "restitution");
+}
+
 async function copyRestitutionSignatureLink(id) {
   try {
     const { absoluteUrl } = await ensureRestitutionSignatureLink(id);
@@ -2231,6 +2340,54 @@ async function prepareRestitutionInfoEmail(id) {
     showToast(error.message || "Impossible de préparer l'e-mail d'information de restitution.", "error");
   }
 }
+
+// Écrans de restitution : actions de suite (PDF, e-mails) dans la barre du bas, comme pour un dossier signé
+// (renderLockedDossierActions). Sans droit d'export effectif, seul l'e-mail d'information (sans PDF) est proposé.
+async function sendRestitutionEmail(id) {
+  if (canExportUnmasked(await getSessionInfo())) {
+    await prepareRestitutionPdfEmail(id);
+  } else {
+    await prepareRestitutionInfoEmail(id);
+  }
+}
+
+async function renderRestitutionFollowUpActions(id, anchorId) {
+  const bar = document.querySelector(".action-bar__buttons");
+  if (!bar || !id) return;
+  bar.querySelectorAll("[data-restitution-action]").forEach((btn) => btn.remove());
+  const canExport = canExportUnmasked(await getSessionInfo());
+  const actions = [
+    canExport && { label: "Télécharger le PDF", run: () => exportRestitutionPdf(id) },
+    { label: "Informer par e-mail", run: () => prepareRestitutionInfoEmail(id) },
+    canExport && { label: "Envoyer le PDF par e-mail", run: () => prepareRestitutionPdfEmail(id) }
+  ].filter(Boolean);
+  const anchor = document.getElementById(anchorId);
+  actions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-outline-secondary";
+    btn.dataset.restitutionAction = "true";
+    btn.textContent = action.label;
+    btn.addEventListener("click", action.run);
+    bar.insertBefore(btn, anchor && anchor.parentElement === bar ? anchor : null);
+  });
+}
+
+// Proposée juste après la validation de la Phase 1 : prévenir la personne que la restitution est engagée.
+async function offerRestitutionInfoEmail(id) {
+  const choice = await window.askWorkflowDialog({
+    title: "Restitution engagée",
+    text: "Souhaitez-vous préparer un e-mail pour informer la personne de la restitution ?",
+    steps: [],
+    hideSpinner: true,
+    showConfirm: true,
+    confirmLabel: "Préparer l'e-mail",
+    secondaryLabel: "Plus tard"
+  });
+  if (choice === "confirm") {
+    await prepareRestitutionInfoEmail(id);
+  }
+}
 function bindSignatureLinkNotice() {
   const notice = document.getElementById("signatureLinkNotice");
   if (!notice) {
@@ -2251,6 +2408,11 @@ function bindSignatureLinkNotice() {
       }
     });
     copyButton.dataset.boundCopyLink = "true";
+  }
+  const qrButton = notice.querySelector("[data-signature-link-qr]");
+  if (qrButton && !qrButton.dataset.boundQrLink) {
+    qrButton.addEventListener("click", () => showSignatureQrDialog({ url: qrButton.dataset.link || "", title: "Lien de signature", subtitle: qrButton.dataset.title || "" }));
+    qrButton.dataset.boundQrLink = "true";
   }
   const dismissButton = notice.querySelector("[data-signature-link-dismiss]");
   if (dismissButton && !dismissButton.dataset.boundDismissLink) {
@@ -2315,6 +2477,7 @@ function renderDashboardSignatureLinkNotice() {
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button type="button" class="btn btn-sm btn-outline-primary" data-signature-link-copy data-link="${escapeHtml(payload.url)}">Copier le lien</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-signature-link-qr data-link="${escapeHtml(payload.url)}" data-title="${escapeHtml(payload.title || "")}">QR code</button>
         ${canRevoke ? `<button type="button" class="btn btn-sm btn-outline-danger" data-signature-link-revoke data-link-id="${escapeHtml(payload.linkId)}">Révoquer</button>` : ""}
         <button type="button" class="btn btn-sm btn-outline-secondary" data-signature-link-dismiss>Masquer</button>
       </div>
@@ -2338,7 +2501,9 @@ function setExportLoaderProgress(value) {
 }
 
 function showExportLoader(title, text) {
+  // Le chargeur n'existe que sur les listes : la fiche et les écrans de restitution exportent sans lui.
   const overlay = document.getElementById("exportLoader");
+  if (!overlay) return;
   document.getElementById("exportLoaderTitle").textContent = title;
   document.getElementById("exportLoaderText").textContent = text;
   startFallbackExportProgress({ start: 4, cap: 28, step: 3, interval: 220 });
@@ -3012,7 +3177,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDashboardSignatureLinkNotice();
   void getSessionInfo().then((user) => {
     // « Administration » et « Synthèse » sont ajoutés au menu du compte par ui.js (renderUserMenuFeatureLinks), sur toutes les pages.
-    if (user && (user.permissions.includes("forms.export") || user.permissions.includes("*"))) {
+    if (canExportUnmasked(user)) {
       document.getElementById("exportMenu")?.classList.remove("d-none");
     }
     if (user && (user.permissions.includes("forms.create") || user.permissions.includes("*"))) {
@@ -3036,7 +3201,10 @@ document.addEventListener("DOMContentLoaded", () => {
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,
     prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail,
-    removeDraft
+    removeDraft,
+    showAssignmentSignatureQr, showRestitutionSignatureQr,
+    openAdjustment: (id) => window.openAdjustment?.(id),
+    openAdjustmentSignature: (id) => window.openAdjustmentSignature?.(id)
   };
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
