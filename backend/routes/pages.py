@@ -22,11 +22,22 @@ import re
 bp = Blueprint("pages", __name__)
 
 
+UNKNOWN_LOGIN_LABEL = "(identifiant inconnu)"
+
+
+def loggable_login_identifier(username):
+    """Identifiant à écrire dans le journal après un échec de connexion. Un identifiant qui ne correspond à aucun compte
+    peut être un mot de passe tapé dans le mauvais champ : il ne doit JAMAIS être journalisé tel quel."""
+    if not username:
+        return "(vide)"
+    return username if get_user_record(username) else UNKNOWN_LOGIN_LABEL
+
+
 def build_login_forensic_details(username, auth_state):
     from auth import extract_first_forwarded_ip
     details = {
         "etat_authentification": auth_state,
-        "identifiant_tente": username or "(vide)",
+        "identifiant_tente": loggable_login_identifier(username),
         "methode": request.method,
         "chemin": request.path,
         "hote": request.host,
@@ -83,7 +94,7 @@ def login():
                 "login_failed",
                 "Echec de connexion",
                 "user",
-                username or "(vide)",
+                loggable_login_identifier(username),
                 build_login_forensic_details(username, auth_state),
                 actor="anonymous",
             )

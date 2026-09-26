@@ -129,6 +129,11 @@ async function initPhase1Page() {
     const unlockDays = settings?.restitutionPhase1UnlockDays ?? 1;
 
     applyPhase1ValidatedState(currentRestitution, unlockDays, id);
+    // Dès que la restitution existe (dates enregistrées), on peut en informer la personne ou envoyer le PDF.
+    const refreshFollowUpActions = () => {
+      if (currentRestitution?.returnedAt) void renderRestitutionFollowUpActions(id, "savePhase1Btn");
+    };
+    refreshFollowUpActions();
 
     // Bouton "Enregistrer" (sans valider)
     getEl("savePhase1Btn")?.addEventListener("click", async () => {
@@ -138,6 +143,7 @@ async function initPhase1Page() {
         const updated = await requestJson(`/api/forms/${encodeURIComponent(id)}`);
         currentRestitution = updated?.data?.restitution || currentRestitution;
         applyPhase1ValidatedState(currentRestitution, unlockDays, id);
+        refreshFollowUpActions();
       } catch (e) {
         alert(e.message || "Erreur lors de l'enregistrement.");
       }
@@ -153,7 +159,8 @@ async function initPhase1Page() {
         const resp = await requestJson(`/api/forms/${encodeURIComponent(id)}/restitution-phase1-validate`, { method: "POST" });
         currentRestitution = resp?.data?.restitution || currentRestitution;
         applyPhase1ValidatedState(currentRestitution, unlockDays, id);
-        // Rediriger vers Phase 2 après un court délai
+        await offerRestitutionInfoEmail(id);
+        // Rediriger vers Phase 2 après un court délai (laisse le téléchargement de l'e-mail se terminer)
         setTimeout(() => { window.location.href = `restitution.html?id=${encodeURIComponent(id)}`; }, 800);
       } catch (e) {
         alert(e.message || "Erreur lors de la validation.");
