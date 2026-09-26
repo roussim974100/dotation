@@ -174,9 +174,13 @@ def _m_resync_retrait_sources(connection):
         return
     import logging
     from models.stock import sync_stock_for_form
-    from models.units import ensure_units_schema, sync_units_for_form, unit_identifier_keys
+    from models.units import sync_units_for_form, unit_identifier_keys
+    # Pas de ensure_units_schema ici : il utilise executescript, qui VALIDE la transaction en cours et detruit le point de
+    # sauvegarde (SAVEPOINT) du lanceur de migrations. Sans les tables du parc, il n'y a rien a rattraper.
+    existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    if not {"resource_units", "resource_unit_events"} <= existing:
+        return
     try:
-        ensure_units_schema(connection)
         keys = unit_identifier_keys(connection)
     except sqlite3.OperationalError:
         return
