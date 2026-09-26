@@ -5,7 +5,7 @@
 > Nouveautés depuis la 3.18 : voir le [CHANGELOG](CHANGELOG.md). Pour contribuer : section [Développement local](#développement-local) en bas de page.
 
 **Version :** `3.66.0` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
-**Statut :** voir l'environnement (pastille DEV / PREPROD, absente en production) | **Dernière MAJ :** 19 septembre 2026
+**Statut :** voir l'environnement (pastille DEV / PREPROD, absente en production) | **Dernière MAJ :** 26 septembre 2026
 
 ---
 
@@ -118,13 +118,15 @@ Tout comme un voyage, le parcours professionnel d'un collaborateur comporte des 
 ### 📋 Gestion des dossiers
 
 - Créer, modifier et verrouiller des dossiers d'attribution
-- 4 types de dossier : nouvelle arrivée, changement de service, mise à jour, sortie
+- Types de dossier : nouvelle arrivée, changement de service, sortie (dont la **régularisation** : restitution d'une personne sans attribution enregistrée) ; les anciens dossiers « mise à jour de ressources » restent consultables
+- **Ajuster un dossier actif** : ajouter ou retirer des ressources et changer le service d'une personne **sur son dossier existant** (bouton « Ajuster »), avec une signature par geste (en présentiel, à distance, ou impossible avec un responsable signataire) et un historique des ajustements ; permission dédiée `forms.adjust`
 - Ressources configurables par l'admin (champs métier, suivi, restitution)
 - Import / export CSV du catalogue de services
 
 ### 🖊️ Signature sécurisée
 
 - Signature directe sur l'écran ou via lien à usage unique
+- **QR code** du lien de signature : la personne présente le scanne avec son téléphone, sans e-mail (générateur embarqué, aucun accès Internet nécessaire)
 - Signature de restitution distincte
 - Protection de la signature dans les PDF selon les droits du profil
 
@@ -133,6 +135,8 @@ Tout comme un voyage, le parcours professionnel d'un collaborateur comporte des 
 - Écran dédié : état par ressource (conforme, dégradé, manquant…), commentaires, dates
 - PDF de restitution distinct du PDF d'attribution
 - Traçabilité complète du parcours
+- **E-mails préparés** (fichier `.eml` à ouvrir dans sa messagerie) : information de restitution et envoi du PDF, proposés depuis les écrans de restitution
+- Restitution en deux phases (dates, puis état du matériel et signature)
 
 ### 🗃️ Parc matériel et stocks
 
@@ -150,6 +154,7 @@ La consultation est ouverte à qui voit les dossiers ; les actions de gestion de
 - Export Excel (dossiers + ressources)
 - Export groupé multi-sélection
 - Journal d'audit complet
+- Contrôle de santé de la base (intégrité, champs orphelins, écarts parc/dossiers)
 
 ### ⚙️ Administration complète
 
