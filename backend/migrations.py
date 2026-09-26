@@ -159,6 +159,35 @@ def _m_mask_login_failed_identifiers(connection):
         )
 
 
+def _m_resync_retrait_sources(connection):
+    """Rattrapage du bug corrige en 3.60.1 : un retrait fait via un dossier « mise a jour » modifiait le dossier SOURCE sans
+    resynchroniser le parc ni le stock, si bien qu'un objet rendu restait affiche comme detenu. Rejoue la synchronisation
+    (idempotente, dedupliquee) de chaque dossier source deja concerne. Un dossier en echec est ignore et journalise : il ne
+    doit jamais empecher le demarrage ni les migrations suivantes."""
+    try:
+        sources = [row[0] for row in connection.execute(
+            "SELECT DISTINCT source_form_id FROM dotation_forms WHERE dossier_type = 'mise_a_jour' AND source_form_id IS NOT NULL "
+            "AND source_form_id != '' AND source_form_id IN (SELECT id FROM dotation_forms)").fetchall()]
+    except sqlite3.OperationalError:  # base tres ancienne (colonnes absentes) : rien a rattraper
+        return
+    if not sources:
+        return
+    import logging
+    from models.stock import sync_stock_for_form
+    from models.units import ensure_units_schema, sync_units_for_form, unit_identifier_keys
+    try:
+        ensure_units_schema(connection)
+        keys = unit_identifier_keys(connection)
+    except sqlite3.OperationalError:
+        return
+    for form_id in sources:
+        try:
+            sync_units_for_form(connection, form_id, keys)
+            sync_stock_for_form(connection, form_id)
+        except Exception as error:  # noqa: BLE001
+            logging.getLogger(__name__).warning("Rattrapage des retraits : dossier %s ignore (%s)", form_id, error)
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
@@ -166,6 +195,7 @@ MIGRATIONS = [
     (4, "index_de_performance", _m_indexes),
     (5, "identifiant_de_personne", _m_person_id_column),
     (6, "masquer_identifiants_de_connexion", _m_mask_login_failed_identifiers),
+    (7, "rattrapage_retraits_dossiers_sources", _m_resync_retrait_sources),
 ]
 
 

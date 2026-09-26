@@ -1,5 +1,19 @@
 # Historique des versions — À Quai
 
+## [3.64.0] - 2026-09-26
+
+Troisième étape du chantier « ajuster les ressources d'un dossier déjà actif » : rattrapage des données héritées du bug corrigé en 3.60.1.
+
+### 🔧 Migration 7 — rattrapage des retraits « mise à jour »
+- Avant 3.60.1, un retrait fait via un dossier « mise à jour » modifiait le dossier source **sans resynchroniser le parc ni le stock** : un objet rendu pouvait rester affiché comme détenu. La migration 7 (`rattrapage_retraits_dossiers_sources`) rejoue la synchronisation (idempotente, dédupliquée) de chaque dossier source concerné. Copie de sécurité automatique avant application, comme toute migration ; un dossier en échec est ignoré et journalisé sans bloquer le démarrage.
+- **Vérifié sur une copie de la base de production (34 dossiers) : 2 dossiers sources concernés, aucun changement** (parc `assigned` 14 / `degraded` 1 / `in_stock` 3 / `reserved` 4 avant et après, aucun solde de stock modifié, 2ᵉ passage identique). Aucun effet visible à annoncer sur cette base ; une autre installation pourrait voir réapparaître des objets « disponibles » dans le parc.
+
+### 🩺 Invariant de santé
+- Le **Contrôle général de la base** signale désormais « objet(s) du parc encore attribué(s) alors que le dossier les indique rendus (retrait non répercuté) » (`retraitsNonRepercutes`, `backend/models/health.py`).
+
+### 🧪 Tests
+- Scénario HTTP `test_migration_7_rattrape_un_retrait_jamais_repercute_au_parc` (état hérité recréé, invariant avant/après, idempotence) et `tests/browser/check_retrait_rattrapage.py` (7 vérifications : page Base de données, signalement puis disparition, parc).
+
 ## [3.63.0] - 2026-09-26
 
 Deuxième étape du chantier « ajuster les ressources d'un dossier déjà actif » (backend et règles ; le bouton arrive en 3.65.0).

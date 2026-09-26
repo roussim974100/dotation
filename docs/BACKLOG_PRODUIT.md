@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` = **3.63.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
+`dev` = **3.64.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
 
 ## Sprint en cours — « Ajuster les ressources d'un dossier déjà actif »
 
@@ -20,7 +20,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 |---|---|---|---|
 | ✅ 3.62.0 (fait le 24/09) | E-mails de restitution : voir « Demandes utilisateur » ci-dessous | S | P1 |
 | ✅ 3.63.0 (fait le 26/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct. **Reste** : lien public de signature à distance pour un ajustement (aujourd'hui : signature recueillie ensuite depuis l'application), assigner `forms.adjust` aux groupes sur les installations existantes | M | P1 |
-| 3.64.0 | Migration de rattrapage sur les 34 dossiers « mise à jour » déjà en base (resynchronisation parc/stock historique) + invariant de santé associé | S | P0 |
+| ✅ 3.64.0 (fait le 26/09) | Migration 7 de rattrapage + invariant de santé « retrait non répercuté ». Sur la copie de la base de production : 2 dossiers sources, aucun changement (rien à annoncer) | S | P0 |
 | 3.65.0 | Interface : bouton « Ajuster les ressources / le service » sur un dossier actif, retrait de l'option « Mise à jour » du sélecteur de création (le type reste lisible pour les dossiers existants) | M | P1 |
 | 3.66.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
 

@@ -585,6 +585,24 @@ with _gdb() as _pc:
     _new_person_id = _pc.execute("SELECT person_id FROM dotation_forms WHERE id = ?", (_new_id,)).fetchone()[0]
 results["person_unrelated_dossier_gets_new_person"] = bool(_new_person_id) and _new_person_id != _src_person_id
 
+# ---- 3.64.0 : la migration 7 rattrape un retrait « mise a jour » jamais repercute au parc (etat herite du bug 3.60.1) ----
+from migrations import _m_resync_retrait_sources  # noqa: E402
+from models.health import stock_and_unit_invariants  # noqa: E402
+with _gdb() as _mc:
+    # On recree l'etat d'avant le correctif : l'objet rendu est de nouveau « attribue » au dossier source.
+    _mc.execute("UPDATE resource_units SET status = 'assigned', holder_form_id = ? WHERE resource_code = 'poste_retrait360'", (_src_id,))
+with _gdb() as _mc:
+    results["rattrapage_invariant_before"] = stock_and_unit_invariants(_mc)["retraitsNonRepercutes"]
+with _gdb() as _mc:
+    _m_resync_retrait_sources(_mc)
+with _gdb() as _mc:
+    results["rattrapage_invariant_after"] = stock_and_unit_invariants(_mc)["retraitsNonRepercutes"]
+_units_fixed = (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", [])
+results["rattrapage_unit_status"] = [u.get("status") for u in _units_fixed if u.get("identifier") == "SN-RETRAIT-360"]
+with _gdb() as _mc:
+    _m_resync_retrait_sources(_mc)  # idempotente
+results["rattrapage_unit_status_second_run"] = [u.get("status") for u in (admin.get("/api/units?resource=poste_retrait360").get_json() or {}).get("units", []) if u.get("identifier") == "SN-RETRAIT-360"]
+
 # Limitation de connexion : la 11e tentative (meme IP) est refusee, meme avec un en-tete X-Forwarded-For different.
 limited = None
 for i in range(13):

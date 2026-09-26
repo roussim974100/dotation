@@ -278,6 +278,15 @@ def test_retrait_via_mise_a_jour_resynchronise_le_parc_du_dossier_source(http):
     assert http["retrait360_source_items_returned"].get("poste_retrait360", {}).get("state") == "conforme"
 
 
+def test_migration_7_rattrape_un_retrait_jamais_repercute_au_parc(http):
+    """3.64.0 : l'etat herite du bug 3.60.1 (objet rendu toujours « attribue » au dossier source) est detecte par l'invariant
+    de sante puis corrige par la migration 7, qui est idempotente."""
+    assert http["rattrapage_invariant_before"] == 1
+    assert http["rattrapage_invariant_after"] == 0
+    assert http["rattrapage_unit_status"] == ["in_stock"]
+    assert http["rattrapage_unit_status_second_run"] == ["in_stock"]
+
+
 def test_person_id_is_stable_across_a_resource_update_dossier(http):
     """3.61.0 : creer un dossier « mise a jour » en transmettant meta.personId du dossier source relie a la MEME
     personne (pas une nouvelle fiche), alors qu'un dossier tout nouveau sans lien en cree bien une autre."""
