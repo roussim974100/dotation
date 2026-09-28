@@ -728,9 +728,27 @@ function buildPersonHistoryRows(group) {
   `;
 }
 
+// "Progression" (X/Y ressources) porte sur UN dossier : sur la ligne fusionnee d'une personne, se contenter du
+// dossier principal ferait croire qu'elle ne detient que ses ressources a elle, en ignorant ses autres dossiers
+// encore ouverts. On agrege sur tous les dossiers pas encore entierement restitues (un dossier "returned" ne
+// compte plus : ses ressources sont reellement rendues).
+function aggregateGroupProgress(group) {
+  const members = [group.primary, ...group.others];
+  const stillHeld = members.filter((draft) => !["returned", "cancelled"].includes(draft.status || "draft"));
+  const relevant = stillHeld.length ? stillHeld : members;
+  const completed = relevant.reduce((sum, draft) => sum + (Number.isFinite(draft.completedResources) ? draft.completedResources : 0), 0);
+  const total = relevant.reduce((sum, draft) => sum + (Number.isFinite(draft.totalResources) ? draft.totalResources : 0), 0);
+  return { completed, total, ratio: total ? completed / total : 0 };
+}
+
 function renderGroupedDraftRows(drafts, permissions) {
   return groupDraftsByPerson(drafts).map((group) => {
-    const primaryHtml = buildDashboardRow(group.primary, permissions);
+    let rowDraft = group.primary;
+    if (group.others.length) {
+      const aggregate = aggregateGroupProgress(group);
+      rowDraft = { ...group.primary, completedResources: aggregate.completed, totalResources: aggregate.total, resourceProgressRatio: aggregate.ratio };
+    }
+    const primaryHtml = buildDashboardRow(rowDraft, permissions);
     return group.others.length ? primaryHtml + buildPersonHistoryRows(group) : primaryHtml;
   }).join("");
 }
