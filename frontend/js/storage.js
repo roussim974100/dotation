@@ -622,6 +622,116 @@ function renderDashboardCell(key, ctx) {
   return column?.secondary ? html.replace(/<td/, '<td class="dash-col--secondary"') : html;
 }
 
+// Regroupement des lignes par personne : une personne n'apparait qu'une fois par tableau (ses autres dossiers
+// se deplient sous la ligne principale), sans rien changer aux dossiers eux-memes (toujours des documents
+// distincts et immuables : PDF, export, audit inchanges).
+function normalizedIdentityKey(draft, index) {
+  const nom = (draft.nom || "").trim().toLowerCase();
+  const prenom = (draft.prenom || "").trim().toLowerCase();
+  // Identite incomplete (brouillon a peine commence) : jamais fusionnee par nom, on lui donne une cle unique.
+  if (!nom || !prenom) return `solo:${index}`;
+  return `${nom}|${prenom}|${(draft.service || "").trim().toLowerCase()}`;
+}
+
+function draftPriorityScore(draft) {
+  const status = draft.status || "draft";
+  if (status === "awaiting_signature") return 4;
+  if (isOperationalRestitutionDraft(draft)) return 3;
+  if (status === "active") return 2;
+  if (["draft", "partial_assignment"].includes(status)) return 1;
+  return 0; // returned, cancelled : le moins prioritaire pour la ligne principale
+}
+
+// Deux dossiers sont "la meme personne" s'ils partagent un personId non vide, OU la meme identite normalisee
+// (nom+prenom+service) : necessaire pour les dossiers deja crees avant que "Nouvelle attribution pour cette
+// personne" ne reprenne le personId du dossier source (voir prefillIdentityFromForm, app.js). Union-find simple
+// pour fusionner correctement par transitivite (ex: A et B partagent le personId, B et C la meme identite).
+function groupDraftsByPerson(drafts) {
+  const parent = drafts.map((_, i) => i);
+  const find = (i) => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  };
+  const union = (a, b) => {
+    const rootA = find(a), rootB = find(b);
+    if (rootA !== rootB) parent[rootA] = rootB;
+  };
+
+  const byPersonId = new Map();
+  const byIdentity = new Map();
+  drafts.forEach((draft, index) => {
+    if (draft.personId) {
+      if (byPersonId.has(draft.personId)) union(index, byPersonId.get(draft.personId));
+      else byPersonId.set(draft.personId, index);
+    }
+    const identityKey = normalizedIdentityKey(draft, index);
+    if (byIdentity.has(identityKey)) union(index, byIdentity.get(identityKey));
+    else byIdentity.set(identityKey, index);
+  });
+
+  const clusters = new Map();
+  drafts.forEach((draft, index) => {
+    const root = find(index);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root).push(draft);
+  });
+
+  return [...clusters.values()].map((members) => {
+    if (members.length === 1) return { primary: members[0], others: [] };
+    const sorted = [...members].sort((a, b) => {
+      const scoreDiff = draftPriorityScore(b) - draftPriorityScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+    });
+    return { primary: sorted[0], others: sorted.slice(1) };
+  });
+}
+
+function buildPersonHistoryRows(group) {
+  const colCount = getDashboardViewColumns().length;
+  const groupId = `person-history-${group.primary.id}`;
+  const count = group.others.length;
+  const items = group.others.map((draft) => `
+    <li class="person-history__item">
+      <span class="person-history__date">${escapeHtml(formatDate(draft.updatedAt))}</span>
+      <span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}">${escapeHtml(formatDraftStatusLabel(draft))}</span>
+      <span class="person-history__title">${escapeHtml(draft.title || "Dossier")}</span>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-action="editDraft" data-id="${draft.id}">Ouvrir</button>
+    </li>`).join("");
+  return `
+    <tr class="person-history-toggle">
+      <td colspan="${colCount}">
+        <button class="person-history__summary" type="button" data-person-history-open="${groupId}" aria-expanded="false" aria-controls="${groupId}">
+          <span class="person-history__chevron" aria-hidden="true">▸</span>
+          ${count} autre${count > 1 ? "s" : ""} dossier${count > 1 ? "s" : ""} pour cette personne
+        </button>
+      </td>
+    </tr>
+    <tr class="person-history-panel d-none" id="${groupId}">
+      <td colspan="${colCount}"><ul class="person-history__list">${items}</ul></td>
+    </tr>
+  `;
+}
+
+function renderGroupedDraftRows(drafts, permissions) {
+  return groupDraftsByPerson(drafts).map((group) => {
+    const primaryHtml = buildDashboardRow(group.primary, permissions);
+    return group.others.length ? primaryHtml + buildPersonHistoryRows(group) : primaryHtml;
+  }).join("");
+}
+
+document.addEventListener("click", (event) => {
+  const toggle = event.target.closest("[data-person-history-open]");
+  if (!toggle) return;
+  const panel = document.getElementById(toggle.dataset.personHistoryOpen);
+  if (!panel) return;
+  const opening = panel.classList.contains("d-none");
+  panel.classList.toggle("d-none", !opening);
+  toggle.setAttribute("aria-expanded", String(opening));
+  const chevron = toggle.querySelector(".person-history__chevron");
+  if (chevron) chevron.textContent = opening ? "▾" : "▸";
+});
+
 function buildDashboardRow(draft, permissions) {
   const viewMode = getDashboardViewMode();
   if (viewMode === "restitutions_pending") {
@@ -1681,25 +1791,19 @@ async function renderDraftList() {
     if (viewMode === "active") {
       if (draftList) {
         const visibleAssignment = assignmentDrafts.slice(0, assignmentDisplayCount);
-        draftList.innerHTML = visibleAssignment
-          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
-          .join("");
+        draftList.innerHTML = renderGroupedDraftRows(visibleAssignment, { canExport, canDelete, canRestitution, canEdit, canAdjust });
         renderLoadMoreButton("assignment", assignmentDrafts.length, assignmentDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       }
       if (restitutionList) {
         const visibleRestitution = restitutionDrafts.slice(0, restitutionDisplayCount);
-        restitutionList.innerHTML = visibleRestitution
-          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
-          .join("");
+        restitutionList.innerHTML = renderGroupedDraftRows(visibleRestitution, { canExport, canDelete, canRestitution, canEdit, canAdjust });
         renderLoadMoreButton("restitution", restitutionDrafts.length, restitutionDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       }
       assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
       restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
     } else if (historyList) {
       const visibleHistory = historyDrafts.slice(0, historyDisplayCount);
-      historyList.innerHTML = visibleHistory
-        .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
-        .join("");
+      historyList.innerHTML = renderGroupedDraftRows(visibleHistory, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       renderLoadMoreButton("history", historyDrafts.length, historyDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       historyEmptyState?.classList.toggle("d-none", historyDrafts.length > 0);
     }

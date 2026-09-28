@@ -2737,6 +2737,13 @@ async function prefillIdentityFromForm(sourceId) {
       radio.dispatchEvent(new Event("change", { bubbles: true }));
     }
     if (person.service) setServiceValue(person.service);
+    const startAt = result?.data?.meta?.startAt || "";
+    const startAtEl = document.getElementById("start_at");
+    if (startAtEl && startAt) startAtEl.value = normalizeDateInputValue(startAt);
+    // Meme identite de personne que le dossier source (pas une nouvelle fiche « personne » a chaque nouvelle
+    // attribution) : regroupee avec ses dossiers precedents dans les tableaux de bord (voir groupDraftsByPerson).
+    const personIdEl = document.getElementById("retraitsSourcePersonId");
+    if (personIdEl) personIdEl.value = result?.data?.meta?.personId || "";
     showToast("Identité reprise du dossier précédent.", "info");
   } catch (error) {
     showToast("Impossible de reprendre l'identité du dossier précédent.", "warning");

@@ -1525,6 +1525,70 @@ form section.content-card {
   background-color: var(--surface-alt);
 }
 
+/* Historique deplie d'une personne ayant plusieurs dossiers (une ligne par personne dans les tableaux de bord). */
+.person-history-toggle td {
+  padding: 0;
+  border-top: none;
+}
+
+.person-history__summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: none;
+  border: none;
+  color: var(--text-muted, #6b7a8d);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.person-history__summary:hover {
+  color: var(--text);
+}
+
+.person-history__chevron {
+  display: inline-block;
+  transition: transform 0.12s ease;
+}
+
+.person-history-panel td {
+  padding: 0 1rem 0.75rem;
+  border-top: none;
+}
+
+.person-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.person-history__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.person-history__date {
+  color: var(--text-muted, #6b7a8d);
+  min-width: 6.5rem;
+}
+
+.person-history__title {
+  flex: 1;
+  min-width: 8rem;
+}
+
 /* Pagination du journal */
 .logs-pagination {
   display: flex;
