@@ -1,5 +1,32 @@
 # Historique des versions — À Quai
 
+## [3.66.1] - 2026-09-28
+
+### 🐛 Droit `forms.adjust` manquant sur les groupes déjà en service
+- Le groupe **admin** (et **administration**) créé avant la 3.65.0 n'avait jamais reçu automatiquement le droit `forms.adjust` : le bouton « Ajuster » restait invisible malgré le rôle admin. `seed_default_groups` et `migrate_missing_groups` dupliquaient chacune la même liste de permissions, seule l'une des deux avait été mise à jour.
+- Déduplication des deux fonctions + nouveau mécanisme `PERMISSION_BACKFILLS` (`backend/app.py`) : rattrape **une fois pour toutes** un droit précis sur des groupes précis au démarrage, sans jamais réajouter une permission retirée volontairement par un admin.
+
+### 🖥️ Tableau des autorisations éditable (Admin > Groupes)
+- Le tableau « Qui peut faire quoi ? » n'affichait les droits qu'en lecture seule (✔ / –), sauf l'accès UNC. Toutes les permissions sont désormais des cases à cocher, pour tous les groupes.
+- Garde-fou : impossible de retirer `users.manage`/`db.manage` de son propre groupe si aucun autre de ses groupes ne le porte (on ne peut pas se verrouiller soi-même hors de l'administration). Chaque changement reste journalisé (audit existant).
+- Fichiers : `backend/routes/admin.py`, `frontend/js/admin.js`. Tests : `tests/test_group_permissions_editable.py`.
+
+### 🖥️ Retrait partiel par ajustement visible dans « Restitutions en cours »
+- Un retrait fait via « Ajuster » (dossier actif, la personne ne quitte pas son poste) reste dans « Attributions finalisées » **et** apparaît maintenant aussi dans « Restitutions en cours » tant que sa signature à distance est en attente, avec un badge dédié (« Ajustement à signer ») et une ouverture qui pointe vers la fiche plutôt que vers la restitution.
+- Fichier : `frontend/js/storage.js`.
+
+### 📱 Lien de signature à distance + QR code pour un ajustement
+- Troisième type de lien de signature (à côté de l'attribution et de la restitution) : QR code et e-mail `.eml` disponibles depuis une ligne « Ajustement à signer » (menu « ⋯ »), page publique dédiée pour consulter le geste puis signer.
+- Fichiers : `backend/models/signature.py`, `backend/routes/signature.py`, `backend/models/forms.py`, `backend/routes/pages.py`, `frontend/adjustment-signature.html` (nouveau), `frontend/js/adjustment-signature.js` (nouveau), `frontend/js/storage.js`.
+- **Correctif de sécurité au passage** : les 3 routes publiques de soumission de signature (attribution, restitution, ajustement) renvoyaient tout le dossier — image de signature comprise — dans leur réponse JSON. Corrigé pour les 3 (`_public_summary`, `backend/routes/signature.py`).
+- Tests : `tests/test_adjustment_signature_link.py`.
+
+### 🐛 Cadre de signature invisible en mode sombre
+- `.signature-box` n'avait pas de bordure ; en mode sombre son fond se confondait avec celui de la fenêtre. Bordure ajoutée (`var(--border)`, déjà adapté au mode sombre).
+
+### 🧪 Tests
+- 8 tests ajoutés (permissions éditables, lien de signature d'ajustement) ; suite complète : 429 passent.
+
 ## [3.66.0] - 2026-09-26
 
 ### 📱 QR code du lien de signature
