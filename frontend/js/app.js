@@ -1250,7 +1250,10 @@ function syncDossierTypeUi() {
   }
   const sourceFormPickerBlock = document.getElementById("sourceFormPickerBlock");
   if (sourceFormPickerBlock) {
-    sourceFormPickerBlock.classList.toggle("d-none", dossierType !== "mise_a_jour");
+    // "Changement de service" doit aussi pouvoir reprendre l'identite (et le personId) d'un dossier existant :
+    // sans ca, la personne repartirait sur un personId different et n'apparaitrait plus regroupee avec son
+    // historique dans les tableaux de bord (voir groupDraftsByPerson, storage.js).
+    sourceFormPickerBlock.classList.toggle("d-none", !["mise_a_jour", "changement_service"].includes(dossierType));
   }
   const retraitsSection = document.getElementById("section-retraits");
   if (retraitsSection) {
@@ -2737,6 +2740,13 @@ async function prefillIdentityFromForm(sourceId) {
       radio.dispatchEvent(new Event("change", { bubbles: true }));
     }
     if (person.service) setServiceValue(person.service);
+    const startAt = result?.data?.meta?.startAt || "";
+    const startAtEl = document.getElementById("start_at");
+    if (startAtEl && startAt) startAtEl.value = normalizeDateInputValue(startAt);
+    // Meme identite de personne que le dossier source (pas une nouvelle fiche « personne » a chaque nouvelle
+    // attribution) : regroupee avec ses dossiers precedents dans les tableaux de bord (voir groupDraftsByPerson).
+    const personIdEl = document.getElementById("retraitsSourcePersonId");
+    if (personIdEl) personIdEl.value = result?.data?.meta?.personId || "";
     showToast("Identité reprise du dossier précédent.", "info");
   } catch (error) {
     showToast("Impossible de reprendre l'identité du dossier précédent.", "warning");

@@ -515,6 +515,7 @@ def row_to_summary(row, warning_days=None):
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],
+        "personId": row["person_id"] if "person_id" in row.keys() else "",
         "dossierType": row["dossier_type"],
         "title": row["title"],
         "status": effective_status,

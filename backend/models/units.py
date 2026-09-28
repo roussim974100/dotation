@@ -87,6 +87,16 @@ def next_status(current, event_type):
     raise ValueError(f"Evenement inconnu : {event_type}")
 
 
+# Evenements qui cloturent la relation ENTRE UN DOSSIER PRECIS ET L'UNITE (attribution reelle, restitution, perte,
+# transfert, mise au rebut, dossier supprime) : une reservation de ce meme dossier devient alors obsolete. On la
+# leve ici plutot que de compter sur l'ordre chronologique "reserve" avant "attribue" : un dossier de regularisation
+# (attribution retrodatee, voir sync_units_for_form) peut produire un evenement "reserve" date APRES l'"assigned"
+# correspondant. Sans ce filet, la reservation ne serait jamais levee et l'objet resterait affiche "reserve" pour
+# toujours, meme longtemps apres sa restitution (constate en production sur une regularisation : voir
+# tests/test_units_reservation_regularisation.py).
+_FORM_RELATIONSHIP_SETTLED = {"assigned", "released", "returned", "returned_degraded", "lost", "transferred", "retired"}
+
+
 def derive_state(events):
     """Etat courant d'une unite a partir de ses evenements (tries par date puis ordre d'insertion).
     Les reservations sont suivies par dossier et se superposent a l'etat de base : tant qu'un dossier au moins
@@ -101,8 +111,8 @@ def derive_state(events):
         if kind == "reservation_released":
             reservations.pop(form, None)
             continue
-        if kind in ("assigned", "released"):
-            reservations.pop(form, None)  # la reservation de ce dossier devient attribution, ou disparait avec lui
+        if kind in _FORM_RELATIONSHIP_SETTLED:
+            reservations.pop(form, None)  # la reservation de ce dossier devient attribution, ou n'a plus lieu d'etre
         if kind == "released":
             # Dossier supprime : n'affecte l'etat de base que s'il detenait l'objet (pas s'il ne faisait que le reserver).
             if holder and holder.get("form_id") == form:
