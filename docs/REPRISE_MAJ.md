@@ -7,16 +7,16 @@ Document de passage de relais (session du 20 septembre 2026). À lire en premier
 
 ## 1. Où on en est
 
+> Mis à jour le 26/09/2026. Le suivi détaillé (version, sprint, priorités) est dans [`BACKLOG_PRODUIT.md`](BACKLOG_PRODUIT.md).
+
 | Élément | État |
 |---|---|
-| Version | **3.60.0** sur `dev` (`README.md`, `frontend/js/branding.js`, `CHANGELOG.md`) |
-| PR dev → preprod | **#17** ouverte |
-| PR dev → prod | **#18** ouverte, à fusionner **après validation sur preprod** |
-| Fusion des PR | par le propriétaire du dépôt (« Create a merge commit », contournement administrateur) |
-| Tests | 387 pytest réussis (navigateur inclus) + scénarios `tests/browser/check_*.py` verts |
-| Non exécuté sur un vrai serveur | `setup/deploy-common.sh` (validé par syntaxe et tests), migrations sur un LXC Linux multi-workers, CI GitHub |
+| Version | **3.66.0** sur `dev`, `preprod` et `prod` (`README.md`, `frontend/js/branding.js`, `CHANGELOG.md`) |
+| Promotion | dev → preprod par PR (#24) puis preprod → prod (#25), fusionnées par le propriétaire (« Create a merge commit », contournement administrateur). La branche `main` est la branche par défaut de GitHub (affichage du README) : la tenir alignée par une PR |
+| Tests | 421 pytest réussis + scénarios `tests/browser/check_*.py` (dont ajustement, QR code avec décodage réel, e-mails de restitution) |
+| Non exécuté sur un vrai serveur | `setup/deploy-common.sh` (validé par syntaxe et tests), migrations sur un LXC Linux multi-workers |
 
-Historique des versions du chantier : `CHANGELOG.md` (3.50.2 à 3.60.0). Audit et décisions : `docs/audit/`.
+Historique des versions : `CHANGELOG.md`. Audit et décisions : `docs/audit/`.
 
 ## 2. Circuit de mise en production
 

@@ -23,7 +23,7 @@ async function adminRequest(url, options = {}) {
     } catch (error) {
       payload = null;
     }
-    throw new Error(payload?.error || `HTTP ${response.status}`);
+    throw new Error(payload?.message || payload?.error || `HTTP ${response.status}`);
   }
 
   return response.json();
@@ -303,14 +303,26 @@ function renderGroupMatrix() {
     return;
   }
   const head = entries.map(([, group]) => `<th scope="col" class="text-center">${escapeHtml(group.label)}</th>`).join("");
+  const cell = (key, group, info) => {
+    const isAdmin = (group.permissions || []).includes("*");
+    if (isAdmin) {
+      return '<td class="text-center text-success" aria-label="Oui">✔</td>';
+    }
+    const checked = groupCan(group, info.key);
+    const id = `perm_${escapeHtml(key)}_${escapeHtml(info.key)}`;
+    return `<td class="text-center">
+      <input class="form-check-input" type="checkbox" role="switch" id="${id}" ${checked ? "checked" : ""}
+        aria-label="${escapeHtml(info.label)} — ${escapeHtml(group.label)}"
+        data-admin-action="toggleGroupPermission" data-group-key="${escapeHtml(key)}"
+        data-permission-key="${escapeHtml(info.key)}" data-current="${checked}">
+    </td>`;
+  };
   const rows = PERMISSION_INFO.map((info) => `
     <tr><th scope="row" class="fw-normal">${escapeHtml(info.label)}</th>
-      ${entries.map(([, group]) => groupCan(group, info.key)
-        ? '<td class="text-center text-success" aria-label="Oui">✔</td>'
-        : '<td class="text-center text-muted" aria-label="Non">–</td>').join("")}</tr>`).join("");
+      ${entries.map(([key, group]) => cell(key, group, info)).join("")}</tr>`).join("");
   host.innerHTML = `
     <h3 class="h5 mt-4">Qui peut faire quoi ?</h3>
-    <p class="panel-text">✔ veut dire « a le droit », – veut dire « n'a pas le droit ».</p>
+    <p class="panel-text">Cochez ou décochez une case pour accorder ou retirer un droit à un groupe. Le groupe « tout faire » n'est pas modifiable ici.</p>
     <div class="table-responsive"><table class="table table-sm align-middle">
       <thead><tr><th scope="col">Ce que l'on peut faire</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -1359,24 +1371,31 @@ async function deleteResource(resourceId) {
 }
 
 async function toggleGroupUnc(groupKey, currentValue) {
-  const label = groups[groupKey]?.label || groupKey;
+  return toggleGroupPermission(groupKey, "unc.view_all", currentValue);
+}
+
+async function toggleGroupPermission(groupKey, permissionKey, currentValue) {
+  const groupLabel = groups[groupKey]?.label || groupKey;
+  const permissionLabel = PERMISSION_INFO.find((info) => info.key === permissionKey)?.label || permissionKey;
   const enabling = !currentValue;
   const msg = enabling
-    ? `Accorder l'accès UNC complet au groupe "${label}" ?`
-    : `Retirer l'accès UNC complet au groupe "${label}" ?`;
+    ? `Accorder « ${permissionLabel} » au groupe « ${groupLabel} » ?`
+    : `Retirer « ${permissionLabel} » au groupe « ${groupLabel} » ?`;
   const confirmed = await askConfirm(msg, {
     confirmLabel: enabling ? "Accorder" : "Retirer",
     confirmClass: enabling ? "btn-success" : "btn-danger"
   });
   if (!confirmed) return;
-  const updated = await adminRequest(`/api/admin/groups/${encodeURIComponent(groupKey)}`, {
-    method: "PUT",
-    body: JSON.stringify({ "unc.view_all": enabling })
-  });
-  if (updated) {
+  try {
+    const updated = await adminRequest(`/api/admin/groups/${encodeURIComponent(groupKey)}`, {
+      method: "PUT",
+      body: JSON.stringify({ [permissionKey]: enabling })
+    });
     groups = updated;
     renderGroups();
-    showToast(enabling ? `Accès UNC accordé au groupe "${label}".` : `Accès UNC retiré au groupe "${label}".`, "success");
+    showToast(enabling ? `« ${permissionLabel} » accordé au groupe « ${groupLabel} ».` : `« ${permissionLabel} » retiré au groupe « ${groupLabel} ».`, "success");
+  } catch (error) {
+    showToast(`Impossible de modifier ce droit : ${error.message}`, "error");
   }
 }
 
@@ -1430,6 +1449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     else if (action === "toggleResourceState") toggleResourceState(id, active === "true");
     else if (action === "deleteResource") deleteResource(id);
     else if (action === "toggleGroupUnc") toggleGroupUnc(btn.dataset.groupKey, btn.dataset.current === "true");
+    else if (action === "toggleGroupPermission") toggleGroupPermission(btn.dataset.groupKey, btn.dataset.permissionKey, btn.dataset.current === "true");
   });
 
   try {

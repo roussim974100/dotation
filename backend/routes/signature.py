@@ -5,13 +5,17 @@ from database import get_db
 from auth import login_required, has_permission, get_request_client_ip
 from models.audit import current_actor, insert_audit_event, insert_app_log
 from models.workflow import collect_resource_validation_errors, derive_restitution_workflow_status
-from models.forms import get_form, persist_form, build_signature_public_payload, build_restitution_signature_public_payload
+from models.forms import (
+    get_form, persist_form, build_signature_public_payload, build_restitution_signature_public_payload,
+    build_adjustment_signature_public_payload,
+)
 from models.signature import (
     signature_link_label, signature_link_scope, signature_link_public_actor,
     serialize_signature_link,
     get_latest_signature_link, get_signature_link_by_id, get_signature_link_by_token,
     create_signature_link, revoke_signature_link,
 )
+from models.adjustment import complete_adjustment_signature
 
 bp = Blueprint("signature", __name__)
 
@@ -92,6 +96,44 @@ def create_form_restitution_signature_link_route(form_id):
     return jsonify({"link": serialize_signature_link(link_row)}), 201
 
 
+@bp.route("/api/forms/<form_id>/adjustment-signature-link", methods=["GET"])
+@login_required
+def get_form_adjustment_signature_link_route(form_id):
+    if not has_permission("forms.adjust"):
+        return jsonify({"error": "forbidden"}), 403
+    if not get_form(form_id):
+        return jsonify({"error": "not_found"}), 404
+    with get_db() as connection:
+        link_row = get_latest_signature_link(connection, form_id, link_type="adjustment")
+    return jsonify({"link": serialize_signature_link(link_row)})
+
+
+@bp.route("/api/forms/<form_id>/adjustment-signature-link", methods=["POST"])
+@login_required
+def create_form_adjustment_signature_link_route(form_id):
+    if not has_permission("forms.adjust"):
+        return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json(silent=True) or {}
+    validity_days = payload.get("validityDays", 7)
+    try:
+        validity_days = int(validity_days)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_validity_days"}), 400
+    if validity_days < 1 or validity_days > 30:
+        return jsonify({"error": "invalid_validity_days"}), 400
+    try:
+        with get_db() as connection:
+            link_row = create_signature_link(
+                connection, form_id,
+                actor=current_actor(),
+                expires_in_hours=validity_days * 24,
+                link_type="adjustment",
+            )
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+    return jsonify({"link": serialize_signature_link(link_row)}), 201
+
+
 @bp.route("/api/signature-links/<link_id>", methods=["DELETE"])
 @login_required
 def revoke_signature_link_route(link_id):
@@ -99,7 +141,11 @@ def revoke_signature_link_route(link_id):
         existing_link = get_signature_link_by_id(connection, link_id)
         if not existing_link:
             return jsonify({"error": "not_found"}), 404
-        required_permission = "forms.restitution" if existing_link["link_type"] == "restitution" else "forms.edit"
+        required_permission = (
+            "forms.restitution" if existing_link["link_type"] == "restitution"
+            else "forms.adjust" if existing_link["link_type"] == "adjustment"
+            else "forms.edit"
+        )
         if not has_permission(required_permission):
             return jsonify({"error": "forbidden"}), 403
         link_row = revoke_signature_link(connection, link_id, actor=current_actor())
@@ -146,6 +192,12 @@ def get_signature_token_route(token):
 
 
 _MAX_SIGNATURE_BYTES = 1_048_576  # 1 Mo
+
+
+def _public_summary(saved):
+    """Resume renvoye par une route PUBLIQUE de signature : jamais `data` (le dossier complet, image de
+    signature comprise, ne doit jamais repartir dans une reponse a un lien non authentifie)."""
+    return {key: value for key, value in (saved.get("summary") or {}).items() if key != "data"}
 
 
 @bp.route("/api/signature/<token>/submit", methods=["POST"])
@@ -218,7 +270,7 @@ def submit_signature_token_route(token):
                 target_label=form_row["title"],
             )
 
-    return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})
+    return jsonify({"success": True, "summary": _public_summary(saved), "link": serialize_signature_link(current_link)})
 
 
 @bp.route("/api/restitution-signature/<token>", methods=["GET"])
@@ -328,7 +380,107 @@ def submit_restitution_signature_token_route(token):
                 target_label=form_row["title"],
             )
 
-    return jsonify({"success": True, "summary": saved["summary"], "link": serialize_signature_link(current_link)})
+    return jsonify({"success": True, "summary": _public_summary(saved), "link": serialize_signature_link(current_link)})
+
+
+@bp.route("/api/adjustment-signature/<token>", methods=["GET"])
+def get_adjustment_signature_token_route(token):
+    with get_db() as connection:
+        link_row = get_signature_link_by_token(connection, token)
+        if not link_row or link_row["link_type"] != "adjustment":
+            return jsonify({"error": "invalid_link"}), 404
+        if link_row["status"] != "active":
+            return jsonify({"error": link_row["status"]}), 410
+
+        connection.execute(
+            "UPDATE signature_links SET last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
+            (utc_now(), get_request_client_ip(), link_row["id"]),
+        )
+        form_row = connection.execute(
+            "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
+            (link_row["form_id"],),
+        ).fetchone()
+        if form_row:
+            insert_app_log(
+                connection, "adjustment_signature", "signature_link_opened",
+                "Lien de signature d'ajustement ouvert",
+                "form", link_row["form_id"],
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "adjustment"},
+                actor=signature_link_public_actor("adjustment"),
+                target_label=form_row["title"],
+            )
+
+    form_data = get_form(link_row["form_id"])
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        payload = build_adjustment_signature_public_payload(form_data, link_row)
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+    response = jsonify(payload)
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
+
+
+@bp.route("/api/adjustment-signature/<token>/submit", methods=["POST"])
+def submit_adjustment_signature_token_route(token):
+    payload = request.get_json(silent=True) or {}
+    signature_data = payload.get("signatureDataUrl") or ""
+    if not signature_data:
+        return jsonify({"error": "signature_required"}), 400
+    if len(signature_data) > _MAX_SIGNATURE_BYTES:
+        return jsonify({"error": "signature_too_large"}), 413
+
+    with get_db() as connection:
+        link_row = get_signature_link_by_token(connection, token)
+        if not link_row or link_row["link_type"] != "adjustment":
+            return jsonify({"error": "invalid_link"}), 404
+        if link_row["status"] != "active":
+            return jsonify({"error": link_row["status"]}), 410
+
+    form_data = get_form(link_row["form_id"])
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+
+    dossier_payload = form_data["data"]
+    event = next((e for e in dossier_payload.get("ajustements") or [] if e.get("status") == "pending_signature"), None)
+    if not event:
+        return jsonify({"error": "no_pending_adjustment"}), 404
+
+    try:
+        dossier_payload, event = complete_adjustment_signature(
+            dossier_payload, event["id"], {"mode": "presentiel", "signatureDataUrl": signature_data},
+        )
+        saved = persist_form(dossier_payload, allow_locked_update=True)
+    except AppError as error:
+        return jsonify({"error": error.code}), error.status
+
+    with get_db() as connection:
+        connection.execute(
+            "UPDATE signature_links SET status = 'used', used_at = ?, last_opened_at = ?, last_opened_ip = ? WHERE id = ?",
+            (utc_now(), utc_now(), get_request_client_ip(), link_row["id"]),
+        )
+        current_link = get_signature_link_by_id(connection, link_row["id"])
+        form_row = connection.execute(
+            "SELECT dossier_id, title FROM dotation_forms WHERE id = ?",
+            (link_row["form_id"],),
+        ).fetchone()
+        if form_row:
+            insert_audit_event(
+                connection, form_row["dossier_id"], "signature_link_used",
+                "Lien de signature d'ajustement utilise",
+                {"form_id": link_row["form_id"], "title": form_row["title"], "link_type": "adjustment"},
+            )
+            insert_app_log(
+                connection, "adjustment_signature", "signature_link_used",
+                "Lien de signature d'ajustement utilise",
+                "form", link_row["form_id"],
+                {"title": form_row["title"], "ip": get_request_client_ip(), "link_type": "adjustment"},
+                actor=signature_link_public_actor("adjustment"),
+                target_label=form_row["title"],
+            )
+
+    return jsonify({"success": True, "summary": _public_summary(saved), "link": serialize_signature_link(current_link)})
 
 
 def _check_signature_verification():

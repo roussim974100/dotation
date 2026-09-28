@@ -15,7 +15,7 @@ results = {}
 
 # Endpoints volontairement publics (pas d'authentification attendue).
 PUBLIC_PREFIXES = ("/css/", "/js/", "/assets/", "/api/auth/", "/api/signature/", "/api/restitution-signature/",
-                   "/signature/", "/restitution-signature/")
+                   "/api/adjustment-signature/", "/signature/", "/restitution-signature/", "/adjustment-signature/")
 PUBLIC_EXACT = {
     "/", "/login", "/signup", "/logout", "/setup.html", "/api/settings/public", "/api/settings/logo", "/api/client-context",
     "/api/csrf-token", "/api/session", "/api/setup/status", "/api/setup/complete", "/about.html", "/contact.html",

@@ -13,24 +13,32 @@ from models.audit import insert_audit_event, insert_app_log, current_actor
 def signature_link_label(link_type):
     if link_type == "restitution":
         return "Lien de signature de restitution"
+    if link_type == "adjustment":
+        return "Lien de signature d'ajustement"
     return "Lien de signature"
 
 
 def signature_link_scope(link_type):
     if link_type == "restitution":
         return "restitution_signature"
+    if link_type == "adjustment":
+        return "adjustment_signature"
     return "signature"
 
 
 def signature_link_public_url(link_type, token):
     if link_type == "restitution":
         return f"/restitution-signature/{token}"
+    if link_type == "adjustment":
+        return f"/adjustment-signature/{token}"
     return f"/signature/{token}"
 
 
 def signature_link_public_actor(link_type):
     if link_type == "restitution":
         return "public_restitution_signature_link"
+    if link_type == "adjustment":
+        return "public_adjustment_signature_link"
     return "public_signature_link"
 
 
@@ -156,6 +164,10 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, 
             raise AppError("restitution_not_ready", "La restitution doit être préparée avant de générer un lien.")
         if restitution.get("signatureDataUrl"):
             raise AppError("already_signed", "Cette restitution est déjà signée.")
+    elif link_type == "adjustment":
+        pending = next((e for e in payload.get("ajustements") or [] if e.get("status") == "pending_signature"), None)
+        if not pending:
+            raise AppError("no_pending_adjustment", "Aucun ajustement en attente de signature sur ce dossier.")
     else:
         validation = payload.get("validation", {})
         if validation.get("signatureDataUrl"):

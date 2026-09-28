@@ -691,6 +691,9 @@ function formatDraftStatusLabel(draft) {
   if (draft?.pendingFinalization && (draft.status || "draft") === "partial_return") {
     return "En attente de finalisation";
   }
+  if ((draft?.status || "draft") === "active" && !hasRestitutionData(draft) && pendingAdjustmentWithdrawal(draft)) {
+    return "Ajustement à signer";
+  }
   return formatStatusLabel(draft?.status || "draft");
 }
 function hasRestitutionData(draft) {
@@ -758,8 +761,14 @@ function isOperationalAssignmentDraft(draft) {
     && ["draft", "partial_assignment", "awaiting_signature"].includes(draft.status || "draft");
 }
 
+// Un retrait fait par ajustement n'est pas une restitution (voir hasRestitutionData), mais tant qu'il attend
+// sa signature (mode a distance), on veut le garder visible dans "Restitutions en cours" pour ne pas le perdre.
+function pendingAdjustmentWithdrawal(draft) {
+  return (draft.data?.ajustements || []).find((event) => event.status === "pending_signature" && (event.retraits || []).length > 0) || null;
+}
+
 function isOperationalRestitutionDraft(draft) {
-  return hasRestitutionData(draft)
+  return (hasRestitutionData(draft) || Boolean(pendingAdjustmentWithdrawal(draft)))
     && ["active", "partial_return", "awaiting_signature"].includes(draft.status || "draft");
 }
 
@@ -821,15 +830,23 @@ function buildDraftActionButtons(draft, options) {
   // bascule en phase de restitution que si des données de restitution existent.
   const inRestitutionPhase = ["returned", "partial_return"].includes(status) || (status === "awaiting_signature" && hasRestitution);
 
-  // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html
+  // Dans la vue "Restitutions en cours", "Ouvrir" va directement à restitution.html — sauf si le dossier n'y
+  // figure que pour un ajustement en attente de signature : il n'y a alors aucune vraie restitution à ouvrir.
   const inRestitutionsPendingView = viewMode === "restitutions_pending";
-  const openAction = (inRestitutionsPendingView && canOpenRestitution(draft, options))
-    ? "openRestitution"
-    : "editDraft";
+  const pendingAdjustment = inRestitutionsPendingView && status === "active" && !hasRestitution && options.canAdjust
+    ? pendingAdjustmentWithdrawal(draft)
+    : null;
+  const openAction = pendingAdjustment
+    ? "editDraft"
+    : (inRestitutionsPendingView && canOpenRestitution(draft, options))
+      ? "openRestitution"
+      : "editDraft";
 
   // Action metier de l'etape, mise en avant a cote de "Ouvrir".
   let stepAction = null;
-  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+  if (pendingAdjustment) {
+    stepAction = { action: "openAdjustmentSignature", label: "Signer l'ajustement" };
+  } else if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
     stepAction = { action: "openRestitution", label: "Restituer" };
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
     stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
@@ -853,7 +870,9 @@ function buildDraftActionButtons(draft, options) {
 
   // E-mails — actions adaptées au workflow courant (la demande de signature est promue en bouton)
   const emailItems = [];
-  if (inRestitutionPhase) {
+  if (pendingAdjustment) {
+    emailItems.push({ action: "prepareAdjustmentSignatureEmail", id, label: "Envoyer le lien de signature (ajustement)" });
+  } else if (inRestitutionPhase) {
     emailItems.push({ action: "prepareRestitutionInfoEmail", id, label: "Informer de la restitution" });
     if (options.canExport && hasRestitution) {
       emailItems.push({ action: "prepareRestitutionPdfEmail", id, label: "Envoyer le PDF de restitution" });
@@ -880,7 +899,9 @@ function buildDraftActionButtons(draft, options) {
 
   // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
   const qrItems = [];
-  if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
+  if (pendingAdjustment) {
+    qrItems.push({ action: "showAdjustmentSignatureQr", id, label: "QR code de signature (ajustement)" });
+  } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
     qrItems.push({ action: "showRestitutionSignatureQr", id, label: "QR code de signature (restitution)" });
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
     qrItems.push({ action: "showAssignmentSignatureQr", id, label: "QR code de signature (attribution)" });
@@ -1655,30 +1676,31 @@ async function renderDraftList() {
     const canDelete = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.delete"));
     const canRestitution = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.restitution"));
     const canEdit = Boolean(user?.permissions?.includes("*") || user?.permissions?.includes("forms.edit"));
+    const canAdjust = canAdjustDossier(user);
 
     if (viewMode === "active") {
       if (draftList) {
         const visibleAssignment = assignmentDrafts.slice(0, assignmentDisplayCount);
         draftList.innerHTML = visibleAssignment
-          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
           .join("");
-        renderLoadMoreButton("assignment", assignmentDrafts.length, assignmentDisplayCount, { canExport, canDelete, canRestitution, canEdit });
+        renderLoadMoreButton("assignment", assignmentDrafts.length, assignmentDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       }
       if (restitutionList) {
         const visibleRestitution = restitutionDrafts.slice(0, restitutionDisplayCount);
         restitutionList.innerHTML = visibleRestitution
-          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+          .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
           .join("");
-        renderLoadMoreButton("restitution", restitutionDrafts.length, restitutionDisplayCount, { canExport, canDelete, canRestitution, canEdit });
+        renderLoadMoreButton("restitution", restitutionDrafts.length, restitutionDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       }
       assignmentEmptyState?.classList.toggle("d-none", assignmentDrafts.length > 0);
       restitutionEmptyState?.classList.toggle("d-none", restitutionDrafts.length > 0);
     } else if (historyList) {
       const visibleHistory = historyDrafts.slice(0, historyDisplayCount);
       historyList.innerHTML = visibleHistory
-        .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit }))
+        .map((draft) => buildDashboardRow(draft, { canExport, canDelete, canRestitution, canEdit, canAdjust }))
         .join("");
-      renderLoadMoreButton("history", historyDrafts.length, historyDisplayCount, { canExport, canDelete, canRestitution, canEdit });
+      renderLoadMoreButton("history", historyDrafts.length, historyDisplayCount, { canExport, canDelete, canRestitution, canEdit, canAdjust });
       historyEmptyState?.classList.toggle("d-none", historyDrafts.length > 0);
     }
 
@@ -2173,6 +2195,20 @@ async function ensureRestitutionSignatureLink(id, validityDays) {
   };
 }
 
+async function ensureAdjustmentSignatureLink(id, validityDays) {
+  let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/adjustment-signature-link`);
+  if (!result?.link || result.link.status !== "active" || !result.link.url) {
+    result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/adjustment-signature-link`, {
+      method: "POST",
+      body: validityDays ? JSON.stringify({ validityDays }) : undefined
+    });
+  }
+  return {
+    link: result.link,
+    absoluteUrl: new URL(result.link.url, window.location.origin).href
+  };
+}
+
 function askSignatureLinkValidityDays() {
   return new Promise((resolve) => {
     let modal = document.getElementById("signatureLinkValidityModal");
@@ -2276,11 +2312,14 @@ async function showSignatureQr(id, kind) {
   try {
     const { link, absoluteUrl } = kind === "restitution"
       ? await ensureRestitutionSignatureLink(id)
-      : await ensureAssignmentSignatureLink(id);
+      : kind === "adjustment"
+        ? await ensureAdjustmentSignatureLink(id)
+        : await ensureAssignmentSignatureLink(id);
     const draft = findDraftSummary(id);
+    const titles = { restitution: "Signature de la restitution", adjustment: "Signature de l'ajustement" };
     showSignatureQrDialog({
       url: absoluteUrl,
-      title: kind === "restitution" ? "Signature de la restitution" : "Signature de l'attribution",
+      title: titles[kind] || "Signature de l'attribution",
       subtitle: draft?.title || "",
       expiresAt: link?.expiresAt
     });
@@ -2295,6 +2334,10 @@ async function showAssignmentSignatureQr(id) {
 
 async function showRestitutionSignatureQr(id) {
   await showSignatureQr(id, "restitution");
+}
+
+async function showAdjustmentSignatureQr(id) {
+  await showSignatureQr(id, "adjustment");
 }
 
 async function copyRestitutionSignatureLink(id) {
@@ -2322,6 +2365,47 @@ async function prepareRestitutionSignatureEmail(id) {
     await saveSimpleEmailDraft(emailDraft, `signature_restitution_${draft?.title || id}`);
   } catch (error) {
     showToast(error.message || "Impossible de préparer l'e-mail de restitution.", "error");
+  }
+}
+
+function buildAdjustmentSignatureEmailContent(draft, absoluteUrl) {
+  const title = draft?.title || "Dossier";
+  const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
+  const recipientEmail = getPdfEmailRecipient(draft);
+  return {
+    recipientEmail,
+    subject: "Lien de signature de l'ajustement",
+    title: "Signature d'ajustement",
+    metaLines: [title, fullName].filter(Boolean),
+    bodyLines: [
+      "Bonjour,",
+      "",
+      "Vous trouverez ci-dessous le lien pour consulter et signer l'ajustement de votre dossier :",
+      absoluteUrl,
+      "",
+      `Dossier : ${title}`,
+      fullName ? `Personne concernée : ${fullName}` : "",
+      "",
+      "Cordialement,"
+    ].filter(Boolean)
+  };
+}
+
+async function prepareAdjustmentSignatureEmail(id) {
+  try {
+    const validityDays = await askSignatureLinkValidityDays();
+    if (validityDays === null) {
+      return;
+    }
+    const { absoluteUrl } = await ensureAdjustmentSignatureLink(id, validityDays);
+    const result = await getDraftById(id);
+    const draft = result
+      ? { ...result.summary, data: result.data }
+      : findDraftSummary(id);
+    const emailDraft = buildAdjustmentSignatureEmailContent(draft, absoluteUrl);
+    await saveSimpleEmailDraft(emailDraft, `signature_ajustement_${draft?.title || id}`);
+  } catch (error) {
+    showToast(error.message || "Impossible de préparer l'e-mail d'ajustement.", "error");
   }
 }
 
@@ -3200,9 +3284,9 @@ document.addEventListener("DOMContentLoaded", () => {
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,
-    prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail,
+    prepareAssignmentSignatureEmail, prepareRestitutionSignatureEmail, prepareAdjustmentSignatureEmail,
     removeDraft,
-    showAssignmentSignatureQr, showRestitutionSignatureQr,
+    showAssignmentSignatureQr, showRestitutionSignatureQr, showAdjustmentSignatureQr,
     openAdjustment: (id) => window.openAdjustment?.(id),
     openAdjustmentSignature: (id) => window.openAdjustmentSignature?.(id)
   };

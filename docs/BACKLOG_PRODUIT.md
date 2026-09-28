@@ -1,20 +1,20 @@
 # Backlog produit — À Quai
 
-Dernière revue : **23 septembre 2026** (daily scrum de fin de session, animé par le Scrum Master). Reprise prévue le **25 septembre 2026**.
+Dernière revue : **26 septembre 2026** (fin du chantier « ajustement d'un dossier actif », versions 3.62.1 à 3.66.0).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
 ## Version courante
 
-`dev` = **3.66.0**, promue vers `preprod` par la PR #24 (ouverte, à fusionner par le propriétaire). `preprod` et `prod` sont à 3.60.2 tant que la #24 n'est pas fusionnée.
+`dev`, `preprod` et `prod` sont à **3.66.0** sur GitHub (PR #24 et #25 fusionnées le 26/09). Reste au propriétaire : déployer la production, cocher `forms.adjust` dans Administration > Comptes, faire changer le mot de passe fuité dans le journal.
 
-## Sprint en cours — « Ajuster les ressources d'un dossier déjà actif »
+## Sprint terminé le 26/09 — « Ajuster les ressources d'un dossier déjà actif »
 
 Cadré le 21-22/09 avec trois experts (process métier, base de données, architecture) : voir `docs/REPRISE_MAJ.md` et la mémoire `feature_ajustement_dossier_actif`.
 
-**Fait** : 3.60.1 (bug parc/stock sur retrait), 3.60.2 (limiteur de connexion sous charge, trouvé par la CI), 3.61.0 (identifiant de personne stable), 3.62.0 (e-mails de restitution, inséré avant la suite du sprint).
+**Fait** : 3.60.1 (bug parc/stock sur retrait), 3.60.2 (limiteur de connexion), 3.61.0 (identifiant de personne stable), 3.62.0 (e-mails de restitution), 3.62.1 (journal de connexion), 3.63.0 à 3.65.0 (ajustement), 3.66.0 (QR code de signature).
 
-**Reste, dans l'ordre** :
+**Détail des versions** (les lignes « Reste » de chaque version restent à traiter) :
 
 | # | Contenu | Effort | Priorité |
 |---|---|---|---|

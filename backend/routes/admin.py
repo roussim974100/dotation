@@ -585,7 +585,17 @@ def admin_groups():
     return jsonify({g["key"]: g for g in groups})
 
 
-TOGGLEABLE_PERMISSIONS = {"unc.view_all"}
+# Tenu a jour avec PERMISSION_INFO dans frontend/js/admin.js (memes cles).
+TOGGLEABLE_PERMISSIONS = {
+    "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution",
+    "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "unc.view_all",
+    "parc.manage", "users.manage", "db.manage",
+}
+
+# Droits qu'on ne peut pas retirer de son propre groupe si aucun autre de ses groupes ne les porte :
+# on s'interdit sinon de se verrouiller soi-meme hors de l'administration.
+_SELF_LOCKOUT_GUARD = {"users.manage", "db.manage"}
+
 
 @bp.route("/api/admin/groups/<key>", methods=["PUT"])
 @login_required
@@ -598,13 +608,29 @@ def update_group_permissions(key):
     if "*" in group.get("permissions", []):
         return jsonify({"error": "cannot_edit_admin_group"}), 403
     payload = request.get_json(silent=True) or {}
-    perms = list(group.get("permissions", []))
+    original = list(group.get("permissions", []))
+    perms = list(original)
     for perm in TOGGLEABLE_PERMISSIONS:
         if perm in payload:
             if payload[perm] and perm not in perms:
                 perms.append(perm)
             elif not payload[perm] and perm in perms:
                 perms.remove(perm)
+
+    actor = current_user() or {}
+    actor_groups = actor.get("groups") or []
+    if key in actor_groups:
+        for guarded in _SELF_LOCKOUT_GUARD:
+            removed = guarded in original and guarded not in perms
+            if not removed:
+                continue
+            other_groups = [g for g in groups if g["key"] != key and g["key"] in actor_groups]
+            if not any(guarded in g.get("permissions", []) for g in other_groups):
+                return jsonify({
+                    "error": "self_lockout",
+                    "message": f"Impossible de retirer « {guarded} » de votre propre groupe : vous perdriez ce droit vous-même.",
+                }), 409
+
     update_group(key, perms)
     with get_db() as connection:
         insert_app_log(
