@@ -199,42 +199,87 @@ def init_users_db():
         migrate_users_from_json(connection)
 
 
-def seed_default_groups(connection):
-    """Crée les groupes par défaut. Crée les groupes manquants, met à jour les existants."""
+# Source unique des groupes prérèglés (utilisée à la fois pour une première installation et pour
+# rattraper une base déjà en service) : `seed_default_groups` et `migrate_missing_groups` en dupliquaient
+# chacune une copie, si bien qu'un droit ajouté a l'une (ex. forms.adjust en 3.65.0) restait absent des
+# bases existantes tant qu'on ne pensait pas a repercuter le changement dans les deux.
+DEFAULT_GROUPS = [
+    ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
+     ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
+    ("user", "Utilisateur", "Accès aux formulaires et restitutions",
+     ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
+    ("administration", "Administration", "Complet total et gestion des utilisateurs",
+     ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
+    ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
+     ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
+    ("gestion", "Gestion", "Gestion avancée avec restitution et export",
+     ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all"], "full"),
+    ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
+     ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
+    ("redaction", "Rédaction", "Création et modification des fiches en cours",
+     ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"], "full"),
+]
+
+# Droits ajoutés au référentiel après coup, à rattraper UNE SEULE FOIS sur les groupes prérèglés qui
+# doivent les avoir (ex. forms.adjust à la sortie de l'ajustement de dossier en 3.65.0, jamais répercuté
+# sur les bases déjà en service car `_upsert_default_groups` ne touche jamais aux permissions d'un groupe
+# existant). Une fois appliqué, un identifiant n'est jamais rejoué : si un admin retire ensuite ce droit,
+# il reste retiré. Pour un nouveau droit à propager aux groupes existants : ajouter une ligne ici avec un
+# identifiant unique qui ne sera jamais réutilisé.
+PERMISSION_BACKFILLS = [
+    ("2026-09-28-forms-adjust", "forms.adjust", {"admin", "administration"}),
+]
+
+
+def _upsert_default_groups(connection):
+    """Crée les groupes prérèglés manquants. Ne touche jamais aux permissions d'un groupe déjà existant,
+    potentiellement personnalisées par un admin (voir `PERMISSION_BACKFILLS` pour rattraper un droit précis)."""
     now = utc_now()
-    default_groups = [
-        ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
-        ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
-        ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
-        ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
-        ("gestion", "Gestion", "Gestion avancée avec restitution et export",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all"], "full"),
-        ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
-         ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
-        ("redaction", "Rédaction", "Création et modification des fiches en cours",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"], "full"),
-    ]
-    for key, label, description, permissions, data_scope in default_groups:
+    for key, label, description, permissions, data_scope in DEFAULT_GROUPS:
         existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
         if existing:
-            # Groupe existe déjà : mettre à jour label/description, sans écraser
-            # les permissions (potentiellement personnalisées par un admin)
             connection.execute(
                 "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
                 (label, description, now, key)
             )
         else:
-            # Groupe n'existe pas : créer avec les permissions par défaut
             connection.execute(
                 "INSERT INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
                 (key, label, description, json.dumps(permissions), data_scope, now, now)
             )
     connection.commit()
-    # Créer l'utilisateur admin par défaut s'il n'existe pas
+    apply_permission_backfills(connection)
+
+
+def apply_permission_backfills(connection):
+    """Applique une fois chaque entrée de `PERMISSION_BACKFILLS` non encore jouée, puis la marque comme
+    appliquée pour ne plus jamais y retoucher (même si le droit est ensuite retiré manuellement)."""
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS permission_backfills (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+    )
+    applied = {row["id"] for row in connection.execute("SELECT id FROM permission_backfills").fetchall()}
+    now = utc_now()
+    for backfill_id, permission, group_keys in PERMISSION_BACKFILLS:
+        if backfill_id in applied:
+            continue
+        for key in group_keys:
+            row = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
+            if not row:
+                continue
+            perms = json.loads(row["permissions_json"] or "[]")
+            if permission not in perms:
+                perms.append(permission)
+                connection.execute(
+                    "UPDATE groups SET permissions_json = ?, updated_at = ? WHERE key = ?",
+                    (json.dumps(perms), now, key)
+                )
+        connection.execute("INSERT INTO permission_backfills (id, applied_at) VALUES (?, ?)", (backfill_id, now))
+    connection.commit()
+
+
+def seed_default_groups(connection):
+    """Crée les groupes par défaut et l'utilisateur admin par défaut (première installation)."""
+    _upsert_default_groups(connection)
     seed_default_admin(connection)
 
 
@@ -259,40 +304,8 @@ def seed_default_admin(connection):
 
 
 def migrate_missing_groups(connection):
-    """Ajoute les groupes manquants même si la base de données existe déjà."""
-    now = utc_now()
-    default_groups = [
-        ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-         ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
-        ("user", "Utilisateur", "Accès aux formulaires et restitutions",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
-        ("administration", "Administration", "Complet total et gestion des utilisateurs",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "users.manage"], "full"),
-        ("direction", "Direction", "Accès complet aux dossiers avec visibilité sur les chemins réseau UNC (idéal pour DG, DRH et encadrement supérieur)",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all", "unc.view_all"], "full"),
-        ("gestion", "Gestion", "Gestion avancée avec restitution et export",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export", "forms.delete", "forms.view_all"], "full"),
-        ("lecture", "Lecture", "Consultation seule, sans possible de saisie",
-         ["forms.read_list", "forms.read_detail", "forms.export", "forms.view_all"], "full"),
-        ("redaction", "Rédaction", "Création et modification des fiches en cours",
-         ["forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution", "forms.export"], "full"),
-    ]
-    for key, label, description, permissions, data_scope in default_groups:
-        existing = connection.execute("SELECT permissions_json FROM groups WHERE key = ?", (key,)).fetchone()
-        if existing:
-            # Groupe existe : mettre à jour label/description, sans écraser
-            # les permissions (potentiellement personnalisées par un admin)
-            connection.execute(
-                "UPDATE groups SET label = ?, description = ?, updated_at = ? WHERE key = ?",
-                (label, description, now, key)
-            )
-        else:
-            # Groupe n'existe pas : créer
-            connection.execute(
-                "INSERT INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-                (key, label, description, json.dumps(permissions), data_scope, now, now)
-            )
-    connection.commit()
+    """Ajoute les groupes manquants et rattrape leurs droits par défaut, même si la base existe déjà."""
+    _upsert_default_groups(connection)
 
 
 def migrate_users_from_json(connection):

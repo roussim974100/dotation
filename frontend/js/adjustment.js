@@ -337,7 +337,12 @@ async function openAdjustment(id) {
 
   const readSignature = bindAdjustmentSignatureSection(modal, "adjSig");
   const errorNode = modal.querySelector("#adjustmentError");
-  const showError = (message) => { errorNode.textContent = message; errorNode.classList.toggle("d-none", !message); };
+  const showError = (message) => {
+    errorNode.textContent = message;
+    errorNode.classList.toggle("d-none", !message);
+    // La barre d'actions est collante en bas de la fenêtre : sans ça, l'erreur reste cachée dessous.
+    if (message) errorNode.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
   modal.querySelectorAll("[data-adj-close]").forEach((button) => button.addEventListener("click", closeAdjustmentModal));
   modal.querySelectorAll("[data-adj-withdraw]").forEach((box) => box.addEventListener("change", () => {
     box.closest("[data-adj-held]").querySelector("[data-adj-withdraw-details]").classList.toggle("d-none", !box.checked);

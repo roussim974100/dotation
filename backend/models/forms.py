@@ -725,3 +725,47 @@ def build_restitution_signature_public_payload(form_data, link_row):
             },
         },
     }
+
+
+def build_adjustment_signature_public_payload(form_data, link_row):
+    payload = form_data["data"]
+    beneficiaire = payload.get("beneficiaire", {})
+    event = next((e for e in payload.get("ajustements") or [] if e.get("status") == "pending_signature"), None)
+    if not event:
+        raise AppError("no_pending_adjustment", "Aucun ajustement en attente de signature sur ce dossier.", 404)
+
+    retraits = [
+        {
+            "label": item.get("label") or item.get("key"),
+            "state": item.get("state") or "conforme",
+            "stateLabel": format_restitution_state_label(item.get("state") or "conforme"),
+            "notes": item.get("notes") or "",
+        }
+        for item in (event.get("retraits") or [])
+    ]
+    ajouts = [{"label": item.get("label") or item.get("key")} for item in (event.get("ajouts") or [])]
+
+    return {
+        "link": {
+            "status": link_row["status"],
+            "expiresAt": link_row["expires_at"],
+            "type": link_row["link_type"],
+        },
+        "form": {
+            "id": form_data["summary"]["id"],
+            "title": form_data["summary"]["title"],
+            "beneficiaire": {
+                "nom": beneficiaire.get("nom") or "",
+                "prenom": beneficiaire.get("prenom") or "",
+                "qualite": beneficiaire.get("qualite") or "",
+                "service": beneficiaire.get("service") or "",
+                "fonction": beneficiaire.get("fonction") or "",
+                "mandat": beneficiaire.get("mandat") or "",
+            },
+            "adjustment": {
+                "ajouts": ajouts,
+                "retraits": retraits,
+                "service": event.get("service"),
+            },
+        },
+    }

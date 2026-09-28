@@ -1164,6 +1164,7 @@ body.login-shell {
   height: 220px;
   display: block;
   border-radius: 10px;
+  border: 1px solid var(--border);
   background: #fff;
   touch-action: none;
 }
