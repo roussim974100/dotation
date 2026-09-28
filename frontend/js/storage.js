@@ -687,17 +687,32 @@ function groupDraftsByPerson(drafts) {
   });
 }
 
+// Ce qu'un dossier contient reellement (pour le distinguer des autres dossiers de la meme personne dans
+// l'historique deplie) : type de dossier + resume des ressources, reprend buildDotationPreview (deja utilise
+// pour l'apercu au survol, dashboard-preview.js, charge apres ce fichier).
+function summarizeDraftContent(draft) {
+  const typeLabel = formatDossierTypeLabel(draft.dossierType || draft.data?.dossier?.type || "");
+  const items = (typeof buildDotationPreview === "function" ? buildDotationPreview(draft.data) : []) || [];
+  return { typeLabel, resourceSummary: items.length ? items.join(" · ") : "Aucune ressource renseignée" };
+}
+
 function buildPersonHistoryRows(group) {
   const colCount = getDashboardViewColumns().length;
   const groupId = `person-history-${group.primary.id}`;
   const count = group.others.length;
-  const items = group.others.map((draft) => `
+  const items = group.others.map((draft) => {
+    const { typeLabel, resourceSummary } = summarizeDraftContent(draft);
+    return `
     <li class="person-history__item">
-      <span class="person-history__date">${escapeHtml(formatDate(draft.updatedAt))}</span>
-      <span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}">${escapeHtml(formatDraftStatusLabel(draft))}</span>
-      <span class="person-history__title">${escapeHtml(draft.title || "Dossier")}</span>
-      <button class="btn btn-sm btn-outline-secondary" type="button" data-action="editDraft" data-id="${draft.id}">Ouvrir</button>
-    </li>`).join("");
+      <div class="person-history__row">
+        <span class="person-history__date">${escapeHtml(formatDate(draft.updatedAt))}</span>
+        <span class="status-chip status-chip--${escapeHtml(draft.status || "draft")}">${escapeHtml(formatDraftStatusLabel(draft))}</span>
+        <span class="person-history__title">${escapeHtml(typeLabel)}</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-action="editDraft" data-id="${draft.id}">Ouvrir</button>
+      </div>
+      <div class="person-history__resources">${escapeHtml(resourceSummary)}</div>
+    </li>`;
+  }).join("");
   return `
     <tr class="person-history-toggle">
       <td colspan="${colCount}">
@@ -1712,6 +1727,7 @@ async function renderDraftList() {
 
   try {
     captureDashboardSelection();
+    captureDashboardOpenState();
     const drafts = await listForms();
     const sortedDrafts = sortDraftsForDisplay(drafts);
     const previousIds = new Set(dashboardKnownIds);
@@ -1819,6 +1835,7 @@ async function renderDraftList() {
     const selectable = viewMode === "active" || viewMode === "restitutions_pending";
     bindSelectionActions(selectable && canExport, viewMode === "active" && canDelete);
     restoreDashboardSelection();
+    restoreDashboardOpenState();
   } finally {
     dashboardRefreshInFlight = false;
   }
@@ -2776,6 +2793,43 @@ function getSelectedDraftIds() {
 
 function captureDashboardSelection() {
   dashboardSelectedIds = new Set(getSelectedDraftIds());
+}
+
+// L'actualisation automatique (toutes les 20s) reconstruit entierement les lignes : sans ceci, un menu "⋯" ou
+// un historique deplie se refermait tout seul au premier rafraichissement pendant qu'on le consultait.
+let dashboardOpenState = { menus: new Set(), historyPanels: new Set() };
+
+function captureDashboardOpenState() {
+  const menus = new Set();
+  document.querySelectorAll(".draft-actions__menu[open]").forEach((details) => {
+    const row = details.closest("tr[data-quick-preview-id]");
+    if (row) menus.add(row.dataset.quickPreviewId);
+    // Le volet a pu etre deplace vers <body> sur grand ecran (placeActionMenuPanel) : on le detache avant que
+    // la ligne d'origine soit detruite par le nouveau rendu, pour ne pas laisser un volet orphelin.
+    const floating = [...floatingActionMenus].find(([, owner]) => owner === details);
+    if (floating) restoreActionMenuPanel(floating[0], details);
+  });
+  const historyPanels = new Set();
+  document.querySelectorAll(".person-history-panel:not(.d-none)").forEach((panel) => historyPanels.add(panel.id));
+  dashboardOpenState = { menus, historyPanels };
+}
+
+function restoreDashboardOpenState() {
+  document.querySelectorAll(".draft-actions__menu").forEach((details) => {
+    const row = details.closest("tr[data-quick-preview-id]");
+    if (row && dashboardOpenState.menus.has(row.dataset.quickPreviewId)) details.open = true;
+  });
+  dashboardOpenState.historyPanels.forEach((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return; // le groupe n'existe plus dans ce rendu (ex: dossier restitue passe dans un autre onglet)
+    panel.classList.remove("d-none");
+    const toggle = document.querySelector(`[data-person-history-open="${id}"]`);
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", "true");
+      const chevron = toggle.querySelector(".person-history__chevron");
+      if (chevron) chevron.textContent = "▾";
+    }
+  });
 }
 
 function restoreDashboardSelection() {

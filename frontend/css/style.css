@@ -1570,13 +1570,24 @@ form section.content-card {
 
 .person-history__item {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: 0.3rem;
   padding: 0.4rem 0.6rem;
   background: var(--surface-alt);
   border-radius: 8px;
   font-size: 0.85rem;
+}
+
+.person-history__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.person-history__resources {
+  color: var(--text-muted, #6b7a8d);
+  font-size: 0.8rem;
 }
 
 .person-history__date {
