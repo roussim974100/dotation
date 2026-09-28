@@ -13,6 +13,10 @@ let dashboardLastUpdatedAt = "";
 let dashboardKnownIds = new Set();
 let dashboardPendingNewIds = new Set();
 let dashboardSelectedIds = new Set();
+// Total agrege (voir renderGroupedDraftRows) pour la ligne principale d'une personne a plusieurs dossiers : lu
+// par le survol "Pilotage" (dashboard-preview.js) pour ne pas afficher un chiffre par dossier qui contredirait
+// le total deja visible sur la ligne.
+let dashboardRowAggregates = new Map();
 const DASHBOARD_PAGE_SIZE = 20;
 let assignmentDisplayCount = DASHBOARD_PAGE_SIZE;
 let restitutionDisplayCount = DASHBOARD_PAGE_SIZE;
@@ -747,6 +751,7 @@ function renderGroupedDraftRows(drafts, permissions) {
     if (group.others.length) {
       const aggregate = aggregateGroupProgress(group);
       rowDraft = { ...group.primary, completedResources: aggregate.completed, totalResources: aggregate.total, resourceProgressRatio: aggregate.ratio };
+      dashboardRowAggregates.set(group.primary.id, { completed: aggregate.completed, total: aggregate.total, dossierCount: group.others.length + 1 });
     }
     const primaryHtml = buildDashboardRow(rowDraft, permissions);
     return group.others.length ? primaryHtml + buildPersonHistoryRows(group) : primaryHtml;
@@ -1746,6 +1751,7 @@ async function renderDraftList() {
   try {
     captureDashboardSelection();
     captureDashboardOpenState();
+    dashboardRowAggregates.clear();
     const drafts = await listForms();
     const sortedDrafts = sortDraftsForDisplay(drafts);
     const previousIds = new Set(dashboardKnownIds);
