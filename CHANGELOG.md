@@ -1,5 +1,22 @@
 # Historique des versions — À Quai
 
+## [3.67.1] - 2026-09-28
+
+### 🖥️ Une ligne par personne dans les 4 tableaux de bord
+- Une personne pouvait apparaître plusieurs fois dès qu'elle avait plusieurs dossiers (ex : « Nouvelle attribution pour cette personne » après restitution complète). Les dossiers restent des documents distincts et immuables (PDF, export, audit inchangés) : seul l'affichage se regroupe désormais, avec la ligne la plus prioritaire en avant (signature en attente > restitution en cours > actif > le reste) et les autres dossiers dépliables sous la ligne.
+- L'historique déplié détaille le type et les ressources de chaque dossier (au lieu du titre générique identique partout).
+- La progression affichée (X/Y ressources) et le survol « Pilotage » sont désormais **agrégés** sur tous les dossiers encore ouverts de la personne, cohérents entre eux.
+- Le panneau déplié et le menu « ⋯ » restent ouverts à travers l'actualisation automatique (toutes les 20s), qui reconstruit entièrement les lignes.
+- « Nouvelle attribution pour cette personne » et **« Changement de service »** reprennent désormais l'identité, la date de prise de fonction **et** le `personId` du dossier précédent (auparavant réservé à « mise à jour ») : une personne reste correctement regroupée même après un changement de service.
+- Fichiers : `backend/models/forms.py` (`personId` exposé), `frontend/js/storage.js`, `frontend/js/dashboard-preview.js`, `frontend/js/app.js`, `frontend/css/style.css`.
+
+### 🐛 Cache-busting incomplet
+- `admin.js` et `app.js` n'avaient aucun paramètre `?v=...` sur leurs pages, `adjustment.js` était resté sur une version périmée : un navigateur ouvert avant une mise à jour pouvait exécuter du code obsolète indéfiniment, y compris après un rechargement simple. Ajouté/mis à jour sur toutes les pages concernées.
+
+### 🧪 Tests
+- `tests/test_person_grouping.py` (`personId` exposé et repris correctement côté serveur).
+- `tests/browser/check_person_grouping.py` (16 vérifications en navigateur réel : regroupement, progression agrégée sur la ligne et au survol, historique détaillé, panneau qui résiste à l'actualisation automatique, reprise d'identité pour une nouvelle attribution et un changement de service).
+
 ## [3.66.1] - 2026-09-28
 
 ### 🐛 Droit `forms.adjust` manquant sur les groupes déjà en service

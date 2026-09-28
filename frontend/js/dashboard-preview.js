@@ -162,7 +162,7 @@ function bindStatusPreviews() {
   });
 }
 
-function buildTimingPreview(data) {
+function buildTimingPreview(data, aggregate) {
   if (!data) {
     return [];
   }
@@ -178,7 +178,7 @@ function buildTimingPreview(data) {
   if (isRestitution) {
     return buildRestitutionTimingPreview(data, restitution, restitutionItems);
   }
-  return buildAttributionTimingPreview(data);
+  return buildAttributionTimingPreview(data, aggregate);
 }
 
 function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
@@ -240,7 +240,7 @@ function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
   return sections;
 }
 
-function buildAttributionTimingPreview(data) {
+function buildAttributionTimingPreview(data, aggregate) {
   const sections = [];
   const startAt = data.meta?.startAt || "";
   const dossierType = data.dossier?.type || "";
@@ -257,7 +257,14 @@ function buildAttributionTimingPreview(data) {
   const requested = collectRequestedResourcesFromPayload(data);
   const completed = requested.filter((r) => r.isCompleted);
   const missing = requested.filter((r) => !r.isCompleted);
-  sections.push(`Progression : ${completed.length}/${requested.length} ressource(s) attribuée(s)`);
+  // Cette personne a plusieurs dossiers (voir groupDraftsByPerson, storage.js) : le total deja affiche sur la
+  // ligne est cumule sur tous ses dossiers ouverts, pas seulement celui-ci - on l'affiche ici a l'identique
+  // pour ne pas se contredire.
+  if (aggregate) {
+    sections.push(`Progression : ${aggregate.completed}/${aggregate.total} ressource(s) attribuée(s) (cumulé sur ${aggregate.dossierCount} dossiers)`);
+  } else {
+    sections.push(`Progression : ${completed.length}/${requested.length} ressource(s) attribuée(s)`);
+  }
   if (missing.length) {
     const additional = data.resources?.additional || [];
     const materiel = data.materiel || {};
@@ -291,7 +298,8 @@ async function showTimingPreview(target, id) {
     positionHoverCard(card, target);
     return;
   }
-  const items = buildTimingPreview(result.data);
+  const aggregate = typeof dashboardRowAggregates !== "undefined" ? dashboardRowAggregates.get(id) : null;
+  const items = buildTimingPreview(result.data, aggregate);
   card.innerHTML = items.length
     ? `<h4>Pilotage</h4><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
     : '<p class="status-hover-card__hint">Aucune information de pilotage.</p>';
