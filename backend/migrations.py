@@ -192,6 +192,26 @@ def _m_resync_retrait_sources(connection):
             logging.getLogger(__name__).warning("Rattrapage des retraits : dossier %s ignore (%s)", form_id, error)
 
 
+def _m_recompute_stuck_reservations(connection):
+    """Rattrapage du bug corrige en 3.66.1 (models/units.py, derive_state) : un dossier de regularisation ("sortie",
+    attribution retrodatee) produit un evenement "reserve" date APRES son "assigned" ; la reservation de ce dossier
+    n'etait alors jamais levee, meme apres restitution, et l'objet restait affiche "reserve" pour toujours (constate
+    en production : un ordinateur restitue n'etait plus jamais propose pour une reattribution). Rejoue le calcul de
+    statut de chaque unite a partir de ses evenements deja enregistres (recompute_unit, idempotent) : ne modifie
+    aucun evenement, seulement le statut derive. Une unite en echec est ignoree et journalisee."""
+    existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    if "resource_units" not in existing:
+        return
+    import logging
+    from models.units import recompute_unit
+    unit_ids = [row[0] for row in connection.execute("SELECT id FROM resource_units").fetchall()]
+    for unit_id in unit_ids:
+        try:
+            recompute_unit(connection, unit_id)
+        except Exception as error:  # noqa: BLE001
+            logging.getLogger(__name__).warning("Rattrapage des reservations bloquees : unite %s ignoree (%s)", unit_id, error)
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
@@ -200,6 +220,7 @@ MIGRATIONS = [
     (5, "identifiant_de_personne", _m_person_id_column),
     (6, "masquer_identifiants_de_connexion", _m_mask_login_failed_identifiers),
     (7, "rattrapage_retraits_dossiers_sources", _m_resync_retrait_sources),
+    (8, "rattrapage_reservations_bloquees", _m_recompute_stuck_reservations),
 ]
 
 
