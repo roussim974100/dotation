@@ -281,6 +281,13 @@ def restitution_signature_page(token):
     return response
 
 
+@bp.route("/adjustment-signature/<token>")
+def adjustment_signature_page(token):
+    response = make_response(send_from_directory(FRONTEND_DIR, "adjustment-signature.html"))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
+
+
 @bp.route("/admin.html")
 @login_required
 def admin_page():
