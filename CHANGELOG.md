@@ -7,8 +7,13 @@
 - **« Nouvelle attribution pour cette personne »** ne s'affiche plus sur un dossier actif (cas qui recréait justement le doublon que « Gérer les ressources » vise à éviter) ; reste proposé sur un dossier restitué ou en restitution, là où il n'y a plus de dossier actif à ajuster.
 - Fichier : `frontend/js/storage.js`.
 
+### 🖥️ Reprise de matériel restitué dans l'ajustement
+- **« Reprendre un matériel déjà restitué »** dans la fenêtre « Gérer les ressources » : en ajoutant une ressource suivie par identifiant (n° de série…), les unités disponibles en stock sont désormais proposées et remplissent automatiquement les champs — même mécanisme que la création de dossier, jusqu'ici absent de l'ajustement (constaté par l'utilisateur : un PC restitué n'était jamais suggéré, il fallait ressaisir son numéro de série à la main).
+- Fichier : `frontend/js/adjustment.js` (`openAdjustmentReuseModal`, réimplémenté plutôt que partagé avec `app.js` car ce fichier est aussi chargé sur des pages sans lui).
+
 ### 🧪 Tests
 - `tests/browser/check_person_grouping.py` : 20/20 vérifications (2 nouvelles : absence sur un dossier actif, présence sur un dossier restitué).
+- `tests/browser/check_adjustment_reuse_stock.py` (nouveau) : 12/12 vérifications, scénario complet (restitution via ajustement → unité en stock → reprise automatique sur un autre dossier).
 
 ## [3.67.1] - 2026-09-28
 
