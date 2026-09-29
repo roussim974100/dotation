@@ -85,6 +85,13 @@ with Instance() as inst:
     toggle_text = js(driver, "return document.querySelector('[data-person-history-open]')?.textContent.trim() || ''")
     check("le chevron annonce les 2 autres dossiers", "2 autres dossiers" in toggle_text, toggle_text)
 
+    step_labels = js(driver, """
+        const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('GUERRIERO'));
+        return [...row.querySelectorAll('.draft-actions__primary .btn-outline-primary')].map(b => b.textContent.trim());
+    """)
+    check("« Gérer les ressources » et « Restituer » coexistent (2 parcours distincts)",
+          "Gérer les ressources" in step_labels and "Restituer" in step_labels, str(step_labels))
+
     progress = js(driver, """
         const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('GUERRIERO'));
         return row?.querySelector('.resource-progress__fraction')?.textContent.trim() || '';
