@@ -1039,9 +1039,11 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
-  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  // Repartir de l'identite de la personne pour une nouvelle attribution : utile seulement quand il n'y a PLUS de
+  // dossier actif a ajuster (restitution terminee ou en cours). Sur un dossier "active", "Gerer les ressources"
+  // (ci-dessus) est le bon outil : proposer aussi ce bouton ne ferait que recreer le doublon qu'il visait a eviter.
   const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
-  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+  const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
   // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
