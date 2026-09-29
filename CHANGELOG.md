@@ -1,5 +1,15 @@
 # Historique des versions — À Quai
 
+## [3.67.2] - 2026-09-29
+
+### 🖥️ Deux parcours distincts sur un dossier actif
+- **« Gérer les ressources »** apparaît désormais à côté de **« Restituer »** sur un dossier actif : ajustement partiel (ajout/retrait, la personne reste) et restitution complète (départ) sont deux boutons séparés au lieu d'un seul. « Signer l'ajustement » prend la place du premier quand un geste reste à signer à distance, dans toutes les vues.
+- **« Nouvelle attribution pour cette personne »** ne s'affiche plus sur un dossier actif (cas qui recréait justement le doublon que « Gérer les ressources » vise à éviter) ; reste proposé sur un dossier restitué ou en restitution, là où il n'y a plus de dossier actif à ajuster.
+- Fichier : `frontend/js/storage.js`.
+
+### 🧪 Tests
+- `tests/browser/check_person_grouping.py` : 20/20 vérifications (2 nouvelles : absence sur un dossier actif, présence sur un dossier restitué).
+
 ## [3.67.1] - 2026-09-28
 
 ### 🖥️ Une ligne par personne dans les 4 tableaux de bord
