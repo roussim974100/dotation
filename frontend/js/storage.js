@@ -990,16 +990,23 @@ function buildDraftActionButtons(draft, options) {
       ? "openRestitution"
       : "editDraft";
 
-  // Action metier de l'etape, mise en avant a cote de "Ouvrir".
-  let stepAction = null;
-  if (pendingAdjustment) {
-    stepAction = { action: "openAdjustmentSignature", label: "Signer l'ajustement" };
-  } else if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
-    stepAction = { action: "openRestitution", label: "Restituer" };
+  // Action(s) metier de l'etape, mises en avant a cote de "Ouvrir". Deux peuvent coexister sur un dossier actif :
+  // "Gerer les ressources" (ajout/retrait partiel, la personne reste) et "Restituer" (depart complet de la
+  // personne) sont deux parcours distincts, pas une alternative.
+  const stepActions = [];
+  const hasPendingAdjustmentSignature = (draft.data?.ajustements || []).some((event) => event.status === "pending_signature");
+  const canAdjustHere = canAdjustDossier(sessionInfo) && status === "active";
+  if (canAdjustHere && hasPendingAdjustmentSignature) {
+    stepActions.push({ action: "openAdjustmentSignature", label: "Signer l'ajustement" });
+  } else if (canAdjustHere) {
+    stepActions.push({ action: "openAdjustment", label: "Gérer les ressources" });
+  }
+  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+    stepActions.push({ action: "openRestitution", label: "Restituer" });
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
-    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
-    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   }
 
   // Documents (PDF) — l'ordre suit la phase
@@ -1032,18 +1039,15 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
-  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  // Repartir de l'identite de la personne pour une nouvelle attribution : utile seulement quand il n'y a PLUS de
+  // dossier actif a ajuster (restitution terminee ou en cours). Sur un dossier "active", "Gerer les ressources"
+  // (ci-dessus) est le bon outil : proposer aussi ce bouton ne ferait que recreer le doublon qu'il visait a eviter.
   const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
-  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+  const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
-  // Ajuster un dossier actif (ajouter / retirer des ressources, changer le service) ; signer un ajustement resté en attente.
-  if (canAdjustDossier(sessionInfo) && status === "active") {
-    personItems.push({ action: "openAdjustment", id, label: "Ajuster les ressources / le service" });
-    if ((draft.data?.ajustements || []).some((event) => event.status === "pending_signature")) {
-      personItems.push({ action: "openAdjustmentSignature", id, label: "Signer l'ajustement en attente" });
-    }
-  }
+  // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
+  // (canAdjustHere) : rien à dupliquer dans le menu « … ».
 
   // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
   const qrItems = [];
@@ -1060,7 +1064,7 @@ function buildDraftActionButtons(draft, options) {
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
-      ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
+      ${stepActions.map((action) => `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${action.action}" data-id="${id}">${escapeHtml(action.label)}</button>`).join("")}
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
         { title: "Envoyer par e-mail", items: emailItems },
