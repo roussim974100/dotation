@@ -19,18 +19,18 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | # | Contenu | Effort | Priorité |
 |---|---|---|---|
 | ✅ 3.62.0 (fait le 24/09) | E-mails de restitution : voir « Demandes utilisateur » ci-dessous | S | P1 |
-| ✅ 3.63.0 (fait le 26/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct. **Reste** : lien public de signature à distance pour un ajustement (aujourd'hui : signature recueillie ensuite depuis l'application), assigner `forms.adjust` aux groupes sur les installations existantes | M | P1 |
+| ✅ 3.63.0 (fait le 26/09, complété le 28-29/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct + lien public de signature à distance (`adjustment-signature.html`, 3.66.1) + `forms.adjust` rattrapé automatiquement sur les groupes existants (`PERMISSION_BACKFILLS`, 3.66.1) | M | P1 |
 | ✅ 3.64.0 (fait le 26/09) | Migration 7 de rattrapage + invariant de santé « retrait non répercuté ». Sur la copie de la base de production : 2 dossiers sources, aucun changement (rien à annoncer) | S | P0 |
-| ✅ 3.65.0 (fait le 26/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique), « Mise à jour » retiré du sélecteur de création. **Reste** : lien public de signature à distance, PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
-| 3.67.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
+| ✅ 3.65.0 (fait le 26/09, complété le 28-29/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique, reprise de matériel restitué), « Mise à jour » retiré du sélecteur de création, plus « Gérer les ressources » à côté de « Restituer » (3.67.2). **Reste** : PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
+| ✅ 3.67.1 (fait le 28/09) | Regroupement des dossiers par personne dans les 4 tableaux de bord (`groupDraftsByPerson`) — répond au symptôme visible des doublons (voir constat ci-dessous), mais ne fusionne pas les fiches « personne » elles-mêmes | M | P2 |
 
-**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. Restent : QR code aussi pour la signature à distance d'un ajustement (le lien public de cet ajustement n'existe pas encore) et sur les écrans de restitution après « Enregistrer en attente ».
+**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 
 | Sujet | Détail | Priorité |
 |---|---|---|
-| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.67.0 | P1 |
+| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). Le regroupement par personne dans les tableaux de bord (3.67.1) masque le symptôme visible (une personne = une ligne, même avec plusieurs `personId`, grâce au repli par identité), mais aucune fusion des fiches « personne » elles-mêmes n'a été faite | P1 |
 | Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
