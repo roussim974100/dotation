@@ -1,12 +1,12 @@
 # Backlog produit — À Quai
 
-Dernière revue : **26 septembre 2026** (fin du chantier « ajustement d'un dossier actif », versions 3.62.1 à 3.66.0).
+Dernière revue : **29 septembre 2026** (chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
 ## Version courante
 
-`dev`, `preprod` et `prod` sont à **3.66.0** sur GitHub (PR #24 et #25 fusionnées le 26/09). Reste au propriétaire : déployer la production, cocher `forms.adjust` dans Administration > Comptes, faire changer le mot de passe fuité dans le journal.
+`dev` à **3.67.2**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## Sprint terminé le 26/09 — « Ajuster les ressources d'un dossier déjà actif »
 
@@ -46,6 +46,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 | Sujet | Détail | Effort | Priorité |
 |---|---|---|---|
+| Reprise de matériel restitué absente dans l'ajustement | Demande du 29/09 : ajouter une ressource via « Gérer les ressources » (fenêtre d'ajustement, `frontend/js/adjustment.js`) ne propose jamais les unités déjà en stock — contrairement au formulaire de création de dossier. `buildAdjustmentAdditionBlock` (ligne ~138) affiche des champs vides à saisir à la main pour chaque ressource ajoutée, sans jamais appeler `/api/catalog/available/<id>` (`backend/routes/inventory.py`, `available_units_for_resource`) comme le fait la création d'un dossier. Un PC déjà restitué et disponible en stock n'est donc jamais suggéré depuis cette fenêtre : il faut ressaisir son numéro de série à la main. À reprendre en s'inspirant du câblage existant côté `form.html`/`app.js` | M | P1 |
 | ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
 | ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
 | Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |
