@@ -1997,6 +1997,8 @@ button.export-menu__item {
 
 .export-filter-modal__dialog {
   width: min(480px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -2128,6 +2130,8 @@ button.export-menu__item {
 
 .password-change-modal__dialog {
   width: min(440px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
