@@ -3173,7 +3173,9 @@ async function saveDraft(signaturePad) {
       steps: workflowLabels.map((label) => ({ label, status: "done" }))
     });
 
-    if (["active", "awaiting_signature"].includes(result.summary.status || "") && typeof window.playCompletionCelebration === "function") {
+    // "awaiting_signature" veut dire que les champs sont complets mais pas encore signes : feter ce moment-la
+    // donnerait l'impression que c'est fait alors que la signature (l'evenement reel) reste a venir.
+    if (result.summary.status === "active" && typeof window.playCompletionCelebration === "function") {
       await window.playCompletionCelebration("confetti");
     }
 
