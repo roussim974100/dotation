@@ -42,6 +42,11 @@ with Instance() as inst:
         return Boolean(el && !el.classList.contains('is-hidden'));
     """))
 
+    # Ressource pas encore renseignee = information, pas un blocage : "Erreur" etait inutilement alarmant
+    # pour un dossier qui "reste modifiable" (voir le sous-titre de la fenetre).
+    state_text = js(driver, "return document.querySelector('#workflowDialogSteps .workflow-dialog__state')?.textContent || ''")
+    check("le libellé est rassurant (« À compléter », pas « Erreur »)", state_text.strip() == "À compléter", state_text)
+
     check("la liste des erreurs déborde (donc nécessite un défilement interne)", js(driver, """
         const list = document.getElementById('workflowDialogSteps');
         return list.scrollHeight > list.clientHeight;

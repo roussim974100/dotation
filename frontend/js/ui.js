@@ -227,7 +227,9 @@ function getWorkflowStepStateLabel(status) {
     return "Terminé";
   }
   if (status === "error") {
-    return "Erreur";
+    // Utilise uniquement pour les ressources pas encore completement renseignees (le dossier reste modifiable,
+    // ce n'est jamais un blocage reel) : "Erreur" etait inutilement alarmant pour une simple information.
+    return "À compléter";
   }
   return "À traiter";
 }

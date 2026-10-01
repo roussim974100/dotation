@@ -2748,9 +2748,11 @@ button.export-menu__item {
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
+/* Ambre plutot que rouge : ce statut signale une ressource pas encore completement renseignee, jamais un
+   blocage reel (le dossier reste modifiable) - voir getWorkflowStepStateLabel, ui.js. */
 .workflow-dialog__item.is-error .workflow-dialog__bullet {
-  border-color: #b84a4a;
-  background: #b84a4a;
+  border-color: #c89e30;
+  background: #f1d48b;
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
@@ -2764,7 +2766,7 @@ button.export-menu__item {
 }
 
 .workflow-dialog__item.is-error .workflow-dialog__state {
-  color: #b84a4a;
+  color: #8a4b12;
   font-weight: 600;
 }
 
@@ -3586,6 +3588,15 @@ button.export-menu__item {
 
 [data-color-mode="dark"] .workflow-dialog__item.is-active .workflow-dialog__state {
   color: var(--brand);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__bullet {
+  border-color: #c89e30;
+  background: color-mix(in srgb, #694b00 60%, #f1d48b);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #e8a060;
 }
 
 [data-color-mode="dark"] .workflow-dialog__item.is-done .workflow-dialog__state {
