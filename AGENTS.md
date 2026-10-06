@@ -51,7 +51,7 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `models/units.py`, `models/stock.py` | projections parc/stock (`sync_units_for_form`, `sync_stock_for_form`) |
 | `models/vocab.py` | libellés de statuts et types de bénéficiaires (source unique, publiés au navigateur) |
 | `models/settings.py` | paramètres de l'organisation |
-| `auth.py`, `permissions.py` | comptes, groupes, permissions, portée des données (`data_scope`) ; toutes les permissions sont éditables par groupe dans Admin > Comptes (`routes/admin.py`, `TOGGLEABLE_PERMISSIONS`), avec garde-fou anti-verrouillage sur `users.manage`/`db.manage` |
+| `auth.py`, `permissions.py` | **validité des sessions** (`enforce_session_validity`, `start_session`, voir §4) ; comptes, groupes, permissions, portée des données (`data_scope`) ; toutes les permissions sont éditables par groupe dans Admin > Comptes (`routes/admin.py`, `TOGGLEABLE_PERMISSIONS`), avec garde-fou anti-verrouillage sur `users.manage`/`db.manage` |
 | `app.py` (`PERMISSION_BACKFILLS`) | rattrape une fois pour toutes un droit ajouté après coup sur des groupes déjà en service (ex. `forms.adjust`), sans jamais réajouter un droit retiré volontairement — ajouter une ligne ici plutôt que de modifier `DEFAULT_GROUPS` pour un nouveau droit sur l'existant |
 | `migrations.py` | migrations de schéma numérotées, idempotentes, avec copie de sécurité avant application (8 migrations à ce jour) |
 | `pdf/attribution.py`, `pdf/restitution.py` | génération des PDF |
@@ -81,7 +81,8 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 
 ### Tests (`tests/`)
 
-- `python -m pytest tests -q` : suite complète (~2 min).
+- `python -m pytest tests -q` : suite complète (~2 min). `tests/conftest.py` isole les bases (dossier temporaire) et installe `tests/_stamped_client.py` : une session posée à la main (`session_transaction`) est complétée comme une vraie connexion, sinon le contrôle de session la refuserait ; un test qui utilise un compte absent de la base reçoit 401.
+- **Ne jamais lancer `tests/_http_scenarios.py` à la main** : il crée, importe, répare des données. Sans `APP_DATA_DIR` il refuse de démarrer (depuis le 06/10) ; passer par `tests/test_http_endpoints.py`.
 - `RUN_BROWSER_TESTS=1 python -m pytest tests -q` : avec navigateur (~5 à 8 min).
 - `python tests/browser/check_<nom>.py` : scénarios navigateur isolés (serveur temporaire, base vierge, port 5055) ;
   `tests/browser/browser_harness.py` (`Instance(copy_db=...)` pour travailler sur une **copie** d'une base).
@@ -112,6 +113,7 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 - **Permissions** : `forms.create`, `forms.edit`, `forms.delete`, `forms.export`, `forms.restitution`,
   `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
   (`permissions.py`).
+- **Sessions** (3.67.3) : le cookie porte `user`, `pwd_fp` (HMAC du hash du mot de passe), `login_at`, `last_seen`. Un `before_request` (`app.py` → `auth.enforce_session_validity`) le rapproche de la base à chaque requête : mot de passe changé, compte désactivé/en attente/supprimé, durée absolue (12 h) ou inactivité (60 min) dépassées → session vidée, 401, `session_revoked` au journal. Toute connexion passe par `start_session` (vide l'ancienne session) ; tout changement de **son propre** mot de passe appelle `realign_session_password`. Ne jamais écrire `session["user"] = ...` à la main dans le code applicatif. Réglages : `APP_SESSION_MAX_HOURS`, `APP_SESSION_IDLE_MINUTES`.
 - **Signatures** : jamais exposées sans authentification ; affichage protégé par mot de passe.
 - **E-mails** : l'application ne les envoie pas ; elle prépare un fichier `.eml` que l'utilisateur ouvre dans sa
   messagerie (fonctions `prepare*Email` de `storage.js`).
@@ -165,3 +167,4 @@ Variables utiles : `APP_DATA_DIR`, `APP_LOG_LEVEL`, `APP_DEBUG_ENDPOINTS=1`, `AP
   son `assigned`. `derive_state` traite les événements triés par date : sans `_FORM_RELATIONSHIP_SETTLED`, la
   réservation de ce dossier n'était jamais levée et l'unité restait affichée « réservée » pour toujours, même après
   restitution (corrigé en 3.66.1, migration 8 pour rattraper l'existant).
+- **Script de scénarios lancé à la main** (06/10) : `_http_scenarios.py` lancé sans `APP_DATA_DIR` a tourné sur `backend/dotation.db` (copie de la production) : 13 dossiers de test, réglages d'organisation écrasés, faux logo, groupe `lecteur_masque`. Réparé depuis `db_backups/` (sauvegarde `avant_assistant_*` + réglages du 28/09). Pour tester un flux sur de vraies données : `browser_harness.Instance(copy_db=...)` ou une instance temporaire sur le port 5055.
