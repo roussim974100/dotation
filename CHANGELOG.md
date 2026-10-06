@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [Non publié] — Notifications, lot 3 : tâches des administrateurs (numéro de version à confirmer ; proposé : 3.69.0)
+## [3.69.0] - 2026-10-06 — Notifications, lot 3 : tâches des administrateurs
 
 ### 🔔 Trois nouvelles notifications pour les administrateurs
 - **Nouvelle version disponible** (droit `users.manage`) : « Nouvelle version disponible : x.y.z », avec la version installée et un lien vers l'écran de mise à jour. Lue dans le cache disque (`update_check.cached_status`) : **jamais d'appel réseau** pendant un contrôle de session ; une vérification périmée part en arrière-plan. Respecte `APP_UPDATE_CHECK=0`. Disparaît quand la version est installée.
