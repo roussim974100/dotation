@@ -6,6 +6,11 @@ import os
 import re
 import sys
 
+if not os.environ.get("APP_DATA_DIR"):
+    # Ces scenarios creent, modifient, importent et reparent des donnees : lances sans base isolee, ils s'executent
+    # sur backend/dotation.db (copie de la production). Passer par pytest (tests/test_http_endpoints.py) ou poser APP_DATA_DIR.
+    sys.exit("Refus : APP_DATA_DIR n'est pas defini, ces scenarios modifieraient la vraie base. Lancer via pytest.")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 import app as app_module  # noqa: E402  (cree des bases vierges dans APP_DATA_DIR)
