@@ -11,6 +11,7 @@ from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, get_rate_limit_key, extract_first_forwarded_ip, check_user,
+    start_session, realign_session_password,
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
@@ -71,8 +72,7 @@ def login():
         auth_state = check_user(username, password)
 
         if auth_state == "ok":
-            session["user"] = username
-            session.modified = True
+            start_session(username)
             with get_db() as connection:
                 insert_app_log(
                     connection,
@@ -468,6 +468,7 @@ def change_own_password():
             (new_hash, utc_now(), user["username"])
         )
         conn.commit()
+    realign_session_password(new_hash)  # sa session reste ouverte ; toutes les autres sont refusees (auth.session_invalid_reason)
     with get_db() as connection:
         insert_app_log(connection, "security", "password_self_change", "Changement de mot de passe", details={
             "username": user["username"],

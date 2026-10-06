@@ -3,6 +3,8 @@ from flask.sessions import SecureCookieSessionInterface
 import gzip
 import os
 import secrets
+from datetime import timedelta
+from auth import enforce_session_validity, SESSION_MAX_HOURS
 from proxy import AutoProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
@@ -52,6 +54,14 @@ for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=SESSION_MAX_HOURS)
+
+
+@app.before_request
+def reject_stale_session():
+    """Refuse une session devenue invalide (mot de passe change, compte desactive ou supprime, expiration).
+    Declare avant validate_csrf : une session videe ici ne passe plus la verification CSRF et recoit 401."""
+    enforce_session_validity()
 
 
 @app.before_request

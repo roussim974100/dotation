@@ -1,6 +1,9 @@
+import hashlib
+import hmac
 import json
 import os
 import re
+import time
 import bcrypt
 from datetime import datetime
 from functools import wraps
@@ -269,6 +272,86 @@ def build_user_context(username):
         "last_name": (user.get("last_name") or "") if user else "",
         "email": (user.get("email") or "") if user else "",
     }
+
+
+# ---------------------------------------------------------------------------
+# Validite des sessions : le cookie ne prouve qu'une connexion passee. A chaque requete on le rapproche de la base,
+# sinon un changement de mot de passe, une desactivation ou une suppression de compte laisserait la session ouverte.
+# ---------------------------------------------------------------------------
+
+SESSION_MAX_HOURS = float(os.environ.get("APP_SESSION_MAX_HOURS", "12"))       # duree absolue depuis la connexion
+SESSION_IDLE_MINUTES = float(os.environ.get("APP_SESSION_IDLE_MINUTES", "60"))  # inactivite maximale
+_SESSION_TOUCH_SECONDS = 60  # evite de reecrire le cookie a chaque requete
+
+
+def password_fingerprint(password_hash):
+    """Empreinte du hash de mot de passe (HMAC avec la cle de l'application) : change des qu'un mot de passe change,
+    sans exposer le hash dans le cookie."""
+    from flask import current_app
+    key = str(current_app.secret_key or "").encode()
+    return hmac.new(key, str(password_hash or "").encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def start_session(username, user_record=None):
+    """Ouvre une session neuve (l'ancienne est videe : pas de fixation de session)."""
+    record = user_record or get_user_record(username)
+    session.clear()
+    now = int(time.time())
+    session["user"] = username
+    session["pwd_fp"] = password_fingerprint(record["password_hash"]) if record else ""
+    session["login_at"] = now
+    session["last_seen"] = now
+    session.permanent = True
+    session.modified = True
+
+
+def realign_session_password(new_password_hash):
+    """Apres un changement de mot de passe par l'utilisateur lui-meme : sa session courante reste valide."""
+    session["pwd_fp"] = password_fingerprint(new_password_hash)
+    session.modified = True
+
+
+def session_invalid_reason():
+    """None si la session courante est valide (ou absente), sinon le motif de son rejet."""
+    username = session.get("user")
+    if not username:
+        return None
+    now = int(time.time())
+    try:
+        login_at = int(session.get("login_at"))
+        last_seen = int(session.get("last_seen"))
+    except (TypeError, ValueError):
+        return "legacy"  # cookie anterieur a ce controle : on exige une nouvelle connexion
+    if now - login_at > SESSION_MAX_HOURS * 3600:
+        return "expired"
+    if now - last_seen > SESSION_IDLE_MINUTES * 60:
+        return "idle"
+    record = get_user_record(username)
+    if not record:
+        return "user_missing"
+    if record.get("status") in ("pending", "disabled") or not record.get("is_active", True):
+        return "user_disabled"
+    if not hmac.compare_digest(str(session.get("pwd_fp") or ""), password_fingerprint(record["password_hash"])):
+        return "password_changed"
+    if now - last_seen >= _SESSION_TOUCH_SECONDS:
+        session["last_seen"] = now
+    return None
+
+
+def enforce_session_validity():
+    """before_request : vide la session si elle n'est plus valide et journalise le motif."""
+    username = session.get("user")
+    reason = session_invalid_reason()
+    if reason is None:
+        return
+    session.clear()
+    try:
+        from models.audit import insert_app_log
+        with get_db() as connection:
+            insert_app_log(connection, "security", "session_revoked", "Session refusee", "user", username,
+                           {"reason": reason, "ip": get_request_client_ip()}, actor=username)
+    except Exception:
+        pass
 
 
 def current_user():

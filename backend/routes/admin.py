@@ -18,7 +18,7 @@ from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
     get_user_record, password_complexity_error, is_valid_username,
-    current_user, rate_limit,
+    current_user, rate_limit, realign_session_password,
     list_all_users, list_all_groups, update_group,
     create_user, update_user, delete_user, normalize_email,
 )
@@ -1539,6 +1539,8 @@ def update_admin_user(username):
     if update_fields:
         if not update_user(username, **update_fields):
             return jsonify({"error": "failed_to_update_user"}), 500
+        if password_changed and username == session.get("user"):
+            realign_session_password(update_fields["password_hash"])  # l'admin qui change son propre mot de passe reste connecte
 
     with get_db() as connection:
         insert_app_log(
