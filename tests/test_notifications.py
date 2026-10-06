@@ -300,3 +300,117 @@ def test_modifier_une_ressource_tolere_l_ancien_texte_inchange_mais_pas_un_nouve
     assert admin.put(f"/api/admin/resources/{legacy}", json=resource_body(code, ""), headers=H).get_json()["error"] == "issuer_service_required"
     assert admin.put(f"/api/admin/resources/{legacy}", json=resource_body(code, label), headers=H).status_code == 200
     assert group_for(my_tasks(admin), legacy) is None
+
+
+# ---- lot 3 : tâches des administrateurs (inscription, nouvelle version, sauvegarde) -------------------------------------
+
+import update_check  # noqa: E402
+from models import notifications as notif  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def cache_vide():
+    notif.clear_cache()
+    yield
+    notif.clear_cache()
+
+
+def kinds(client):
+    return [t["kind"] for t in my_tasks(client)["tasks"]]
+
+
+def task_of(client, kind):
+    return next((t for t in my_tasks(client)["tasks"] if t["kind"] == kind), None)
+
+
+def test_inscription_en_attente_est_une_tache_sans_nom(compte):
+    admin = client_for()
+    before = (task_of(admin, notif.KIND_SIGNUPS_PENDING) or {"count": 0})["count"]
+    pending = f"attente_{uid()}"
+    assert create_user(pending, bcrypt.hashpw(b"Mot-2-Passe-Attente1!", bcrypt.gensalt()).decode(), ["lecture"], status="pending")
+    try:
+        task = task_of(admin, notif.KIND_SIGNUPS_PENDING)
+        assert task["count"] == before + 1 and task["link"] == "/admin-comptes.html"
+        assert pending not in str(task)  # seulement un nombre, aucun identifiant
+        assert task_of(client_for(compte), notif.KIND_SIGNUPS_PENDING) is None  # réservé à ceux qui gèrent les comptes
+        update_user(pending, status="active")  # validée : la tâche diminue d'elle-même
+        assert (task_of(admin, notif.KIND_SIGNUPS_PENDING) or {"count": 0})["count"] == before
+    finally:
+        delete_user(pending)
+
+
+def fake_check_file(monkeypatch, tmp_path, latest, age=0, enabled=True):
+    path = tmp_path / "check.json"
+    path.write_text('{"latest": "%s", "checked_at": %s, "error": null}' % (latest, time.time() - age), encoding="utf-8")
+    monkeypatch.setattr(update_check, "CHECK_FILE", str(path))
+    monkeypatch.setenv("APP_UPDATE_CHECK", "1" if enabled else "0")
+    calls = []
+    monkeypatch.setattr(update_check, "_refresh_in_background", lambda: calls.append(1))
+    return calls
+
+
+def test_nouvelle_version_est_une_tache_pour_les_administrateurs(monkeypatch, tmp_path, compte):
+    fake_check_file(monkeypatch, tmp_path, "99.0.0")
+    task = task_of(client_for(), notif.KIND_UPDATE_AVAILABLE)
+    assert task["latest"] == "99.0.0" and task["link"] == "/admin.html"
+    assert task_of(client_for(compte), notif.KIND_UPDATE_AVAILABLE) is None
+
+
+def test_pas_de_tache_si_a_jour_ou_verification_desactivee(monkeypatch, tmp_path):
+    fake_check_file(monkeypatch, tmp_path, "0.0.1")
+    assert task_of(client_for(), notif.KIND_UPDATE_AVAILABLE) is None
+    fake_check_file(monkeypatch, tmp_path, "99.0.0", enabled=False)
+    assert task_of(client_for(), notif.KIND_UPDATE_AVAILABLE) is None
+
+
+def test_la_verification_de_version_ne_bloque_jamais_et_ne_fait_aucun_appel_reseau(monkeypatch, tmp_path):
+    """Lu à chaque contrôle de session : une vérification périmée part en arrière-plan, sans jamais attendre le réseau."""
+    calls = fake_check_file(monkeypatch, tmp_path, "99.0.0", age=update_check.CHECK_TTL_SECONDS + 60)
+    monkeypatch.setattr(update_check, "fetch_latest_version", lambda *a, **k: pytest.fail("appel réseau synchrone"))
+    assert task_of(client_for(), notif.KIND_UPDATE_AVAILABLE) is not None  # la valeur en cache sert en attendant
+    assert calls == [1]  # et une vérification est lancée en arrière-plan
+
+
+def fake_backup_health(monkeypatch, level, message="Dernière sauvegarde automatique en échec : disque plein."):
+    import backup_schedule
+    calls = []
+    monkeypatch.setattr(backup_schedule, "health", lambda config, now=None: calls.append(1) or {"level": level, "message": message})
+    notif.clear_cache()
+    return calls
+
+
+def test_sauvegarde_en_echec_est_une_tache_urgente(monkeypatch, compte):
+    fake_backup_health(monkeypatch, "error")
+    task = task_of(client_for(), notif.KIND_BACKUP_FAILED)
+    assert task["severity"] == "urgent" and "disque plein" in task["message"] and task["link"] == "/admin-db.html"
+    assert task_of(client_for(compte), notif.KIND_BACKUP_FAILED) is None  # réservé au droit de gestion des sauvegardes
+
+
+@pytest.mark.parametrize("level", ["ok", "info", "warning"])
+def test_sauvegarde_en_bonne_sante_n_est_pas_une_tache(monkeypatch, level):
+    fake_backup_health(monkeypatch, level)
+    assert task_of(client_for(), notif.KIND_BACKUP_FAILED) is None
+
+
+def test_la_sante_des_sauvegardes_est_mise_en_cache(monkeypatch):
+    calls = fake_backup_health(monkeypatch, "error")
+    admin = client_for()
+    for _ in range(3):
+        my_tasks(admin)
+    assert len(calls) == 1  # un seul calcul pour trois lectures rapprochées (le fichier d'historique peut être gros)
+
+
+def test_la_sauvegarde_en_echec_passe_avant_le_reste(monkeypatch, tmp_path):
+    fake_backup_health(monkeypatch, "error")
+    fake_check_file(monkeypatch, tmp_path, "99.0.0")
+    add_resource("Pour l'ordre", "Introuvable ordre")
+    order = kinds(client_for())
+    assert order[0] == notif.KIND_BACKUP_FAILED
+    assert order.index(notif.KIND_UPDATE_AVAILABLE) < order.index(notif.KIND_RESOURCES_MISSING_SERVICE)
+
+
+def test_le_compteur_de_session_compte_toutes_les_taches(monkeypatch, tmp_path):
+    fake_backup_health(monkeypatch, "error")
+    fake_check_file(monkeypatch, tmp_path, "99.0.0")
+    admin = client_for()
+    assert admin.get("/api/session").get_json()["notifications_count"] == len(my_tasks(admin)["tasks"]) >= 2

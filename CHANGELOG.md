@@ -1,5 +1,18 @@
 # Historique des versions — À Quai
 
+## [Non publié] — Notifications, lot 3 : tâches des administrateurs (numéro de version à confirmer ; proposé : 3.69.0)
+
+### 🔔 Trois nouvelles notifications pour les administrateurs
+- **Nouvelle version disponible** (droit `users.manage`) : « Nouvelle version disponible : x.y.z », avec la version installée et un lien vers l'écran de mise à jour. Lue dans le cache disque (`update_check.cached_status`) : **jamais d'appel réseau** pendant un contrôle de session ; une vérification périmée part en arrière-plan. Respecte `APP_UPDATE_CHECK=0`. Disparaît quand la version est installée.
+- **Sauvegarde automatique en échec** (droit `db.manage` ou son indicateur individuel) : même état que le bandeau de l'administration de la base (`backup_schedule.health`, niveau « erreur » : dernière sauvegarde en échec, ou plus aucune exécution). Marquée « ⚠ Urgent » en toutes lettres (pas seulement par la couleur) et placée en premier. Calcul mis en cache 60 s dans le processus (le fichier d'historique peut être gros).
+- **Demandes d'inscription à valider** (droit `users.manage`) : seulement leur nombre, **aucun identifiant** dans la notification ; lien vers Admin > Comptes. Diminue quand une demande est validée ou refusée.
+- Toujours calculées à partir de l'état réel : aucune notification à « marquer comme lue », elle disparaît quand la situation est réglée. Ordre : sauvegarde, version, inscriptions, ressources sans service.
+- Fichiers : `backend/models/notifications.py`, `backend/update_check.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` : 11 cas de plus (droits, cache, absence de réseau, ordre, compteur de session) ; `tests/browser/check_notifications.py` : 26 vérifications (inscription et version, clic jusqu'à la page).
+
+
 ## [3.68.0] - 2026-10-06 — Notifications, lot 1
 
 ### 🔔 Une cloche, des services et leurs titulaires

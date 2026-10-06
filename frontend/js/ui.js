@@ -868,7 +868,7 @@ function loadNotificationsScript() {
   }
   notificationsScriptPromise = notificationsScriptPromise || new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "/js/notifications.js?v=20261006d";
+    script.src = "/js/notifications.js?v=20261006f";
     script.onload = resolve;
     script.onerror = () => {
       notificationsScriptPromise = null;

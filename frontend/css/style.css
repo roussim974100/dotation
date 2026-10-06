@@ -5508,6 +5508,15 @@ section.content-card[id^="db-"] {
   font-weight: 600;
 }
 
+.notification-item__urgent {
+  font-weight: 700;
+  color: #b42318;
+}
+
+[data-color-mode="dark"] .notification-item__urgent {
+  color: #f19b92;
+}
+
 .notification-item__detail {
   margin: 0 0 0.6rem;
   font-size: 0.86rem;

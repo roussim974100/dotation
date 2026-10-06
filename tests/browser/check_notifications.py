@@ -128,6 +128,26 @@ with Instance() as inst:
     db.close()
     check("titulaire enregistré en base", count == 1, str(count))
 
+    # ---- lot 3 : inscription en attente et nouvelle version --------------------------------------------------------
+    users = sqlite3.connect(os.path.join(inst.dir, "users.db"))
+    users.execute("INSERT INTO users (username, password_hash, is_active, status, created_at, updated_at) VALUES ('inscrit_e2e', 'x', 1, 'pending', 'x', 'x')")
+    users.commit()
+    users.close()
+    os.makedirs(os.path.join(inst.dir, "update"), exist_ok=True)
+    with open(os.path.join(inst.dir, "update", "check.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"latest": "99.9.9", "checked_at": %s, "error": null}' % time.time())  # frais : aucun appel réseau
+    driver.get(inst.url("/index.html"))
+    wait_for(lambda: driver.find_elements("id", "notificationBell"))
+    check("le compteur annonce 2 tâches (inscription + version)", wait_for(lambda: badge_count(driver) == 2), str(badge_count(driver)))
+    driver.find_element("id", "notificationBell").click()
+    wait_for(lambda: driver.find_elements("id", "notificationPanel"))
+    panel_text = lambda: driver.find_element("id", "notificationPanel").text
+    check("la nouvelle version est annoncée", wait_for(lambda: "Nouvelle version disponible : 99.9.9" in panel_text()), panel_text()[:200])
+    check("la demande d'inscription est annoncée sans nom", "1 demande d'inscription à traiter" in panel_text() and "inscrit_e2e" not in panel_text(), panel_text()[:200])
+    driver.save_screenshot(str(CAPTURES / "notif_lot3.png"))
+    driver.find_element("xpath", "//button[contains(., 'Voir les demandes')]").click()
+    check("« Voir les demandes » mène à la gestion des comptes", wait_for(lambda: "admin-comptes" in driver.current_url), driver.current_url)
+
     errors = [e for e in inst.console_errors(driver) if "favicon" not in e]
     check("aucune erreur JavaScript", not errors, str(errors)[:300])
 

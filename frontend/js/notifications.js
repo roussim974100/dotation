@@ -8,7 +8,27 @@
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 
+  const goTo = (task) => window.location.assign(task.link);
+
   const NOTIFICATION_KINDS = {
+    backup_failed: {
+      title: () => "La sauvegarde automatique a échoué",
+      detail: (task) => task.message || "Vérifiez la configuration des sauvegardes.",
+      actionLabel: "Voir les sauvegardes",
+      run: goTo,
+    },
+    update_available: {
+      title: (task) => `Nouvelle version disponible : ${task.latest}`,
+      detail: (task) => (task.current ? `Version installée : ${task.current}. Lisez les notes de version avant de mettre à jour.` : "Lisez les notes de version avant de mettre à jour."),
+      actionLabel: "Voir la mise à jour",
+      run: goTo,
+    },
+    signups_pending: {
+      title: (task) => plural(task.count, "demande d'inscription à traiter", "demandes d'inscription à traiter"),
+      detail: () => "Validez ou refusez les comptes en attente.",
+      actionLabel: "Voir les demandes",
+      run: goTo,
+    },
     resources_missing_service: {
       title: (task) => `${plural(task.count, "ressource sans service référent", "ressources sans service référent")}`,
       detail: () => "Choisissez le service de chacune : ses titulaires seront prévenus des actions à mener.",
@@ -37,8 +57,9 @@
     if (!kind) {
       return "";
     }
+    const urgent = task.severity === "urgent" ? '<span class="notification-item__urgent">⚠ Urgent</span> ' : "";
     return `<li class="notification-item">
-      <p class="notification-item__title">${esc(kind.title(task))}</p>
+      <p class="notification-item__title">${urgent}${esc(kind.title(task))}</p>
       <p class="notification-item__detail">${esc(kind.detail(task))}</p>
       <button type="button" class="btn btn-sm btn-primary" data-notification-run="${index}">${esc(kind.actionLabel)}</button>
     </li>`;

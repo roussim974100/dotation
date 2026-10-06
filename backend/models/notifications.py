@@ -9,6 +9,7 @@ Principe (cadrage du 06/10, voir docs/BACKLOG_PRODUIT.md) :
 
 Lot 1 : une seule tache, pour les administrateurs — des ressources n'ont pas (ou plus) de service referent."""
 import re
+import time
 import unicodedata
 
 from models.audit import insert_app_log
@@ -18,6 +19,28 @@ from utils import utc_now
 MANAGE_PERMISSION = "users.manage"
 
 KIND_RESOURCES_MISSING_SERVICE = "resources_missing_service"
+KIND_BACKUP_FAILED = "backup_failed"
+KIND_UPDATE_AVAILABLE = "update_available"
+KIND_SIGNUPS_PENDING = "signups_pending"
+
+_CACHE_SECONDS = 60
+_cache = {}
+
+
+def clear_cache():
+    _cache.clear()
+
+
+def _cached(key, compute, seconds=_CACHE_SECONDS):
+    """Calcul mis en cache dans le processus : les taches sont recalculees a chaque controle de session (chaque minute,
+    pour chaque administrateur connecte), et certaines lisent des fichiers (historique des sauvegardes)."""
+    now = time.monotonic()
+    hit = _cache.get(key)
+    if hit and now - hit[0] < seconds:
+        return hit[1]
+    value = compute()
+    _cache[key] = (now, value)
+    return value
 
 # Services dont l'appellation courante differe du libelle du catalogue ; sert UNIQUEMENT a pre-remplir la suggestion
 # (l'administrateur valide ou change : rien n'est rattache sans lui).
@@ -97,27 +120,70 @@ def missing_service_task(connection):
     }
 
 
-def can_manage(user):
+def _has(user, permission):
     permissions = (user or {}).get("permissions") or []
-    return "*" in permissions or MANAGE_PERMISSION in permissions
+    return "*" in permissions or permission in permissions
+
+
+def can_manage(user):
+    return _has(user, MANAGE_PERMISSION)
+
+
+def backup_failed_task(user):
+    """Sauvegarde automatique en echec (ou qui ne s'execute plus) : meme etat que le bandeau de l'administration de la base.
+    Reserve au droit qui gere les sauvegardes (db.manage, ou son indicateur individuel)."""
+    if not (_has(user, "db.manage") or (user or {}).get("db_manage")):
+        return None
+
+    def compute():
+        import backup_schedule
+        import backup_targets
+        try:
+            return backup_schedule.health(backup_targets.load_config())
+        except Exception:  # noqa: BLE001 - une configuration illisible ne doit jamais empecher de lire le reste des notifications
+            return {"level": "ok", "message": ""}
+
+    state = _cached("backup_health", compute)
+    if state.get("level") != "error":
+        return None
+    return {"kind": KIND_BACKUP_FAILED, "severity": "urgent", "message": state.get("message") or "", "link": "/admin-db.html"}
+
+
+def update_available_task(user):
+    """Nouvelle version disponible (cache disque, jamais de reseau ici). Reserve a ceux qui gerent les mises a jour."""
+    if not can_manage(user):
+        return None
+    import update_check
+    state = update_check.cached_status()
+    if not state.get("available"):
+        return None
+    return {"kind": KIND_UPDATE_AVAILABLE, "current": state.get("current") or "", "latest": state.get("latest") or "", "link": "/admin.html"}
+
+
+def signups_pending_task(user):
+    """Demandes d'inscription a valider ou refuser (aucun nom dans la notification : seulement leur nombre)."""
+    if not can_manage(user):
+        return None
+    from database import get_users_db
+    try:
+        with get_users_db() as users:
+            count = users.execute("SELECT COUNT(*) FROM users WHERE status = 'pending'").fetchone()[0]
+    except Exception:  # noqa: BLE001
+        return None
+    return {"kind": KIND_SIGNUPS_PENDING, "count": count, "link": "/admin-comptes.html"} if count else None
 
 
 def open_tasks(connection, user):
-    """Taches ouvertes visibles par cet utilisateur (calculees a l'instant)."""
-    tasks = []
+    """Taches ouvertes visibles par cet utilisateur (calculees a l'instant), les plus urgentes d'abord."""
+    tasks = [backup_failed_task(user), update_available_task(user), signups_pending_task(user)]
     if can_manage(user):
-        task = missing_service_task(connection)
-        if task:
-            tasks.append(task)
-    return tasks
+        tasks.append(missing_service_task(connection))
+    return [task for task in tasks if task]
 
 
 def open_tasks_count(connection, user):
-    """Nombre de taches ouvertes, sans le detail : lu a chaque contrôle de session (toutes les minutes)."""
-    count = 0
-    if can_manage(user):
-        count += 1 if resources_missing_service(connection) else 0
-    return count
+    """Nombre de taches ouvertes : lu a chaque controle de session (toutes les minutes)."""
+    return len(open_tasks(connection, user))
 
 
 def apply_service_assignments(connection, assignments, actor):
