@@ -1,12 +1,26 @@
 # Backlog produit — À Quai
 
-Dernière revue : **29 septembre 2026** (chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
+Dernière revue : **6 octobre 2026** (ajout du P0 « sécurité des sessions » ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
 ## Version courante
 
 `dev` à **3.67.2**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+
+## 🔴 P0 — Sécurité des sessions (trouvé le 06/10, à traiter en premier)
+
+**Constat** : après un changement de mot de passe, une session ouverte avant (ex. `admin/admin` par défaut) reste valide et garde tous les droits. Cause : le cookie de session ne contient que `session["user"]` ; `login_required` (`auth.py`) ne relit rien en base, et ni `/api/me/password` (`routes/pages.py`) ni la modification d'un compte par l'admin (`routes/admin.py`) n'invalident les sessions existantes. La désactivation et la suppression d'un compte sont très probablement touchées aussi (à vérifier par test).
+
+| Lot | Contenu | Effort | Priorité |
+|---|---|---|---|
+| 1 | **Version de session** : colonne `session_version` (ou `password_changed_at`) sur `users`, copiée dans le cookie à la connexion et comparée à chaque requête (`current_user()` / `login_required`). Incrémentée au changement de mot de passe, à la réinitialisation par un admin, à la désactivation ; compte supprimé ou désactivé → 401. La session de l'utilisateur qui change son propre mot de passe est réalignée (pas de déconnexion). Migration numérotée. | M | P0 |
+| 2 | **Cycle de vie** : `session.clear()` avant l'écriture de `session["user"]` à la connexion ; `PERMANENT_SESSION_LIFETIME` (8-12 h absolu) + expiration par inactivité (15-30 min) | S | P0 |
+| 3 | **Compte par défaut** : changement obligatoire de `admin/admin` à la première connexion (`must_change_password`) ; vérifier le flag cookie `Secure` en HTTPS (absent de `app.py:52-54`) | S | P0 |
+| Tests | Un test HTTP par événement : session A ouverte, action depuis la session B (changement de mot de passe, réinitialisation admin, désactivation, suppression) → la session A reçoit 401 | S | P0 |
+| Plus tard | Limitation des tentatives de connexion (à vérifier), MFA TOTP pour les admins, liste des sessions actives | M | P2 |
+
+À livrer en correctif (x.y.Z) : version à confirmer avec le propriétaire avant tout changement. Bonnes pratiques de référence : OWASP Session Management, ASVS §3.
 
 ## Sprint terminé le 26/09 — « Ajuster les ressources d'un dossier déjà actif »
 
