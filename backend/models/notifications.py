@@ -8,6 +8,7 @@ Principe (cadrage du 06/10, voir docs/BACKLOG_PRODUIT.md) :
   quand la situation qui l'a produite est resolue. Aucune donnee personnelle dans une tache : type, ressource, service.
 
 Lot 1 : une seule tache, pour les administrateurs — des ressources n'ont pas (ou plus) de service referent."""
+import os
 import re
 import time
 import unicodedata
@@ -24,6 +25,9 @@ KIND_UPDATE_AVAILABLE = "update_available"
 KIND_SIGNUPS_PENDING = "signups_pending"
 
 _CACHE_SECONDS = 60
+# Taches de service : le cache est vide a chaque enregistrement de dossier (models/forms.persist_form) et a chaque « Fait » ;
+# cette duree ne borne que le retard vu par un AUTRE processus (plusieurs workers). Reglable pour les tests navigateur.
+_SERVICE_TASKS_CACHE_SECONDS = float(os.environ.get("APP_NOTIFICATIONS_CACHE_SECONDS", "30"))
 _cache = {}
 
 
@@ -176,9 +180,16 @@ def signups_pending_task(user):
 def open_tasks(connection, user):
     """Taches ouvertes visibles par cet utilisateur (calculees a l'instant), les plus urgentes d'abord."""
     tasks = [backup_failed_task(user), update_available_task(user), signups_pending_task(user)]
+    tasks.extend(_service_tasks_cached(connection, user))
     if can_manage(user):
         tasks.append(missing_service_task(connection))
     return [task for task in tasks if task]
+
+
+def _service_tasks_cached(connection, user):
+    """Taches des services (compte a creer / a fermer) : recalculees a chaque controle de session, donc mises en cache 30 s par compte."""
+    from models.service_tasks import service_tasks
+    return _cached(("service_tasks", (user or {}).get("username")), lambda: service_tasks(connection, user), seconds=_SERVICE_TASKS_CACHE_SECONDS)
 
 
 def open_tasks_count(connection, user):

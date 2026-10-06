@@ -40,11 +40,11 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 **Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
-## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10 ; lots 2 et 4 à faire)
+## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10, lot 2 codé le 06/10 (version à confirmer) ; lot 4 à faire)
 
 Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD).
 
-**Lot 1 ✅ (3.68.0, 06/10)** : titulaires par service (Admin > Services), service obligatoire sur une ressource, migration 9, cloche + panneau, tâche des administrateurs « ressources sans service référent » avec suggestion validée par l'administrateur. **Lot 3 ✅ (3.69.0, 06/10)** : tâches des administrateurs (nouvelle version, sauvegarde en échec, inscriptions en attente). **Reste** : lot 2 (compte à créer à l'attribution / à fermer à la restitution, tâche partagée par service avec « Fait » enregistré dans le dossier, périmètre toutes ressources), lot 4 (relance J+3, escalade J+7, page « Mes tâches », rétention 90 jours).
+**Lot 1 ✅ (3.68.0, 06/10)** : titulaires par service (Admin > Services), service obligatoire sur une ressource, migration 9, cloche + panneau, tâche des administrateurs « ressources sans service référent » avec suggestion validée par l'administrateur. **Lot 3 ✅ (3.69.0, 06/10)** : tâches des administrateurs (nouvelle version, sauvegarde en échec, inscriptions en attente). **Lot 2 ✅ (codé le 06/10, non publié)** : tâches de service « à fournir » / « à fermer », « Fait » partagé (table `service_task_done`, pas dans le contenu du dossier), repli sur les administrateurs, migration 10 qui considère l'existant comme traité. **Reste** : retrait d'une ressource par un ajustement → « à fermer » ; « Fait par X le … » dans la fiche du dossier ; lot 4 (relance J+3, escalade J+7, page « Mes tâches », rétention 90 jours).
 
 **Décisions du propriétaire (06/10)** : tâche **partagée** par service (un seul état, elle disparaît pour tous dès qu'un titulaire la fait) ; **toutes les ressources** concernées, pas seulement dotelec ; **le même service** est prévenu d'un compte à fermer au départ d'un agent ; l'administrateur garde la main sur le rattachement des ressources existantes (Informatique = DSI proposé, validé par lui).
 

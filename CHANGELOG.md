@@ -1,5 +1,22 @@
 # Historique des versions — À Quai
 
+## [Non publié] — Notifications, lot 2 : tâches de service (numéro de version à confirmer ; proposé : 3.70.0)
+
+### 🔔 Ce que doit faire chaque service, et un « Fait » partagé
+- **« Ressources à fournir »** : dès qu'un dossier attribue une ressource (dossier en attente de signature ou actif, élément non rendu), **tous les titulaires du service de la ressource** reçoivent la tâche (créer le compte, l'accès, préparer le matériel). Elle disparaît si le dossier est annulé ou restitué, ou si l'élément est retiré.
+- **« Ressources à fermer »** : quand un dossier passe en restitution, les ressources **sans retour physique** (comptes, accès : « doit être restituée » décoché) deviennent une tâche pour le service émetteur — le matériel à rendre reste suivi par la restitution elle-même.
+- **« Fait »** (bouton sur chaque ligne de la fenêtre « Ressources à fournir / à fermer ») : enregistre qui et quand (`service_task_done`), et **la tâche disparaît pour tous les titulaires du service**. « À fournir » et « à fermer » sont deux décisions distinctes (le compte créé doit être fermé au départ). Le « Fait » est indépendant des lignes d'éléments : il survit à un nouvel enregistrement du dossier, et n'écrit rien dans le contenu (signé) du dossier.
+- **Repli sur les administrateurs** si le service n'a aucun titulaire actif (comptes supprimés, désactivés ou liste vide) : la ligne le précise. Une ressource sans service du catalogue reste dans la tâche « choisir le service ».
+- **Aucune donnée personnelle pour un profil masqué** : le nom de la personne n'est affiché qu'à un lecteur en portée complète ; un profil masqué voit « Dossier du jj/mm/aaaa ». Le lien « Ouvrir le dossier » n'apparaît que pour qui peut le lire. Rien dans le journal.
+- **Migration 10** (sauvegarde automatique avant application) : crée `service_task_done` et **considère l'existant comme traité** (tous les éléments des dossiers non brouillons) : sans cela, les centaines d'attributions historiques deviendraient d'un coup des tâches. Seuls les nouveaux éléments et les brouillons validés plus tard en créent.
+- Le calcul est mis en cache 30 s par compte (`APP_NOTIFICATIONS_CACHE_SECONDS`) ; le cache est vidé à chaque enregistrement de dossier et à chaque « Fait ».
+- **Pas encore** : retrait d'une ressource par un ajustement (→ « à fermer »), relances J+3 / escalade J+7, historique « Fait par X le … » dans la fiche du dossier, page « Mes tâches ».
+- Fichiers : `backend/models/service_tasks.py`, `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/models/forms.py` (vidage du cache), `backend/migrations.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` (16 cas : titulaires, partage du « Fait », refus, survie à un nouvel enregistrement, à fermer, repli administrateurs, masquage, migration) ; scénario navigateur `tests/browser/check_service_tasks.py` (15 vérifications, session d'un compte ordinaire).
+
+
 ## [3.69.0] - 2026-10-06 — Notifications, lot 3 : tâches des administrateurs
 
 ### 🔔 Trois nouvelles notifications pour les administrateurs

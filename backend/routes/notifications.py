@@ -5,8 +5,9 @@ from auth import current_user, get_user_record, login_required, permission_requi
 from database import get_db
 from models.audit import insert_app_log
 from models.notifications import (
-    apply_service_assignments, open_tasks, service_referents, set_service_referents,
+    apply_service_assignments, clear_cache, open_tasks, service_referents, set_service_referents,
 )
+from models.service_tasks import mark_done
 
 bp = Blueprint("notifications", __name__)
 
@@ -62,3 +63,19 @@ def put_service_referents(service_id):
         insert_app_log(connection, "admin", "service_referents_updated", "Titulaires d'un service mis a jour", "service", service_id,
                        {"usernames": saved}, actor=session.get("user"))
     return jsonify({"usernames": saved})
+
+
+@bp.route("/api/service-tasks/done", methods=["POST"])
+@login_required
+def service_task_done():
+    """« Fait » : un titulaire du service (ou un administrateur si le service n'a aucun titulaire actif) termine une tache ;
+    elle disparait pour tous ses collegues."""
+    payload = request.get_json(silent=True) or {}
+    user = current_user()
+    with get_db() as connection:
+        ok, error = mark_done(connection, user, payload.get("kind"), payload.get("form_id"), payload.get("item_key"))
+        if not ok:
+            return jsonify({"error": error}), 404 if error == "task_not_found" else 400
+        clear_cache()
+        tasks = open_tasks(connection, user)
+    return jsonify({"done": True, "tasks": tasks, "count": len(tasks)})

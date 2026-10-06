@@ -29,6 +29,18 @@
       actionLabel: "Voir les demandes",
       run: goTo,
     },
+    service_provision: {
+      title: (task) => plural(task.count, "ressource à fournir", "ressources à fournir"),
+      detail: () => "Préparez ou créez ce qui a été attribué (compte, accès, matériel), puis cliquez « Fait » : la tâche disparaît pour tout votre service.",
+      actionLabel: "Voir la liste",
+      run: (task) => openServiceTasksModal(task, "Ressources à fournir", "Fait : fourni"),
+    },
+    service_deprovision: {
+      title: (task) => plural(task.count, "ressource à fermer", "ressources à fermer"),
+      detail: () => "Des personnes quittent l'organisation : désactivez leurs comptes et accès, puis cliquez « Fait ».",
+      actionLabel: "Voir la liste",
+      run: (task) => openServiceTasksModal(task, "Ressources à fermer", "Fait : fermé"),
+    },
     resources_missing_service: {
       title: (task) => `${plural(task.count, "ressource sans service référent", "ressources sans service référent")}`,
       detail: () => "Choisissez le service de chacune : ses titulaires seront prévenus des actions à mener.",
@@ -250,6 +262,92 @@
       }
     });
     backdrop.querySelector("select")?.focus();
+  }
+
+  // ─── Tâches de service : à fournir / à fermer, avec « Fait » partagé par tout le service ──────────────────────────
+  function openServiceTasksModal(task, title, doneLabel) {
+    if (document.getElementById("serviceTasksModal")) {
+      return;
+    }
+    const rows = (task.items || []).map((item, index) => `<tr data-row="${index}">
+        <td data-label="Personne">${esc(item.who)}</td>
+        <td data-label="Ressource">${esc(item.label)}${item.unattended ? '<br><span class="form-text">Service sans titulaire : pris en charge par les administrateurs.</span>' : ""}</td>
+        <td data-label="Service">${esc(item.service)}</td>
+        <td data-label="Depuis">${esc(item.since)}</td>
+        <td data-label="Actions" class="service-tasks__actions">
+          ${item.can_open ? `<a class="btn btn-sm btn-outline-secondary" href="form.html?id=${encodeURIComponent(item.form_id)}">Ouvrir le dossier</a>` : ""}
+          <button type="button" class="btn btn-sm btn-primary" data-done="${index}">${esc(doneLabel)}</button>
+        </td>
+      </tr>`).join("");
+    const backdrop = document.createElement("div");
+    backdrop.id = "serviceTasksModal";
+    backdrop.className = "password-change-modal__backdrop";
+    backdrop.innerHTML = `
+      <div class="password-change-modal__dialog service-tasks" role="dialog" aria-modal="true" aria-labelledby="serviceTasksTitle">
+        <h3 id="serviceTasksTitle" tabindex="-1">${esc(title)}</h3>
+        ${task.truncated ? '<p class="form-text">Liste limitée aux premières lignes ; les suivantes apparaîtront au fur et à mesure.</p>' : ""}
+        <div class="table-responsive">
+          <table class="table align-middle service-tasks__table">
+            <thead><tr><th>Personne</th><th>Ressource</th><th>Service</th><th>Depuis</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div id="serviceTasksFeedback" role="status"></div>
+        <div class="password-change-modal__actions">
+          <button class="btn btn-outline-secondary" type="button" id="serviceTasksClose">Fermer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+
+    const close = () => {
+      document.removeEventListener("keydown", onEscape);
+      backdrop.remove();
+      bell()?.focus();
+    };
+    const onEscape = (event) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+    document.addEventListener("keydown", onEscape);
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) {
+        close();
+      }
+    });
+    backdrop.querySelector("#serviceTasksClose").addEventListener("click", close);
+    backdrop.querySelectorAll("[data-done]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const item = task.items[Number(button.dataset.done)];
+        const feedback = backdrop.querySelector("#serviceTasksFeedback");
+        button.disabled = true;
+        try {
+          const response = await fetch("/api/service-tasks/done", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": await getCsrfToken() },
+            body: JSON.stringify({ kind: task.kind, form_id: item.form_id, item_key: item.item_key }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "erreur");
+          }
+          backdrop.querySelector(`tr[data-row="${button.dataset.done}"]`)?.remove();
+          window.updateNotificationBadge?.(data.count);
+          feedback.className = "";
+          feedback.textContent = `${item.label} : terminé pour tout le service.`;
+          if (!backdrop.querySelector("tbody tr")) {
+            close();
+            showToast("Plus rien à faire dans cette liste.", "success");
+          }
+        } catch (error) {
+          button.disabled = false;
+          feedback.className = "password-change-modal__feedback password-change-modal__feedback--error";
+          feedback.textContent = "Impossible d'enregistrer. Un collègue l'a peut-être déjà fait : rechargez la page.";
+        }
+      });
+    });
+    backdrop.querySelector("#serviceTasksTitle").focus();
   }
 
   window.AQuaiNotifications = { togglePanel, openPanel, closePanel, NOTIFICATION_KINDS };

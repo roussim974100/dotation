@@ -5555,3 +5555,41 @@ section.content-card[id^="db-"] {
 .service-referents__item {
   margin: 0;
 }
+
+.service-tasks {
+  width: min(860px, 100%);
+}
+
+.service-tasks__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .service-tasks__table thead {
+    position: absolute;
+    left: -9999px;
+  }
+
+  .service-tasks__table tr {
+    display: block;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .service-tasks__table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0;
+    padding: 0.2rem 0;
+  }
+
+  .service-tasks__table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+  }
+}

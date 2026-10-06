@@ -235,6 +235,20 @@ def _m_service_referents(connection):
             connection.execute("UPDATE resource_catalog SET issuer_service = ? WHERE id = ?", (exact, resource_id))
 
 
+def _m_service_tasks(connection):
+    """3.70 (notifications, lot 2) : « Fait » des taches de service (qui, quand) ; l'existant est considere comme traite
+    (models/service_tasks.baseline_existing) pour ne pas transformer l'historique en taches."""
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS service_task_done ("
+        "kind TEXT NOT NULL, form_id TEXT NOT NULL, item_key TEXT NOT NULL, done_at TEXT NOT NULL, done_by TEXT, note TEXT, "
+        "PRIMARY KEY (kind, form_id, item_key))"
+    )
+    existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    if {"dotation_items", "dotation_forms"} <= existing:
+        from models.service_tasks import baseline_existing
+        baseline_existing(connection)
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
@@ -245,6 +259,7 @@ MIGRATIONS = [
     (7, "rattrapage_retraits_dossiers_sources", _m_resync_retrait_sources),
     (8, "rattrapage_reservations_bloquees", _m_recompute_stuck_reservations),
     (9, "titulaires_de_service", _m_service_referents),
+    (10, "taches_de_service", _m_service_tasks),
 ]
 
 
