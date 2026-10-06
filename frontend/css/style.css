@@ -1997,6 +1997,8 @@ button.export-menu__item {
 
 .export-filter-modal__dialog {
   width: min(480px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -2117,7 +2119,7 @@ button.export-menu__item {
 .password-change-modal__backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1080; /* au-dessus de la bannière de configuration (1040) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2128,6 +2130,8 @@ button.export-menu__item {
 
 .password-change-modal__dialog {
   width: min(440px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -2648,6 +2652,9 @@ button.export-menu__item {
 .workflow-dialog__panel {
   position: relative;
   width: min(100%, 38rem);
+  max-height: min(90vh, 640px);
+  display: flex;
+  flex-direction: column;
   padding: 1.35rem;
   border: 1px solid rgba(212, 221, 230, 0.9);
   border-radius: 24px;
@@ -2659,6 +2666,7 @@ button.export-menu__item {
   display: flex;
   gap: 0.9rem;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 .workflow-dialog__header p {
@@ -2681,6 +2689,12 @@ button.export-menu__item {
   padding: 0;
   list-style: none;
   border-top: 1px solid rgba(15, 91, 141, 0.10);
+  /* Beaucoup de ressources incompletes (ex: "Attribution partielle") rendent cette liste tres longue : elle
+     defile seule, le bouton OK (hors de ce bloc) reste toujours visible. min-height:0 est indispensable, sinon
+     un enfant flex ne peut jamais se restreindre sous la hauteur de son contenu et ne defile pas. */
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .workflow-dialog__item {
@@ -2734,9 +2748,11 @@ button.export-menu__item {
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
+/* Ambre plutot que rouge : ce statut signale une ressource pas encore completement renseignee, jamais un
+   blocage reel (le dossier reste modifiable) - voir getWorkflowStepStateLabel, ui.js. */
 .workflow-dialog__item.is-error .workflow-dialog__bullet {
-  border-color: #b84a4a;
-  background: #b84a4a;
+  border-color: #c89e30;
+  background: #f1d48b;
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
@@ -2750,7 +2766,7 @@ button.export-menu__item {
 }
 
 .workflow-dialog__item.is-error .workflow-dialog__state {
-  color: #b84a4a;
+  color: #8a4b12;
   font-weight: 600;
 }
 
@@ -2760,6 +2776,7 @@ button.export-menu__item {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 1.1rem;
+  flex-shrink: 0;
 }
 
 .signature-validity-dialog__panel {
@@ -3571,6 +3588,15 @@ button.export-menu__item {
 
 [data-color-mode="dark"] .workflow-dialog__item.is-active .workflow-dialog__state {
   color: var(--brand);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__bullet {
+  border-color: #c89e30;
+  background: color-mix(in srgb, #694b00 60%, #f1d48b);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #e8a060;
 }
 
 [data-color-mode="dark"] .workflow-dialog__item.is-done .workflow-dialog__state {

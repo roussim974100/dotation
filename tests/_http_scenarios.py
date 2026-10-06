@@ -6,11 +6,19 @@ import os
 import re
 import sys
 
+if not os.environ.get("APP_DATA_DIR"):
+    # Ces scenarios creent, modifient, importent et reparent des donnees : lances sans base isolee, ils s'executent
+    # sur backend/dotation.db (copie de la production). Passer par pytest (tests/test_http_endpoints.py) ou poser APP_DATA_DIR.
+    sys.exit("Refus : APP_DATA_DIR n'est pas defini, ces scenarios modifieraient la vraie base. Lancer via pytest.")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 import app as app_module  # noqa: E402  (cree des bases vierges dans APP_DATA_DIR)
 
 app = app_module.app
+import _stamped_client  # noqa: E402  (sessions posees a la main = sessions valides)
+_stamped_client.install(app)
+_stamped_client.release_default_admin()
 results = {}
 
 # Endpoints volontairement publics (pas d'authentification attendue).
@@ -362,7 +370,7 @@ with _gudb() as _uc:
     _uc.execute("INSERT OR REPLACE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES ('lecteur_masque','Lecteur masque','',?,'masked','2026-01-01','2026-01-01')",
                 (json.dumps(["forms.read_list", "forms.read_detail", "forms.view_all", "forms.edit"]),))
 _real_get_user_record = _auth.get_user_record
-_auth.get_user_record = lambda username: ({"username": "masque", "groups": ["lecteur_masque"], "active": True, "role": "user"} if username == "masque" else _real_get_user_record(username))
+_auth.get_user_record = lambda username: ({"username": "masque", "groups": ["lecteur_masque"], "active": True, "role": "user", "password_hash": "x", "status": "active"} if username == "masque" else _real_get_user_record(username))
 masked = app.test_client()
 with masked.session_transaction() as _s:
     _s["user"] = "masque"

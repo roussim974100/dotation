@@ -1,12 +1,26 @@
 # Backlog produit — À Quai
 
-Dernière revue : **26 septembre 2026** (fin du chantier « ajustement d'un dossier actif », versions 3.62.1 à 3.66.0).
+Dernière revue : **6 octobre 2026** (P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
 ## Version courante
 
-`dev`, `preprod` et `prod` sont à **3.66.0** sur GitHub (PR #24 et #25 fusionnées le 26/09). Reste au propriétaire : déployer la production, cocher `forms.adjust` dans Administration > Comptes, faire changer le mot de passe fuité dans le journal.
+`dev` à **3.67.3**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+
+## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
+
+**Constat** : après un changement de mot de passe, une session ouverte avant (ex. `admin/admin` par défaut) reste valide et garde tous les droits. Cause : le cookie de session ne contient que `session["user"]` ; `login_required` (`auth.py`) ne relit rien en base, et ni `/api/me/password` (`routes/pages.py`) ni la modification d'un compte par l'admin (`routes/admin.py`) n'invalident les sessions existantes. La désactivation et la suppression d'un compte sont très probablement touchées aussi (à vérifier par test).
+
+| Lot | Contenu | Effort | Priorité |
+|---|---|---|---|
+| ✅ 1 (code fait le 06/10, 3.67.3) | **Empreinte de session** : au lieu d'une colonne (donc sans migration), le cookie porte un HMAC du hash du mot de passe (`pwd_fp`), comparé à chaque requête par `enforce_session_validity` (`auth.py`, `before_request` dans `app.py`). Mot de passe changé (par l'utilisateur ou un admin), compte désactivé, en attente ou supprimé → session vidée, 401, entrée `session_revoked` au journal de sécurité. La session de celui qui change son propre mot de passe est réalignée (`realign_session_password`). Les cookies émis avant le correctif (sans empreinte) sont refusés : **tout le monde devra se reconnecter une fois à la mise à jour**. Limite connue : un compte désactivé puis réactivé avant toute requête de la session ancienne la ressuscite | M | P0 |
+| ✅ 2 (code fait le 06/10, 3.67.3) | **Cycle de vie** : `start_session` vide la session avant la connexion (pas de fixation) ; durée absolue 12 h et inactivité 60 min, réglables par `APP_SESSION_MAX_HOURS` / `APP_SESSION_IDLE_MINUTES` | S | P0 |
+| ✅ 3 (fait le 06/10, 3.67.3) | **Compte par défaut** : `must_change_password` posé sur `admin` au seed et au démarrage tant que son mot de passe est `admin` ; le serveur ne répond plus qu'au changement de mot de passe, fenêtre non fermable côté navigateur. Le flag cookie `Secure` est déjà posé automatiquement en HTTPS (`_AutoSecureSessionInterface`). Scénario navigateur : `tests/browser/check_password_obligatoire.py` | S | P0 |
+| ✅ Tests (`tests/test_session_validity.py`, 11 tests) | Changement par un admin, par l'utilisateur (sa session reste ouverte), désactivation, suppression, mutation avec jeton CSRF valide, expiration absolue et par inactivité, cookie ancien, remplacement de session à la connexion. `tests/_stamped_client.py` complète les sessions posées à la main par les autres tests | S | P0 |
+| Plus tard | Limitation des tentatives de connexion (à vérifier), MFA TOTP pour les admins, liste des sessions actives, forcer le changement après une réinitialisation par un administrateur | M | P2 |
+
+À livrer en correctif (x.y.Z) : version à confirmer avec le propriétaire avant tout changement. Bonnes pratiques de référence : OWASP Session Management, ASVS §3.
 
 ## Sprint terminé le 26/09 — « Ajuster les ressources d'un dossier déjà actif »
 
@@ -19,18 +33,18 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | # | Contenu | Effort | Priorité |
 |---|---|---|---|
 | ✅ 3.62.0 (fait le 24/09) | E-mails de restitution : voir « Demandes utilisateur » ci-dessous | S | P1 |
-| ✅ 3.63.0 (fait le 26/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct. **Reste** : lien public de signature à distance pour un ajustement (aujourd'hui : signature recueillie ensuite depuis l'application), assigner `forms.adjust` aux groupes sur les installations existantes | M | P1 |
+| ✅ 3.63.0 (fait le 26/09, complété le 28-29/09) | Route `PATCH /api/forms/<id>/ajustement` + signature par geste + permission `forms.adjust` + statut d'événement distinct + lien public de signature à distance (`adjustment-signature.html`, 3.66.1) + `forms.adjust` rattrapé automatiquement sur les groupes existants (`PERMISSION_BACKFILLS`, 3.66.1) | M | P1 |
 | ✅ 3.64.0 (fait le 26/09) | Migration 7 de rattrapage + invariant de santé « retrait non répercuté ». Sur la copie de la base de production : 2 dossiers sources, aucun changement (rien à annoncer) | S | P0 |
-| ✅ 3.65.0 (fait le 26/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique), « Mise à jour » retiré du sélecteur de création. **Reste** : lien public de signature à distance, PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
-| 3.67.0 (optionnel) | Écran de rapprochement/fusion de doublons de personnes — voir constat ci-dessous (47 fiches pour 34 dossiers) | L | P2 |
+| ✅ 3.65.0 (fait le 26/09, complété le 28-29/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique, reprise de matériel restitué), « Mise à jour » retiré du sélecteur de création, plus « Gérer les ressources » à côté de « Restituer » (3.67.2). **Reste** : PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
+| ✅ 3.67.1 (fait le 28/09) | Regroupement des dossiers par personne dans les 4 tableaux de bord (`groupDraftsByPerson`) — répond au symptôme visible des doublons (voir constat ci-dessous), mais ne fusionne pas les fiches « personne » elles-mêmes | M | P2 |
 
-**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. Restent : QR code aussi pour la signature à distance d'un ajustement (le lien public de cet ajustement n'existe pas encore) et sur les écrans de restitution après « Enregistrer en attente ».
+**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 
 | Sujet | Détail | Priorité |
 |---|---|---|
-| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). La colonne `person_id` les rend maintenant visibles, mais aucune fusion n'a été faite. Se raccroche à 3.67.0 | P1 |
+| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). Le regroupement par personne dans les tableaux de bord (3.67.1) masque le symptôme visible (une personne = une ligne, même avec plusieurs `personId`, grâce au repli par identité), mais aucune fusion des fiches « personne » elles-mêmes n'a été faite | P1 |
 | Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
 | Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
 | Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
@@ -46,6 +60,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 | Sujet | Détail | Effort | Priorité |
 |---|---|---|---|
+| ✅ Reprise de matériel restitué dans l'ajustement (demande du 29/09, fait le 29/09) | « Reprendre un matériel déjà restitué » propose désormais, quand on ajoute une ressource via « Gérer les ressources », les unités disponibles en stock (`/api/catalog/available/<id>`) — même mécanisme que la création de dossier, réimplémenté dans `frontend/js/adjustment.js` (`openAdjustmentReuseModal`) car ce fichier est aussi chargé sur des pages sans `app.js`. Scénario : `tests/browser/check_adjustment_reuse_stock.py` (12/12) | M | P1 |
 | ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
 | ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
 | Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |

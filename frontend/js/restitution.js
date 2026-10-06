@@ -837,7 +837,9 @@ async function initRestitutionPage() {
           text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
           steps: workflowLabels.map((label) => ({ label, status: "done" }))
         });
-        if (["returned", "awaiting_signature"].includes(response?.summary?.status || "")) {
+        // "awaiting_signature" veut dire que la restitution est complete mais pas encore signee : feter ce
+        // moment-la donnerait l'impression que c'est fait alors que la signature (l'evenement reel) reste a venir.
+        if (response?.summary?.status === "returned") {
           await window.playCompletionCelebration("boat");
         }
         const choice = await window.askWorkflowDialog({

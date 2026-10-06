@@ -1,5 +1,20 @@
 # Historique des versions — À Quai
 
+## [3.67.3] - 2026-10-06
+
+### 🔒 Sécurité : une session ne survit plus au changement de mot de passe
+- **Faille corrigée** (signalée par l'utilisateur) : une session ouverte avec `admin/admin` restait active, avec tous les droits, après que le mot de passe a été changé par quelqu'un d'autre. Le cookie ne portait que le nom d'utilisateur et rien n'était revérifié en base.
+- **Empreinte de session** : le cookie contient désormais un HMAC du hash du mot de passe, comparé à chaque requête. Mot de passe changé (par l'utilisateur ou par un administrateur), compte désactivé, en attente ou supprimé → session refusée (401) et entrée `session_revoked` dans le journal de sécurité. Celui qui change son propre mot de passe reste connecté ; ses autres sessions sont fermées.
+- **Cycle de vie** : la connexion vide l'ancienne session (pas de fixation) ; durée maximale 12 h et inactivité maximale 60 min, réglables par `APP_SESSION_MAX_HOURS` et `APP_SESSION_IDLE_MINUTES`.
+- ⚠️ **À la mise à jour, tout le monde doit se reconnecter une fois** : les cookies émis avant ce correctif sont refusés (c'est voulu, cela ferme aussi les sessions éventuellement compromises).
+- **Mot de passe d'origine à changer** : le compte `admin` protégé par `admin` est marqué `must_change_password` — à l'installation, et au démarrage pour les installations déjà en service (ou une base restaurée depuis une ancienne archive). Tant qu'il n'est pas changé, le serveur ne répond qu'au changement de mot de passe (API : 403 `password_change_required` ; pages : retour à l'accueil) et une fenêtre non fermable (ni Annuler, ni Échap, ni clic à côté) s'ouvre d'elle-même. Le nouveau mot de passe doit différer de l'ancien. Seul le compte `admin` est visé ; un mot de passe fixé par un administrateur dans Admin > Comptes lève aussi le drapeau. Colonne ajoutée à `users.db` (sans migration numérotée : `ensure_users_schema`).
+- **Fenêtre de changement de mot de passe** : elle passait sous la bannière « Configuration initiale » (`z-index` 100 contre 1040) ; les messages d'erreur de complexité ne correspondaient pas aux codes du serveur (affichage d'un code technique au lieu d'une phrase).
+- Fichiers : `backend/auth.py`, `backend/app.py`, `backend/database.py`, `backend/routes/pages.py`, `backend/routes/admin.py`, `frontend/js/ui.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_default_password_change.py` (26 cas) et le scénario navigateur `tests/browser/check_password_obligatoire.py` (vraie connexion, fenêtre, déblocage). Le harnais navigateur fabrique désormais un cookie de session valide (empreinte du mot de passe) et change le mot de passe de `admin` dans l'instance isolée.
+- `tests/test_session_validity.py` (11 tests). `tests/_stamped_client.py` complète les sessions posées à la main par les autres tests ; trois tests qui utilisaient un compte absent de la base ont été ajustés.
+
 ## [3.67.2] - 2026-09-29
 
 ### 🖥️ Deux parcours distincts sur un dossier actif
@@ -7,8 +22,13 @@
 - **« Nouvelle attribution pour cette personne »** ne s'affiche plus sur un dossier actif (cas qui recréait justement le doublon que « Gérer les ressources » vise à éviter) ; reste proposé sur un dossier restitué ou en restitution, là où il n'y a plus de dossier actif à ajuster.
 - Fichier : `frontend/js/storage.js`.
 
+### 🖥️ Reprise de matériel restitué dans l'ajustement
+- **« Reprendre un matériel déjà restitué »** dans la fenêtre « Gérer les ressources » : en ajoutant une ressource suivie par identifiant (n° de série…), les unités disponibles en stock sont désormais proposées et remplissent automatiquement les champs — même mécanisme que la création de dossier, jusqu'ici absent de l'ajustement (constaté par l'utilisateur : un PC restitué n'était jamais suggéré, il fallait ressaisir son numéro de série à la main).
+- Fichier : `frontend/js/adjustment.js` (`openAdjustmentReuseModal`, réimplémenté plutôt que partagé avec `app.js` car ce fichier est aussi chargé sur des pages sans lui).
+
 ### 🧪 Tests
 - `tests/browser/check_person_grouping.py` : 20/20 vérifications (2 nouvelles : absence sur un dossier actif, présence sur un dossier restitué).
+- `tests/browser/check_adjustment_reuse_stock.py` (nouveau) : 12/12 vérifications, scénario complet (restitution via ajustement → unité en stock → reprise automatique sur un autre dossier).
 
 ## [3.67.1] - 2026-09-28
 

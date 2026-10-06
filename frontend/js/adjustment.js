@@ -142,10 +142,98 @@ function buildAdjustmentAdditionBlock(resource) {
     : `<div class="mb-2"><label class="form-label" for="adj_${adjEsc(resource.id)}_details">Précision / détails</label><input class="form-control" id="adj_${adjEsc(resource.id)}_details" data-adj-details="true" placeholder="Numéro de série, taille, couleur…"></div>`;
   const condition = resource.has_assignment_condition
     ? `<div class="mb-2"><label class="form-label">État à la remise</label><select class="form-select" data-adj-condition="true">${adjOptions(ADJUSTMENT_CONDITIONS)}</select></div>` : "";
+  // Materiel suivi par identifiant (n° de serie...) : proposer de reprendre une unite deja restituee et en stock,
+  // au lieu de ressaisir ses champs a la main (meme mecanisme que la creation de dossier, voir openReuseResourceModal
+  // dans app.js - reimplemente ici car adjustment.js est aussi charge sur les pages sans app.js).
+  const reuse = resource.identifier_key
+    ? `<div class="mb-2"><button type="button" class="btn btn-sm btn-outline-primary" data-adj-reuse="${adjEsc(resource.id)}">Reprendre un matériel déjà restitué</button></div>`
+    : "";
   return `<div class="border rounded p-3 mb-2" data-adj-addition="${adjEsc(resource.id)}">
     <div class="d-flex justify-content-between align-items-start mb-2"><strong>+ ${adjEsc(resource.label)}</strong>
       <button type="button" class="btn btn-sm btn-outline-secondary" data-adj-remove-addition="${adjEsc(resource.id)}">Annuler l'ajout</button></div>
-    ${fields}${condition}</div>`;
+    ${reuse}${fields}${condition}</div>`;
+}
+
+// Fenetre de reprise d'un materiel deja restitue, pour un ajout dans l'ajustement (voir buildAdjustmentAdditionBlock).
+async function openAdjustmentReuseModal(resource, block) {
+  let data;
+  try {
+    data = await requestJson(`/api/catalog/available/${encodeURIComponent(resource.id)}`);
+  } catch (error) {
+    showToast("Impossible de charger le matériel disponible.", "error");
+    return;
+  }
+  const schema = Array.isArray(resource.field_schema) ? resource.field_schema : [];
+  const labelOf = (key) => schema.find((field) => field.key === key)?.label || key;
+  const summary = (item) => Object.entries(item.fields)
+    .filter(([key]) => key !== data.identifierKey)
+    .map(([, value]) => String(value)).join(" · ");
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+  let modal = document.getElementById("adjustmentReuseModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "password-generator-modal d-none";
+    modal.id = "adjustmentReuseModal";
+    modal.setAttribute("aria-hidden", "true");
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="password-generator-modal__backdrop" data-adj-reuse-close="true"></div>
+    <div class="password-generator-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="adjReuseTitle">
+      <div class="password-generator-modal__header">
+        <div><p class="panel-eyebrow">Matériel restitué</p><h2 class="section-title" id="adjReuseTitle">${adjEsc(resource.label)}</h2></div>
+        <button class="btn btn-outline-secondary btn-sm" type="button" data-adj-reuse-close="true">Fermer</button>
+      </div>
+      <div class="password-generator-modal__content">
+        <input class="form-control" id="adjReuseSearch" type="search" placeholder="Rechercher (n° de série, marque, modèle…)" autocomplete="off">
+        <div class="list-group" id="adjReuseList" role="list"></div>
+        <p class="form-text mb-0" id="adjReuseHint"></p>
+      </div>
+    </div>`;
+  modal.classList.remove("d-none");
+  modal.setAttribute("aria-hidden", "false");
+
+  const search = modal.querySelector("#adjReuseSearch");
+  const list = modal.querySelector("#adjReuseList");
+  const hint = modal.querySelector("#adjReuseHint");
+  const close = () => { modal.classList.add("d-none"); modal.setAttribute("aria-hidden", "true"); document.removeEventListener("keydown", onKeydown); };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+
+  const render = () => {
+    const query = normalize(search.value);
+    const items = data.items.filter((item) => !query || normalize(`${item.identifier} ${summary(item)}`).includes(query));
+    list.innerHTML = items.map((item) => `
+      <button class="list-group-item list-group-item-action" type="button" data-adj-reuse-index="${data.items.indexOf(item)}">
+        <span class="fw-semibold">${adjEsc(labelOf(data.identifierKey))} : ${adjEsc(item.identifier)}</span>
+        ${item.status === "degraded" ? '<span class="status-chip status-chip--draft ms-2">Restitué dégradé</span>' : ""}
+        <span class="d-block small text-muted">${adjEsc(summary(item))}${item.returned_at ? ` · restitué le ${adjEsc(new Date(item.returned_at).toLocaleDateString("fr-FR"))}` : ""}</span>
+      </button>`).join("");
+    hint.textContent = !data.items.length
+      ? "Aucun matériel restitué disponible pour cette ressource."
+      : (items.length ? `${items.length} matériel(s) disponible(s).` : "Aucun résultat pour cette recherche.");
+  };
+
+  list.onclick = (event) => {
+    const button = event.target.closest("[data-adj-reuse-index]");
+    if (!button) return;
+    const item = data.items[Number(button.dataset.adjReuseIndex)];
+    schema.forEach((field) => {
+      const input = block.querySelector(`[data-adj-field="${CSS.escape(field.key)}"]`);
+      if (!input) return;
+      input.value = item.fields[field.key] ?? "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    close();
+    showToast(`« ${item.identifier} » repris : vérifiez l'état à la remise.`, item.status === "degraded" ? "warning" : "success");
+  };
+  modal.querySelectorAll("[data-adj-reuse-close]").forEach((button) => { button.onclick = close; });
+  search.oninput = render;
+  search.value = "";
+  render();
+  document.addEventListener("keydown", onKeydown);
+  search.focus();
 }
 
 function readAdjustmentAddition(block, resource) {
@@ -356,6 +444,7 @@ async function openAdjustment(id) {
     additions.insertAdjacentHTML("beforeend", buildAdjustmentAdditionBlock(resource));
     const block = additions.lastElementChild;
     block.querySelector("[data-adj-remove-addition]").addEventListener("click", () => block.remove());
+    block.querySelector("[data-adj-reuse]")?.addEventListener("click", () => openAdjustmentReuseModal(resource, block));
   });
 
   modal.querySelector("#adjustmentForm").addEventListener("submit", async (event) => {

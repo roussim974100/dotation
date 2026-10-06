@@ -42,7 +42,7 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `routes/forms.py` | API des dossiers : création, mise à jour, restitution (`PATCH /api/forms/<id>/restitution`), Phase 1, régularisation, exports Excel/PDF |
 | `routes/pages.py` | pages HTML, connexion, `/api/session` (utilisateur courant, permissions, `data_scope`) |
 | `routes/admin.py` | administration (comptes, services, ressources, personnalisation, base de données) |
-| `routes/signature.py` | liens de signature à distance (attribution et restitution) |
+| `routes/signature.py` | liens de signature à distance (attribution, restitution, **ajustement**) ; `models/signature.py` (`signature_link_*`) pour ajouter un 4ᵉ type |
 | `routes/units.py`, `routes/stock.py`, `routes/inventory.py` | parc (objets suivis), stock, inventaire |
 | `models/forms.py` | `persist_form` : **chemin unique d'enregistrement d'un dossier** (resynchronise parc et stock) |
 | `models/workflow.py` | calcul des statuts (attribution, restitution) |
@@ -51,23 +51,26 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `models/units.py`, `models/stock.py` | projections parc/stock (`sync_units_for_form`, `sync_stock_for_form`) |
 | `models/vocab.py` | libellés de statuts et types de bénéficiaires (source unique, publiés au navigateur) |
 | `models/settings.py` | paramètres de l'organisation |
-| `auth.py`, `permissions.py` | comptes, groupes, permissions, portée des données (`data_scope`) |
-| `migrations.py` | migrations de schéma numérotées, idempotentes, avec copie de sécurité avant application |
+| `auth.py`, `permissions.py` | **validité des sessions** (`enforce_session_validity`, `start_session`, voir §4) ; comptes, groupes, permissions, portée des données (`data_scope`) ; toutes les permissions sont éditables par groupe dans Admin > Comptes (`routes/admin.py`, `TOGGLEABLE_PERMISSIONS`), avec garde-fou anti-verrouillage sur `users.manage`/`db.manage` |
+| `app.py` (`PERMISSION_BACKFILLS`) | rattrape une fois pour toutes un droit ajouté après coup sur des groupes déjà en service (ex. `forms.adjust`), sans jamais réajouter un droit retiré volontairement — ajouter une ligne ici plutôt que de modifier `DEFAULT_GROUPS` pour un nouveau droit sur l'existant |
+| `migrations.py` | migrations de schéma numérotées, idempotentes, avec copie de sécurité avant application (8 migrations à ce jour) |
 | `pdf/attribution.py`, `pdf/restitution.py` | génération des PDF |
 | `config.py`, `environment.py` | chemins de données (`APP_DATA_DIR`), environnement (dev/preprod/prod) écrit par le script de déploiement |
 
 ### Navigateur (`frontend/`)
 
 Scripts **classiques** (pas de modules, pas de build) : les fonctions sont globales et partagées entre fichiers chargés
-sur une même page. Chaque page HTML liste ses scripts en bas ; `?v=AAAAMMJJx` sert à forcer le rechargement.
+sur une même page. Chaque page HTML liste ses scripts en bas ; `?v=AAAAMMJJx` sert à forcer le rechargement — **mettre à
+jour la version sur TOUTES les pages qui chargent ce fichier** (voir piège ci-dessous).
 
 | Fichier | Rôle |
 |---|---|
-| `js/storage.js` | appels API, listes des dossiers (4 tableaux de bord), menus d'actions, exports, **e-mails `.eml`** et PDF |
-| `js/app.js` | formulaire d'un dossier (`form.html`) : saisie, ressources, signature, actions d'un dossier signé |
+| `js/storage.js` | appels API, listes des dossiers (**4 tableaux de bord, regroupés par personne** — `groupDraftsByPerson`, une ligne par personne avec historique dépliable, dossiers toujours distincts en base), menus d'actions, exports, **e-mails `.eml`** et PDF |
+| `js/app.js` | formulaire d'un dossier (`form.html`) : saisie, ressources (dont reprise de matériel restitué, `openReuseResourceModal`), signature, actions d'un dossier signé |
 | `js/restitution-phase1.js`, `js/restitution.js` | restitution en deux phases : dates (`restitution-phase1.html`), état du matériel et signature (`restitution.html`) |
-| `js/signature-qr.js`, `js/vendor/qrcode-generator.js` | QR code d'un lien de signature (fenêtre, générateur embarqué MIT, aucun CDN) ; actions `showAssignmentSignatureQr` / `showRestitutionSignatureQr` dans `storage.js` |
-| `js/adjustment.js` | ajustement d'un dossier actif : fenêtre (retirer / ajouter / service / signature), signature d'un ajustement en attente, historique ; chargé après `storage.js` (listes et fiche) |
+| `js/signature-qr.js`, `js/vendor/qrcode-generator.js` | QR code d'un lien de signature (fenêtre, générateur embarqué MIT, aucun CDN) ; actions `showAssignmentSignatureQr` / `showRestitutionSignatureQr` / `showAdjustmentSignatureQr` dans `storage.js` |
+| `js/adjustment.js` | ajustement d'un dossier actif : fenêtre (retirer / ajouter — avec reprise de matériel restitué, `openAdjustmentReuseModal` / changer le service / signature), signature d'un ajustement en attente, historique ; chargé après `storage.js` (listes et fiche) |
+| `adjustment-signature.html`, `js/adjustment-signature.js` | page publique de signature à distance d'un ajustement (lien + QR) |
 | `js/ui.js` | composants partagés : `showToast`, `askConfirm`, dialogues de workflow (`askWorkflowDialog`), menu du compte |
 | `js/branding.js` | version, logo, pied de page, pastille d'environnement |
 | `js/admin*.js` | écrans d'administration |
@@ -78,7 +81,8 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 
 ### Tests (`tests/`)
 
-- `python -m pytest tests -q` : suite complète (~2 min).
+- `python -m pytest tests -q` : suite complète (~2 min). `tests/conftest.py` isole les bases (dossier temporaire) et installe `tests/_stamped_client.py` : une session posée à la main (`session_transaction`) est complétée comme une vraie connexion, sinon le contrôle de session la refuserait ; un test qui utilise un compte absent de la base reçoit 401.
+- **Ne jamais lancer `tests/_http_scenarios.py` à la main** : il crée, importe, répare des données. Sans `APP_DATA_DIR` il refuse de démarrer (depuis le 06/10) ; passer par `tests/test_http_endpoints.py`.
 - `RUN_BROWSER_TESTS=1 python -m pytest tests -q` : avec navigateur (~5 à 8 min).
 - `python tests/browser/check_<nom>.py` : scénarios navigateur isolés (serveur temporaire, base vierge, port 5055) ;
   `tests/browser/browser_harness.py` (`Instance(copy_db=...)` pour travailler sur une **copie** d'une base).
@@ -90,15 +94,27 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   recalculées par `persist_form`. Tout enregistrement de dossier passe par là (voir `docs/ARCHITECTURE_DONNEES.md`).
 - **Statuts** (`models/vocab.py`) : `draft`, `partial_assignment`, `awaiting_signature`, `active`, `partial_return`,
   `returned`, `cancelled`. Un dossier « en restitution » est `partial_return` dès l'enregistrement de la Phase 1.
-- **Types de dossier** : `arrivee`, `mise_a_jour` (ajout/retrait de ressources — **chaque mise à jour crée aujourd'hui un
-  nouveau dossier**, un chantier en cours doit permettre d'ajuster le dossier existant, voir le backlog),
-  `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne sans attribution enregistrée).
+- **Types de dossier** : `arrivee`, `mise_a_jour` (ancien type, retiré du sélecteur de création depuis 3.65.0 — voir
+  **ajustement** ci-dessous), `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne
+  sans attribution enregistrée).
+- **Ajustement d'un dossier actif** (`models/adjustment.py`, `PATCH /api/forms/<id>/ajustement`) : ajouter/retirer des
+  ressources ou changer le service **sans créer un nouveau dossier** — le dossier reste `active`, chaque geste a sa
+  propre signature. « Nouvelle attribution pour cette personne » ne doit plus être utilisée sur un dossier actif (menu
+  masqué depuis 3.67.2) : c'est justement le cas qui créait des doublons.
+- **Regroupement par personne** (`groupDraftsByPerson`, `storage.js`) : les 4 tableaux de bord n'affichent qu'une ligne
+  par personne (fusion par `personId` **et** par identité nom+prénom+service, en secours pour les dossiers créés avant
+  qu'une action ne reprenne le `personId`). Les dossiers restent des documents distincts et immuables ; seul
+  l'affichage fusionne. Pour qu'un nouveau dossier reste bien rattaché à la même personne, reprendre son `personId`
+  via le champ caché `#retraitsSourcePersonId` (déjà fait pour « mise à jour », « nouvelle attribution » et
+  « changement de service »).
 - **Portée des données** : un groupe `data_scope = "masked"` (RGPD) voit des données masquées et **ne peut générer aucun
   PDF ni export**, même avec `forms.export`. Serveur : `can_export_unmasked()` (`routes/forms.py`). Navigateur :
   `canExportUnmasked(user)` (`storage.js`). Garder les deux alignés.
 - **Permissions** : `forms.create`, `forms.edit`, `forms.delete`, `forms.export`, `forms.restitution`,
   `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
   (`permissions.py`).
+- **Sessions** (3.67.3) : le cookie porte `user`, `pwd_fp` (HMAC du hash du mot de passe), `login_at`, `last_seen`. Un `before_request` (`app.py` → `auth.enforce_session_validity`) le rapproche de la base à chaque requête : mot de passe changé, compte désactivé/en attente/supprimé, durée absolue (12 h) ou inactivité (60 min) dépassées → session vidée, 401, `session_revoked` au journal. Toute connexion passe par `start_session` (vide l'ancienne session) ; tout changement de **son propre** mot de passe appelle `realign_session_password`. Ne jamais écrire `session["user"] = ...` à la main dans le code applicatif. Réglages : `APP_SESSION_MAX_HOURS`, `APP_SESSION_IDLE_MINUTES`.
+- **Mot de passe d'origine** (3.67.3) : `users.must_change_password`, posé sur `admin` par le seed et par `flag_default_credentials()` (`database.py`, appelée à chaque `ensure_users_schema`, donc au démarrage et après une restauration) tant que son mot de passe est `admin`. Tant qu'il est levé, `auth.enforce_password_change` (before_request) ne laisse passer que `/api/session`, `/api/csrf-token`, `/api/me/password`, les réglages publics, l'accueil et les fichiers statiques ; `ui.js` ouvre alors la fenêtre non fermable (`openPasswordChangeModal({forced:true})`). Dans les tests, `conftest.py` démarque `admin` (`release_default_admin`) ; le harnais navigateur lui donne un autre mot de passe (un simple drapeau serait reposé par la prochaine importation de l'application).
 - **Signatures** : jamais exposées sans authentification ; affichage protégé par mot de passe.
 - **E-mails** : l'application ne les envoie pas ; elle prépare un fichier `.eml` que l'utilisateur ouvre dans sa
   messagerie (fonctions `prepare*Email` de `storage.js`).
@@ -142,3 +158,14 @@ Variables utiles : `APP_DATA_DIR`, `APP_LOG_LEVEL`, `APP_DEBUG_ENDPOINTS=1`, `AP
   action à effet (envoi, suppression) sur le bouton secondaire.
 - Flask : impossible d'ajouter une route après la première requête ; relancer le serveur après une modification.
 - GitHub : l'outil `gh` n'est pas installé sur le poste de développement ; les PR sont ouvertes par le navigateur.
+- **Cache-busting incomplet** (trouvé le 28/09) : `admin.js` et `app.js` n'avaient *aucun* `?v=...` sur leurs pages,
+  `adjustment.js` était resté sur une version périmée. Un navigateur déjà ouvert peut exécuter du code obsolète
+  indéfiniment, même après un rechargement simple (F5) — seul un rechargement forcé (Ctrl+F5) ou la navigation privée
+  le contourne à coup sûr. **Toujours vérifier que le `?v=` a bien été mis à jour sur CHAQUE page qui charge le
+  fichier modifié**, pas seulement celle qu'on teste.
+- **Régularisation et unité de parc bloquée** (`models/units.py`, `derive_state`) : un dossier de régularisation
+  (`assigned_at` rétrodaté avant la création réelle du brouillon) peut produire un événement `reserved` daté *après*
+  son `assigned`. `derive_state` traite les événements triés par date : sans `_FORM_RELATIONSHIP_SETTLED`, la
+  réservation de ce dossier n'était jamais levée et l'unité restait affichée « réservée » pour toujours, même après
+  restitution (corrigé en 3.66.1, migration 8 pour rattraper l'existant).
+- **Script de scénarios lancé à la main** (06/10) : `_http_scenarios.py` lancé sans `APP_DATA_DIR` a tourné sur `backend/dotation.db` (copie de la production) : 13 dossiers de test, réglages d'organisation écrasés, faux logo, groupe `lecteur_masque`. Réparé depuis `db_backups/` (sauvegarde `avant_assistant_*` + réglages du 28/09). Pour tester un flux sur de vraies données : `browser_harness.Instance(copy_db=...)` ou une instance temporaire sur le port 5055.

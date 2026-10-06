@@ -227,7 +227,9 @@ function getWorkflowStepStateLabel(status) {
     return "Terminé";
   }
   if (status === "error") {
-    return "Erreur";
+    // Utilise uniquement pour les ressources pas encore completement renseignees (le dossier reste modifiable,
+    // ce n'est jamais un blocage reel) : "Erreur" etait inutilement alarmant pour une simple information.
+    return "À compléter";
   }
   return "À traiter";
 }
@@ -723,16 +725,20 @@ async function populateUserMenuIdentity() {
 
 // ─── Modale changement de mot de passe ─────────────
 
-function openPasswordChangeModal() {
+// forced = true : compte au mot de passe d'origine (admin/admin) ; la fenêtre ne se ferme pas tant que le mot de passe
+// n'est pas changé (ni Annuler, ni Échap, ni clic à côté). Le serveur refuse de toute façon le reste (403).
+function openPasswordChangeModal({ forced = false } = {}) {
   if (document.getElementById("passwordChangeModal")) {
     return;
   }
   const backdrop = document.createElement("div");
   backdrop.id = "passwordChangeModal";
   backdrop.className = "password-change-modal__backdrop";
+  backdrop.dataset.forced = forced ? "1" : "";
   backdrop.innerHTML = `
-    <div class="password-change-modal__dialog">
-      <h3>Changer le mot de passe</h3>
+    <div class="password-change-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="pwdTitle">
+      <h3 id="pwdTitle">${forced ? "Choisissez votre mot de passe" : "Changer le mot de passe"}</h3>
+      ${forced ? '<p class="alert alert-warning" style="font-size:0.88rem;">Ce compte utilise encore le mot de passe d’origine. Pour la sécurité de l’application, choisissez-en un nouveau avant de continuer.</p>' : ""}
       <div style="display:grid;gap:0.85rem;">
         <div>
           <label class="form-label" for="pwdCurrent">Mot de passe actuel</label>
@@ -750,7 +756,7 @@ function openPasswordChangeModal() {
       </div>
       <div id="pwdFeedback"></div>
       <div class="password-change-modal__actions">
-        <button class="btn btn-outline-secondary" type="button" id="pwdCancelBtn">Annuler</button>
+        ${forced ? "" : '<button class="btn btn-outline-secondary" type="button" id="pwdCancelBtn">Annuler</button>'}
         <button class="btn btn-primary" type="button" id="pwdSubmitBtn">Valider</button>
       </div>
     </div>`;
@@ -758,17 +764,17 @@ function openPasswordChangeModal() {
 
   // Fermer au clic sur backdrop
   backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) {
+    if (e.target === backdrop && !forced) {
       closePasswordChangeModal();
     }
   });
 
-  document.getElementById("pwdCancelBtn").addEventListener("click", closePasswordChangeModal);
+  document.getElementById("pwdCancelBtn")?.addEventListener("click", closePasswordChangeModal);
   document.getElementById("pwdSubmitBtn").addEventListener("click", submitPasswordChange);
 
   // Fermer avec Escape
   backdrop._escHandler = (e) => {
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && !forced) {
       closePasswordChangeModal();
     }
   };
@@ -791,11 +797,31 @@ const PASSWORD_ERROR_MESSAGES = {
   missing_fields: "Veuillez remplir tous les champs.",
   invalid_current_password: "Le mot de passe actuel est incorrect.",
   password_too_short: "Le nouveau mot de passe est trop court (12 caractères minimum).",
-  password_no_upper: "Le mot de passe doit contenir au moins une majuscule.",
-  password_no_lower: "Le mot de passe doit contenir au moins une minuscule.",
-  password_no_digit: "Le mot de passe doit contenir au moins un chiffre.",
-  password_no_special: "Le mot de passe doit contenir au moins un caractère spécial.",
+  password_missing_upper: "Le mot de passe doit contenir au moins une majuscule.",
+  password_missing_lower: "Le mot de passe doit contenir au moins une minuscule.",
+  password_missing_digit: "Le mot de passe doit contenir au moins un chiffre.",
+  password_missing_special: "Le mot de passe doit contenir au moins un caractère spécial.",
+  password_unchanged: "Le nouveau mot de passe doit être différent de l'actuel.",
 };
+
+// Compte au mot de passe d'origine : ouvre la fenêtre de changement obligatoire (voir /api/session, must_change_password).
+async function initForcedPasswordChange() {
+  if (!document.getElementById("userMenu")) {
+    return;
+  }
+  try {
+    const response = await fetch("/api/session", { credentials: "same-origin" });
+    if (!response.ok) {
+      return;
+    }
+    const session = await response.json();
+    if (session && session.must_change_password) {
+      openPasswordChangeModal({ forced: true });
+    }
+  } catch (_) {
+    /* sans réponse du serveur, le serveur refuse de toute façon les actions du compte */
+  }
+}
 
 async function submitPasswordChange() {
   const current = document.getElementById("pwdCurrent")?.value || "";
@@ -827,7 +853,11 @@ async function submitPasswordChange() {
     const data = await response.json();
     if (response.ok) {
       showPwdFeedback(feedback, "Mot de passe modifié avec succès.", false);
-      setTimeout(closePasswordChangeModal, 1500);
+      if (document.getElementById("passwordChangeModal")?.dataset.forced) {
+        setTimeout(() => window.location.assign("/"), 1000);  // recharge la page avec un compte pleinement utilisable
+      } else {
+        setTimeout(closePasswordChangeModal, 1500);
+      }
     } else {
       const msg = PASSWORD_ERROR_MESSAGES[data.error] || data.error || "Erreur inconnue.";
       showPwdFeedback(feedback, msg, true);
@@ -850,6 +880,7 @@ function showPwdFeedback(el, msg, isError) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initForcedPasswordChange();
   document.querySelectorAll("[data-back-btn]").forEach((btn) => {
     btn.addEventListener("click", () => window.history.back());
   });
