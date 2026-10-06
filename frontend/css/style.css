@@ -2119,7 +2119,7 @@ button.export-menu__item {
 .password-change-modal__backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1080; /* au-dessus de la bannière de configuration (1040) */
   display: flex;
   align-items: center;
   justify-content: center;

@@ -24,7 +24,10 @@ CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 
 class Instance:
-    def __init__(self, copy_db=None, port=5055, user="admin", env=None):
+    def __init__(self, copy_db=None, port=5055, user="admin", env=None, keep_default_password_flag=False):
+        """keep_default_password_flag : garde le compte `admin` marque « mot de passe d'origine a changer » (3.67.3), pour
+        tester justement ce blocage ; sinon on le demarque, sinon aucune page ne repond a la session injectee."""
+        self.keep_default_password_flag = keep_default_password_flag
         self.extra_env = env or {}
         self.copy_db = copy_db
         self.port = port
@@ -76,15 +79,27 @@ class Instance:
     def session_cookie(self):
         """Cookie de session Flask signe avec la cle secrete de l'instance isolee (aucun mot de passe utilise)."""
         env_code = (
-            "import sys, json; sys.path.insert(0, r'%s'); import app;"
+            "import sys, json, time; sys.path.insert(0, r'%s'); import app, auth;"
             "s = app.app.session_interface.get_signing_serializer(app.app);"
-            "print(s.dumps({'user': %r, 'csrf_token': 'jeton-navigateur'}))" % (ROOT / "backend", self.user)
+            "ctx = app.app.app_context(); ctx.push();"
+            "rec = auth.get_user_record(%r); now = int(time.time());"
+            "print(s.dumps({'user': %r, 'csrf_token': 'jeton-navigateur', 'pwd_fp': auth.password_fingerprint(rec['password_hash']), 'login_at': now, 'last_seen': now}))"
+            % (ROOT / "backend", self.user, self.user)
         )
         env = dict(os.environ, **self.extra_env, APP_DATA_DIR=self.dir, APP_CUSTOM_BRANDING_DIR=os.path.join(self.dir, "branding"), PYTHONIOENCODING="utf-8")
         out = subprocess.run([sys.executable, "-c", env_code], cwd=str(ROOT), env=env, capture_output=True, text=True, encoding="utf-8")
         return out.stdout.strip().splitlines()[-1]
 
-    def driver(self, width=1366, height=900):
+    def release_default_admin(self):
+        # Baisser le drapeau ne suffit pas : toute importation de l'application le repose tant que le mot de passe est `admin`.
+        import bcrypt
+        users = sqlite3.connect(os.path.join(self.dir, "users.db"))
+        users.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE username = 'admin'",
+                      (bcrypt.hashpw(b"Harnais-Mot-2-Passe!", bcrypt.gensalt()).decode(),))
+        users.commit()
+        users.close()
+
+    def driver(self, width=1366, height=900, with_session=True):
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
         options = Options()
@@ -96,7 +111,10 @@ class Instance:
         driver = webdriver.Chrome(options=options)
         self._drivers.append(driver)
         driver.get(self.url("/login"))
-        driver.add_cookie({"name": "publier_session", "value": self.session_cookie(), "path": "/"})
+        if with_session:
+            if not self.keep_default_password_flag:
+                self.release_default_admin()
+            driver.add_cookie({"name": "publier_session", "value": self.session_cookie(), "path": "/"})
         return driver
 
     def console_errors(self, driver):

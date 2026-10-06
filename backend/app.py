@@ -4,7 +4,7 @@ import gzip
 import os
 import secrets
 from datetime import timedelta
-from auth import enforce_session_validity, SESSION_MAX_HOURS
+from auth import enforce_session_validity, enforce_password_change, SESSION_MAX_HOURS
 from proxy import AutoProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
@@ -62,6 +62,12 @@ def reject_stale_session():
     """Refuse une session devenue invalide (mot de passe change, compte desactive ou supprime, expiration).
     Declare avant validate_csrf : une session videe ici ne passe plus la verification CSRF et recoit 401."""
     enforce_session_validity()
+
+
+@app.before_request
+def require_password_change():
+    """Compte au mot de passe d'origine : rien d'autre que le changement du mot de passe (voir auth.enforce_password_change)."""
+    return enforce_password_change()
 
 
 @app.before_request
@@ -183,6 +189,7 @@ def init_users_db():
                 email TEXT NOT NULL DEFAULT '',
                 first_name TEXT NOT NULL DEFAULT '',
                 last_name TEXT NOT NULL DEFAULT '',
+                must_change_password INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -294,7 +301,7 @@ def seed_default_groups(connection):
 
 
 def seed_default_admin(connection):
-    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas."""
+    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas ; son mot de passe devra être changé à la première connexion."""
     import bcrypt
     user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if user_count > 0:
@@ -306,6 +313,9 @@ def seed_default_admin(connection):
         "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
         ("admin", password_hash, 1, "active", "", 0, now, now)
     )
+    # Mot de passe d'origine : a changer des la premiere connexion (si la colonne existe ; sinon ensure_users_schema la creera et posera le drapeau)
+    if any(row[1] == "must_change_password" for row in connection.execute("PRAGMA table_info(users)")):
+        connection.execute("UPDATE users SET must_change_password = 1 WHERE username = 'admin'")
     connection.execute(
         "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
         ("admin", "admin")

@@ -18,6 +18,7 @@ import app as app_module  # noqa: E402  (cree des bases vierges dans APP_DATA_DI
 app = app_module.app
 import _stamped_client  # noqa: E402  (sessions posees a la main = sessions valides)
 _stamped_client.install(app)
+_stamped_client.release_default_admin()
 results = {}
 
 # Endpoints volontairement publics (pas d'authentification attendue).

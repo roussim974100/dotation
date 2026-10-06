@@ -116,6 +116,7 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
 # Colonnes modifiables de users : liste blanche, car les noms de colonnes sont inseres dans le SQL.
 UPDATABLE_USER_COLUMNS = frozenset({
     "password_hash", "is_active", "status", "service", "db_manage", "email", "first_name", "last_name",
+    "must_change_password",
 })
 
 
@@ -271,6 +272,7 @@ def build_user_context(username):
         "first_name": (user.get("first_name") or "") if user else "",
         "last_name": (user.get("last_name") or "") if user else "",
         "email": (user.get("email") or "") if user else "",
+        "must_change_password": bool(user.get("must_change_password")) if user else False,
     }
 
 
@@ -352,6 +354,34 @@ def enforce_session_validity():
                            {"reason": reason, "ip": get_request_client_ip()}, actor=username)
     except Exception:
         pass
+
+
+# Compte au mot de passe d'origine (admin/admin) : tant qu'il n'est pas change, seules ces routes repondent.
+_PASSWORD_CHANGE_API = frozenset({
+    "/api/session", "/api/csrf-token", "/api/me/password", "/api/settings/public", "/api/settings/logo", "/api/client-context",
+})
+_PASSWORD_CHANGE_PAGES = frozenset({"/", "/index.html", "/login", "/logout"})
+_PASSWORD_CHANGE_STATIC_PREFIXES = ("/css/", "/js/", "/assets/")
+
+
+def enforce_password_change():
+    """before_request : un compte marque `must_change_password` ne peut rien faire d'autre que changer son mot de passe.
+    API -> 403 `password_change_required` ; page -> retour a l'accueil, ou la fenetre de changement s'ouvre d'elle-meme
+    (ui.js). Voir flag_default_credentials (database.py)."""
+    username = session.get("user")
+    if not username:
+        return None
+    record = get_user_record(username)
+    if not record or not record.get("must_change_password"):
+        return None
+    path = request.path
+    if path.startswith("/api/"):
+        if path in _PASSWORD_CHANGE_API:
+            return None
+        return jsonify({"error": "password_change_required"}), 403
+    if path in _PASSWORD_CHANGE_PAGES or path.startswith(_PASSWORD_CHANGE_STATIC_PREFIXES) or path in ("/favicon.ico", "/app-icon.svg"):
+        return None
+    return redirect("/")
 
 
 def current_user():

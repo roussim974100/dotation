@@ -84,6 +84,8 @@ def login():
                     {"ip": get_request_client_ip()},
                     actor=username,
                 )
+            if (get_user_record(username) or {}).get("must_change_password"):
+                return redirect("/")  # la fenetre de changement de mot de passe s'y ouvre (ui.js)
             settings = get_app_settings()
             setup_completed = settings.get("setup_completed", "0") == "1"
             return redirect("/setup.html" if not setup_completed else "/")
@@ -458,13 +460,15 @@ def change_own_password():
     record = get_user_record(user["username"])
     if not record or not bcrypt.checkpw(current_pw.encode(), record["password_hash"].encode()):
         return jsonify({"error": "invalid_current_password"}), 403
+    if new_pw == current_pw:
+        return jsonify({"error": "password_unchanged"}), 400
     complexity_error = password_complexity_error(new_pw)
     if complexity_error:
         return jsonify({"error": complexity_error}), 400
     new_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
     with get_users_db() as conn:
         conn.execute(
-            "UPDATE users SET password_hash=?, updated_at=? WHERE username=?",
+            "UPDATE users SET password_hash=?, must_change_password=0, updated_at=? WHERE username=?",
             (new_hash, utc_now(), user["username"])
         )
         conn.commit()

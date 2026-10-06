@@ -10,6 +10,16 @@ from contextlib import contextmanager
 from flask.testing import FlaskClient
 
 
+def release_default_admin():
+    """Le compte admin d'une base neuve est marque « mot de passe d'origine a changer » (3.67.3) : il ne pourrait rien faire
+    d'autre. La plupart des tests l'utilisent comme administrateur ordinaire : on le demarque ; test_default_password_change.py
+    le re-marque explicitement quand il teste justement ce blocage."""
+    from database import get_users_db
+    with get_users_db() as connection:
+        connection.execute("UPDATE users SET must_change_password = 0 WHERE username = 'admin'")
+        connection.commit()
+
+
 def install(app):
     import auth  # resolu a l'appel : certains scenarios remplacent auth.get_user_record
 

@@ -19,4 +19,5 @@ sys.path.insert(0, str(Path(__file__).parent))
 import _stamped_client  # noqa: E402
 from app import app  # noqa: E402
 
-_stamped_client.install(app)  # sessions posees a la main = sessions valides (voir _stamped_client.py)
+_stamped_client.install(app)
+_stamped_client.release_default_admin()  # sessions posees a la main = sessions valides (voir _stamped_client.py)
