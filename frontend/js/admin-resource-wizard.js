@@ -87,7 +87,7 @@ function wizardIssues(state) {
   const labels = state.fields.map((field) => wizardSlug(field.label));
   if (state.fields.some((field) => !field.label.trim())) issues.push({ level: "error", text: "Un champ n'a pas de nom." });
   if (new Set(labels).size !== labels.length) issues.push({ level: "error", text: "Deux champs portent le même nom." });
-  if (!state.issuer) issues.push({ level: "warning", text: "Aucun service émetteur : personne ne saura qui doit l'attribuer." });
+  if (!state.issuer) issues.push({ level: "error", text: "Choisissez le service référent : ses titulaires reçoivent les notifications de cette ressource." });
   return issues;
 }
 
@@ -143,8 +143,8 @@ function wizardStepBody(state) {
         <div class="form-text">Généré depuis le nom. Il ne pourra plus changer dès qu'un dossier utilisera la ressource.</div></div>
       <div class="mb-3"><label class="form-label" for="wz_description">Description (facultatif)</label>
         <input class="form-control" id="wz_description" value="${escapeHtml(state.description)}"></div>
-      <div class="mb-3"><label class="form-label" for="wz_issuer">Service émetteur</label>
-        <select class="form-select" id="wz_issuer"><option value="">— À définir —</option>${services.map((service) => `<option value="${escapeHtml(service.label)}"${service.label === state.issuer ? " selected" : ""}>${escapeHtml(service.label)}</option>`).join("")}</select>
+      <div class="mb-3"><label class="form-label" for="wz_issuer">Service référent</label>
+        <select class="form-select" id="wz_issuer"><option value="">— Choisir un service —</option>${services.map((service) => `<option value="${escapeHtml(service.label)}"${service.label === state.issuer ? " selected" : ""}>${escapeHtml(service.label)}</option>`).join("")}</select>
         <div class="form-text">Le service qui attribue et récupère cette ressource.</div></div>
       ${state.mode !== "access" ? `<div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="wz_return"${state.requiresReturn ? " checked" : ""}><label class="form-check-label" for="wz_return">La ressource doit être restituée</label></div>` : ""}
       ${state.mode === "unit" ? `<div class="form-check"><input class="form-check-input" type="checkbox" id="wz_condition"${state.hasCondition ? " checked" : ""}><label class="form-check-label" for="wz_condition">Noter l'état à la remise (neuf, bon état…) — recommandé pour l'historique</label></div>` : ""}`;

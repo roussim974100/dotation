@@ -1,12 +1,32 @@
 # Backlog produit — À Quai
 
-Dernière revue : **6 octobre 2026** (P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
+Dernière revue : **6 octobre 2026**, fin de journée (série 3.67.3 → 3.71.0 ; 3.67.4 : déconnexion immédiate de l'onglet ouvert ; P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
+## 🔁 Reprise — où on en est (6 octobre 2026, fin de journée)
+
+**État** : `dev` = **3.71.0**. La série du 06/10 (3.67.3 → 3.71.0) est sur `dev` : sécurité des sessions (3.67.3, 3.67.4) puis notifications (3.68.0 à 3.71.0). 3.67.3 est déjà fusionnée en préprod (PR n°36) ; le reste passe par une PR `dev` → `preprod` que le propriétaire fusionne. La production n'a **rien** de cette série : à déployer par lui, après test en préprod.
+
+**À tester en préprod (propriétaire)** : (1) deux navigateurs, changement de mot de passe dans l'un → l'autre est déconnecté en moins d'une minute ; (2) `admin/admin` encore en place → fenêtre de changement obligatoire ; (3) cloche → « N ressources sans service référent » → choisir les services (Informatique = DSI proposé) ; (4) Admin > Services → ajouter les **titulaires** de chaque service ; (5) attribuer une ressource d'un service → la tâche « à fournir » apparaît chez les titulaires → « Fait » ; (6) restituer → « à fermer » pour un compte ; (7) page « Mes tâches », « Rouvrir ». Migrations 9 et 10 au premier démarrage (copie de sécurité automatique).
+
+**Avant la mise en production** : sauvegarde de la base ; prévenir les utilisateurs qu'ils devront **se reconnecter une fois** ; rattacher les ressources aux services et saisir les titulaires **avant** de compter sur les notifications (sans titulaire, tout retombe sur les administrateurs) ; faire changer les mots de passe `admin` restants.
+
+**Suite conseillée, dans l'ordre**
+1. **Retrait d'une ressource par un ajustement → tâche « à fermer »** (aujourd'hui seule la restitution la crée) : `models/adjustment.py` + `models/service_tasks.py`.
+2. **« Fait par X le … » dans la fiche du dossier** (lecture de `service_task_done`).
+3. **Six scénarios navigateur déjà en panne avant cette série** : `check_groups` (13 droits au lieu de 12), `check_update`, `check_dark_fiche`, `check_degraded`, `check_fiche`, `check_parc`. À réparer pour garder des tests fiables.
+4. Sécurité P2 : limitation des tentatives de connexion par compte, MFA admin, liste des sessions actives, forcer le changement de mot de passe après une réinitialisation par un administrateur.
+5. Reste de l'ajustement : PDF de l'ajustement, e-mail de la fiche de retraits, QR code sur les restitutions après « Enregistrer en attente ».
+6. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
+
+**Pièges appris pendant cette série** (détail dans `AGENTS.md` §4 et §7) : ne jamais lancer `tests/_http_scenarios.py` à la main (il a écrasé la base locale le 06/10) ; les sessions posées à la main dans un test passent par `tests/_stamped_client.py` ; le harnais navigateur donne à `admin` un autre mot de passe (sinon `admin/admin` est reflaggé) ; `/api/forms` est limité à 30 créations par minute (neutraliser dans un test qui en crée beaucoup) ; une ressource ne se crée plus sans service du catalogue ; les scénarios qui modifient la base directement règlent `APP_NOTIFICATIONS_CACHE_SECONDS=1`.
+
+**Méthode** : explorer avec `graft` (`ask`, `callers` avant de modifier une fonction partagée, `grep`) et `graphify` (hook de commit déjà installé) plutôt qu'avec des lectures de fichiers entiers ; skill `token-thrift` en début de tâche ; un seul outil par besoin.
+
 ## Version courante
 
-`dev` à **3.67.3**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.71.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
@@ -39,6 +59,24 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | ✅ 3.67.1 (fait le 28/09) | Regroupement des dossiers par personne dans les 4 tableaux de bord (`groupDraftsByPerson`) — répond au symptôme visible des doublons (voir constat ci-dessous), mais ne fusionne pas les fiches « personne » elles-mêmes | M | P2 |
 
 **Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
+
+## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10, lot 2 livré en 3.70.0 le 06/10, lot 4 livré en 3.71.0 le 06/10)
+
+Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD).
+
+**Lot 1 ✅ (3.68.0, 06/10)** : titulaires par service (Admin > Services), service obligatoire sur une ressource, migration 9, cloche + panneau, tâche des administrateurs « ressources sans service référent » avec suggestion validée par l'administrateur. **Lot 3 ✅ (3.69.0, 06/10)** : tâches des administrateurs (nouvelle version, sauvegarde en échec, inscriptions en attente). **Lot 2 ✅ (3.70.0, 06/10)** : tâches de service « à fournir » / « à fermer », « Fait » partagé (table `service_task_done`, pas dans le contenu du dossier), repli sur les administrateurs, migration 10 qui considère l'existant comme traité. **Reste** : retrait d'une ressource par un ajustement → « à fermer » ; « Fait par X le … » dans la fiche du dossier ; lot 4 (relance J+3, escalade J+7, page « Mes tâches », rétention 90 jours).
+
+**Décisions du propriétaire (06/10)** : tâche **partagée** par service (un seul état, elle disparaît pour tous dès qu'un titulaire la fait) ; **toutes les ressources** concernées, pas seulement dotelec ; **le même service** est prévenu d'un compte à fermer au départ d'un agent ; l'administrateur garde la main sur le rattachement des ressources existantes (Informatique = DSI proposé, validé par lui).
+
+**Décision du propriétaire (06/10, remplace la précédente)** : *on rattache chaque ressource à un **service**, et le service porte une **liste de comptes** (ses titulaires)*. **Tous les membres du service reçoivent la notification** (ex. une création de compte AD part à tous les membres de la DSI). Conséquences à cadrer :
+- table `service_referents` (service du catalogue `service_catalog` ↔ comptes) + section « Titulaires » dans l'édition d'un service (Admin > Services) ;
+- le « service émetteur » d'une ressource (`resource_catalog.issuer_service`, texte libre : `DSI` et `Informatique`, `DRH` et `Ressources humaines` coexistent) doit devenir une vraie référence au catalogue des services, avec migration qui propose la correspondance et signale les cas ambigus ; **obligatoire** à la création d'une ressource ;
+- une tâche est **partagée par service** (un seul état) : visible chez tous les titulaires, elle disparaît pour tous dès que l'un la termine ; repli sur les administrateurs si le service n'a aucun titulaire actif ;
+- plus tard, si besoin : référent propre à une ressource (non prévu en V1).
+
+**Consensus des experts** : cloche dans l'application (sondage de 60 s déjà en place), pas d'e-mail en V1, aucune donnée personnelle dans le texte d'une notification (type + ressource + n° de dossier ; un profil « masqué » ne voit aucun nom), tâches visibles jusqu'à l'action, relance à J+3 puis escalade aux administrateurs à J+7, rétention 90 jours. Piège central : aucun marqueur « compte créé / à créer » n'existe dans les dossiers — c'est le vrai chantier. Architecture conseillée : tâches **calculées** à partir des dossiers + petite table de suivi (`notifications`, migration 9, `dotation.db`) ; événements ponctuels (version, sauvegarde) en `INSERT OR IGNORE` à clé unique ; nouveau droit `notifications.view` rattrapé par `PERMISSION_BACKFILLS`.
+
+**V1 proposée** : 4 sources — compte/accès à créer à l'attribution, compte à fermer à la restitution, inscription en attente, nouvelle version ou sauvegarde en échec. **Questions ouvertes** : seul dotelec ou aussi messagerie/badges/clés ; la création bloque-t-elle la signature ; qui est prévenu d'un compte à fermer ; un simple « Fait » ou la saisie de l'identifiant créé.
 
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 

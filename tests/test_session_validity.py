@@ -130,3 +130,24 @@ def test_activite_normale_ne_deconnecte_pas(compte):
     client = ouvrir_session(compte)
     for _ in range(3):
         assert client.get("/api/session").status_code == 200
+
+
+def test_un_controle_du_navigateur_ne_prolonge_pas_la_session(compte):
+    """ui.js contrôle la session toutes les minutes (X-Session-Check) : cela ne doit pas repousser l'inactivité."""
+    client = ouvrir_session(compte)
+    ancien = int(time.time()) - 600
+    with client.session_transaction() as s:
+        s["last_seen"] = ancien
+    assert client.get("/api/session", headers={"X-Session-Check": "1"}).status_code == 200
+    with client.session_transaction() as s:
+        assert s["last_seen"] == ancien  # inchangé
+    assert client.get("/api/session").status_code == 200  # une vraie requête, elle, compte
+    with client.session_transaction() as s:
+        assert s["last_seen"] > ancien
+
+
+def test_un_onglet_laisse_ouvert_tombe_en_inactivite_malgre_les_controles(compte):
+    client = ouvrir_session(compte)
+    with client.session_transaction() as s:
+        s["last_seen"] = int(time.time()) - 2 * 3600
+    assert client.get("/api/session", headers={"X-Session-Check": "1"}).status_code == 401

@@ -591,6 +591,7 @@ function buildUserMenuPanel(menu) {
     </div>
     <div id="userMenuSpaces" class="d-none"><div class="user-menu__sep"></div></div>
     <a class="user-menu__item" id="accountLink" href="account.html"${onAccount}>Mon profil</a>
+    <a class="user-menu__item" id="tasksLink" href="tasks.html"${window.location.pathname.endsWith("tasks.html") ? ' aria-current="page"' : ""}>Mes tâches</a>
     <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
     <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
     <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide générale</a>
@@ -804,6 +805,125 @@ const PASSWORD_ERROR_MESSAGES = {
   password_unchanged: "Le nouveau mot de passe doit être différent de l'actuel.",
 };
 
+// ─── Session terminée ailleurs ─────────────────────
+// Le serveur refuse une session dont le mot de passe a changé, dont le compte est désactivé ou qui a expiré (401). Une page
+// déjà ouverte ne le sait qu'à sa prochaine requête : on renvoie vers la connexion dès qu'une requête reçoit ce 401, et on
+// contrôle la session au retour sur l'onglet puis chaque minute. Ce contrôle ne prolonge pas la session (X-Session-Check).
+const SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+let sessionRedirectStarted = false;
+
+function redirectToLoginAfterSessionEnd() {
+  if (sessionRedirectStarted) {
+    return;
+  }
+  sessionRedirectStarted = true;
+  window.location.assign("/login?error=session");
+}
+
+function initSessionWatch() {
+  if (!document.getElementById("userMenu") || window.__sessionWatchStarted) {
+    return;  // pages publiques (signature, connexion) : pas de session à surveiller
+  }
+  window.__sessionWatchStarted = true;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const response = await nativeFetch(input, init);
+    if (response.status === 401) {
+      const url = new URL(typeof input === "string" ? input : (input.url || ""), window.location.origin);
+      const isApi = url.origin === window.location.origin && url.pathname.startsWith("/api/");
+      const isPublic = /^\/api\/(auth|signature|restitution-signature|adjustment-signature)\//.test(url.pathname);
+      if (isApi && !isPublic) {
+        redirectToLoginAfterSessionEnd();
+      }
+    }
+    return response;
+  };
+
+  const check = () => {
+    if (document.visibilityState === "hidden") {
+      return;
+    }
+    window.fetch("/api/session", { credentials: "same-origin", headers: { "X-Session-Check": "1" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((session) => {
+        if (session && typeof session.notifications_count === "number") {
+          updateNotificationBadge(session.notifications_count);  // même requête que le contrôle de session : pas de second sondage
+        }
+      })
+      .catch(() => {});
+  };
+  document.addEventListener("visibilitychange", check);
+  window.addEventListener("focus", check);
+  window.setInterval(check, SESSION_CHECK_INTERVAL_MS);
+}
+
+// ─── Notifications (cloche de l'en-tête) ──────────────
+// Le compteur arrive avec /api/session (déjà contrôlé chaque minute, voir initSessionWatch) ; le panneau et ses fenêtres
+// (js/notifications.js) ne sont chargés qu'au premier clic.
+let notificationsScriptPromise = null;
+
+function loadNotificationsScript() {
+  if (window.AQuaiNotifications) {
+    return Promise.resolve();
+  }
+  notificationsScriptPromise = notificationsScriptPromise || new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "/js/notifications.js?v=20261006j";
+    script.onload = resolve;
+    script.onerror = () => {
+      notificationsScriptPromise = null;
+      reject(new Error("notifications_script"));
+    };
+    document.head.appendChild(script);
+  });
+  return notificationsScriptPromise;
+}
+
+function updateNotificationBadge(count) {
+  const bell = document.getElementById("notificationBell");
+  if (!bell) {
+    return;
+  }
+  const n = Math.max(0, Number(count) || 0);
+  const previous = Number(bell.dataset.count || 0);
+  bell.dataset.count = String(n);
+  const badge = bell.querySelector(".notification-bell__count");
+  badge.textContent = n > 9 ? "9+" : String(n);
+  badge.hidden = n === 0;
+  bell.setAttribute("aria-label", n ? `Notifications, ${n} à traiter` : "Notifications, rien à faire");
+  const live = document.getElementById("notificationLive");
+  if (live && n > previous) {
+    live.textContent = n === 1 ? "1 nouvelle tâche à traiter." : `${n} tâches à traiter.`;
+  }
+}
+
+function initNotificationBell(count) {
+  const menu = document.getElementById("userMenu");
+  if (!menu || document.getElementById("notificationBell")) {
+    return;
+  }
+  const bell = document.createElement("button");
+  bell.type = "button";
+  bell.id = "notificationBell";
+  bell.className = "btn btn-outline-light notification-bell";
+  bell.setAttribute("aria-haspopup", "dialog");
+  bell.setAttribute("aria-expanded", "false");
+  bell.setAttribute("aria-controls", "notificationPanel");
+  bell.innerHTML = '<span aria-hidden="true">🔔</span><span class="notification-bell__count" hidden></span>';
+  menu.parentNode.insertBefore(bell, menu);
+  const live = document.createElement("div");
+  live.id = "notificationLive";
+  live.className = "visually-hidden";
+  live.setAttribute("aria-live", "polite");
+  menu.parentNode.insertBefore(live, menu);
+  bell.addEventListener("click", () => {
+    loadNotificationsScript().then(() => window.AQuaiNotifications.togglePanel()).catch(() => showToast("Impossible de charger les notifications.", "error"));
+  });
+  updateNotificationBadge(count);
+  live.textContent = "";
+}
+
 // Compte au mot de passe d'origine : ouvre la fenêtre de changement obligatoire (voir /api/session, must_change_password).
 async function initForcedPasswordChange() {
   if (!document.getElementById("userMenu")) {
@@ -817,6 +937,8 @@ async function initForcedPasswordChange() {
     const session = await response.json();
     if (session && session.must_change_password) {
       openPasswordChangeModal({ forced: true });
+    } else if (session) {
+      initNotificationBell(session.notifications_count || 0);
     }
   } catch (_) {
     /* sans réponse du serveur, le serveur refuse de toute façon les actions du compte */
@@ -880,6 +1002,7 @@ function showPwdFeedback(el, msg, isError) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initSessionWatch();
   initForcedPasswordChange();
   document.querySelectorAll("[data-back-btn]").forEach((btn) => {
     btn.addEventListener("click", () => window.history.back());

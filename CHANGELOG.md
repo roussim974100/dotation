@@ -1,5 +1,77 @@
 # Historique des versions — À Quai
 
+## [3.71.0] - 2026-10-06 — Notifications, lot 4 : retards, escalade, page « Mes tâches »
+
+### 🔔 Relances, escalade et une page pour tout voir
+- **En retard après 3 jours** : une tâche de service plus ancienne est marquée « ⏰ En retard · N j » (en toutes lettres, pas seulement par la couleur), dans la liste, dans le panneau de la cloche (« N en retard ») et dans la page « Mes tâches ». L'ancienneté part de la création du dossier (à fournir) ou de la date de restitution (à fermer) ; une date future (départ planifié) n'est jamais en retard. Seuils réglables : `APP_TASK_LATE_DAYS` (3) et `APP_TASK_ESCALATE_DAYS` (7).
+- **Escaladée après 7 jours** : la tâche apparaît **aussi chez les administrateurs** (« ⚠ Escaladée aux administrateurs »), qui peuvent la terminer. Avant, un administrateur ne voyait que les tâches d'un service sans titulaire.
+- **Page « Mes tâches »** (`tasks.html`, lien « Tout voir » de la cloche et entrée du menu du compte) : toutes les tâches qui me concernent, filtrables par type et « seulement en retard », avec « Fait » sur chaque ligne.
+- **Terminées ces 30 derniers jours** : qui a fait quoi, et **« Rouvrir »** pour un « Fait » enregistré par erreur (la tâche revient chez tous les titulaires ; réservé aux titulaires du service et aux administrateurs ; journalisé).
+- **Pas de purge « à 90 jours » des « Fait »** (prévue au cadrage) : ces lignes sont la mémoire du « déjà fait » — les supprimer ferait réapparaître la tâche tant que le dossier existe. Seuls les « Fait » d'un dossier **supprimé** sont purgés (au démarrage, `purge_orphans`).
+- Pas d'e-mail : le retard est un état visible, pas un message envoyé.
+- Fichiers : `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `backend/app.py` (purge au démarrage), `frontend/tasks.html`, `frontend/js/tasks.js`, `frontend/js/notifications.js` (tableaux réutilisables), `frontend/js/ui.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` : 29 cas (retard, seuils, escalade, réouverture, historique, masquage, purge, page). Scénario navigateur `tests/browser/check_tasks_page.py` (17 vérifications). `check_menu.py` attend le nouveau lien ; `check_session_terminee_ailleurs.py` laisse la page finir de charger avant de révoquer (course de timing).
+
+
+## [3.70.0] - 2026-10-06 — Notifications, lot 2 : tâches de service
+
+### 🔔 Ce que doit faire chaque service, et un « Fait » partagé
+- **« Ressources à fournir »** : dès qu'un dossier attribue une ressource (dossier en attente de signature ou actif, élément non rendu), **tous les titulaires du service de la ressource** reçoivent la tâche (créer le compte, l'accès, préparer le matériel). Elle disparaît si le dossier est annulé ou restitué, ou si l'élément est retiré.
+- **« Ressources à fermer »** : quand un dossier passe en restitution, les ressources **sans retour physique** (comptes, accès : « doit être restituée » décoché) deviennent une tâche pour le service émetteur — le matériel à rendre reste suivi par la restitution elle-même.
+- **« Fait »** (bouton sur chaque ligne de la fenêtre « Ressources à fournir / à fermer ») : enregistre qui et quand (`service_task_done`), et **la tâche disparaît pour tous les titulaires du service**. « À fournir » et « à fermer » sont deux décisions distinctes (le compte créé doit être fermé au départ). Le « Fait » est indépendant des lignes d'éléments : il survit à un nouvel enregistrement du dossier, et n'écrit rien dans le contenu (signé) du dossier.
+- **Repli sur les administrateurs** si le service n'a aucun titulaire actif (comptes supprimés, désactivés ou liste vide) : la ligne le précise. Une ressource sans service du catalogue reste dans la tâche « choisir le service ».
+- **Aucune donnée personnelle pour un profil masqué** : le nom de la personne n'est affiché qu'à un lecteur en portée complète ; un profil masqué voit « Dossier du jj/mm/aaaa ». Le lien « Ouvrir le dossier » n'apparaît que pour qui peut le lire. Rien dans le journal.
+- **Migration 10** (sauvegarde automatique avant application) : crée `service_task_done` et **considère l'existant comme traité** (tous les éléments des dossiers non brouillons) : sans cela, les centaines d'attributions historiques deviendraient d'un coup des tâches. Seuls les nouveaux éléments et les brouillons validés plus tard en créent.
+- Le calcul est mis en cache 30 s par compte (`APP_NOTIFICATIONS_CACHE_SECONDS`) ; le cache est vidé à chaque enregistrement de dossier et à chaque « Fait ».
+- **Pas encore** : retrait d'une ressource par un ajustement (→ « à fermer »), relances J+3 / escalade J+7, historique « Fait par X le … » dans la fiche du dossier, page « Mes tâches ».
+- Fichiers : `backend/models/service_tasks.py`, `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/models/forms.py` (vidage du cache), `backend/migrations.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` (16 cas : titulaires, partage du « Fait », refus, survie à un nouvel enregistrement, à fermer, repli administrateurs, masquage, migration) ; scénario navigateur `tests/browser/check_service_tasks.py` (15 vérifications, session d'un compte ordinaire).
+
+
+## [3.69.0] - 2026-10-06 — Notifications, lot 3 : tâches des administrateurs
+
+### 🔔 Trois nouvelles notifications pour les administrateurs
+- **Nouvelle version disponible** (droit `users.manage`) : « Nouvelle version disponible : x.y.z », avec la version installée et un lien vers l'écran de mise à jour. Lue dans le cache disque (`update_check.cached_status`) : **jamais d'appel réseau** pendant un contrôle de session ; une vérification périmée part en arrière-plan. Respecte `APP_UPDATE_CHECK=0`. Disparaît quand la version est installée.
+- **Sauvegarde automatique en échec** (droit `db.manage` ou son indicateur individuel) : même état que le bandeau de l'administration de la base (`backup_schedule.health`, niveau « erreur » : dernière sauvegarde en échec, ou plus aucune exécution). Marquée « ⚠ Urgent » en toutes lettres (pas seulement par la couleur) et placée en premier. Calcul mis en cache 60 s dans le processus (le fichier d'historique peut être gros).
+- **Demandes d'inscription à valider** (droit `users.manage`) : seulement leur nombre, **aucun identifiant** dans la notification ; lien vers Admin > Comptes. Diminue quand une demande est validée ou refusée.
+- Toujours calculées à partir de l'état réel : aucune notification à « marquer comme lue », elle disparaît quand la situation est réglée. Ordre : sauvegarde, version, inscriptions, ressources sans service.
+- Fichiers : `backend/models/notifications.py`, `backend/update_check.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` : 11 cas de plus (droits, cache, absence de réseau, ordre, compteur de session) ; `tests/browser/check_notifications.py` : 26 vérifications (inscription et version, clic jusqu'à la page).
+
+
+## [3.68.0] - 2026-10-06 — Notifications, lot 1
+
+### 🔔 Une cloche, des services et leurs titulaires
+- **Chaque ressource appartient à un service du catalogue**, et chaque service porte une **liste de comptes titulaires** (Admin > Services, fenêtre « Modifier le service »). Tous les titulaires reçoivent les notifications du service ; sans titulaire, ce seront les administrateurs. Le lien ressource → service est le libellé (« service émetteur » de la ressource, rebaptisé « Service référent » dans les formulaires) ; **renommer un service fait suivre ses ressources**, le supprimer les remet à choisir.
+- **Le service est obligatoire** à la création d'une ressource (formulaire, assistant, API : `issuer_service_required` / `issuer_service_unknown`). À la modification, un ancien texte inchangé reste toléré pour ne pas bloquer l'édition des ressources d'avant.
+- **Cloche dans l'en-tête** (toutes les pages avec le menu du compte) : compteur lu avec le contrôle de session déjà fait chaque minute (`notifications_count` dans `/api/session`, aucun sondage de plus), panneau déroulant accessible (clavier, Échap, libellé annonçant le nombre, région vocale polie). `frontend/js/notifications.js` n'est chargé qu'au premier clic.
+- **Première tâche, pour les administrateurs (`users.manage`)** : « N ressources sans service référent ». La fenêtre de choix regroupe les ressources par ancien nom (une décision par groupe), **pré-remplit une suggestion** (nom identique, appellation courante comme Informatique → DSI, ou libellé qui contient l'ancien nom) que l'administrateur valide ou change ; rien n'est modifié avant sa validation, l'opération est tout ou rien et l'ancienne valeur est conservée au journal. La tâche est **calculée** à partir des données : elle disparaît toute seule quand la dernière ressource est rattachée.
+- **Migration 9** (sauvegarde automatique avant application) : crée `service_referents` et ramène au libellé exact du catalogue les services qui n'en différaient que par la casse, les accents ou les espaces (dans la copie de production consultée, 13 ressources sur 24 sont déjà rattachées à un service du catalogue) ; les autres ne sont **jamais devinées**.
+- Aucune donnée personnelle dans une notification (type, ressource, service). Pas de nouveau droit en V1 : chaque tâche est limitée par le droit qui permet de la traiter.
+- **Pas encore** (lots suivants) : tâches des services (compte à créer à l'attribution, compte à fermer à la restitution, avec « Fait »), administrateurs (inscription en attente, nouvelle version, sauvegarde en échec), relances.
+- Fichiers : `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/migrations.py`, `backend/routes/admin.py`, `backend/routes/pages.py`, `frontend/js/ui.js`, `frontend/js/notifications.js`, `frontend/js/admin.js`, `frontend/js/admin-resource-wizard.js`, `frontend/admin-services.html`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` (21 cas) et `tests/browser/check_notifications.py` (22 vérifications : cloche, panneau, choix, titulaires). Les scénarios HTTP créent désormais leurs ressources avec un service existant du catalogue.
+
+
+## [3.67.4] - 2026-10-06
+
+### 🔒 Une session révoquée ailleurs est fermée tout de suite dans l'onglet déjà ouvert
+- **Constat** (préprod, 3.67.3) : après un changement de mot de passe dans un autre navigateur, l'ancien navigateur était bien refusé par le serveur, mais l'ancienne page restait affichée jusqu'à un rechargement manuel.
+- **Correctif** (`frontend/js/ui.js`, pages avec le menu du compte) : toute requête de l'application qui reçoit un 401 renvoie vers la connexion ; la session est aussi contrôlée au retour sur l'onglet et chaque minute. Ce contrôle (en-tête `X-Session-Check`, `backend/auth.py`) **ne prolonge pas** la session : un onglet laissé ouvert tombe bien en inactivité après 60 min.
+- **Message** de la page de connexion : « Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion) » à la place de « La session n'a pas pu être conservée. Vérifiez les cookies » (trompeur dans ce cas ; `frontend/js/config.js`, `login.js`).
+- Les pages publiques de signature ne sont pas concernées (pas de session).
+
+### 🧪 Tests
+- `tests/test_session_validity.py` : 2 cas de plus (le contrôle ne prolonge pas la session ; un onglet ouvert tombe en inactivité). Scénario navigateur `tests/browser/check_session_terminee_ailleurs.py` : mot de passe changé, compte désactivé, requête en 401, session valide non déconnectée (9 vérifications).
+
 ## [3.67.3] - 2026-10-06
 
 ### 🔒 Sécurité : une session ne survit plus au changement de mot de passe

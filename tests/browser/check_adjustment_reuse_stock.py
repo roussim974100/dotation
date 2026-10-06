@@ -50,7 +50,7 @@ with Instance() as inst:
     # Ressource suivie par numero de serie (identifier: true).
     created_resource = api(driver, "POST", "/api/admin/resources", {
         "code": "ordi_reuse", "label": "Ordinateur reprise", "description": "", "category": "materiel",
-        "issuer_service": "DSI", "requires_return": True, "has_assignment_date": False,
+        "issuer_service": "Informatique", "requires_return": True, "has_assignment_date": False,
         "has_assignment_condition": False, "has_assignment_notes": False, "display_order": 990, "is_active": True,
         "field_schema": [
             {"key": "numeroSerie", "label": "N° de série", "type": "text", "required": True, "identifier": True},

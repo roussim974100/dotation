@@ -33,7 +33,7 @@ function applyLoginMessages() {
 
   const errorMessages = {
     invalid: getAppText("login.errorInvalid", "Identifiants invalides."),
-    session: getAppText("login.errorSession", "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous."),
+    session: getAppText("login.errorSession", "Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion). Reconnectez-vous ; si cela se répète, vérifiez les cookies du navigateur."),
     pending: getAppText("login.errorPending", "Votre compte est en attente de validation par un administrateur."),
     disabled: getAppText("login.errorDisabled", "Votre compte est désactivé. Rapprochez-vous d'un administrateur."),
     rate_limited: getAppText("login.errorRateLimited", "Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.")

@@ -23,6 +23,7 @@ from auth import (
     create_user, update_user, delete_user, normalize_email,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
+from models.notifications import active_services, all_referents, find_service_by_label, forget_account, forget_service, rename_service
 from models.settings import (
     DEFAULT_APP_SETTINGS, THEME_PRESETS,
     get_app_settings, save_app_settings, SettingsValidationError,
@@ -979,7 +980,11 @@ def admin_services():
         rows = connection.execute(
             "SELECT * FROM service_catalog ORDER BY is_active DESC, label COLLATE NOCASE ASC"
         ).fetchall()
-    return jsonify([normalize_service_row(row) for row in rows])
+        referents = all_referents(connection)
+    services = [normalize_service_row(row) for row in rows]
+    for service in services:
+        service["referents"] = referents.get(service["id"], [])
+    return jsonify(services)
 
 
 @bp.route("/api/admin/services", methods=["POST"])
@@ -1050,6 +1055,8 @@ def update_admin_service(service_id):
             return jsonify({"error": "service_exists"}), 409
 
         next_is_active = bool_to_int(payload.get("is_active", bool(row["is_active"])))
+        if next_label != row["label"]:
+            rename_service(connection, row["label"], next_label)  # le lien ressource -> service est le libelle
         connection.execute(
             """
             UPDATE service_catalog
@@ -1089,6 +1096,7 @@ def delete_admin_service(service_id):
             (service_id,),
         ).rowcount
         if deleted:
+            forget_service(connection, service_id)
             insert_app_log(
                 connection,
                 "admin",
@@ -1206,6 +1214,19 @@ def admin_resources():
     return jsonify([normalize_reference_row(row) for row in rows])
 
 
+def _issuer_service_error(connection, issuer_service, previous=None):
+    """Chaque ressource est rattachee a un service du catalogue (notifications : ses titulaires la prennent en charge).
+    Exige un service actif du catalogue ; a la modification, un ancien texte INCHANGE est tolere (la tache « choisir le service »
+    des administrateurs le traite) pour ne pas bloquer l'edition d'une ressource d'avant cette regle."""
+    if previous is not None and str(issuer_service or "").strip() == str(previous or "").strip():
+        return None
+    if not str(issuer_service or "").strip():
+        return "issuer_service_required"
+    if not find_service_by_label(active_services(connection), issuer_service):
+        return "issuer_service_unknown"
+    return None
+
+
 @bp.route("/api/admin/resources", methods=["POST"])
 @login_required
 @permission_required("users.manage")
@@ -1221,6 +1242,9 @@ def create_admin_resource():
 
     now = utc_now()
     with get_db() as connection:
+        issuer_error = _issuer_service_error(connection, resource_data["issuer_service"])
+        if issuer_error:
+            return jsonify({"error": issuer_error}), 400
         existing = connection.execute("SELECT id FROM resource_catalog WHERE code = ?", (resource_data["code"],)).fetchone()
         if existing:
             return jsonify({"error": "resource_exists"}), 409
@@ -1296,6 +1320,9 @@ def update_admin_resource(resource_id):
         blocking = blocking_issues(validate_resource(resource_data))
         if blocking:
             return jsonify({"error": "invalid_resource", "issues": blocking}), 400
+        issuer_error = _issuer_service_error(connection, resource_data["issuer_service"], row["issuer_service"])
+        if issuer_error:
+            return jsonify({"error": issuer_error}), 400
         # Garde-fous de l'historique : le code sert de cle aux lignes deja saisies, et le champ identifiant
         # d'un suivi par objet ne peut plus etre change, masque ou supprime s'il a deja ete utilise.
         if next_code != row["code"] and connection.execute(
@@ -1578,6 +1605,7 @@ def delete_admin_user(username):
         return jsonify({"error": "failed_to_delete_user"}), 500
 
     with get_db() as connection:
+        forget_account(connection, username)  # il quitte les services dont il etait titulaire
         insert_deleted_item(
             connection,
             "user",

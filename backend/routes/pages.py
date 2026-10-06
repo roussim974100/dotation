@@ -17,6 +17,7 @@ from auth import (
 )
 from account_rules import normalize_person_name
 from models.audit import insert_app_log, read_login_attempt_context
+from models.notifications import open_tasks_count
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings, build_public_settings_payload
 import re
 
@@ -445,7 +446,11 @@ def client_context_route():
 @bp.route("/api/session", methods=["GET"])
 @login_required
 def session_route():
-    return jsonify(current_user())
+    user = current_user()
+    if user:
+        with get_db() as connection:
+            user["notifications_count"] = open_tasks_count(connection, user)  # lu a chaque controle de session (ui.js)
+    return jsonify(user)
 
 
 @bp.route("/api/me/password", methods=["POST"])

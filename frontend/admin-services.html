@@ -141,6 +141,7 @@
             <thead>
               <tr>
                 <th>Service</th>
+                <th>Titulaires</th>
                 <th>État</th>
                 <th class="text-end">Actions</th>
               </tr>
@@ -166,6 +167,11 @@
               <input class="form-control" id="modalServiceLabel" type="text">
             </div>
             <div class="mb-3">
+              <span class="form-label d-block" id="modalServiceReferentsLabel">Titulaires du service</span>
+              <p class="form-text mt-0">Ils reçoivent toutes les notifications des ressources de ce service. Sans titulaire, ce sont les administrateurs qui les reçoivent.</p>
+              <div class="service-referents" id="modalServiceReferents" role="group" aria-labelledby="modalServiceReferentsLabel"></div>
+            </div>
+            <div class="mb-3">
               <label class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" id="modalServiceActive">
                 <span class="form-check-label">Service actif</span>
@@ -187,7 +193,7 @@
 <script src="js/ui.js"></script>
 <script src="js/admin-nav.js"></script>
 <script src="js/global-search.js"></script>
-<script src="js/admin.js?v=20260928a"></script>
+<script src="js/admin.js?v=20261006d"></script>
 </body>
 </html>
 

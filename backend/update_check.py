@@ -174,6 +174,22 @@ def status(force=False, now=None):
     return result
 
 
+def cached_status(now=None):
+    """Etat lu SANS reseau ni attente (cache disque), pour les notifications : il est lu a chaque controle de session.
+    Une verification perimee ou absente est lancee en arriere-plan (jamais attendue)."""
+    if not enabled():
+        return {"enabled": False, "available": False, "latest": None, "current": ""}
+    now = time.time() if now is None else now
+    installed = current_version()
+    cached = _read_json(CHECK_FILE)
+    if not cached or now - float(cached.get("checked_at") or 0) > CHECK_TTL_SECONDS:
+        _refresh_in_background()
+    latest = cached.get("latest")
+    channel = channel_for(installed)
+    return {"enabled": True, "available": is_newer(latest, installed), "latest": latest,
+            "current": environment.display_version(installed, channel)}
+
+
 def request_update(requested_by, target_version, now=None):
     """Depose la demande de mise a jour. Le CONTENU n'est jamais interprete par le script : il ne sert qu'a la trace."""
     _write_json_atomic(REQUEST_FILE, {
