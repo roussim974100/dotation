@@ -1,12 +1,32 @@
 # Backlog produit — À Quai
 
-Dernière revue : **6 octobre 2026** (3.67.4 : déconnexion immédiate de l'onglet ouvert ; P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
+Dernière revue : **6 octobre 2026**, fin de journée (série 3.67.3 → 3.71.0 ; 3.67.4 : déconnexion immédiate de l'onglet ouvert ; P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
+## 🔁 Reprise — où on en est (6 octobre 2026, fin de journée)
+
+**État** : `dev` = **3.71.0**. La série du 06/10 (3.67.3 → 3.71.0) est sur `dev` : sécurité des sessions (3.67.3, 3.67.4) puis notifications (3.68.0 à 3.71.0). 3.67.3 est déjà fusionnée en préprod (PR n°36) ; le reste passe par une PR `dev` → `preprod` que le propriétaire fusionne. La production n'a **rien** de cette série : à déployer par lui, après test en préprod.
+
+**À tester en préprod (propriétaire)** : (1) deux navigateurs, changement de mot de passe dans l'un → l'autre est déconnecté en moins d'une minute ; (2) `admin/admin` encore en place → fenêtre de changement obligatoire ; (3) cloche → « N ressources sans service référent » → choisir les services (Informatique = DSI proposé) ; (4) Admin > Services → ajouter les **titulaires** de chaque service ; (5) attribuer une ressource d'un service → la tâche « à fournir » apparaît chez les titulaires → « Fait » ; (6) restituer → « à fermer » pour un compte ; (7) page « Mes tâches », « Rouvrir ». Migrations 9 et 10 au premier démarrage (copie de sécurité automatique).
+
+**Avant la mise en production** : sauvegarde de la base ; prévenir les utilisateurs qu'ils devront **se reconnecter une fois** ; rattacher les ressources aux services et saisir les titulaires **avant** de compter sur les notifications (sans titulaire, tout retombe sur les administrateurs) ; faire changer les mots de passe `admin` restants.
+
+**Suite conseillée, dans l'ordre**
+1. **Retrait d'une ressource par un ajustement → tâche « à fermer »** (aujourd'hui seule la restitution la crée) : `models/adjustment.py` + `models/service_tasks.py`.
+2. **« Fait par X le … » dans la fiche du dossier** (lecture de `service_task_done`).
+3. **Six scénarios navigateur déjà en panne avant cette série** : `check_groups` (13 droits au lieu de 12), `check_update`, `check_dark_fiche`, `check_degraded`, `check_fiche`, `check_parc`. À réparer pour garder des tests fiables.
+4. Sécurité P2 : limitation des tentatives de connexion par compte, MFA admin, liste des sessions actives, forcer le changement de mot de passe après une réinitialisation par un administrateur.
+5. Reste de l'ajustement : PDF de l'ajustement, e-mail de la fiche de retraits, QR code sur les restitutions après « Enregistrer en attente ».
+6. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
+
+**Pièges appris pendant cette série** (détail dans `AGENTS.md` §4 et §7) : ne jamais lancer `tests/_http_scenarios.py` à la main (il a écrasé la base locale le 06/10) ; les sessions posées à la main dans un test passent par `tests/_stamped_client.py` ; le harnais navigateur donne à `admin` un autre mot de passe (sinon `admin/admin` est reflaggé) ; `/api/forms` est limité à 30 créations par minute (neutraliser dans un test qui en crée beaucoup) ; une ressource ne se crée plus sans service du catalogue ; les scénarios qui modifient la base directement règlent `APP_NOTIFICATIONS_CACHE_SECONDS=1`.
+
+**Méthode** : explorer avec `graft` (`ask`, `callers` avant de modifier une fonction partagée, `grep`) et `graphify` (hook de commit déjà installé) plutôt qu'avec des lectures de fichiers entiers ; skill `token-thrift` en début de tâche ; un seul outil par besoin.
+
 ## Version courante
 
-`dev` à **3.70.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.71.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
@@ -40,7 +60,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 **Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
-## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10, lot 2 livré en 3.70.0 le 06/10, lot 4 codé le 06/10 (version à confirmer))
+## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10, lot 2 livré en 3.70.0 le 06/10, lot 4 livré en 3.71.0 le 06/10)
 
 Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD).
 

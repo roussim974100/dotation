@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [Non publié] — Notifications, lot 4 : retards, escalade, page « Mes tâches » (numéro de version à confirmer ; proposé : 3.71.0)
+## [3.71.0] - 2026-10-06 — Notifications, lot 4 : retards, escalade, page « Mes tâches »
 
 ### 🔔 Relances, escalade et une page pour tout voir
 - **En retard après 3 jours** : une tâche de service plus ancienne est marquée « ⏰ En retard · N j » (en toutes lettres, pas seulement par la couleur), dans la liste, dans le panneau de la cloche (« N en retard ») et dans la page « Mes tâches ». L'ancienneté part de la création du dossier (à fournir) ou de la date de restitution (à fermer) ; une date future (départ planifié) n'est jamais en retard. Seuils réglables : `APP_TASK_LATE_DAYS` (3) et `APP_TASK_ESCALATE_DAYS` (7).

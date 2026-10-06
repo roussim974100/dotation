@@ -17,7 +17,7 @@ côté serveur, **HTML + JavaScript sans framework** côté navigateur, PDF gén
 
 | Question | Où regarder |
 |---|---|
-| Où en est le projet, qu'est-ce qui reste à faire ? | `docs/BACKLOG_PRODUIT.md` (vue d'ensemble, priorités, sprint en cours) |
+| Où en est le projet, qu'est-ce qui reste à faire ? | `docs/BACKLOG_PRODUIT.md` — **commencer par la section « 🔁 Reprise »** (état, tests à faire en préprod, suite conseillée, pièges), puis priorités et sprint en cours |
 | Qu'est-ce qui a changé, version par version ? | `CHANGELOG.md` (le plus récent en haut) |
 | Pourquoi les données sont organisées ainsi (dossier, champs, parc, stock) ? | `docs/ARCHITECTURE_DONNEES.md` — **à lire avant de toucher aux ressources ou aux champs** |
 | Circuit de mise en production, tests, diagnostic | `docs/REPRISE_MAJ.md` (§2 à §6 ; son §1 « où on en est » date du 20/09, l'état courant est dans le backlog) |
