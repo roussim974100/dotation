@@ -1,6 +1,6 @@
 # Backlog produit — À Quai
 
-Dernière revue : **6 octobre 2026** (ajout du P0 « sécurité des sessions » ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
+Dernière revue : **6 octobre 2026** (P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
@@ -8,7 +8,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 `dev` à **3.67.3**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
-## 🔴 P0 — Sécurité des sessions (trouvé le 06/10, à traiter en premier)
+## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
 **Constat** : après un changement de mot de passe, une session ouverte avant (ex. `admin/admin` par défaut) reste valide et garde tous les droits. Cause : le cookie de session ne contient que `session["user"]` ; `login_required` (`auth.py`) ne relit rien en base, et ni `/api/me/password` (`routes/pages.py`) ni la modification d'un compte par l'admin (`routes/admin.py`) n'invalident les sessions existantes. La désactivation et la suppression d'un compte sont très probablement touchées aussi (à vérifier par test).
 
@@ -16,9 +16,9 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 |---|---|---|---|
 | ✅ 1 (code fait le 06/10, 3.67.3) | **Empreinte de session** : au lieu d'une colonne (donc sans migration), le cookie porte un HMAC du hash du mot de passe (`pwd_fp`), comparé à chaque requête par `enforce_session_validity` (`auth.py`, `before_request` dans `app.py`). Mot de passe changé (par l'utilisateur ou un admin), compte désactivé, en attente ou supprimé → session vidée, 401, entrée `session_revoked` au journal de sécurité. La session de celui qui change son propre mot de passe est réalignée (`realign_session_password`). Les cookies émis avant le correctif (sans empreinte) sont refusés : **tout le monde devra se reconnecter une fois à la mise à jour**. Limite connue : un compte désactivé puis réactivé avant toute requête de la session ancienne la ressuscite | M | P0 |
 | ✅ 2 (code fait le 06/10, 3.67.3) | **Cycle de vie** : `start_session` vide la session avant la connexion (pas de fixation) ; durée absolue 12 h et inactivité 60 min, réglables par `APP_SESSION_MAX_HOURS` / `APP_SESSION_IDLE_MINUTES` | S | P0 |
-| 3 | **Compte par défaut** : changement obligatoire de `admin/admin` à la première connexion (`must_change_password`). Le flag cookie `Secure` est déjà posé automatiquement en HTTPS (`_AutoSecureSessionInterface`, `app.py`) : rien à faire | S | P0 |
+| ✅ 3 (fait le 06/10, 3.67.3) | **Compte par défaut** : `must_change_password` posé sur `admin` au seed et au démarrage tant que son mot de passe est `admin` ; le serveur ne répond plus qu'au changement de mot de passe, fenêtre non fermable côté navigateur. Le flag cookie `Secure` est déjà posé automatiquement en HTTPS (`_AutoSecureSessionInterface`). Scénario navigateur : `tests/browser/check_password_obligatoire.py` | S | P0 |
 | ✅ Tests (`tests/test_session_validity.py`, 11 tests) | Changement par un admin, par l'utilisateur (sa session reste ouverte), désactivation, suppression, mutation avec jeton CSRF valide, expiration absolue et par inactivité, cookie ancien, remplacement de session à la connexion. `tests/_stamped_client.py` complète les sessions posées à la main par les autres tests | S | P0 |
-| Plus tard | Limitation des tentatives de connexion (à vérifier), MFA TOTP pour les admins, liste des sessions actives | M | P2 |
+| Plus tard | Limitation des tentatives de connexion (à vérifier), MFA TOTP pour les admins, liste des sessions actives, forcer le changement après une réinitialisation par un administrateur | M | P2 |
 
 À livrer en correctif (x.y.Z) : version à confirmer avec le propriétaire avant tout changement. Bonnes pratiques de référence : OWASP Session Management, ASVS §3.
 
