@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [Non publié] — Notifications, lot 2 : tâches de service (numéro de version à confirmer ; proposé : 3.70.0)
+## [3.70.0] - 2026-10-06 — Notifications, lot 2 : tâches de service
 
 ### 🔔 Ce que doit faire chaque service, et un « Fait » partagé
 - **« Ressources à fournir »** : dès qu'un dossier attribue une ressource (dossier en attente de signature ou actif, élément non rendu), **tous les titulaires du service de la ressource** reçoivent la tâche (créer le compte, l'accès, préparer le matériel). Elle disparaît si le dossier est annulé ou restitué, ou si l'élément est retiré.
