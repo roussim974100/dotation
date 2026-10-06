@@ -22,6 +22,12 @@ def uid():
     return str(time.time_ns())
 
 
+@pytest.fixture(autouse=True)
+def sans_limiteur_de_creation(monkeypatch):
+    """Ces tests créent plus de 30 dossiers à la minute (limite de /api/forms) : on neutralise le limiteur, pas la règle testée."""
+    monkeypatch.setattr("auth._is_api_rate_limited", lambda *args, **kwargs: False)
+
+
 def client_for(user):
     client = app.test_client()
     with client.session_transaction() as s:
@@ -277,3 +283,175 @@ def test_migration_10_declaree_et_appliquee():
         assert c.execute("SELECT 1 FROM schema_migrations WHERE version = 10").fetchone()
         assert c.execute("SELECT 1 FROM sqlite_master WHERE name = 'service_task_done'").fetchone()
     assert baseline_existing  # importable
+
+
+# ---- lot 4 : retard, escalade, réouverture, tâches récentes ---------------------------------------------------------------
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from models import service_tasks as st  # noqa: E402
+
+
+def days_ago(days):
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def age_form(form_id, days, column="created_at"):
+    with get_db() as c:
+        c.execute(f"UPDATE dotation_forms SET {column} = ? WHERE id = ?", (days_ago(days), form_id))
+    notif.clear_cache()
+
+
+def item_of(user, kind, form_id, code):
+    task = tasks(user, kind)
+    return next((i for i in (task or {"items": []})["items"] if i["form_id"] == form_id and i["item_key"] == code), None)
+
+
+def test_age_en_jours_et_dates_inconnues():
+    now = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+    assert st.age_days("2026-10-05T09:00:00", now) == 5
+    assert st.age_days("2026-10-05T09:00:00+00:00", now) == 5
+    assert st.age_days("2026-10-05T09:00:00Z", now) == 5
+    assert st.age_days("2026-12-01T00:00:00", now) == 0   # date future (départ planifié) : jamais en retard
+    assert st.age_days(None, now) == 0 and st.age_days("n'importe quoi", now) == 0
+
+
+def test_une_tache_recente_n_est_ni_en_retard_ni_escaladee(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    item = item_of(equipe["titulaire"], KIND_PROVISION, form_id, code)
+    assert item["late"] is False and item["escalated"] is False and item["age_days"] == 0
+    assert tasks(equipe["titulaire"], KIND_PROVISION)["severity"] == "normal"
+
+
+def test_en_retard_apres_trois_jours_visible_du_service_seulement(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    age_form(form_id, 4)
+    item = item_of(equipe["collegue"], KIND_PROVISION, form_id, code)
+    assert item["late"] is True and item["escalated"] is False and item["age_days"] == 4
+    task = tasks(equipe["collegue"], KIND_PROVISION)
+    assert task["severity"] == "late" and task["late_count"] >= 1
+    assert item_of("admin", KIND_PROVISION, form_id, code) is None  # pas encore escaladée : les administrateurs ne la voient pas
+
+
+def test_escaladee_apres_sept_jours_chez_les_administrateurs(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    age_form(form_id, 8)
+    assert item_of(equipe["titulaire"], KIND_PROVISION, form_id, code)["escalated"] is True
+    admin_item = item_of("admin", KIND_PROVISION, form_id, code)
+    assert admin_item and admin_item["escalated"] is True and admin_item["unattended"] is False
+    # un administrateur peut la terminer
+    resp = client_for("admin").post("/api/service-tasks/done", json={"kind": KIND_PROVISION, "form_id": form_id, "item_key": code}, headers=H)
+    assert resp.status_code == 200
+    assert item_of(equipe["titulaire"], KIND_PROVISION, form_id, code) is None
+
+
+def test_les_seuils_sont_reglables(monkeypatch, equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    age_form(form_id, 2)
+    assert item_of(equipe["titulaire"], KIND_PROVISION, form_id, code)["late"] is False
+    monkeypatch.setattr(st, "LATE_DAYS", 1)
+    monkeypatch.setattr(st, "ESCALATE_DAYS", 2)
+    item = item_of(equipe["titulaire"], KIND_PROVISION, form_id, code)
+    assert item["late"] is True and item["escalated"] is True
+    assert item_of("admin", KIND_PROVISION, form_id, code) is not None
+
+
+def test_l_anciennete_d_une_tache_a_fermer_part_de_la_restitution(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    age_form(form_id, 30)  # dossier ancien...
+    set_status(form_id, "partial_return")
+    with get_db() as c:
+        c.execute("UPDATE dotation_forms SET returned_at = ? WHERE id = ?", (days_ago(1), form_id))  # ...mais restitué hier
+    notif.clear_cache()
+    item = item_of(equipe["titulaire"], KIND_DEPROVISION, form_id, code)
+    assert item["age_days"] == 1 and item["late"] is False
+    age_form(form_id, 5, column="returned_at")
+    assert item_of(equipe["titulaire"], KIND_DEPROVISION, form_id, code)["late"] is True
+
+
+def test_rouvrir_un_fait_par_erreur(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    body = {"kind": KIND_PROVISION, "form_id": form_id, "item_key": code}
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json=body, headers=H)
+    recent = client_for(equipe["collegue"]).get("/api/service-tasks/recent").get_json()["items"]
+    entry = next(i for i in recent if i["form_id"] == form_id and i["item_key"] == code)
+    assert entry["done_by"] == equipe["titulaire"] and entry["service"] == equipe["label"]
+    assert not any(i["form_id"] == form_id for i in client_for(equipe["etranger"]).get("/api/service-tasks/recent").get_json()["items"])
+    assert client_for(equipe["etranger"]).post("/api/service-tasks/reopen", json=body, headers=H).status_code == 404
+    resp = client_for(equipe["collegue"]).post("/api/service-tasks/reopen", json=body, headers=H)
+    assert resp.status_code == 200 and resp.get_json()["reopened"] is True
+    assert item_of(equipe["titulaire"], KIND_PROVISION, form_id, code) is not None  # la tâche est revenue pour tous
+    assert client_for(equipe["collegue"]).post("/api/service-tasks/reopen", json=body, headers=H).status_code == 404  # déjà rouverte
+    with get_db() as c:
+        assert c.execute("SELECT COUNT(*) FROM app_logs WHERE action_type = 'service_task_reopened'").fetchone()[0] >= 1
+
+
+def test_un_administrateur_voit_et_rouvre_tout(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    body = {"kind": KIND_PROVISION, "form_id": form_id, "item_key": code}
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json=body, headers=H)
+    assert any(i["form_id"] == form_id for i in client_for("admin").get("/api/service-tasks/recent").get_json()["items"])
+    assert client_for("admin").post("/api/service-tasks/reopen", json=body, headers=H).status_code == 200
+
+
+def test_l_historique_d_avant_les_notifications_et_les_vieux_fait_ne_sont_pas_listes(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    with get_db() as c:
+        c.execute("INSERT OR REPLACE INTO service_task_done (kind, form_id, item_key, done_at, done_by, note) VALUES ('provision', ?, ?, ?, NULL, 'avant les notifications')",
+                  (form_id, code, days_ago(1)))
+    assert not any(i["form_id"] == form_id for i in client_for(equipe["titulaire"]).get("/api/service-tasks/recent").get_json()["items"])  # baseline : pas d'auteur
+    with get_db() as c:
+        c.execute("UPDATE service_task_done SET done_by = ?, done_at = ? WHERE form_id = ?", (equipe["titulaire"], days_ago(45), form_id))
+    assert not any(i["form_id"] == form_id for i in client_for(equipe["titulaire"]).get("/api/service-tasks/recent").get_json()["items"])  # plus de 30 jours
+
+
+def test_le_nom_est_masque_dans_les_taches_recentes_pour_un_profil_masque(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, nom = make_dossier([code], nom=f"DURAND{uid()}")
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json={"kind": KIND_PROVISION, "form_id": form_id, "item_key": code}, headers=H)
+    full = next(i for i in client_for(equipe["collegue"]).get("/api/service-tasks/recent").get_json()["items"] if i["form_id"] == form_id)
+    assert nom in full["who"]
+    with get_users_db() as users:
+        users.execute("INSERT OR REPLACE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES ('masque_recent','M','','[]','masked','x','x')")
+        users.execute("DELETE FROM user_groups WHERE username = ?", (equipe["collegue"],))
+        users.execute("INSERT INTO user_groups (username, group_key) VALUES (?, 'masque_recent')", (equipe["collegue"],))
+    try:
+        masked = next(i for i in client_for(equipe["collegue"]).get("/api/service-tasks/recent").get_json()["items"] if i["form_id"] == form_id)
+        assert nom not in str(masked) and masked["who"].startswith("Dossier du ")
+    finally:
+        with get_users_db() as users:
+            users.execute("DELETE FROM user_groups WHERE group_key = 'masque_recent'")
+            users.execute("DELETE FROM groups WHERE key = 'masque_recent'")
+
+
+def test_les_fait_d_un_dossier_supprime_sont_purges_les_autres_gardes(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json={"kind": KIND_PROVISION, "form_id": form_id, "item_key": code}, headers=H)
+    with get_db() as c:
+        c.execute("INSERT INTO service_task_done (kind, form_id, item_key, done_at, done_by, note) VALUES ('provision', 'form_disparu', 'x', 'x', 'y', '')")
+        assert st.purge_orphans(c) >= 1
+        assert c.execute("SELECT COUNT(*) FROM service_task_done WHERE form_id = 'form_disparu'").fetchone()[0] == 0
+        assert c.execute("SELECT COUNT(*) FROM service_task_done WHERE form_id = ?", (form_id,)).fetchone()[0] == 1  # le « Fait » d'un dossier existant reste : il est la mémoire du déjà fait
+        assert st.purge_orphans(c) == 0  # idempotent
+
+
+def test_les_routes_de_reouverture_exigent_une_session():
+    anonymous = app.test_client()
+    assert anonymous.get("/api/service-tasks/recent").status_code == 401
+    assert anonymous.post("/api/service-tasks/reopen", json={}, headers=H).status_code == 401
+    assert client_for("admin").post("/api/service-tasks/reopen", json={"kind": "autre"}, headers=H).status_code == 400
+
+
+def test_la_page_mes_taches_exige_une_session():
+    assert app.test_client().get("/tasks.html").status_code == 302  # renvoyée vers la connexion
+    page = client_for("admin").get("/tasks.html")
+    assert page.status_code == 200 and "Mes tâches" in page.get_data(as_text=True)

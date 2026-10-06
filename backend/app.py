@@ -607,6 +607,11 @@ def init_db():
                 print(f"[demarrage] {_step.__name__} ignoree : {_exc}")
         from migrations import run_pending_migrations
         run_pending_migrations(connection)  # migrations numerotees (identifiants de champs...), copie de securite avant
+        try:
+            from models.service_tasks import purge_orphans
+            purge_orphans(connection)  # « Fait » d'un dossier supprime (la table existe apres la migration 10)
+        except Exception as _exc:  # noqa: BLE001 - jamais bloquant au demarrage
+            print(f"[demarrage] purge des taches orphelines ignoree : {_exc}")
         # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
         from models.units import backfill_units, ensure_units_schema
         ensure_units_schema(connection)

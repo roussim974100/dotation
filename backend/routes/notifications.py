@@ -1,15 +1,23 @@
 """Notifications et titulaires de service (voir models/notifications.py)."""
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, send_from_directory, session
 
 from auth import current_user, get_user_record, login_required, permission_required
+from config import FRONTEND_DIR
 from database import get_db
 from models.audit import insert_app_log
 from models.notifications import (
     apply_service_assignments, clear_cache, open_tasks, service_referents, set_service_referents,
 )
-from models.service_tasks import mark_done
+from models.service_tasks import mark_done, recently_done, reopen
 
 bp = Blueprint("notifications", __name__)
+
+
+@bp.route("/tasks.html")
+@login_required
+def tasks_page():
+    """Page « Mes taches » : tout ce qui me concerne, avec « Fait » et l'historique recent."""
+    return send_from_directory(FRONTEND_DIR, "tasks.html")
 
 
 @bp.route("/api/notifications", methods=["GET"])
@@ -79,3 +87,26 @@ def service_task_done():
         clear_cache()
         tasks = open_tasks(connection, user)
     return jsonify({"done": True, "tasks": tasks, "count": len(tasks)})
+
+
+@bp.route("/api/service-tasks/recent", methods=["GET"])
+@login_required
+def service_tasks_recent():
+    """Ce qui a ete termine ces 30 derniers jours dans mes services (page « Mes taches », avec possibilite de rouvrir)."""
+    with get_db() as connection:
+        return jsonify({"items": recently_done(connection, current_user())})
+
+
+@bp.route("/api/service-tasks/reopen", methods=["POST"])
+@login_required
+def service_task_reopen():
+    """Rouvre un « Fait » enregistre par erreur : la tache revient chez tous les titulaires du service."""
+    payload = request.get_json(silent=True) or {}
+    user = current_user()
+    with get_db() as connection:
+        ok, error = reopen(connection, user, payload.get("kind"), payload.get("form_id"), payload.get("item_key"))
+        if not ok:
+            return jsonify({"error": error}), 404 if error == "task_not_found" else 400
+        clear_cache()
+        tasks = open_tasks(connection, user)
+    return jsonify({"reopened": True, "tasks": tasks, "count": len(tasks)})

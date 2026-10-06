@@ -591,6 +591,7 @@ function buildUserMenuPanel(menu) {
     </div>
     <div id="userMenuSpaces" class="d-none"><div class="user-menu__sep"></div></div>
     <a class="user-menu__item" id="accountLink" href="account.html"${onAccount}>Mon profil</a>
+    <a class="user-menu__item" id="tasksLink" href="tasks.html"${window.location.pathname.endsWith("tasks.html") ? ' aria-current="page"' : ""}>Mes tâches</a>
     <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
     <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
     <a class="user-menu__item" data-help-page="dashboard" href="help.html?page=dashboard">Aide générale</a>
@@ -868,7 +869,7 @@ function loadNotificationsScript() {
   }
   notificationsScriptPromise = notificationsScriptPromise || new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "/js/notifications.js?v=20261006h";
+    script.src = "/js/notifications.js?v=20261006j";
     script.onload = resolve;
     script.onerror = () => {
       notificationsScriptPromise = null;

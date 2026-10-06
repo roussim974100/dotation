@@ -1,5 +1,20 @@
 # Historique des versions — À Quai
 
+## [Non publié] — Notifications, lot 4 : retards, escalade, page « Mes tâches » (numéro de version à confirmer ; proposé : 3.71.0)
+
+### 🔔 Relances, escalade et une page pour tout voir
+- **En retard après 3 jours** : une tâche de service plus ancienne est marquée « ⏰ En retard · N j » (en toutes lettres, pas seulement par la couleur), dans la liste, dans le panneau de la cloche (« N en retard ») et dans la page « Mes tâches ». L'ancienneté part de la création du dossier (à fournir) ou de la date de restitution (à fermer) ; une date future (départ planifié) n'est jamais en retard. Seuils réglables : `APP_TASK_LATE_DAYS` (3) et `APP_TASK_ESCALATE_DAYS` (7).
+- **Escaladée après 7 jours** : la tâche apparaît **aussi chez les administrateurs** (« ⚠ Escaladée aux administrateurs »), qui peuvent la terminer. Avant, un administrateur ne voyait que les tâches d'un service sans titulaire.
+- **Page « Mes tâches »** (`tasks.html`, lien « Tout voir » de la cloche et entrée du menu du compte) : toutes les tâches qui me concernent, filtrables par type et « seulement en retard », avec « Fait » sur chaque ligne.
+- **Terminées ces 30 derniers jours** : qui a fait quoi, et **« Rouvrir »** pour un « Fait » enregistré par erreur (la tâche revient chez tous les titulaires ; réservé aux titulaires du service et aux administrateurs ; journalisé).
+- **Pas de purge « à 90 jours » des « Fait »** (prévue au cadrage) : ces lignes sont la mémoire du « déjà fait » — les supprimer ferait réapparaître la tâche tant que le dossier existe. Seuls les « Fait » d'un dossier **supprimé** sont purgés (au démarrage, `purge_orphans`).
+- Pas d'e-mail : le retard est un état visible, pas un message envoyé.
+- Fichiers : `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `backend/app.py` (purge au démarrage), `frontend/tasks.html`, `frontend/js/tasks.js`, `frontend/js/notifications.js` (tableaux réutilisables), `frontend/js/ui.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` : 29 cas (retard, seuils, escalade, réouverture, historique, masquage, purge, page). Scénario navigateur `tests/browser/check_tasks_page.py` (17 vérifications). `check_menu.py` attend le nouveau lien ; `check_session_terminee_ailleurs.py` laisse la page finir de charger avant de révoquer (course de timing).
+
+
 ## [3.70.0] - 2026-10-06 — Notifications, lot 2 : tâches de service
 
 ### 🔔 Ce que doit faire chaque service, et un « Fait » partagé

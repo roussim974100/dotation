@@ -50,6 +50,7 @@ for scenario in ("password", "disabled"):
         driver = inst.driver()
         driver.get(inst.url("/index.html"))
         check(f"[{scenario}] page ouverte avec une session valide", wait_for(lambda: driver.find_elements("id", "userMenu")) and not on_login_page(driver))
+        time.sleep(3)  # laisser finir les requêtes de chargement de la page : sinon un 401 légitime part avant le contrôle
         revoke(inst, scenario)
         time.sleep(1)
         check(f"[{scenario}] sans action, la page reste affichée (aucune requête n'est partie)", not on_login_page(driver))

@@ -70,8 +70,9 @@
       return "";
     }
     const urgent = task.severity === "urgent" ? '<span class="notification-item__urgent">⚠ Urgent</span> ' : "";
+    const late = task.late_count ? ` <span class="notification-item__urgent">⏰ ${esc(plural(task.late_count, "en retard", "en retard"))}</span>` : "";
     return `<li class="notification-item">
-      <p class="notification-item__title">${urgent}${esc(kind.title(task))}</p>
+      <p class="notification-item__title">${urgent}${esc(kind.title(task))}${late}</p>
       <p class="notification-item__detail">${esc(kind.detail(task))}</p>
       <button type="button" class="btn btn-sm btn-primary" data-notification-run="${index}">${esc(kind.actionLabel)}</button>
     </li>`;
@@ -85,7 +86,8 @@
     const body = tasks.length
       ? `<ul class="notification-list">${tasks.map(renderTask).join("")}</ul>`
       : '<p class="notification-empty">Rien à faire pour le moment.</p>';
-    panel.innerHTML = `<h2 class="notification-panel__title" id="notificationPanelTitle" tabindex="-1">Notifications</h2>${body}`;
+    panel.innerHTML = `<h2 class="notification-panel__title" id="notificationPanelTitle" tabindex="-1">Notifications</h2>${body}
+      <p class="notification-panel__all"><a href="tasks.html">Tout voir dans « Mes tâches »</a></p>`;
     panel.querySelectorAll("[data-notification-run]").forEach((button) => {
       button.addEventListener("click", () => {
         const task = tasks[Number(button.dataset.notificationRun)];
@@ -265,35 +267,131 @@
   }
 
   // ─── Tâches de service : à fournir / à fermer, avec « Fait » partagé par tout le service ──────────────────────────
-  function openServiceTasksModal(task, title, doneLabel) {
-    if (document.getElementById("serviceTasksModal")) {
-      return;
+  // L'ancienneté est dite en toutes lettres (« En retard », « Escaladée »), jamais seulement par la couleur.
+  function ageLabel(item, lateDays, escalateDays) {
+    const days = `${item.age_days} j`;
+    if (item.escalated) {
+      return `<span class="service-tasks__late service-tasks__late--escalated">⚠ Escaladée aux administrateurs · ${days}</span>`;
     }
+    if (item.late) {
+      return `<span class="service-tasks__late">⏰ En retard · ${days}</span>`;
+    }
+    return esc(days);
+  }
+
+  async function postJson(url, body) {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": await getCsrfToken() },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "erreur");
+    }
+    return data;
+  }
+
+  // Dessine le tableau des lignes d'une tâche de service dans `container` ; « Fait » enregistre et retire la ligne.
+  // hooks : { doneLabel, onChange(data), onEmpty() }
+  function mountServiceTasks(container, task, hooks = {}) {
     const rows = (task.items || []).map((item, index) => `<tr data-row="${index}">
         <td data-label="Personne">${esc(item.who)}</td>
         <td data-label="Ressource">${esc(item.label)}${item.unattended ? '<br><span class="form-text">Service sans titulaire : pris en charge par les administrateurs.</span>' : ""}</td>
         <td data-label="Service">${esc(item.service)}</td>
-        <td data-label="Depuis">${esc(item.since)}</td>
+        <td data-label="Ancienneté">${ageLabel(item)}</td>
         <td data-label="Actions" class="service-tasks__actions">
           ${item.can_open ? `<a class="btn btn-sm btn-outline-secondary" href="form.html?id=${encodeURIComponent(item.form_id)}">Ouvrir le dossier</a>` : ""}
-          <button type="button" class="btn btn-sm btn-primary" data-done="${index}">${esc(doneLabel)}</button>
+          <button type="button" class="btn btn-sm btn-primary" data-done="${index}">${esc(hooks.doneLabel || "Fait")}</button>
         </td>
       </tr>`).join("");
+    container.innerHTML = `
+      ${task.truncated ? '<p class="form-text">Liste limitée aux premières lignes ; les suivantes apparaîtront au fur et à mesure.</p>' : ""}
+      <div class="table-responsive">
+        <table class="table align-middle service-tasks__table">
+          <thead><tr><th>Personne</th><th>Ressource</th><th>Service</th><th>Ancienneté</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="service-tasks__feedback" role="status"></div>`;
+    const feedback = container.querySelector(".service-tasks__feedback");
+    container.querySelectorAll("[data-done]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const item = task.items[Number(button.dataset.done)];
+        button.disabled = true;
+        try {
+          const data = await postJson("/api/service-tasks/done", { kind: task.kind, form_id: item.form_id, item_key: item.item_key });
+          container.querySelector(`tr[data-row="${button.dataset.done}"]`)?.remove();
+          window.updateNotificationBadge?.(data.count);
+          feedback.className = "service-tasks__feedback";
+          feedback.textContent = `${item.label} : terminé pour tout le service.`;
+          hooks.onChange?.(data);
+          if (!container.querySelector("tbody tr")) {
+            hooks.onEmpty?.();
+          }
+        } catch (error) {
+          button.disabled = false;
+          feedback.className = "service-tasks__feedback password-change-modal__feedback password-change-modal__feedback--error";
+          feedback.textContent = "Impossible d'enregistrer. Un collègue l'a peut-être déjà fait : rechargez la page.";
+        }
+      });
+    });
+  }
+
+  // Ce qui a été terminé ces 30 derniers jours : permet de vérifier, et de rouvrir un « Fait » enregistré par erreur.
+  function mountRecentDone(container, items, hooks = {}) {
+    if (!items.length) {
+      container.innerHTML = '<p class="notification-empty">Rien de terminé ces 30 derniers jours.</p>';
+      return;
+    }
+    const kindLabel = (kind) => (kind === "service_deprovision" ? "À fermer" : "À fournir");
+    const rows = items.map((item, index) => `<tr data-row="${index}">
+        <td data-label="Personne">${esc(item.who)}</td>
+        <td data-label="Ressource">${esc(item.label)} <span class="text-muted">(${kindLabel(item.kind)})</span></td>
+        <td data-label="Service">${esc(item.service)}</td>
+        <td data-label="Terminé">${esc(String(item.done_at || "").slice(0, 10))} par ${esc(item.done_by)}</td>
+        <td data-label="Actions" class="service-tasks__actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-reopen="${index}">Rouvrir</button></td>
+      </tr>`).join("");
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="table align-middle service-tasks__table">
+          <thead><tr><th>Personne</th><th>Ressource</th><th>Service</th><th>Terminé</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="service-tasks__feedback" role="status"></div>`;
+    const feedback = container.querySelector(".service-tasks__feedback");
+    container.querySelectorAll("[data-reopen]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const item = items[Number(button.dataset.reopen)];
+        button.disabled = true;
+        try {
+          const data = await postJson("/api/service-tasks/reopen", { kind: item.kind, form_id: item.form_id, item_key: item.item_key });
+          window.updateNotificationBadge?.(data.count);
+          feedback.textContent = `${item.label} : la tâche est rouverte pour tout le service.`;
+          hooks.onChange?.(data);
+        } catch (error) {
+          button.disabled = false;
+          feedback.textContent = "Impossible de rouvrir : la tâche a peut-être déjà changé. Rechargez la page.";
+        }
+      });
+    });
+  }
+
+  function openServiceTasksModal(task, title, doneLabel) {
+    if (document.getElementById("serviceTasksModal")) {
+      return;
+    }
     const backdrop = document.createElement("div");
     backdrop.id = "serviceTasksModal";
     backdrop.className = "password-change-modal__backdrop";
     backdrop.innerHTML = `
       <div class="password-change-modal__dialog service-tasks" role="dialog" aria-modal="true" aria-labelledby="serviceTasksTitle">
         <h3 id="serviceTasksTitle" tabindex="-1">${esc(title)}</h3>
-        ${task.truncated ? '<p class="form-text">Liste limitée aux premières lignes ; les suivantes apparaîtront au fur et à mesure.</p>' : ""}
-        <div class="table-responsive">
-          <table class="table align-middle service-tasks__table">
-            <thead><tr><th>Personne</th><th>Ressource</th><th>Service</th><th>Depuis</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-        <div id="serviceTasksFeedback" role="status"></div>
+        <div id="serviceTasksBody"></div>
         <div class="password-change-modal__actions">
+          <a class="btn btn-link" href="tasks.html">Tout voir dans « Mes tâches »</a>
           <button class="btn btn-outline-secondary" type="button" id="serviceTasksClose">Fermer</button>
         </div>
       </div>`;
@@ -316,39 +414,15 @@
       }
     });
     backdrop.querySelector("#serviceTasksClose").addEventListener("click", close);
-    backdrop.querySelectorAll("[data-done]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const item = task.items[Number(button.dataset.done)];
-        const feedback = backdrop.querySelector("#serviceTasksFeedback");
-        button.disabled = true;
-        try {
-          const response = await fetch("/api/service-tasks/done", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json", "X-CSRF-Token": await getCsrfToken() },
-            body: JSON.stringify({ kind: task.kind, form_id: item.form_id, item_key: item.item_key }),
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.error || "erreur");
-          }
-          backdrop.querySelector(`tr[data-row="${button.dataset.done}"]`)?.remove();
-          window.updateNotificationBadge?.(data.count);
-          feedback.className = "";
-          feedback.textContent = `${item.label} : terminé pour tout le service.`;
-          if (!backdrop.querySelector("tbody tr")) {
-            close();
-            showToast("Plus rien à faire dans cette liste.", "success");
-          }
-        } catch (error) {
-          button.disabled = false;
-          feedback.className = "password-change-modal__feedback password-change-modal__feedback--error";
-          feedback.textContent = "Impossible d'enregistrer. Un collègue l'a peut-être déjà fait : rechargez la page.";
-        }
-      });
+    mountServiceTasks(backdrop.querySelector("#serviceTasksBody"), task, {
+      doneLabel,
+      onEmpty: () => {
+        close();
+        showToast("Plus rien à faire dans cette liste.", "success");
+      },
     });
     backdrop.querySelector("#serviceTasksTitle").focus();
   }
 
-  window.AQuaiNotifications = { togglePanel, openPanel, closePanel, NOTIFICATION_KINDS };
+  window.AQuaiNotifications = { togglePanel, openPanel, closePanel, NOTIFICATION_KINDS, mountServiceTasks, mountRecentDone, esc, plural };
 })();

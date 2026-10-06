@@ -5593,3 +5593,46 @@ section.content-card[id^="db-"] {
     font-weight: 600;
   }
 }
+
+.notification-panel__all {
+  margin: 0.85rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.service-tasks__late {
+  font-weight: 600;
+  color: #b54708;
+}
+
+.service-tasks__late--escalated {
+  color: #b42318;
+}
+
+[data-color-mode="dark"] .service-tasks__late {
+  color: #f5b668;
+}
+
+[data-color-mode="dark"] .service-tasks__late--escalated {
+  color: #f19b92;
+}
+
+.service-tasks__feedback {
+  min-height: 1.4rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.tasks-page__section {
+  margin-bottom: 1.25rem;
+}
+
+.tasks-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
