@@ -129,6 +129,7 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 
 1. Travailler sur la branche **`dev`**. Promotion `dev` → `preprod` → `prod` **par Pull Request** ; le propriétaire
    fusionne lui-même. La production se déploie depuis la branche **`prod`** (pas `main`).
+   `main` (branche par défaut de GitHub) ne s'aligne qu'**après** la mise en production : une PR `preprod` → `main` ne se fusionne pas avant, sinon le README affiche une version non déployée.
 2. **Ne jamais utiliser `git add -A` ni `git add .`** : ajouter les fichiers un par un. Une base de production a déjà été
    publiée par erreur (le dépôt est public). Ne jamais committer de base (`*.db`), de journal ni de secret.
 3. **Demander avant de changer le numéro de version** (`branding.js`, entête du `README.md`, `CHANGELOG.md`).

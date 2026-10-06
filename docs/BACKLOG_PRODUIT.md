@@ -6,7 +6,9 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (6 octobre 2026, fin de journée)
 
-**État** : `dev` = **3.71.0**. La série du 06/10 (3.67.3 → 3.71.0) est sur `dev` : sécurité des sessions (3.67.3, 3.67.4) puis notifications (3.68.0 à 3.71.0). 3.67.3 est déjà fusionnée en préprod (PR n°36) ; le reste passe par une PR `dev` → `preprod` que le propriétaire fusionne. La production n'a **rien** de cette série : à déployer par lui, après test en préprod.
+**État des branches (fin de journée du 06/10)** : `dev` = `preprod` = **3.71.0** (PR n°36 puis n°37 `dev` → `preprod` fusionnées par le propriétaire) ; **`prod` = `main` = 3.67.1**. La série 3.67.3 → 3.71.0 (sécurité des sessions puis notifications 3.68.0 à 3.71.0) est donc en préprod, **pas en production**. Reste au propriétaire : tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod`, puis déploiement.
+
+**`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
 **À tester en préprod (propriétaire)** : (1) deux navigateurs, changement de mot de passe dans l'un → l'autre est déconnecté en moins d'une minute ; (2) `admin/admin` encore en place → fenêtre de changement obligatoire ; (3) cloche → « N ressources sans service référent » → choisir les services (Informatique = DSI proposé) ; (4) Admin > Services → ajouter les **titulaires** de chaque service ; (5) attribuer une ressource d'un service → la tâche « à fournir » apparaît chez les titulaires → « Fait » ; (6) restituer → « à fermer » pour un compte ; (7) page « Mes tâches », « Rouvrir ». Migrations 9 et 10 au premier démarrage (copie de sécurité automatique).
 
