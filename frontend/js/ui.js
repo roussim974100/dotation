@@ -804,6 +804,52 @@ const PASSWORD_ERROR_MESSAGES = {
   password_unchanged: "Le nouveau mot de passe doit être différent de l'actuel.",
 };
 
+// ─── Session terminée ailleurs ─────────────────────
+// Le serveur refuse une session dont le mot de passe a changé, dont le compte est désactivé ou qui a expiré (401). Une page
+// déjà ouverte ne le sait qu'à sa prochaine requête : on renvoie vers la connexion dès qu'une requête reçoit ce 401, et on
+// contrôle la session au retour sur l'onglet puis chaque minute. Ce contrôle ne prolonge pas la session (X-Session-Check).
+const SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+let sessionRedirectStarted = false;
+
+function redirectToLoginAfterSessionEnd() {
+  if (sessionRedirectStarted) {
+    return;
+  }
+  sessionRedirectStarted = true;
+  window.location.assign("/login?error=session");
+}
+
+function initSessionWatch() {
+  if (!document.getElementById("userMenu") || window.__sessionWatchStarted) {
+    return;  // pages publiques (signature, connexion) : pas de session à surveiller
+  }
+  window.__sessionWatchStarted = true;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const response = await nativeFetch(input, init);
+    if (response.status === 401) {
+      const url = new URL(typeof input === "string" ? input : (input.url || ""), window.location.origin);
+      const isApi = url.origin === window.location.origin && url.pathname.startsWith("/api/");
+      const isPublic = /^\/api\/(auth|signature|restitution-signature|adjustment-signature)\//.test(url.pathname);
+      if (isApi && !isPublic) {
+        redirectToLoginAfterSessionEnd();
+      }
+    }
+    return response;
+  };
+
+  const check = () => {
+    if (document.visibilityState === "hidden") {
+      return;
+    }
+    window.fetch("/api/session", { credentials: "same-origin", headers: { "X-Session-Check": "1" } }).catch(() => {});
+  };
+  document.addEventListener("visibilitychange", check);
+  window.addEventListener("focus", check);
+  window.setInterval(check, SESSION_CHECK_INTERVAL_MS);
+}
+
 // Compte au mot de passe d'origine : ouvre la fenêtre de changement obligatoire (voir /api/session, must_change_password).
 async function initForcedPasswordChange() {
   if (!document.getElementById("userMenu")) {
@@ -880,6 +926,7 @@ function showPwdFeedback(el, msg, isError) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initSessionWatch();
   initForcedPasswordChange();
   document.querySelectorAll("[data-back-btn]").forEach((btn) => {
     btn.addEventListener("click", () => window.history.back());

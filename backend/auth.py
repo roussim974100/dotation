@@ -335,7 +335,9 @@ def session_invalid_reason():
         return "user_disabled"
     if not hmac.compare_digest(str(session.get("pwd_fp") or ""), password_fingerprint(record["password_hash"])):
         return "password_changed"
-    if now - last_seen >= _SESSION_TOUCH_SECONDS:
+    # Un simple controle du navigateur (ui.js, en-tete X-Session-Check) ne compte pas comme une activite : sinon un onglet
+    # laisse ouvert ne tomberait jamais en inactivite.
+    if now - last_seen >= _SESSION_TOUCH_SECONDS and not request.headers.get("X-Session-Check"):
         session["last_seen"] = now
     return None
 

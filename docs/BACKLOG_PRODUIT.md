@@ -1,12 +1,12 @@
 # Backlog produit — À Quai
 
-Dernière revue : **6 octobre 2026** (P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
+Dernière revue : **6 octobre 2026** (3.67.4 : déconnexion immédiate de l'onglet ouvert ; P0 « sécurité des sessions » ajouté puis terminé : 3.67.3 ; précédente : 29 septembre, chantier « regroupement des dossiers par personne », versions 3.66.1 à 3.67.2 ; voir CHANGELOG pour le détail).
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
 ## Version courante
 
-`dev` à **3.67.3**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.67.4**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 

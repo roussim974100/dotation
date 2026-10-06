@@ -1,5 +1,16 @@
 # Historique des versions — À Quai
 
+## [3.67.4] - 2026-10-06
+
+### 🔒 Une session révoquée ailleurs est fermée tout de suite dans l'onglet déjà ouvert
+- **Constat** (préprod, 3.67.3) : après un changement de mot de passe dans un autre navigateur, l'ancien navigateur était bien refusé par le serveur, mais l'ancienne page restait affichée jusqu'à un rechargement manuel.
+- **Correctif** (`frontend/js/ui.js`, pages avec le menu du compte) : toute requête de l'application qui reçoit un 401 renvoie vers la connexion ; la session est aussi contrôlée au retour sur l'onglet et chaque minute. Ce contrôle (en-tête `X-Session-Check`, `backend/auth.py`) **ne prolonge pas** la session : un onglet laissé ouvert tombe bien en inactivité après 60 min.
+- **Message** de la page de connexion : « Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion) » à la place de « La session n'a pas pu être conservée. Vérifiez les cookies » (trompeur dans ce cas ; `frontend/js/config.js`, `login.js`).
+- Les pages publiques de signature ne sont pas concernées (pas de session).
+
+### 🧪 Tests
+- `tests/test_session_validity.py` : 2 cas de plus (le contrôle ne prolonge pas la session ; un onglet ouvert tombe en inactivité). Scénario navigateur `tests/browser/check_session_terminee_ailleurs.py` : mot de passe changé, compte désactivé, requête en 401, session valide non déconnectée (9 vérifications).
+
 ## [3.67.3] - 2026-10-06
 
 ### 🔒 Sécurité : une session ne survit plus au changement de mot de passe
