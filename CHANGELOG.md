@@ -1,5 +1,21 @@
 # Historique des versions — À Quai
 
+## [Non publié] — Notifications, lot 1 (numéro de version à confirmer par le propriétaire ; proposé : 3.68.0)
+
+### 🔔 Une cloche, des services et leurs titulaires
+- **Chaque ressource appartient à un service du catalogue**, et chaque service porte une **liste de comptes titulaires** (Admin > Services, fenêtre « Modifier le service »). Tous les titulaires reçoivent les notifications du service ; sans titulaire, ce seront les administrateurs. Le lien ressource → service est le libellé (« service émetteur » de la ressource, rebaptisé « Service référent » dans les formulaires) ; **renommer un service fait suivre ses ressources**, le supprimer les remet à choisir.
+- **Le service est obligatoire** à la création d'une ressource (formulaire, assistant, API : `issuer_service_required` / `issuer_service_unknown`). À la modification, un ancien texte inchangé reste toléré pour ne pas bloquer l'édition des ressources d'avant.
+- **Cloche dans l'en-tête** (toutes les pages avec le menu du compte) : compteur lu avec le contrôle de session déjà fait chaque minute (`notifications_count` dans `/api/session`, aucun sondage de plus), panneau déroulant accessible (clavier, Échap, libellé annonçant le nombre, région vocale polie). `frontend/js/notifications.js` n'est chargé qu'au premier clic.
+- **Première tâche, pour les administrateurs (`users.manage`)** : « N ressources sans service référent ». La fenêtre de choix regroupe les ressources par ancien nom (une décision par groupe), **pré-remplit une suggestion** (nom identique, appellation courante comme Informatique → DSI, ou libellé qui contient l'ancien nom) que l'administrateur valide ou change ; rien n'est modifié avant sa validation, l'opération est tout ou rien et l'ancienne valeur est conservée au journal. La tâche est **calculée** à partir des données : elle disparaît toute seule quand la dernière ressource est rattachée.
+- **Migration 9** (sauvegarde automatique avant application) : crée `service_referents` et ramène au libellé exact du catalogue les services qui n'en différaient que par la casse, les accents ou les espaces (dans la copie de production consultée, 13 ressources sur 24 sont déjà rattachées à un service du catalogue) ; les autres ne sont **jamais devinées**.
+- Aucune donnée personnelle dans une notification (type, ressource, service). Pas de nouveau droit en V1 : chaque tâche est limitée par le droit qui permet de la traiter.
+- **Pas encore** (lots suivants) : tâches des services (compte à créer à l'attribution, compte à fermer à la restitution, avec « Fait »), administrateurs (inscription en attente, nouvelle version, sauvegarde en échec), relances.
+- Fichiers : `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/migrations.py`, `backend/routes/admin.py`, `backend/routes/pages.py`, `frontend/js/ui.js`, `frontend/js/notifications.js`, `frontend/js/admin.js`, `frontend/js/admin-resource-wizard.js`, `frontend/admin-services.html`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` (21 cas) et `tests/browser/check_notifications.py` (22 vérifications : cloche, panneau, choix, titulaires). Les scénarios HTTP créent désormais leurs ressources avec un service existant du catalogue.
+
+
 ## [3.67.4] - 2026-10-06
 
 ### 🔒 Une session révoquée ailleurs est fermée tout de suite dans l'onglet déjà ouvert

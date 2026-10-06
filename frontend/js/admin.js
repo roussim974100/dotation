@@ -772,6 +772,7 @@ function populateServiceForm(serviceId) {
   editingServiceId = service.id;
   byId("modalServiceLabel").value = service.label || "";
   byId("modalServiceActive").checked = Boolean(service.is_active);
+  renderServiceReferentOptions(service.referents || []);
   openServiceEditModal();
 }
 
@@ -808,6 +809,14 @@ async function saveServiceFromModal() {
       method: "PUT",
       body: JSON.stringify({ label, is_active: isActive })
     });
+    const referentsBox = byId("modalServiceReferents");
+    if (referentsBox?.dataset.ready === "true") {
+      const usernames = [...referentsBox.querySelectorAll("input[type=checkbox]:checked")].map((input) => input.value);
+      await adminRequest(`/api/admin/services/${encodeURIComponent(editingServiceId)}/referents`, {
+        method: "PUT",
+        body: JSON.stringify({ usernames })
+      });
+    }
     showToast("Service mis à jour.");
     closeServiceEditModal();
     await loadServices();
@@ -906,6 +915,10 @@ async function saveResourceFromModal() {
   }
   if (!payload.code) {
     showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
+    return;
+  }
+  if (!payload.issuer_service) {
+    showToast("Choisissez le service référent de la ressource : ses titulaires reçoivent les notifications.", "error");
     return;
   }
   if (!editingResourceId) {
@@ -1100,6 +1113,45 @@ function populateServiceSelect() {
   }
 }
 
+// Titulaires d'un service : les comptes qui reçoivent les notifications de ses ressources.
+function renderServiceReferentsCell(service) {
+  const names = service.referents || [];
+  if (!names.length) {
+    return '<span class="text-muted">Aucun (les administrateurs)</span>';
+  }
+  const shown = names.slice(0, 3).map((name) => escapeHtml(name)).join(", ");
+  return `${shown}${names.length > 3 ? ` <span class="text-muted">+ ${names.length - 3}</span>` : ""}`;
+}
+
+async function renderServiceReferentOptions(selected = []) {
+  const container = byId("modalServiceReferents");
+  if (!container) {
+    return;
+  }
+  container.dataset.ready = "";
+  container.textContent = "Chargement…";
+  try {
+    if (!currentUsers.length) {
+      currentUsers = await adminRequest("/api/admin/users");
+    }
+  } catch (error) {
+    container.textContent = "Impossible de charger les comptes.";
+    return;
+  }
+  const chosen = new Set(selected);
+  const accounts = currentUsers
+    .filter((user) => user.is_active !== false && user.status !== "disabled" && user.status !== "pending")
+    .sort((left, right) => left.username.localeCompare(right.username, "fr"));
+  container.innerHTML = accounts.map((user, index) => {
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+    return `<label class="form-check service-referents__item" for="serviceReferent${index}">
+      <input class="form-check-input" type="checkbox" id="serviceReferent${index}" value="${escapeHtml(user.username)}"${chosen.has(user.username) ? " checked" : ""}>
+      <span class="form-check-label">${escapeHtml(fullName || user.username)}${fullName ? ` <span class="text-muted">(${escapeHtml(user.username)})</span>` : ""}</span>
+    </label>`;
+  }).join("") || '<span class="text-muted">Aucun compte actif.</span>';
+  container.dataset.ready = "true";
+}
+
 async function loadServices() {
   currentServices = await adminRequest("/api/admin/services");
   renderResourceIssuerOptions(byId("resource_issuer")?.value || "");
@@ -1114,6 +1166,7 @@ async function loadServices() {
       <td data-label="Service">
         <div class="draft-title">${escapeHtml(service.label)}</div>
       </td>
+      <td data-label="Titulaires">${renderServiceReferentsCell(service)}</td>
       <td data-label="État"><span class="status-chip status-chip--${service.is_active ? "active" : "cancelled"}">${service.is_active ? "Actif" : "Inactif"}</span></td>
       <td data-label="Actions" class="text-end">
         <div class="draft-actions">
@@ -1336,6 +1389,10 @@ async function saveResource() {
   }
   if (!payload.code) {
     showToast("Le code de la ressource n'a pas pu être généré automatiquement.", "error");
+    return;
+  }
+  if (!payload.issuer_service) {
+    showToast("Choisissez le service référent de la ressource : ses titulaires reçoivent les notifications.", "error");
     return;
   }
   await adminRequest("/api/admin/resources", {

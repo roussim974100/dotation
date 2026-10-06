@@ -40,9 +40,13 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 **Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
-## 🟡 Notifications — « qui doit terminer cette action » (en cadrage, 06/10)
+## 🟡 Notifications — « qui doit terminer cette action » (lot 1 codé le 06/10, version à confirmer ; lots 2 à 4 à faire)
 
-Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD) ; rien n'est codé.
+Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD).
+
+**Lot 1 ✅ (codé le 06/10, non publié)** : titulaires par service (Admin > Services), service obligatoire sur une ressource, migration 9, cloche + panneau, tâche des administrateurs « ressources sans service référent » avec suggestion validée par l'administrateur. **Reste** : lot 2 (compte à créer à l'attribution / à fermer à la restitution, tâche partagée par service avec « Fait » enregistré dans le dossier, périmètre toutes ressources), lot 3 (administrateurs : inscription en attente, nouvelle version, sauvegarde en échec), lot 4 (relance J+3, escalade J+7, page « Mes tâches », rétention 90 jours).
+
+**Décisions du propriétaire (06/10)** : tâche **partagée** par service (un seul état, elle disparaît pour tous dès qu'un titulaire la fait) ; **toutes les ressources** concernées, pas seulement dotelec ; **le même service** est prévenu d'un compte à fermer au départ d'un agent ; l'administrateur garde la main sur le rattachement des ressources existantes (Informatique = DSI proposé, validé par lui).
 
 **Décision du propriétaire (06/10, remplace la précédente)** : *on rattache chaque ressource à un **service**, et le service porte une **liste de comptes** (ses titulaires)*. **Tous les membres du service reçoivent la notification** (ex. une création de compte AD part à tous les membres de la DSI). Conséquences à cadrer :
 - table `service_referents` (service du catalogue `service_catalog` ↔ comptes) + section « Titulaires » dans l'édition d'un service (Admin > Services) ;

@@ -212,6 +212,29 @@ def _m_recompute_stuck_reservations(connection):
             logging.getLogger(__name__).warning("Rattrapage des reservations bloquees : unite %s ignoree (%s)", unit_id, error)
 
 
+def _m_service_referents(connection):
+    """3.68 (notifications) : chaque service du catalogue porte une liste de comptes titulaires (`service_referents`) ;
+    la table ne contient que des noms de comptes (users.db) : un compte supprime ou desactive est ignore a la lecture.
+    Rattache aussi les ressources dont le « service emetteur » ne differe d'un service du catalogue que par la casse, les
+    accents ou les espaces : le texte est ramene au libelle exact du catalogue (le lien ressource -> service est ce libelle).
+    Les autres (« Informatique » alors que le service s'appelle « DSI »...) ne sont PAS devinees : elles deviennent une
+    tache pour les administrateurs (models/notifications.py), qui choisissent."""
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS service_referents ("
+        "service_id TEXT NOT NULL, username TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (service_id, username))"
+    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_service_referents_user ON service_referents (username)")
+    existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    if not {"resource_catalog", "service_catalog"} <= existing:
+        return
+    from models.notifications import normalize_label
+    labels = {normalize_label(row[0]): row[0] for row in connection.execute("SELECT label FROM service_catalog WHERE is_active = 1")}
+    for resource_id, issuer in connection.execute("SELECT id, issuer_service FROM resource_catalog").fetchall():
+        exact = labels.get(normalize_label(issuer))
+        if exact and exact != issuer:
+            connection.execute("UPDATE resource_catalog SET issuer_service = ? WHERE id = ?", (exact, resource_id))
+
+
 MIGRATIONS = [
     (1, "baseline", _m_baseline),
     (2, "identifiants_de_champs", _m_field_ids),
@@ -221,6 +244,7 @@ MIGRATIONS = [
     (6, "masquer_identifiants_de_connexion", _m_mask_login_failed_identifiers),
     (7, "rattrapage_retraits_dossiers_sources", _m_resync_retrait_sources),
     (8, "rattrapage_reservations_bloquees", _m_recompute_stuck_reservations),
+    (9, "titulaires_de_service", _m_service_referents),
 ]
 
 

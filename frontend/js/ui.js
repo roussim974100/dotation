@@ -843,11 +843,84 @@ function initSessionWatch() {
     if (document.visibilityState === "hidden") {
       return;
     }
-    window.fetch("/api/session", { credentials: "same-origin", headers: { "X-Session-Check": "1" } }).catch(() => {});
+    window.fetch("/api/session", { credentials: "same-origin", headers: { "X-Session-Check": "1" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((session) => {
+        if (session && typeof session.notifications_count === "number") {
+          updateNotificationBadge(session.notifications_count);  // même requête que le contrôle de session : pas de second sondage
+        }
+      })
+      .catch(() => {});
   };
   document.addEventListener("visibilitychange", check);
   window.addEventListener("focus", check);
   window.setInterval(check, SESSION_CHECK_INTERVAL_MS);
+}
+
+// ─── Notifications (cloche de l'en-tête) ──────────────
+// Le compteur arrive avec /api/session (déjà contrôlé chaque minute, voir initSessionWatch) ; le panneau et ses fenêtres
+// (js/notifications.js) ne sont chargés qu'au premier clic.
+let notificationsScriptPromise = null;
+
+function loadNotificationsScript() {
+  if (window.AQuaiNotifications) {
+    return Promise.resolve();
+  }
+  notificationsScriptPromise = notificationsScriptPromise || new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "/js/notifications.js?v=20261006d";
+    script.onload = resolve;
+    script.onerror = () => {
+      notificationsScriptPromise = null;
+      reject(new Error("notifications_script"));
+    };
+    document.head.appendChild(script);
+  });
+  return notificationsScriptPromise;
+}
+
+function updateNotificationBadge(count) {
+  const bell = document.getElementById("notificationBell");
+  if (!bell) {
+    return;
+  }
+  const n = Math.max(0, Number(count) || 0);
+  const previous = Number(bell.dataset.count || 0);
+  bell.dataset.count = String(n);
+  const badge = bell.querySelector(".notification-bell__count");
+  badge.textContent = n > 9 ? "9+" : String(n);
+  badge.hidden = n === 0;
+  bell.setAttribute("aria-label", n ? `Notifications, ${n} à traiter` : "Notifications, rien à faire");
+  const live = document.getElementById("notificationLive");
+  if (live && n > previous) {
+    live.textContent = n === 1 ? "1 nouvelle tâche à traiter." : `${n} tâches à traiter.`;
+  }
+}
+
+function initNotificationBell(count) {
+  const menu = document.getElementById("userMenu");
+  if (!menu || document.getElementById("notificationBell")) {
+    return;
+  }
+  const bell = document.createElement("button");
+  bell.type = "button";
+  bell.id = "notificationBell";
+  bell.className = "btn btn-outline-light notification-bell";
+  bell.setAttribute("aria-haspopup", "dialog");
+  bell.setAttribute("aria-expanded", "false");
+  bell.setAttribute("aria-controls", "notificationPanel");
+  bell.innerHTML = '<span aria-hidden="true">🔔</span><span class="notification-bell__count" hidden></span>';
+  menu.parentNode.insertBefore(bell, menu);
+  const live = document.createElement("div");
+  live.id = "notificationLive";
+  live.className = "visually-hidden";
+  live.setAttribute("aria-live", "polite");
+  menu.parentNode.insertBefore(live, menu);
+  bell.addEventListener("click", () => {
+    loadNotificationsScript().then(() => window.AQuaiNotifications.togglePanel()).catch(() => showToast("Impossible de charger les notifications.", "error"));
+  });
+  updateNotificationBadge(count);
+  live.textContent = "";
 }
 
 // Compte au mot de passe d'origine : ouvre la fenêtre de changement obligatoire (voir /api/session, must_change_password).
@@ -863,6 +936,8 @@ async function initForcedPasswordChange() {
     const session = await response.json();
     if (session && session.must_change_password) {
       openPasswordChangeModal({ forced: true });
+    } else if (session) {
+      initNotificationBell(session.notifications_count || 0);
     }
   } catch (_) {
     /* sans réponse du serveur, le serveur refuse de toute façon les actions du compte */
