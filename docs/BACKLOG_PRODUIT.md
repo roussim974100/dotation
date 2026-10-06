@@ -40,6 +40,16 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 
 **Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
 
+## 🟡 Notifications — « qui doit terminer cette action » (en cadrage, 06/10)
+
+Idée du propriétaire : prévenir la personne en charge d'une action (ex. créer un compte dotelec), et les administrateurs (nouvelle version, sauvegarde en échec). Étudiée le 06/10 par un groupe de trois experts (métier, architecture/données, interface/sécurité/RGPD) ; rien n'est codé.
+
+**Décision du propriétaire** : *chaque ressource du catalogue doit avoir soit son **référent** (une personne), soit son **service référent*** — jamais aucun. Conséquences à cadrer : un champ obligatoire à la création de la ressource (comme l'avertissement actuel « aucun service émetteur » de `models/resource_rules.py`, mais bloquant) ; le « service » doit devenir une vraie liste de comptes titulaires (aujourd'hui `issuer_service` est un texte libre) ; sans titulaire joignable, repli sur les administrateurs.
+
+**Consensus des experts** : cloche dans l'application (sondage de 60 s déjà en place), pas d'e-mail en V1, aucune donnée personnelle dans le texte d'une notification (type + ressource + n° de dossier ; un profil « masqué » ne voit aucun nom), tâches visibles jusqu'à l'action, relance à J+3 puis escalade aux administrateurs à J+7, rétention 90 jours. Piège central : aucun marqueur « compte créé / à créer » n'existe dans les dossiers — c'est le vrai chantier. Architecture conseillée : tâches **calculées** à partir des dossiers + petite table de suivi (`notifications`, migration 9, `dotation.db`) ; événements ponctuels (version, sauvegarde) en `INSERT OR IGNORE` à clé unique ; nouveau droit `notifications.view` rattrapé par `PERMISSION_BACKFILLS`.
+
+**V1 proposée** : 4 sources — compte/accès à créer à l'attribution, compte à fermer à la restitution, inscription en attente, nouvelle version ou sauvegarde en échec. **Questions ouvertes** : seul dotelec ou aussi messagerie/badges/clés ; la création bloque-t-elle la signature ; qui est prévenu d'un compte à fermer ; un simple « Fait » ou la saisie de l'identifiant créé.
+
 ## Constats à traiter, issus de l'audit et de la pré-crise du 20/09 (non planifiés en version)
 
 | Sujet | Détail | Priorité |
