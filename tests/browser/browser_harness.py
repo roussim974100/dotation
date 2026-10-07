@@ -20,6 +20,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# Mot de passe du compte `admin` dans une instance de test (3.67.3 : le mot de passe d'origine `admin` obligerait à le changer au
+# premier usage, et le replacerait en « à changer » à chaque démarrage). Un test qui saisit le mot de passe d'admin l'importe d'ici.
+ADMIN_PASSWORD = "Harnais-Mot-2-Passe!"
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 
@@ -95,7 +98,7 @@ class Instance:
         import bcrypt
         users = sqlite3.connect(os.path.join(self.dir, "users.db"))
         users.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE username = 'admin'",
-                      (bcrypt.hashpw(b"Harnais-Mot-2-Passe!", bcrypt.gensalt()).decode(),))
+                      (bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode(),))
         users.commit()
         users.close()
 

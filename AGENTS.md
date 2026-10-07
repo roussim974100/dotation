@@ -86,6 +86,7 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 - **Ne jamais lancer `tests/_http_scenarios.py` à la main** : il crée, importe, répare des données. Sans `APP_DATA_DIR` il refuse de démarrer (depuis le 06/10) ; passer par `tests/test_http_endpoints.py`.
 - `RUN_BROWSER_TESTS=1 python -m pytest tests -q` : avec navigateur (~5 à 8 min).
 - `python tests/browser/check_<nom>.py` : scénarios navigateur isolés (serveur temporaire, base vierge, port 5055) ;
+  `check_*.py` = vrais tests (réussi/échec, code de sortie) ; `inspect_*.py` = outils d'inspection qui affichent l'état d'une **copie** de la base de développement (parc, fiche d'objet, contraste en mode sombre), sans verdict à ce jour ; un test qui saisit le mot de passe de `admin` importe `ADMIN_PASSWORD` du harnais (`browser_harness.py`) ;
   `tests/browser/browser_harness.py` (`Instance(copy_db=...)` pour travailler sur une **copie** d'une base).
 - Scénarios HTTP : `tests/_http_scenarios.py`, lus par `tests/test_http_endpoints.py`.
 
