@@ -19,6 +19,7 @@ from auth import (
     login_required, permission_required, admin_required,
     get_user_record, password_complexity_error, is_valid_username,
     current_user, rate_limit, realign_session_password,
+    is_account_locked, clear_account_failures,
     list_all_users, list_all_groups, update_group,
     create_user, update_user, delete_user, normalize_email,
 )
@@ -756,6 +757,7 @@ def admin_users():
             "username": user["username"],
             "groups": user.get("groups", []),
             "is_active": user.get("is_active", True),
+            "login_locked": is_account_locked(user["username"]),  # trop d'echecs de connexion : voir auth.is_account_locked
             "status": user.get("status", "active"),
             "service": user.get("service") or "",
             "email": user.get("email") or "",
@@ -1496,6 +1498,7 @@ def create_admin_user():
 
     if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email, first_name, last_name):
         return jsonify({"error": "failed_to_create_user"}), 500
+    update_user(username, must_change_password=1)  # l'administrateur connait ce mot de passe : la personne choisira le sien a sa premiere connexion
 
     with get_db() as connection:
         insert_app_log(
@@ -1561,7 +1564,9 @@ def update_admin_user(username):
         if complexity_error:
             return jsonify({"error": complexity_error}), 400
         update_fields["password_hash"] = bcrypt.hashpw(payload["password"].encode(), bcrypt.gensalt()).decode()
-        update_fields["must_change_password"] = 0  # mot de passe choisi par un administrateur : plus le mot de passe d'origine
+        # Un administrateur qui fixe le mot de passe D'UN AUTRE compte le connait : cette personne devra en choisir un nouveau a sa
+        # prochaine connexion. Sur son propre compte, il vient de le choisir lui-meme : rien a imposer.
+        update_fields["must_change_password"] = 0 if username == session.get("user") else 1
         password_changed = True
 
     if update_fields:
@@ -1586,6 +1591,21 @@ def update_admin_user(username):
             },
         )
     return jsonify({"updated": True})
+
+
+@bp.route("/api/admin/users/<username>/unlock", methods=["POST"])
+@login_required
+@permission_required("users.manage")
+def unlock_admin_user(username):
+    """Leve le blocage temporaire de connexion d'un compte (5 echecs en 15 min) sans attendre l'expiration."""
+    if not get_user_record(username):
+        return jsonify({"error": "not_found"}), 404
+    was_locked = is_account_locked(username)
+    clear_account_failures(username)
+    with get_db() as connection:
+        insert_app_log(connection, "security", "login_unblocked", "Blocage de connexion leve par un administrateur", "user", username,
+                       {"was_locked": was_locked}, actor=session.get("user"))
+    return jsonify({"unlocked": True, "was_locked": was_locked})
 
 
 @bp.route("/api/admin/users/<username>", methods=["DELETE"])

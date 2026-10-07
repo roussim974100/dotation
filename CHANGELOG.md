@@ -1,5 +1,21 @@
 # Historique des versions — À Quai
 
+## [Non publié] — Suite des notifications et sécurité des comptes (numéro de version à confirmer ; proposé : 3.72.0)
+
+### 🔔 Notifications
+- **Retrait d'une ressource par un ajustement → tâche « à fermer »** : quand un ajustement retire d'un dossier resté actif une ressource sans retour physique (compte, accès), le service émetteur reçoit la tâche, comme pour une restitution. L'ancienneté part du retrait. (Avant : seule la restitution la créait, donc un compte retiré par un ajustement n'était signalé à personne.)
+- **« Tâches des services » dans la fiche du dossier** : sous l'historique des ajustements, ce qui reste à faire (service, ancienneté, « en retard » / « escaladée ») puis ce qui est fait (**par qui, quand**). Aucune donnée sur la personne dans ce bloc ; rien d'affiché pour un dossier sans tâche ni pour qui ne peut pas lire le dossier. API : `GET /api/forms/<id>/service-tasks` (même droit que l'ouverture du dossier).
+
+### 🔒 Sécurité des comptes
+- **Verrouillage temporaire par compte** : 5 échecs de mot de passe en 15 minutes bloquent les tentatives sur ce compte (même avec le bon mot de passe, même depuis une autre adresse) jusqu'à ce que les échecs vieillissent. Complète la limite par adresse IP, qui ne voit pas un attaquant réparti sur plusieurs adresses. Seuls les échecs comptent (une connexion réussie remet à zéro) ; un identifiant inconnu se comporte exactement comme un compte connu (aucun moyen de deviner quels comptes existent) ; la clé du compteur est un **hachage** de l'identifiant tapé (jamais conservé en clair). Réglable : `APP_LOGIN_ACCOUNT_MAX_FAILURES` (5) et `APP_LOGIN_ACCOUNT_WINDOW_MINUTES` (15). Message clair sur la page de connexion.
+- **Débloquer** : la liste Admin > Comptes affiche « Connexion bloquée » et propose « Débloquer la connexion » (journalisé). Contrepartie connue de tout verrouillage : quelqu'un peut bloquer volontairement un compte en échouant exprès ; un autre administrateur le débloque, et la limite par adresse IP reste active.
+- **Mot de passe fixé par un administrateur** : à la création d'un compte et à la réinitialisation du mot de passe d'un **autre** compte, la personne doit en choisir un nouveau à sa première connexion (même fenêtre non fermable que pour `admin/admin`) — l'administrateur connaît ce mot de passe. Sur son propre compte, un administrateur n'est pas obligé de le rechanger. Le texte de la fenêtre le dit.
+
+### 🧪 Tests
+- `tests/test_login_account_lock.py` (16 cas), `tests/test_default_password_change.py` (+3), `tests/test_service_tasks.py` (+7 : ajustement, fiche) ; scénarios navigateur `check_login_lock.py` (7) et `check_fiche_taches.py` (9).
+- Fichiers : `backend/auth.py`, `backend/rate_store.py` (`count`, `clear`), `backend/routes/pages.py`, `backend/routes/admin.py`, `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `frontend/js/form-service-tasks.js`, `frontend/js/admin.js`, `frontend/js/login.js`, `frontend/js/config.js`, `frontend/js/ui.js`, `frontend/form.html`.
+
+
 ## [3.71.0] - 2026-10-06 — Notifications, lot 4 : retards, escalade, page « Mes tâches »
 
 ### 🔔 Relances, escalade et une page pour tout voir

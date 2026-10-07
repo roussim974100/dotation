@@ -1,14 +1,14 @@
 """Notifications et titulaires de service (voir models/notifications.py)."""
 from flask import Blueprint, jsonify, request, send_from_directory, session
 
-from auth import current_user, get_user_record, login_required, permission_required
+from auth import current_user, get_user_record, has_permission, login_required, permission_required
 from config import FRONTEND_DIR
 from database import get_db
 from models.audit import insert_app_log
 from models.notifications import (
     apply_service_assignments, clear_cache, open_tasks, service_referents, set_service_referents,
 )
-from models.service_tasks import mark_done, recently_done, reopen
+from models.service_tasks import form_service_tasks, mark_done, recently_done, reopen
 
 bp = Blueprint("notifications", __name__)
 
@@ -110,3 +110,15 @@ def service_task_reopen():
         clear_cache()
         tasks = open_tasks(connection, user)
     return jsonify({"reopened": True, "tasks": tasks, "count": len(tasks)})
+
+
+@bp.route("/api/forms/<form_id>/service-tasks", methods=["GET"])
+@login_required
+def form_service_tasks_route(form_id):
+    """Fiche d'un dossier : taches des services (a faire, faites par qui et quand). Meme droit que l'ouverture du dossier."""
+    if not has_permission("forms.read_detail"):
+        return jsonify({"error": "forbidden"}), 403
+    with get_db() as connection:
+        if not connection.execute("SELECT 1 FROM dotation_forms WHERE id = ?", (form_id,)).fetchone():
+            return jsonify({"error": "not_found"}), 404
+        return jsonify({"items": form_service_tasks(connection, form_id)})

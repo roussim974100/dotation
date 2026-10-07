@@ -64,7 +64,7 @@ def make_resource(issuer, requires_return, label=None):
 def make_dossier(codes, nom=None, status="active"):
     nom = nom or f"NOM{uid()}"
     resources = [{"id": index + 1, "code": code, "label": f"Libellé {code}", "category": "materiel", "requiresReturn": True, "selected": True,
-                  "fields": {}, "details": "", "assignedAt": "2026-10-01T09:00:00"} for index, code in enumerate(codes)]
+                  "fields": {}, "details": "Détail de test", "assignedAt": "2026-10-01T09:00:00"} for index, code in enumerate(codes)]
     body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": nom, "prenom": "Prénom", "qualite": "agent", "service": "DRH"},
             "resources": {"additional": resources}, "validation": {"signatureDataUrl": PNG, "rgpdAccepted": True},
             "workflow": {"status": status}, "meta": {}}
@@ -455,3 +455,119 @@ def test_la_page_mes_taches_exige_une_session():
     assert app.test_client().get("/tasks.html").status_code == 302  # renvoyée vers la connexion
     page = client_for("admin").get("/tasks.html")
     assert page.status_code == 200 and "Mes tâches" in page.get_data(as_text=True)
+
+
+# ---- ajustement d'un dossier actif : retrait → à fermer, ajout → à fournir -----------------------------------------------------
+
+def ajuster(form_id, retraits=(), ajouts=()):
+    body = {"retraits": [{"key": key, "state": "conforme"} for key in retraits], "ajouts": list(ajouts),
+            "signature": {"mode": "presentiel", "signatureDataUrl": PNG}}
+    return client_for("admin").patch(f"/api/forms/{form_id}/ajustement", json=body, headers=H)
+
+
+def test_retirer_un_compte_par_un_ajustement_cree_une_tache_a_fermer(equipe):
+    compte, materiel = make_resource(equipe["label"], False), make_resource(equipe["label"], True)
+    form_id, _ = make_dossier([compte, materiel])
+    for code in (compte, materiel):  # à l'attribution : à fournir
+        assert (form_id, code) in keys(tasks(equipe["titulaire"], KIND_PROVISION))
+    resp = ajuster(form_id, retraits=[compte, materiel])
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    with get_db() as c:
+        assert c.execute("SELECT status FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()[0] == "active"  # le dossier reste actif
+    notif.clear_cache()
+    deprovision = tasks(equipe["collegue"], KIND_DEPROVISION)
+    assert keys(deprovision) == {(form_id, compte)}  # le compte est à fermer ; le matériel est suivi par la restitution
+    assert (form_id, compte) not in keys(tasks(equipe["titulaire"], KIND_PROVISION))  # plus rien à fournir
+    assert (form_id, materiel) not in keys(tasks(equipe["titulaire"], KIND_PROVISION))
+    item = deprovision["items"][0]
+    assert item["age_days"] == 0 and item["late"] is False
+    done = client_for(equipe["titulaire"]).post("/api/service-tasks/done", json={"kind": KIND_DEPROVISION, "form_id": form_id, "item_key": compte}, headers=H)
+    assert done.status_code == 200
+    assert tasks(equipe["collegue"], KIND_DEPROVISION) is None
+
+
+def test_un_ajustement_qui_ajoute_une_ressource_cree_une_tache_a_fournir(equipe):
+    existant, nouveau = make_resource(equipe["label"], False), make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([existant])
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json={"kind": KIND_PROVISION, "form_id": form_id, "item_key": existant}, headers=H)
+    ajout = {"id": 9, "code": nouveau, "label": f"Libellé {nouveau}", "category": "materiel", "requiresReturn": True, "selected": True,
+             "fields": {}, "details": "Détail de test", "assignedAt": "2026-10-01T09:00:00"}
+    assert ajuster(form_id, ajouts=[ajout]).status_code == 200
+    notif.clear_cache()
+    assert (form_id, nouveau) in keys(tasks(equipe["titulaire"], KIND_PROVISION))      # la nouvelle ressource est à fournir
+    assert (form_id, existant) not in keys(tasks(equipe["titulaire"], KIND_PROVISION))  # l'ancienne était déjà faite
+
+
+def test_l_anciennete_d_un_retrait_par_ajustement_part_du_retrait(equipe):
+    compte = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([compte])
+    resp = ajuster(form_id, retraits=[compte])
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    with get_db() as c:
+        c.execute("UPDATE dotation_items SET returned_at = ? WHERE form_id = ? AND item_key = ?", (days_ago(4), form_id, compte))
+    notif.clear_cache()
+    item = item_of(equipe["titulaire"], KIND_DEPROVISION, form_id, compte)
+    assert item["age_days"] == 4 and item["late"] is True and item["escalated"] is False
+
+
+# ---- fiche du dossier : tâches des services (à faire, faites par qui et quand) ----------------------------------------------------
+
+def fiche(user, form_id):
+    return client_for(user).get(f"/api/forms/{form_id}/service-tasks")
+
+
+def test_la_fiche_montre_ce_qui_reste_a_faire_et_ce_qui_est_fait(equipe):
+    compte, materiel = make_resource(equipe["label"], False), make_resource(equipe["label"], True)
+    form_id, nom = make_dossier([compte, materiel], nom=f"LEROY{uid()}")
+    age_form(form_id, 4)
+    client_for(equipe["titulaire"]).post("/api/service-tasks/done", json={"kind": KIND_PROVISION, "form_id": form_id, "item_key": compte}, headers=H)
+    resp = fiche("admin", form_id)
+    assert resp.status_code == 200
+    items = resp.get_json()["items"]
+    open_items = [i for i in items if i["state"] == "open"]
+    done_items = [i for i in items if i["state"] == "done"]
+    assert len(open_items) == 1 and open_items[0]["kind"] == KIND_PROVISION and open_items[0]["service"] == equipe["label"]
+    assert open_items[0]["late"] is True and open_items[0]["age_days"] == 4 and open_items[0]["unattended"] is False
+    assert len(done_items) == 1 and done_items[0]["done_by"] == equipe["titulaire"] and done_items[0]["service"] == equipe["label"]
+    assert items.index(open_items[0]) < items.index(done_items[0])  # ce qui reste à faire d'abord
+    assert nom not in str(items)  # aucune donnée sur la personne
+
+
+def test_la_fiche_ne_liste_pas_l_historique_d_avant_les_notifications(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    with get_db() as c:
+        c.execute("INSERT OR REPLACE INTO service_task_done (kind, form_id, item_key, done_at, done_by, note) VALUES ('provision', ?, ?, ?, NULL, 'avant les notifications')",
+                  (form_id, code, days_ago(1)))
+    assert fiche("admin", form_id).get_json()["items"] == []  # fait avant les notifications : ni à faire, ni listé
+
+
+def test_la_fiche_montre_un_retrait_par_ajustement_puis_sa_fermeture(equipe):
+    compte = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([compte])
+    assert ajuster(form_id, retraits=[compte]).status_code == 200
+    notif.clear_cache()
+    kinds_open = [(i["state"], i["kind"]) for i in fiche("admin", form_id).get_json()["items"]]
+    assert ("open", KIND_DEPROVISION) in kinds_open
+    client_for(equipe["collegue"]).post("/api/service-tasks/done", json={"kind": KIND_DEPROVISION, "form_id": form_id, "item_key": compte}, headers=H)
+    final = [(i["state"], i["kind"]) for i in fiche("admin", form_id).get_json()["items"]]
+    assert ("done", KIND_DEPROVISION) in final and ("open", KIND_DEPROVISION) not in final
+
+
+def test_la_fiche_exige_le_droit_de_lecture_et_un_dossier_existant(equipe):
+    code = make_resource(equipe["label"], False)
+    form_id, _ = make_dossier([code])
+    assert app.test_client().get(f"/api/forms/{form_id}/service-tasks").status_code == 401
+    assert fiche("admin", "dossier_inconnu").status_code == 404
+    sans_droit = make_account("sansdroit", groups=())
+    with get_users_db() as users:
+        users.execute("INSERT OR REPLACE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES ('sans_lecture','S','','[]','full','x','x')")
+        users.execute("DELETE FROM user_groups WHERE username = ?", (sans_droit,))
+        users.execute("INSERT INTO user_groups (username, group_key) VALUES (?, 'sans_lecture')", (sans_droit,))
+    try:
+        assert fiche(sans_droit, form_id).status_code == 403
+    finally:
+        with get_users_db() as users:
+            users.execute("DELETE FROM user_groups WHERE group_key = 'sans_lecture'")
+            users.execute("DELETE FROM groups WHERE key = 'sans_lecture'")
+        delete_user(sans_droit)
