@@ -3,12 +3,13 @@
 // ce qui évite le flash du fallback local avant le vrai logo configuré.
 const BRANDING_CACHE_KEY = "appBrandingPublicCacheV1";
 // Numéro de version, IDENTIQUE dans toutes les branches (dev, preprod, prod) : l'environnement est décidé par le serveur.
-const APP_BUILD_VERSION = "3.72.0";
+const APP_BUILD_VERSION = "3.72.1";
 const APP_FIXED_NAME = "A quai";
 const APP_PRIMARY_LOGO_URL = "/assets/a-quai-logo.png";
 const COOKIECONSENT_VERSION = "3.1.0";
-const COOKIECONSENT_CSS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.css`;
-const COOKIECONSENT_JS_URL = `https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@${COOKIECONSENT_VERSION}/dist/cookieconsent.umd.js`;
+// Embarqués dans l'application (frontend/js/vendor, frontend/css/vendor) : aucun accès Internet requis.
+const COOKIECONSENT_CSS_URL = `/css/vendor/cookieconsent.css?v=${COOKIECONSENT_VERSION}`;
+const COOKIECONSENT_JS_URL = `/js/vendor/cookieconsent.umd.js?v=${COOKIECONSENT_VERSION}`;
 const CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1";
 const BRAND_THEME_PRESETS = {
   institutionnel: {
@@ -293,8 +294,19 @@ function ensureAppFooter() {
   targetBody.appendChild(footer);
 
   footer.querySelector(".app-footer__cookies")?.addEventListener("click", async () => {
-    const CookieConsent = await bootCookieConsent();
-    CookieConsent?.showPreferences?.();
+    try {
+      const CookieConsent = await bootCookieConsent();
+      CookieConsent.showPreferences();
+    } catch (error) {
+      console.error("cookieconsent_open_failed", error);
+      cookieConsentBootPromise = null; // permet de réessayer au clic suivant
+      const message = "La fenêtre des cookies n'a pas pu s'ouvrir. Rechargez la page (Ctrl+F5) et réessayez.";
+      if (typeof showToast === "function") {
+        showToast(message, "error");
+      } else {
+        window.alert(message);
+      }
+    }
   });
 }
 
@@ -536,18 +548,39 @@ function loadCookieConsentScript() {
   });
 }
 
+// Durée de vie du cookie de session, telle que le serveur l'applique (durée maximale depuis la connexion ET inactivité) : lue dans les
+// réglages publics, avec les valeurs par défaut du serveur si la lecture échoue.
+async function describeSessionCookieLifetime() {
+  let maxHours = 12;
+  let idleMinutes = 60;
+  try {
+    const response = await fetch("/api/settings/public", { credentials: "same-origin", cache: "no-store" });
+    if (response.ok) {
+      const session = (await response.json()).session || {};
+      maxHours = Number(session.maxHours) || maxHours;
+      idleMinutes = Number(session.idleMinutes) || idleMinutes;
+    }
+  } catch (error) {
+    /* valeurs par défaut */
+  }
+  const hours = `${maxHours} heure${maxHours > 1 ? "s" : ""}`;
+  const idle = idleMinutes % 60 === 0 && idleMinutes >= 60 ? `${idleMinutes / 60} heure${idleMinutes > 60 ? "s" : ""}` : `${idleMinutes} minutes`;
+  return `${hours} au maximum depuis la connexion, et fermeture après ${idle} sans activité`;
+}
+
 async function bootCookieConsent() {
   if (cookieConsentBootPromise) {
     return cookieConsentBootPromise;
   }
 
   ensureCookieConsentStylesheet();
-  cookieConsentBootPromise = loadCookieConsentScript().then((CookieConsent) => {
+  cookieConsentBootPromise = loadCookieConsentScript().then(async (CookieConsent) => {
     if (!CookieConsent?.run) {
       throw new Error("cookieconsent_unavailable");
     }
+    const sessionLifetimeText = await describeSessionCookieLifetime();
 
-    CookieConsent.run({
+    await CookieConsent.run({
       root: document.body,
       mode: "opt-in",
       cookie: {
@@ -612,7 +645,7 @@ async function bootCookieConsent() {
                 },
                 {
                   title: "D\u00e9tails techniques",
-                  description: "<ul class=\"cc-cookie-details\"><li><strong>publier_session</strong> : cookie indispensable pour l'authentification et la s\u00e9curit\u00e9. Dur\u00e9e : session navigateur.</li><li><strong>dotation_cookie_preferences</strong> : m\u00e9morise votre choix de consentement. Dur\u00e9e : 180 jours.</li><li><strong>dotation_client_context_v1</strong> : m\u00e9morise, avec votre accord, le type de poste, le navigateur, l'IP LAN si disponible et l'IP WAN vue par le serveur. Dur\u00e9e : 7 jours.</li></ul>"
+                  description: "<ul class=\"cc-cookie-details\"><li><strong>publier_session</strong> : cookie indispensable pour l'authentification et la s\u00e9curit\u00e9. Dur\u00e9e : " + sessionLifetimeText + ".</li><li><strong>dotation_cookie_preferences</strong> : m\u00e9morise votre choix de consentement. Dur\u00e9e : 180 jours.</li><li><strong>dotation_client_context_v1</strong> : m\u00e9morise, avec votre accord, le type de poste, le navigateur, l'IP LAN si disponible et l'IP WAN vue par le serveur. Dur\u00e9e : 7 jours.</li></ul>"
                 }
               ]
             }

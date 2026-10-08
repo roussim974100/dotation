@@ -403,6 +403,13 @@ def get_dpo_email(settings=None):
     return settings.get("dpo_email") or DEFAULT_APP_SETTINGS["dpo_email"]
 
 
+def _session_durations():
+    """Durees REELLES de la session (variables APP_SESSION_MAX_HOURS / APP_SESSION_IDLE_MINUTES) : la fenetre des cookies ne doit pas
+    annoncer autre chose que ce que fait le serveur."""
+    import auth
+    return {"maxHours": auth.SESSION_MAX_HOURS, "idleMinutes": auth.SESSION_IDLE_MINUTES}
+
+
 def build_public_settings_payload(settings=None):
     settings = settings or get_app_settings()
     theme_id = resolve_theme_id(settings)
@@ -431,6 +438,7 @@ def build_public_settings_payload(settings=None):
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
         "timezone": settings.get("timezone") or DEFAULT_APP_SETTINGS["timezone"],
+        "session": _session_durations(),  # affichees dans la fenetre des cookies (frontend/js/branding.js)
         "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),
     }
 
