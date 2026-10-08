@@ -1,4 +1,5 @@
-"""Verrouillage temporaire par compte : la personne bloquée voit un message clair sur la page de connexion ; l'administrateur voit
+"""(Désactivé par défaut depuis le 08/10/2026 ; activé ici par APP_LOGIN_ACCOUNT_MAX_FAILURES.)
+Verrouillage temporaire par compte : la personne bloquée voit un message clair sur la page de connexion ; l'administrateur voit
 « Connexion bloquée » dans la liste des comptes et la lève (« Débloquer la connexion ») ; la personne se connecte ensuite.
 Instance isolée, base vierge ; les échecs sont posés directement dans le compteur de l'instance.
     python tests/browser/check_login_lock.py
@@ -46,7 +47,7 @@ def se_connecter(driver, inst, username, password):
     time.sleep(2)
 
 
-with Instance() as inst:
+with Instance(env={"APP_LOGIN_ACCOUNT_MAX_FAILURES": "5"}) as inst:  # désactivé par défaut : on l'active pour cette instance
     users = sqlite3.connect(os.path.join(inst.dir, "users.db"))
     users.execute("INSERT INTO users (username, password_hash, is_active, status, created_at, updated_at) VALUES ('bloque_e2e', ?, 1, 'active', 'x', 'x')",
                   (bcrypt.hashpw(BON.encode(), bcrypt.gensalt()).decode(),))

@@ -1,4 +1,5 @@
-"""Verrouillage temporaire PAR COMPTE : 5 échecs en 15 minutes bloquent les tentatives sur ce compte (même avec le bon mot de passe,
+"""(DÉSACTIVÉ PAR DÉFAUT depuis le 08/10/2026 : ces tests l'activent explicitement ; voir `test_desactive_par_defaut`.)
+Verrouillage temporaire PAR COMPTE : 5 échecs en 15 minutes bloquent les tentatives sur ce compte (même avec le bon mot de passe,
 même depuis une autre adresse), une connexion réussie remet à zéro, les identifiants inconnus se comportent pareil (aucune
 énumération), et rien de ce qui est tapé dans le champ identifiant n'est conservé en clair. Base temporaire (tests/conftest.py)."""
 import hashlib
@@ -10,15 +11,19 @@ import pytest
 import auth
 import rate_store
 from app import app
-from auth import ACCOUNT_MAX_FAILURES, create_user, delete_user
+from auth import create_user, delete_user
 from database import get_db, get_users_db
 
 BON = "Mot-2-Passe-Verrou1!"
 
 
+ACCOUNT_MAX_FAILURES = 5
+
+
 @pytest.fixture(autouse=True)
-def sans_limite_par_adresse(monkeypatch):
-    """On teste le verrouillage par COMPTE : la limite par adresse IP (10 / 10 min) ne doit pas s'en mêler."""
+def verrouillage_actif_sans_limite_par_adresse(monkeypatch):
+    """On teste le verrouillage par COMPTE, activé ici (il ne l'est pas par défaut) ; la limite par adresse IP (10 / 10 min) ne doit pas s'en mêler."""
+    monkeypatch.setattr(auth, "ACCOUNT_MAX_FAILURES", ACCOUNT_MAX_FAILURES)
     monkeypatch.setattr("routes.pages._is_login_rate_limited", lambda key: False)
 
 
@@ -184,3 +189,28 @@ def test_debloquer_exige_le_droit_et_un_compte_existant(compte):
     assert other.post(f"/api/admin/users/{compte}/unlock", json={}, headers=H).status_code == 403
     assert admin_client().post("/api/admin/users/inexistant_xyz/unlock", json={}, headers=H).status_code == 404
     assert app.test_client().post(f"/api/admin/users/{compte}/unlock", json={}, headers=H).status_code == 401
+
+
+def test_desactive_par_defaut(monkeypatch, compte):
+    """Décision du propriétaire : pas de verrouillage tant qu'on ne l'active pas (APP_LOGIN_ACCOUNT_MAX_FAILURES)."""
+    monkeypatch.setattr(auth, "ACCOUNT_MAX_FAILURES", 0)
+    assert auth.account_lock_enabled() is False
+    echouer(compte, 20)  # bien au-delà de n'importe quelle limite
+    assert auth.is_account_locked(compte) is False
+    assert not tenter(compte, BON).startswith("/login?error=")  # le bon mot de passe passe toujours
+    listed = {u["username"]: u for u in admin_client().get("/api/admin/users").get_json()}
+    assert listed[compte]["login_locked"] is False
+
+
+def test_la_valeur_par_defaut_du_module_est_zero():
+    """Sans la variable d'environnement, le module est configuré « désactivé » (le fixture ci-dessus l'active pour les autres tests)."""
+    import importlib
+    import os
+    saved = os.environ.pop("APP_LOGIN_ACCOUNT_MAX_FAILURES", None)
+    try:
+        source = open(auth.__file__, encoding="utf-8").read()
+        assert 'os.environ.get("APP_LOGIN_ACCOUNT_MAX_FAILURES", "0")' in source
+    finally:
+        if saved is not None:
+            os.environ["APP_LOGIN_ACCOUNT_MAX_FAILURES"] = saved
+        importlib.invalidate_caches()

@@ -15,12 +15,13 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 **Avant la mise en production** : sauvegarde de la base ; prévenir les utilisateurs qu'ils devront **se reconnecter une fois** ; rattacher les ressources aux services et saisir les titulaires **avant** de compter sur les notifications (sans titulaire, tout retombe sur les administrateurs) ; faire changer les mots de passe `admin` restants.
 
 **Suite conseillée, dans l'ordre**
-1. ✅ **Retrait d'une ressource par un ajustement → tâche « à fermer »** (codé le 07/10, non publié, voir CHANGELOG « Non publié »).
+1. ✅ **Retrait d'une ressource par un ajustement → tâche « à fermer »** (3.72.0, 07/10).
 2. ✅ **« Tâches des services » avec « Fait par X le … » dans la fiche du dossier** (3.72.0, 07/10).
 3. ✅ **Scénarios navigateur** remis au vert (07/10) : 28 `check_*` passent ; `inspect_*` = outils d'inspection sur copie de base.
-4. 🟡 **Sécurité P2** : ✅ verrouillage temporaire par compte + « Débloquer la connexion » ; ✅ changement forcé après création / réinitialisation par un administrateur (3.72.0, 07/10). **Reste** : MFA (TOTP) pour les administrateurs ; liste des sessions actives (exige un registre de sessions côté serveur, aujourd'hui le cookie est sans état) — **décisions de conception à prendre avec le propriétaire avant de commencer**.
-5. **Reste de l'ajustement** : PDF de l'ajustement, e-mail de la fiche de retraits, QR code sur les restitutions après « Enregistrer en attente » — **à cadrer avec le propriétaire** (mise en page du PDF, contenu de l'e-mail).
-6. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
+4. 🟡 **Sécurité P2** : ✅ changement forcé après création / réinitialisation par un administrateur (3.72.0). **Verrouillage temporaire par compte : codé mais DÉSACTIVÉ par défaut, reporté** (décision du propriétaire le 08/10 : un verrouillage permet de bloquer volontairement un compte ; à reprendre plus tard, p. ex. avec un délai croissant entre les essais plutôt qu'un blocage dur ; activable par `APP_LOGIN_ACCOUNT_MAX_FAILURES=5`). **MFA : écarté pour le moment** (décision du 08/10). Reste possible : liste des sessions actives (registre de sessions côté serveur).
+5. **Reste de l'ajustement** : ✅ PDF de l'ajustement et ✅ e-mail (3.72.0, 08/10). Reste : QR code sur les restitutions après « Enregistrer en attente » — **à cadrer avec le propriétaire**.
+6. P2 noté le 08/10 : **les heures des PDF sont affichées en UTC** (`format_export_datetime`, 30 usages), sans conversion en heure locale : l'heure d'une signature peut sembler décalée de 1 à 2 h par rapport à l'en-tête du document.
+7. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
 
 **Pièges appris pendant cette série** (détail dans `AGENTS.md` §4 et §7) : ne jamais lancer `tests/_http_scenarios.py` à la main (il a écrasé la base locale le 06/10) ; les sessions posées à la main dans un test passent par `tests/_stamped_client.py` ; le harnais navigateur donne à `admin` un autre mot de passe (sinon `admin/admin` est reflaggé) ; `/api/forms` est limité à 30 créations par minute (neutraliser dans un test qui en crée beaucoup) ; une ressource ne se crée plus sans service du catalogue ; les scénarios qui modifient la base directement règlent `APP_NOTIFICATIONS_CACHE_SECONDS=1`.
 

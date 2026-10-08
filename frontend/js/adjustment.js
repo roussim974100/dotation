@@ -110,9 +110,38 @@ function renderAdjustmentHistory(container, events) {
           <div class="d-flex justify-content-between gap-2"><strong>${adjEsc(when)}</strong><span class="badge text-bg-secondary">${adjEsc(ADJUSTMENT_STATUS_LABELS[event.status] || event.status)}${substitute}</span></div>
           <div class="small">${describeAdjustment(event).map(adjEsc).join("<br>")}</div>
           <div class="small text-muted">par ${adjEsc(event.by || "—")}</div>
+          <div class="mt-2 d-none" data-adjustment-documents>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-adjustment-pdf="${adjEsc(event.id)}" data-keep-enabled>Télécharger le PDF</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-adjustment-email="${adjEsc(event.id)}" data-keep-enabled>Envoyer par e-mail</button>
+          </div>
         </li>`;
       }).join("")}
     </ul>`;
+  wireAdjustmentDocuments(container);
+}
+
+// PDF et e-mail d'un ajustement : même droit que les autres exports (jamais pour un profil à données masquées).
+async function wireAdjustmentDocuments(container) {
+  const dossierId = new URLSearchParams(window.location.search).get("id");
+  if (!dossierId) {
+    return;
+  }
+  let allowed = false;
+  try {
+    allowed = canExportUnmasked(await getSessionInfo());
+  } catch (error) {
+    allowed = false;
+  }
+  if (!allowed) {
+    return;
+  }
+  container.querySelectorAll("[data-adjustment-documents]").forEach((block) => block.classList.remove("d-none"));
+  container.querySelectorAll("[data-adjustment-pdf]").forEach((button) => {
+    button.addEventListener("click", () => exportAdjustmentPdf(dossierId, button.dataset.adjustmentPdf));
+  });
+  container.querySelectorAll("[data-adjustment-email]").forEach((button) => {
+    button.addEventListener("click", () => prepareAdjustmentPdfEmail(dossierId, button.dataset.adjustmentEmail));
+  });
 }
 
 // ── Champs d'une ressource ajoutée (mêmes types que la fiche : texte, nombre, date, liste, choix, case à cocher, liste de valeurs) ──

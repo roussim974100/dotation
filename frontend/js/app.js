@@ -1414,7 +1414,8 @@ function applyLockState(locked) {
       return;
     }
     // Boutons qui doivent rester accessibles sur dossier verrouillé
-    if (element.hasAttribute("data-back-to-index") || element.id === "showSignatureBtn") {
+    // data-keep-enabled : consultation / export qui ne modifie rien (ex. PDF et e-mail d'un ajustement dans l'historique)
+    if (element.hasAttribute("data-back-to-index") || element.hasAttribute("data-keep-enabled") || element.id === "showSignatureBtn") {
       element.disabled = false;
       return;
     }
