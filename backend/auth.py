@@ -162,54 +162,37 @@ def delete_user(username):
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting login : max 10 tentatives par IP sur une fenetre glissante de 10 minutes.
+# Limitation des connexions par adresse IP : 10 echecs -> adresse bloquee 15 minutes (voir ci-dessous).
 # ---------------------------------------------------------------------------
 
-_LOGIN_MAX_ATTEMPTS = 10
-_LOGIN_WINDOW_SECONDS = 600
+# Seuil et duree de blocage d'une ADRESSE IP : N echecs de connexion -> plus aucune tentative depuis cette adresse pendant la duree du
+# blocage (15 min). Seuls les ECHECS comptent (mot de passe faux, identifiant inconnu, jeton CSRF invalide, compte inactif) : une
+# connexion reussie ne compte pas, donc un poste partage ou un kiosque n'est pas penalise. On bloque l'ADRESSE de celui qui insiste,
+# jamais le compte de sa cible : personne ne peut empecher un collegue de se connecter en tapant de faux mots de passe a sa place.
+# La cle est l'adresse vue par le serveur (corrigee par ProxyFix selon les proxys de confiance), jamais un en-tete fourni par le client.
+# APP_LOGIN_IP_MAX_FAILURES=0 desactive la limitation.
+LOGIN_IP_MAX_FAILURES = int(os.environ.get("APP_LOGIN_IP_MAX_FAILURES", "10"))
+LOGIN_IP_BLOCK_SECONDS = int(os.environ.get("APP_LOGIN_IP_BLOCK_MINUTES", "15")) * 60
+_LOGIN_FAILURE_SCOPE = "login_fail_ip"
+_LOGIN_BLOCK_SCOPE = "login_ip_block"
 
 
 def _is_login_rate_limited(ip: str) -> bool:
-    return rate_store.hit("login", ip, _LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
+    """Cette adresse est-elle bloquee en ce moment ? (lecture seule : une tentative refusee ne prolonge pas le blocage)"""
+    return rate_store.count(_LOGIN_BLOCK_SCOPE, ip, LOGIN_IP_BLOCK_SECONDS) > 0
 
 
-# ---------------------------------------------------------------------------
-# Verrouillage temporaire PAR COMPTE : N echecs en 15 min -> plus aucune tentative sur ce compte jusqu'a ce que les echecs vieillissent.
-# Complete la limite par adresse IP (qui ne voit pas un attaquant reparti sur plusieurs adresses). Seuls les ECHECS comptent (une
-# connexion reussie remet a zero), et la cle est un hachage de l'identifiant tape : on ne conserve jamais ce qui a ete saisi dans le
-# champ identifiant (un mot de passe tape par erreur ici a deja fini au journal, cf. 3.62.1). S'applique aussi aux identifiants
-# inconnus : le message est le meme, aucun moyen de deviner quels comptes existent.
-# ---------------------------------------------------------------------------
-
-# DESACTIVE PAR DEFAUT (decision du proprietaire, 08/10/2026) : un verrouillage permet de bloquer volontairement un compte en echouant
-# expres. Le code reste, a activer plus tard avec APP_LOGIN_ACCOUNT_MAX_FAILURES=5 (0 = pas de verrouillage).
-ACCOUNT_MAX_FAILURES = int(os.environ.get("APP_LOGIN_ACCOUNT_MAX_FAILURES", "0"))
-ACCOUNT_WINDOW_SECONDS = int(os.environ.get("APP_LOGIN_ACCOUNT_WINDOW_MINUTES", "15")) * 60
-_ACCOUNT_SCOPE = "login_fail_account"
-
-
-def _account_key(username):
-    return hashlib.sha256(str(username or "").strip().lower().encode("utf-8")).hexdigest()[:24]
-
-
-def account_lock_enabled():
-    return ACCOUNT_MAX_FAILURES > 0
-
-
-def is_account_locked(username):
-    if not account_lock_enabled():
+def record_login_failure(ip: str) -> bool:
+    """Compte un echec de connexion pour cette adresse ; au seuil, la bloque pour LOGIN_IP_BLOCK_SECONDS et remet son compteur a zero.
+    Retourne True si l'adresse vient d'etre bloquee."""
+    if LOGIN_IP_MAX_FAILURES <= 0:
         return False
-    return rate_store.count(_ACCOUNT_SCOPE, _account_key(username), ACCOUNT_WINDOW_SECONDS) >= ACCOUNT_MAX_FAILURES
-
-
-def record_account_failure(username):
-    if not account_lock_enabled():
-        return  # fonction desactivee : on ne conserve meme pas les echecs
-    rate_store.hit(_ACCOUNT_SCOPE, _account_key(username), 10 ** 9, ACCOUNT_WINDOW_SECONDS)  # on enregistre ; la decision se prend avec count()
-
-
-def clear_account_failures(username):
-    rate_store.clear(_ACCOUNT_SCOPE, _account_key(username))
+    rate_store.hit(_LOGIN_FAILURE_SCOPE, ip, 10 ** 9, LOGIN_IP_BLOCK_SECONDS)  # on enregistre ; la decision se prend avec count()
+    if rate_store.count(_LOGIN_FAILURE_SCOPE, ip, LOGIN_IP_BLOCK_SECONDS) < LOGIN_IP_MAX_FAILURES:
+        return False
+    rate_store.hit(_LOGIN_BLOCK_SCOPE, ip, 10 ** 9, LOGIN_IP_BLOCK_SECONDS)  # debut du blocage
+    rate_store.clear(_LOGIN_FAILURE_SCOPE, ip)  # a la fin du blocage on repart de zero
+    return True
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, get_rate_limit_key, extract_first_forwarded_ip, check_user,
-    start_session, realign_session_password, is_account_locked, record_account_failure, clear_account_failures,
+    start_session, realign_session_password, record_login_failure, LOGIN_IP_BLOCK_SECONDS,
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
@@ -60,28 +60,30 @@ def build_login_forensic_details(username, auth_state):
 # Auth
 # ---------------------------------------------------------------------------
 
+def _count_login_failure(ip):
+    """Un echec de connexion de plus pour cette adresse ; au seuil elle est bloquee et le blocage est journalise (l'adresse seulement :
+    jamais l'identifiant ni le mot de passe tapes)."""
+    if record_login_failure(ip):
+        with get_db() as connection:
+            insert_app_log(connection, "security", "login_ip_blocked", "Adresse bloquee : trop d'echecs de connexion", "ip", ip,
+                           {"ip": ip, "minutes": LOGIN_IP_BLOCK_SECONDS // 60}, actor="anonymous")
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if _is_login_rate_limited(get_rate_limit_key()):
-            return redirect("/login?error=rate_limited")
+        ip = get_rate_limit_key()
+        if _is_login_rate_limited(ip):
+            return redirect("/login?error=rate_limited")  # adresse bloquee (10 echecs, 15 min) : on ne verifie meme plus les identifiants
         submitted_token = request.form.get("csrf_token") or ""
         if not submitted_token or not secrets.compare_digest(submitted_token, session.get("csrf_token", "")):
+            _count_login_failure(ip)
             return redirect("/login?error=invalid")
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
-        if is_account_locked(username):
-            # Trop d'echecs sur ce compte : on ne verifie meme plus le mot de passe (un attaquant ne peut pas deviner pendant le blocage).
-            with get_db() as connection:
-                insert_app_log(connection, "security", "login_blocked", "Connexion refusee : trop d'echecs sur le compte", "user",
-                               loggable_login_identifier(username), build_login_forensic_details(username, "account_locked"), actor="anonymous")
-            return redirect("/login?error=account_locked")
         auth_state = check_user(username, password)
-        if auth_state == "invalid":
-            record_account_failure(username)
 
         if auth_state == "ok":
-            clear_account_failures(username)
             start_session(username)
             with get_db() as connection:
                 insert_app_log(
@@ -99,6 +101,7 @@ def login():
             settings = get_app_settings()
             setup_completed = settings.get("setup_completed", "0") == "1"
             return redirect("/setup.html" if not setup_completed else "/")
+        _count_login_failure(ip)
         with get_db() as connection:
             insert_app_log(
                 connection,

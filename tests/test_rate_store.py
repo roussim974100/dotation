@@ -47,8 +47,14 @@ def test_falls_back_to_memory_when_the_database_is_unusable(tmp_path):
 
 
 def test_login_uses_the_shared_store(monkeypatch):
+    """Le blocage d'adresse (3.72.1) passe par le compteur PARTAGE entre les processus : lire ne compte rien, un échec enregistre."""
     import auth
     calls = []
+    reads = []
+    monkeypatch.setattr(auth.rate_store, "count", lambda scope, key, window, **kwargs: reads.append((scope, key, window)) or 0)
     monkeypatch.setattr(auth.rate_store, "hit", lambda *args, **kwargs: calls.append(args) or False)
+    monkeypatch.setattr(auth.rate_store, "clear", lambda *args, **kwargs: None)
     assert auth._is_login_rate_limited("4.4.4.4") is False
-    assert calls == [("login", "4.4.4.4", 10, 600)]
+    assert reads == [("login_ip_block", "4.4.4.4", auth.LOGIN_IP_BLOCK_SECONDS)] and calls == []  # savoir si une adresse est bloquée ne compte rien
+    assert auth.record_login_failure("4.4.4.4") is False  # un échec : enregistré dans le compteur partagé, pas encore de blocage
+    assert calls == [("login_fail_ip", "4.4.4.4", 10 ** 9, auth.LOGIN_IP_BLOCK_SECONDS)]
