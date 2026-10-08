@@ -36,8 +36,7 @@ function applyLoginMessages() {
     session: getAppText("login.errorSession", "Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion). Reconnectez-vous ; si cela se répète, vérifiez les cookies du navigateur."),
     pending: getAppText("login.errorPending", "Votre compte est en attente de validation par un administrateur."),
     disabled: getAppText("login.errorDisabled", "Votre compte est désactivé. Rapprochez-vous d'un administrateur."),
-    account_locked: getAppText("login.errorAccountLocked", "Trop d'échecs sur ce compte. Par sécurité, réessayez dans quelques minutes (15 minutes au plus)."),
-    rate_limited: getAppText("login.errorRateLimited", "Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.")
+    rate_limited: getAppText("login.errorRateLimited", "Trop de tentatives de connexion échouées depuis cette adresse. Par sécurité, réessayez dans 15 minutes.")
   };
 
   const noticeMessages = {

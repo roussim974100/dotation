@@ -1,10 +1,10 @@
 # À Quai — Gestion des dotations matérielles
 
-> **À Quai** — version `3.72.0`. La même version se **promeut** de `dev` (développement) à `preprod` (préproduction) puis à `prod` (production) : l'environnement d'un serveur est défini par son script de déploiement, pas par les fichiers.
+> **À Quai** — version `3.72.1`. La même version se **promeut** de `dev` (développement) à `preprod` (préproduction) puis à `prod` (production) : l'environnement d'un serveur est défini par son script de déploiement, pas par les fichiers.
 > Pour **déployer ou mettre à jour** : `sudo bash deploy.sh` (production, branche [`prod`](https://github.com/roussim974100/dotation/tree/prod)), `sudo bash deploy-preprod.sh` (préproduction, branche `preprod`) ou `sudo bash deploy-dev.sh` (développement, branche `dev`) — voir [Mise à jour en production](#mise-à-jour-en-production).
 > Nouveautés depuis la 3.18 : voir le [CHANGELOG](CHANGELOG.md). Pour contribuer : section [Développement local](#développement-local) en bas de page.
 
-**Version :** `3.72.0` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
+**Version :** `3.72.1` | **Stack :** Flask · SQLite · Vanilla JS | **Licence :** usage interne  
 **Statut :** voir l'environnement (pastille DEV / PREPROD, absente en production) | **Dernière MAJ :** 29 septembre 2026
 
 ---
@@ -614,6 +614,8 @@ Pour revenir en arrière : arrêter le service, recopier les fichiers de `backen
 
 # Avancé
 
+> **Intranet sans Internet** : l'application n'appelle aucun serveur externe pour s'afficher (Bootstrap, Chart.js, CookieConsent et le générateur de QR sont embarqués dans `frontend/`, voir `frontend/js/vendor/README.md`). Seules la vérification « nouvelle version » (`APP_UPDATE_CHECK=0` pour la couper) et les sauvegardes vers un partage éventuel sortent du serveur.
+
 ## Variables d'environnement
 
 | Variable | Par défaut | Utilité |
@@ -628,6 +630,13 @@ Pour revenir en arrière : arrêter le service, recopier les fichiers de `backen
 | `APP_UPDATE_CHECK_URL` | GitHub, branche du canal | Adresse (http/https) du fichier `branding.js` à interroger, pour un miroir interne |
 | `APP_ALLOW_WEB_UPDATE` | `0` | Posé par `setup/install-web-update.sh` : affiche le bouton de mise à jour (exige l'unité systemd installée) |
 | `APP_TRUSTED_PROXIES` | automatique | Surcharge **facultative** de la confiance dans `X-Forwarded-*` : `0` = jamais, `N` = forcer N proxys (proxy à IP publique). Voir « Adresse IP des clients » |
+| `APP_SESSION_MAX_HOURS` | `12` | Durée maximale d'une session depuis la connexion (le cookie `publier_session` expire avec elle) |
+| `APP_SESSION_IDLE_MINUTES` | `60` | Inactivité après laquelle la session est fermée par le serveur |
+| `APP_LOGIN_IP_MAX_FAILURES` | `10` | Échecs de connexion depuis une même adresse avant son blocage (`0` = désactivé) |
+| `APP_LOGIN_IP_BLOCK_MINUTES` | `15` | Durée du blocage d'une adresse après trop d'échecs de connexion |
+| `APP_TASK_LATE_DAYS` | `3` | Jours avant qu'une tâche de service soit « en retard » |
+| `APP_TASK_ESCALATE_DAYS` | `7` | Jours avant qu'une tâche de service soit portée à la connaissance des administrateurs |
+| `APP_NOTIFICATIONS_CACHE_SECONDS` | `30` | Durée de mise en cache des tâches de service par compte (le cache est vidé à chaque enregistrement de dossier) |
 
 Exemple au démarrage du service :
 

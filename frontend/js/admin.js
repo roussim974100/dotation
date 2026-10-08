@@ -965,17 +965,13 @@ function renderUserTable() {
     const menuItems = user.status === "pending"
       ? []
       : [{ label: user.is_active ? "Désactiver" : "Activer", attrs: `data-admin-action="toggleUserState" data-username="${username}" data-active="${user.is_active ? "false" : "true"}"` }];
-    if (user.login_locked) {
-      menuItems.unshift({ label: "Débloquer la connexion", attrs: `data-admin-action="unlockUser" data-username="${username}"` });
-    }
-    const lockedChip = user.login_locked ? ' <span class="status-chip status-chip--cancelled">Connexion bloquée</span>' : "";
     const rowMenu = renderAdminRowMenu(menuItems, { label: "Supprimer", attrs: `data-admin-action="deleteUser" data-username="${username}"` });
     return `
       <tr>
         <td data-label="Utilisateur">${escapeHtml(user.username)}${(user.first_name || user.last_name) ? `<div class="draft-meta">${escapeHtml(`${user.first_name || ""} ${user.last_name || ""}`.trim())}</div>` : ""}${user.email ? `<div class="draft-meta">${escapeHtml(user.email)}</div>` : ""}</td>
         <td data-label="Groupes">${escapeHtml((user.groups || []).join(", ") || "-")}</td>
         <td data-label="Service">${escapeHtml(user.service || "—")}</td>
-        <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span>${lockedChip}</td>
+        <td data-label="État"><span class="status-chip status-chip--${statusMeta.code}">${statusMeta.label}</span></td>
         <td data-label="Actions" class="text-end">
           <div class="draft-actions">
             ${approveButton}
@@ -1038,16 +1034,6 @@ async function saveUser() {
 
   resetUserForm();
   await loadUsers();
-}
-
-async function unlockUser(username) {
-  try {
-    await adminRequest(`/api/admin/users/${encodeURIComponent(username)}/unlock`, { method: "POST", body: JSON.stringify({}) });
-    showToast(`La connexion de ${username} est débloquée.`);
-    await loadUsers();
-  } catch (error) {
-    showToast(`Impossible de débloquer : ${error.message}`, "error");
-  }
 }
 
 async function toggleUserState(username, nextState) {
@@ -1513,7 +1499,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     else if (action === "toggleUserState") toggleUserState(username, active === "true");
     else if (action === "populateUserForm") populateUserForm(username);
     else if (action === "deleteUser") deleteUser(username);
-    else if (action === "unlockUser") unlockUser(username);
     else if (action === "populateServiceForm") populateServiceForm(id);
     else if (action === "toggleServiceState") toggleServiceState(id, active === "true");
     else if (action === "deleteService") deleteService(id);

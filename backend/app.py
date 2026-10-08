@@ -137,16 +137,17 @@ def disable_frontend_cache(response):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-    # CSP : self uniquement + CDN Bootstrap/CookieConsent autorisés explicitement
+    # CSP : self uniquement. Bootstrap, Chart.js, CookieConsent et le QR code sont embarqués (frontend/js/vendor, frontend/css/vendor) :
+    # l'application ne contacte aucun serveur externe pour s'afficher (intranet sans Internet).
     # unsafe-inline nécessaire pour les styles Bootstrap injectés dynamiquement
     response.headers.setdefault(
         "Content-Security-Policy",
         (
             "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https:; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
+            "font-src 'self'; "
             "connect-src 'self'; "
             "frame-ancestors 'self'"
         ),

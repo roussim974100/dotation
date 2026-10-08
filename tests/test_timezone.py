@@ -125,3 +125,48 @@ def test_le_pdf_d_un_ajustement_affiche_l_heure_locale():
     text = "\n".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(build_adjustment_pdf_bytes(payload, "a1"))).pages)
     assert "08/10/2026 09:03" in text and "08/10/2026 09:05" in text  # et non 07:03 / 07:05 (UTC)
     assert "07:03" not in text
+
+
+# ---- le fuseau est écrit à côté d'un INSTANT (signature, ajustement) ------------------------------------------------------------
+
+from utils import format_export_instant, get_restitution_signature_datetime, get_signature_datetime  # noqa: E402
+
+
+def test_un_instant_porte_son_fuseau_et_son_decalage():
+    assert format_export_instant("2026-10-08T07:03:00+00:00") == "08/10/2026 09:03 (heure de Paris, UTC+2)"   # été
+    assert format_export_instant("2026-01-10T10:00:00+00:00") == "10/01/2026 11:00 (heure de Paris, UTC+1)"   # hiver
+    regler("Indian/Reunion")
+    assert format_export_instant("2026-10-08T07:03:00+00:00") == "08/10/2026 11:03 (heure de Reunion, UTC+4)"
+    regler("Asia/Kolkata")
+    assert format_export_instant("2026-10-08T07:03:00+00:00") == "08/10/2026 12:33 (heure de Kolkata, UTC+5:30)"  # demi-heure
+    regler("America/Argentina/Buenos_Aires")
+    assert format_export_instant("2026-10-08T07:03:00+00:00") == "08/10/2026 04:03 (heure de Buenos Aires, UTC-3)"  # décalage négatif, « _ » enlevé
+    regler("UTC")
+    assert format_export_instant("2026-10-08T07:03:00+00:00") == "08/10/2026 07:03 (UTC)"
+
+
+def test_une_date_sans_fuseau_n_a_pas_de_mention_de_fuseau():
+    """Une date saisie à la main n'est ni convertie ni étiquetée : on ne prétend pas connaître son fuseau."""
+    assert format_export_instant("2026-09-01T09:00:00") == "01/09/2026 09:00"
+    assert format_export_instant(None) == "-" and format_export_instant("pas une date") == "pas une date"
+
+
+def test_la_signature_d_un_dossier_dit_son_fuseau():
+    signe = {"validation": {"signatureDataUrl": "data:image/png;base64,AAAA", "signedAt": "2026-10-08T07:03:00+00:00"}, "meta": {}}
+    assert get_signature_datetime(signe) == "08/10/2026 09:03 (heure de Paris, UTC+2)"
+    verrouille = {"validation": {"signatureDataUrl": "data:image/png;base64,AAAA"}, "meta": {"lockedAt": "2026-01-10T10:00:00+00:00"}}
+    assert get_signature_datetime(verrouille) == "10/01/2026 11:00 (heure de Paris, UTC+1)"  # repli sur le verrouillage (serveur)
+    assert get_signature_datetime({"validation": {}, "meta": {}}) == "-"
+    restitution = {"restitution": {"signatureDataUrl": "data:image/png;base64,AAAA", "signedAt": "2026-10-08T07:03:00+00:00"}, "meta": {}}
+    assert get_restitution_signature_datetime(restitution) == "08/10/2026 09:03 (heure de Paris, UTC+2)"
+
+
+def test_le_pdf_d_un_ajustement_dit_le_fuseau():
+    pypdf = pytest.importorskip("pypdf")
+    from pdf.adjustment import build_adjustment_pdf_bytes
+    payload = {"beneficiaire": {"nom": "ETIQUETTE", "prenom": "Test", "qualite": "agent", "service": "DRH"},
+               "ajustements": [{"id": "a1", "at": "2026-10-08T07:03:00+00:00", "by": "admin", "ajouts": [], "retraits": [], "service": None,
+                                "signature": {"mode": "distance", "status": "substitute", "signedAt": "2026-10-08T07:05:00+00:00",
+                                              "reason": "Absent", "substitute": {"name": "M. Martin", "quality": "RH"}}}]}
+    text = "\n".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(build_adjustment_pdf_bytes(payload, "a1"))).pages)
+    assert text.count("heure de Paris, UTC+2") >= 2, text  # la date de l'ajustement ET celle de la signature
