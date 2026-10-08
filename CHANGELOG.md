@@ -1,6 +1,6 @@
 # Historique des versions — À Quai
 
-## [Non publié] — Suite des notifications et sécurité des comptes (numéro de version à confirmer ; proposé : 3.72.0)
+## [3.72.0] - 2026-10-07 — Suite des notifications et sécurité des comptes
 
 ### 🔔 Notifications
 - **Retrait d'une ressource par un ajustement → tâche « à fermer »** : quand un ajustement retire d'un dossier resté actif une ressource sans retour physique (compte, accès), le service émetteur reçoit la tâche, comme pour une restitution. L'ancienneté part du retrait. (Avant : seule la restitution la créait, donc un compte retiré par un ajustement n'était signalé à personne.)

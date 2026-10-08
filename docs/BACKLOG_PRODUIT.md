@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (6 octobre 2026, fin de journée)
 
-**État des branches (fin de journée du 06/10)** : `dev` = `preprod` = **3.71.0** (PR n°36 puis n°37 `dev` → `preprod` fusionnées par le propriétaire) ; **`prod` = `main` = 3.67.1**. La série 3.67.3 → 3.71.0 (sécurité des sessions puis notifications 3.68.0 à 3.71.0) est donc en préprod, **pas en production**. Reste au propriétaire : tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod`, puis déploiement.
+**État des branches (fin de journée du 06/10)** : `dev` = **3.72.0** (`preprod` = 3.71.0) (PR n°36 puis n°37 `dev` → `preprod` fusionnées par le propriétaire) ; **`prod` = `main` = 3.67.1**. La série 3.67.3 → 3.71.0 (sécurité des sessions puis notifications 3.68.0 à 3.71.0) est donc en préprod, **pas en production**. Reste au propriétaire : tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod`, puis déploiement.
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
@@ -16,9 +16,9 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 **Suite conseillée, dans l'ordre**
 1. ✅ **Retrait d'une ressource par un ajustement → tâche « à fermer »** (codé le 07/10, non publié, voir CHANGELOG « Non publié »).
-2. ✅ **« Tâches des services » avec « Fait par X le … » dans la fiche du dossier** (codé le 07/10, non publié).
+2. ✅ **« Tâches des services » avec « Fait par X le … » dans la fiche du dossier** (3.72.0, 07/10).
 3. ✅ **Scénarios navigateur** remis au vert (07/10) : 28 `check_*` passent ; `inspect_*` = outils d'inspection sur copie de base.
-4. 🟡 **Sécurité P2** : ✅ verrouillage temporaire par compte + « Débloquer la connexion » ; ✅ changement forcé après création / réinitialisation par un administrateur (codés le 07/10, non publiés). **Reste** : MFA (TOTP) pour les administrateurs ; liste des sessions actives (exige un registre de sessions côté serveur, aujourd'hui le cookie est sans état) — **décisions de conception à prendre avec le propriétaire avant de commencer**.
+4. 🟡 **Sécurité P2** : ✅ verrouillage temporaire par compte + « Débloquer la connexion » ; ✅ changement forcé après création / réinitialisation par un administrateur (3.72.0, 07/10). **Reste** : MFA (TOTP) pour les administrateurs ; liste des sessions actives (exige un registre de sessions côté serveur, aujourd'hui le cookie est sans état) — **décisions de conception à prendre avec le propriétaire avant de commencer**.
 5. **Reste de l'ajustement** : PDF de l'ajustement, e-mail de la fiche de retraits, QR code sur les restitutions après « Enregistrer en attente » — **à cadrer avec le propriétaire** (mise en page du PDF, contenu de l'e-mail).
 6. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
 
@@ -28,7 +28,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.71.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.72.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
