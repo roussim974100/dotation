@@ -251,12 +251,40 @@ def format_export_datetime(value):
     return text
 
 
+def timezone_label(moment):
+    """« heure de Paris, UTC+2 » pour un instant exprime dans le fuseau de l'organisation (le decalage tient compte de l'heure d'ete)."""
+    key = getattr(moment.tzinfo, "key", None) or "UTC"
+    offset = moment.utcoffset()
+    if key == "UTC" or offset is None:
+        return "UTC"
+    minutes = int(offset.total_seconds() // 60)
+    sign = "-" if minutes < 0 else "+"
+    hours, rest = divmod(abs(minutes), 60)
+    utc = f"UTC{sign}{hours}" + (f":{rest:02d}" if rest else "")
+    return f"heure de {key.split('/')[-1].replace('_', ' ')}, {utc}"
+
+
+def format_export_instant(value):
+    """Comme format_export_datetime, mais ajoute le FUSEAU pour un INSTANT (valeur enregistree avec fuseau : signature, ajustement) :
+    « 08/10/2026 09:03 (heure de Paris, UTC+2) ». Qui lit le document, de loin ou plus tard, sait a quelle heure il se refere.
+    Une valeur sans fuseau (date saisie a la main) reste affichee sans mention."""
+    base = format_export_datetime(value)
+    text = str(value or "").strip()
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return base
+    if parsed.tzinfo is None:
+        return base
+    return f"{base} ({timezone_label(parsed.astimezone(get_org_timezone()))})"
+
+
 def get_signature_datetime(payload):
     validation = payload.get("validation", {})
     meta = payload.get("meta", {})
     if not validation.get("signatureDataUrl"):
         return "-"
-    return format_export_datetime(
+    return format_export_instant(
         validation.get("signedAt")
         or meta.get("lockedAt")
         or meta.get("savedAt")
@@ -268,7 +296,7 @@ def get_restitution_signature_datetime(payload):
     restitution = payload.get("restitution", {})
     if not restitution.get("signatureDataUrl"):
         return "-"
-    return format_export_datetime(
+    return format_export_instant(
         restitution.get("signedAt")
         or restitution.get("returnedAt")
         or payload.get("meta", {}).get("savedAt")

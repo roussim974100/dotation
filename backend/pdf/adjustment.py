@@ -6,7 +6,7 @@ peut exporter les signatures (`can_export_signature_assets`) ; un ajustement enc
 from auth import can_export_signature_assets
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings, load_a_quai_pdf_logo_image, load_brand_logo_image
 from pdf.attribution import _AQuaiDoc
-from utils import extract_signature_image, format_beneficiary_label, format_export_datetime, normalize_pdf_text
+from utils import extract_signature_image, format_beneficiary_label, format_export_instant, normalize_pdf_text
 
 STATE_LABELS = {"conforme": "Conforme", "degrade": "Dégradé", "autre": "Autre condition"}
 MODE_LABELS = {"presentiel": "en présentiel", "distance": "à distance"}
@@ -28,7 +28,7 @@ def _sections(payload, event):
             f"Bénéficiaire : {beneficiaire.get('nom') or '-'} {beneficiaire.get('prenom') or '-'}",
             f"Qualité : {format_beneficiary_label(beneficiaire.get('qualite'))}",
             f"Service : {service}",
-            f"Date de l'ajustement : {format_export_datetime(event.get('at'))}",
+            f"Date de l'ajustement : {format_export_instant(event.get('at'))}",
             f"Enregistré par : {event.get('by') or '-'}",
         ]),
         ("Ressources ajoutées", [f"- {item.get('label') or item.get('key')}" for item in event.get("ajouts") or []] or ["Aucune ressource ajoutée."]),
@@ -67,14 +67,14 @@ def build_adjustment_pdf_bytes(payload, event_id):
     if status == "signed":
         mode = MODE_LABELS.get(signature.get("requestedMode") or signature.get("mode"), "")
         image = extract_signature_image(signature.get("signatureDataUrl")) if can_export_signature_assets() else None
-        pdf._draw_signature_box(y, "Signature de l'ajustement", format_export_datetime(signature.get("signedAt")),
+        pdf._draw_signature_box(y, "Signature de l'ajustement", format_export_instant(signature.get("signedAt")),
                                 f"Signature recueillie {mode}." if mode else "Signature recueillie.", sig_bytes=image, reservation_lines=[])
     elif status == "substitute":
         substitute = signature.get("substitute") or {}
         pdf._draw_section(y, "Signature par un responsable", [
             f"La signature du bénéficiaire était impossible : {signature.get('reason') or '-'}",
             f"Signé à la place par : {substitute.get('name') or '-'} ({substitute.get('quality') or 'responsable'})",
-            f"Date : {format_export_datetime(signature.get('signedAt'))}",
+            f"Date : {format_export_instant(signature.get('signedAt'))}",
         ])
     else:
         pdf._draw_section(y, "Signature", [
