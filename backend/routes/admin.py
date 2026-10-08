@@ -377,6 +377,7 @@ def admin_settings_route():
         "support_email": settings.get("support_email") or "",
         "support_role": settings.get("support_role") or "",
         "restitution_phase1_unlock_days": settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"],
+        "timezone": settings.get("timezone") or DEFAULT_APP_SETTINGS["timezone"],
         "timing_warning_days": settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"],
         "parc_retention_years": settings.get("parc_retention_years") or DEFAULT_APP_SETTINGS["parc_retention_years"],
     }
@@ -419,6 +420,7 @@ def update_admin_settings_route():
                 "support_email": payload.get("support_email"),
                 "support_role": payload.get("support_role"),
                 "restitution_phase1_unlock_days": optional_int("restitution_phase1_unlock_days", 0, 365),
+                "timezone": payload.get("timezone"),  # fuseau horaire de l'organisation (nom IANA, ex. Europe/Paris) : valide par save_app_settings
                 "timing_warning_days": optional_int("timing_warning_days", 0, 365),
                 "parc_retention_years": optional_int("parc_retention_years", 1, 30),
             })

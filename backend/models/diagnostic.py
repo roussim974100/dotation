@@ -22,7 +22,7 @@ FORMAT = "aquai-diagnostic"
 VERSION = 1
 
 # réglages non identifiants (jamais nom d'organisation, e-mails, support, logo, domaines)
-SAFE_SETTINGS = ("org_context", "theme_id", "dark_mode_policy", "restitution_phase1_unlock_days", "timing_warning_days", "parc_retention_years")
+SAFE_SETTINGS = ("org_context", "theme_id", "dark_mode_policy", "restitution_phase1_unlock_days", "timing_warning_days", "parc_retention_years", "timezone")
 _TECHNICAL = re.compile(r"^[A-Za-z0-9_\-]{1,64}$")
 
 _UNSAFE_PATTERNS = {

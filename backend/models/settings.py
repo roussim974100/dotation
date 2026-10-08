@@ -34,6 +34,7 @@ DEFAULT_APP_SETTINGS = {
     "beneficiary_types": "agent:Agent,elu:Élu(e)",
     "setup_completed": "0",
     "restitution_phase1_unlock_days": "1",
+    "timezone": "Europe/Paris",  # fuseau horaire de l'organisation : heure affichee dans les PDF et exports
     "timing_warning_days": "3",
     "parc_retention_years": "5",
 }
@@ -316,6 +317,15 @@ def save_app_settings(connection, updates):
         sanitized["dark_mode_policy"] = DEFAULT_APP_SETTINGS["dark_mode_policy"]
     if "org_context" in sanitized and sanitized["org_context"] not in VALID_ORG_CONTEXTS:
         sanitized["org_context"] = DEFAULT_APP_SETTINGS["org_context"]
+    if "timezone" in sanitized:
+        if not sanitized["timezone"]:
+            sanitized["timezone"] = DEFAULT_APP_SETTINGS["timezone"]
+        else:
+            try:
+                from zoneinfo import ZoneInfo
+                ZoneInfo(sanitized["timezone"])
+            except Exception:  # noqa: BLE001 - ZoneInfoNotFoundError, ValueError (nom invalide), tzdata absent
+                raise SettingsValidationError(f"Fuseau horaire inconnu : « {sanitized['timezone'][:60]} ». Exemple : Europe/Paris.")
 
     for key, value in sanitized.items():
         connection.execute(
@@ -331,6 +341,9 @@ def save_app_settings(connection, updates):
     BRAND_LOGO_CACHE["loaded"] = False
     BRAND_LOGO_CACHE["cache_key"] = None
     BRAND_LOGO_CACHE["image"] = None
+    if "timezone" in sanitized:
+        from utils import reset_timezone_cache
+        reset_timezone_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +430,7 @@ def build_public_settings_payload(settings=None):
         "statusLabels": __import__("models.vocab", fromlist=["STATUS_LABELS"]).STATUS_LABELS,
         "setupCompleted": settings.get("setup_completed", "0") == "1",
         "restitutionPhase1UnlockDays": int(settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"]),
+        "timezone": settings.get("timezone") or DEFAULT_APP_SETTINGS["timezone"],
         "timingWarningDays": int(settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"]),
     }
 
