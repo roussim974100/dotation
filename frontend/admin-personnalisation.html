@@ -161,6 +161,27 @@
         </div>
       </section>
 
+      <section class="content-card mt-4" id="timezone-settings">
+        <div class="section-heading">
+          <div>
+            <p class="panel-eyebrow">Affichage</p>
+            <h3 class="section-title">Fuseau horaire</h3>
+            <p class="panel-text">Heure affichée dans les PDF et les exports (date de signature, d'ajustement, en-tête des documents). Elle suit l'endroit où se situe votre organisation, quel que soit le fuseau du serveur.</p>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="brandingTimezone">Fuseau horaire de l'organisation</label>
+            <input class="form-control" id="brandingTimezone" list="brandingTimezoneList" placeholder="Europe/Paris" autocomplete="off" spellcheck="false" value="Europe/Paris">
+            <datalist id="brandingTimezoneList"></datalist>
+            <div class="form-text" id="brandingTimezonePreview" role="status">Europe/Paris par défaut.</div>
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary" id="brandingTimezoneDetect">Utiliser le fuseau de ce navigateur</button>
+          </div>
+        </div>
+      </section>
+
       <section class="content-card mt-4" id="support-settings">
         <div class="section-heading">
           <div>
@@ -249,7 +270,7 @@
 <script src="js/ui.js"></script>
 <script src="js/admin-nav.js"></script>
 <script src="js/global-search.js"></script>
-<script src="js/admin-branding.js"></script>
+<script src="js/admin-branding.js?v=20261008b"></script>
 <script src="js/admin-org-wizard.js"></script>
 </body>
 </html>

@@ -2081,21 +2081,28 @@ async function saveSimpleEmailDraft({ recipientEmail, subject, title, bodyLines,
   saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
 }
 
-async function fetchPdfDocument(id, kind) {
-  const isRestitution = kind === "restitution";
-  const config = isRestitution
-    ? {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
-        title: "Préparation du PDF restitution",
-        text: "Le bon de restitution est en cours de génération.",
-        fallbackName: `restitution-${id}.pdf`
-      }
-    : {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
-        title: "Préparation du PDF dossier",
-        text: "Le document est en cours de génération.",
-        fallbackName: `dossier-${id}.pdf`
-      };
+async function fetchPdfDocument(id, kind, extra) {
+  const configs = {
+    restitution: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
+      title: "Préparation du PDF restitution",
+      text: "Le bon de restitution est en cours de génération.",
+      fallbackName: `restitution-${id}.pdf`
+    },
+    ajustement: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf/ajustement/${encodeURIComponent(extra || "")}`,
+      title: "Préparation du PDF d'ajustement",
+      text: "La fiche d'ajustement est en cours de génération.",
+      fallbackName: `ajustement-${id}.pdf`
+    },
+    dossier: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
+      title: "Préparation du PDF dossier",
+      text: "Le document est en cours de génération.",
+      fallbackName: `dossier-${id}.pdf`
+    }
+  };
+  const config = configs[kind] || configs.dossier;
 
   showExportLoader(config.title, config.text);
   try {
@@ -2113,18 +2120,18 @@ async function fetchPdfDocument(id, kind) {
   }
 }
 
-async function preparePdfEmail(id, kind) {
+async function preparePdfEmail(id, kind, extra) {
   try {
     const result = await getDraftById(id);
     const draft = result
       ? { ...result.summary, data: result.data }
       : findDraftSummary(id);
-    const { blob, fileName } = await fetchPdfDocument(id, kind);
+    const { blob, fileName } = await fetchPdfDocument(id, kind, extra);
     const attachmentBase64 = toBase64(await blob.arrayBuffer());
     const recipientEmail = getPdfEmailRecipient(draft);
     const title = draft?.title || "Dossier";
     const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
-    const documentLabel = kind === "restitution" ? "PDF de restitution" : "PDF de dossier";
+    const documentLabel = { restitution: "PDF de restitution", ajustement: "fiche d'ajustement (PDF)" }[kind] || "PDF de dossier";
     const bodyLines = [
       "Bonjour,",
       "",
@@ -2153,7 +2160,9 @@ async function preparePdfEmail(id, kind) {
     showToast(
       error.message || (kind === "restitution"
         ? "Impossible de préparer l'e-mail du PDF restitution."
-        : "Impossible de préparer l'e-mail du PDF dossier."),
+        : kind === "ajustement"
+          ? "Impossible de préparer l'e-mail de la fiche d'ajustement."
+          : "Impossible de préparer l'e-mail du PDF dossier."),
       "error"
     );
   }
@@ -2165,6 +2174,19 @@ async function prepareDraftPdfEmail(id) {
 
 async function prepareRestitutionPdfEmail(id) {
   await preparePdfEmail(id, "restitution");
+}
+
+async function prepareAdjustmentPdfEmail(id, eventId) {
+  await preparePdfEmail(id, "ajustement", eventId);
+}
+
+async function exportAdjustmentPdf(id, eventId) {
+  try {
+    const { blob, fileName } = await fetchPdfDocument(id, "ajustement", eventId);
+    saveBlob(blob, fileName);
+  } catch (error) {
+    showToast("Impossible de générer le PDF de l'ajustement.", "error");
+  }
 }
 
 async function exportDraftPdf(id) {

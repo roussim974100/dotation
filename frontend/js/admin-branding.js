@@ -77,7 +77,8 @@ function normalizeBrandingSettings(raw = {}) {
     support_email: raw.support_email || "",
     restitution_phase1_unlock_days: raw.restitution_phase1_unlock_days ?? "1",
     timing_warning_days: raw.timing_warning_days ?? "3",
-    parc_retention_years: raw.parc_retention_years ?? "5"
+    parc_retention_years: raw.parc_retention_years ?? "5",
+    timezone: raw.timezone || "Europe/Paris"
   };
 }
 
@@ -97,7 +98,8 @@ function collectBrandingPayload() {
     support_email: brandingById("brandingSupportEmail")?.value.trim(),
     restitution_phase1_unlock_days: parseInt(brandingById("brandingPhase1UnlockDays")?.value || "1", 10),
     timing_warning_days: parseInt(brandingById("brandingTimingWarningDays")?.value || "3", 10),
-    parc_retention_years: parseInt(brandingById("brandingParcRetentionYears")?.value || "5", 10)
+    parc_retention_years: parseInt(brandingById("brandingParcRetentionYears")?.value || "5", 10),
+    timezone: brandingById("brandingTimezone")?.value.trim() || "Europe/Paris"
   });
 }
 
@@ -169,9 +171,10 @@ function describeBrandingChanges(previous, next) {
   const phase1Change = describeValueChange("Fenêtre de modification de la phase 1 (jours)", previous.restitution_phase1_unlock_days, next.restitution_phase1_unlock_days);
   const timingChange = describeValueChange("Seuil d'alerte pilotage (jours)", previous.timing_warning_days, next.timing_warning_days);
   const retentionChange = describeValueChange("Conservation de l'historique du parc (ans)", previous.parc_retention_years, next.parc_retention_years);
+  const timezoneChange = describeValueChange("Fuseau horaire", previous.timezone, next.timezone);
 
   [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange, supportNameChange, supportEmailChange, supportRoleChange, orgContextChange, beneficiaryTypesChange,
-    phase1Change, timingChange, retentionChange].filter(Boolean).forEach((item) => {
+    phase1Change, timingChange, retentionChange, timezoneChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 
@@ -295,6 +298,10 @@ async function loadBrandingSettings() {
   if (brandingById("brandingPhase1UnlockDays")) brandingById("brandingPhase1UnlockDays").value = raw.restitution_phase1_unlock_days ?? "1";
   if (brandingById("brandingTimingWarningDays")) brandingById("brandingTimingWarningDays").value = raw.timing_warning_days ?? "3";
   if (brandingById("brandingParcRetentionYears")) brandingById("brandingParcRetentionYears").value = raw.parc_retention_years ?? "5";
+  if (brandingById("brandingTimezone")) {
+    brandingById("brandingTimezone").value = raw.timezone || "Europe/Paris";
+    updateTimezonePreview();
+  }
 
   toggleLogoFields(raw.brand_logo_mode);
   updateBrandingPreview(payload.logoUrl, raw.org_name || payload.orgName);
@@ -430,17 +437,19 @@ async function saveBrandingSettings() {
       }
     });
   } catch (error) {
+    // Le serveur explique un refus de validation en français (ex. « Fuseau horaire inconnu ») ; un code technique ou « HTTP 500 » reste masqué.
+    const serverReason = /^[A-ZÀ-Ý«]/.test(error?.message || "") && !/^HTTP /.test(error.message) ? error.message : "";
     updateBrandingSaveStep(steps, "save", "error");
     renderBrandingSaveDialog({
       title: "Enregistrement interrompu",
-      text: "La personnalisation n'a pas pu être enregistrée. Vérifiez les informations saisies puis réessayez.",
+      text: `La personnalisation n'a pas pu être enregistrée.${serverReason ? ` ${serverReason}` : " Vérifiez les informations saisies puis réessayez."}`,
       steps,
       showConfirm: true,
       confirmLabel: "Fermer",
       hideSpinner: true,
       onConfirm: closeBrandingSaveDialog
     });
-    showBrandingNotice("Impossible d'enregistrer la personnalisation.", "danger");
+    showBrandingNotice(`Impossible d'enregistrer la personnalisation.${serverReason ? ` ${serverReason}` : ""}`, "danger");
   } finally {
     if (saveButton) {
       saveButton.disabled = false;
@@ -485,7 +494,69 @@ async function uploadBrandingLogo() {
   }
 }
 
+// Fuseau horaire de l'organisation : liste des fuseaux connus du navigateur, aperçu de l'heure locale, détection automatique.
+const FALLBACK_TIMEZONES = ["Europe/Paris", "Europe/Brussels", "Europe/Zurich", "Europe/Luxembourg", "America/Montreal", "America/Martinique",
+  "America/Guadeloupe", "America/Cayenne", "Indian/Reunion", "Indian/Mayotte", "Pacific/Noumea", "Pacific/Tahiti", "Africa/Algiers",
+  "Africa/Tunis", "Africa/Casablanca", "Africa/Dakar", "UTC"];
+
+function browserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function updateTimezonePreview() {
+  const input = brandingById("brandingTimezone");
+  const preview = brandingById("brandingTimezonePreview");
+  if (!input || !preview) {
+    return;
+  }
+  const name = input.value.trim();
+  if (!name) {
+    preview.textContent = "Europe/Paris par défaut.";
+    return;
+  }
+  try {
+    const now = new Date();
+    const time = now.toLocaleTimeString("fr-FR", { timeZone: name, hour: "2-digit", minute: "2-digit" });
+    const offset = new Intl.DateTimeFormat("fr-FR", { timeZone: name, timeZoneName: "shortOffset" }).formatToParts(now).find((part) => part.type === "timeZoneName")?.value || "";
+    preview.textContent = `Il est actuellement ${time} dans ce fuseau${offset ? ` (${offset})` : ""}.`;
+  } catch (error) {
+    preview.textContent = "Fuseau inconnu : utilisez un nom comme Europe/Paris.";
+  }
+}
+
+function initTimezoneField() {
+  const input = brandingById("brandingTimezone");
+  if (!input) {
+    return;
+  }
+  const list = brandingById("brandingTimezoneList");
+  let zones = FALLBACK_TIMEZONES;
+  try {
+    zones = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : FALLBACK_TIMEZONES;
+  } catch (error) {
+    zones = FALLBACK_TIMEZONES;
+  }
+  if (list) {
+    list.innerHTML = [...new Set([...FALLBACK_TIMEZONES, ...zones])].map((zone) => `<option value="${zone}"></option>`).join("");
+  }
+  input.addEventListener("input", updateTimezonePreview);
+  brandingById("brandingTimezoneDetect")?.addEventListener("click", () => {
+    const detected = browserTimezone();
+    if (detected) {
+      input.value = detected;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  updateTimezonePreview();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  initTimezoneField();
   if (!brandingById("brandingOrgName")) {
     return;
   }

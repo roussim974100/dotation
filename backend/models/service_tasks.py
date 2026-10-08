@@ -3,7 +3,8 @@
 - « à fournir » : un élément attribué dans un dossier qui n'est pas encore (ou plus) en restitution — le service émetteur de la
   ressource prépare ou crée (compte, accès, matériel). Disparaît quand le dossier est annulé, restitué, ou que l'élément est retiré.
 - « à fermer » : un dossier en restitution contient une ressource SANS retour physique (compte, accès : `requires_return` faux) —
-  le service émetteur la désactive. (Le matériel à rendre est déjà suivi par la restitution elle-même.)
+  le service émetteur la désactive ; de même quand un AJUSTEMENT retire une telle ressource d'un dossier resté actif (l'élément est
+  alors marqué rendu). (Le matériel à rendre est déjà suivi par la restitution elle-même.)
 
 Une tâche est CALCULÉE à partir des éléments des dossiers (`dotation_items`) ; seule la décision « Fait » est enregistrée
 (`service_task_done` : qui, quand), à part du contenu du dossier — aucune réécriture d'un dossier signé, aucun conflit de version.
@@ -77,7 +78,7 @@ def age_days(value, now=None):
     return max(0, ((now or datetime.now(timezone.utc)) - start).days)
 
 
-def _candidate_rows(connection, kind):
+def _candidate_rows(connection, kind, form_id=None):
     """Éléments qui appellent une action de ce type, sans « Fait » enregistré."""
     done_kind = _DONE_KIND[kind]
     if kind == KIND_PROVISION:
@@ -85,17 +86,20 @@ def _candidate_rows(connection, kind):
         params = list(PROVISION_STATUSES)
         since = "f.created_at"
     else:
-        condition = f"f.status IN ({','.join('?' * len(DEPROVISION_STATUSES))}) AND COALESCE(r.requires_return, 1) = 0"
-        params = list(DEPROVISION_STATUSES)
-        since = "COALESCE(f.returned_at, f.updated_at)"
+        # Dossier en restitution, OU élément retiré par un ajustement (le dossier reste actif, l'élément est marqué rendu).
+        condition = (f"(f.status IN ({','.join('?' * len(DEPROVISION_STATUSES))}) "
+                     f"OR (f.status IN ({','.join('?' * len(PROVISION_STATUSES))}) AND i.returned = 1)) AND COALESCE(r.requires_return, 1) = 0")
+        params = list(DEPROVISION_STATUSES) + list(PROVISION_STATUSES)
+        since = "COALESCE(i.returned_at, f.returned_at, f.updated_at)"
+    only_form = "AND i.form_id = ?" if form_id is not None else ""
     return connection.execute(
         f"""SELECT i.form_id, i.item_key, i.label, f.status, f.nom, f.prenom, f.created_at, COALESCE(r.issuer_service, ''), {since}
             FROM dotation_items i
             JOIN dotation_forms f ON f.id = i.form_id
             LEFT JOIN resource_catalog r ON r.code = i.item_key
-            WHERE i.assigned = 1 AND {condition}
+            WHERE i.assigned = 1 AND {condition} {only_form}
               AND NOT EXISTS (SELECT 1 FROM service_task_done d WHERE d.kind = ? AND d.form_id = i.form_id AND d.item_key = i.item_key)
-            ORDER BY f.created_at, i.label""", params + [done_kind]).fetchall()
+            ORDER BY f.created_at, i.label""", params + ([str(form_id)] if form_id is not None else []) + [done_kind]).fetchall()
 
 
 def _responsible_for(services, referents, active_names, issuer_service):
@@ -228,3 +232,33 @@ def reopen(connection, user, kind, form_id, item_key):
     insert_app_log(connection, "admin", "service_task_reopened", "Tâche de service rouverte", "form", str(form_id),
                    {"kind": _DONE_KIND[kind], "resource": str(item_key), "service": allowed[0]["service"]}, actor=user.get("username"))
     return True, None
+
+
+def form_service_tasks(connection, form_id, now=None):
+    """Tâches de service d'UN dossier, pour sa fiche : ce qui reste à faire (service, ancienneté, retard) puis ce qui est fait
+    (par qui, quand). Aucune donnée sur la personne : seulement des ressources, des services et des noms de comptes. Les « Fait »
+    d'avant les notifications (sans auteur) ne sont pas listés."""
+    services = active_services(connection)
+    referents = all_referents(connection)
+    active_names = _active_account_names()
+    entries = []
+    for kind in (KIND_PROVISION, KIND_DEPROVISION):
+        for row in _candidate_rows(connection, kind, form_id=form_id):
+            service, responsible = _responsible_for(services, referents, active_names, row[7])
+            if service is None:
+                continue
+            age = age_days(row[8], now)
+            entries.append({"state": "open", "kind": kind, "label": row[2], "service": service["label"], "age_days": age,
+                            "late": age >= LATE_DAYS, "escalated": age >= ESCALATE_DAYS, "unattended": not responsible})
+    reverse = {value: key for key, value in _DONE_KIND.items()}
+    done_rows = connection.execute(
+        """SELECT d.kind, d.item_key, d.done_at, d.done_by, COALESCE(i.label, d.item_key), COALESCE(r.issuer_service, '')
+           FROM service_task_done d
+           LEFT JOIN dotation_items i ON i.form_id = d.form_id AND i.item_key = d.item_key
+           LEFT JOIN resource_catalog r ON r.code = d.item_key
+           WHERE d.form_id = ? AND d.done_by IS NOT NULL ORDER BY d.done_at DESC""", (str(form_id),)).fetchall()
+    for kind, item_key, done_at, done_by, label, issuer in done_rows:
+        service = find_service_by_label(services, issuer)
+        entries.append({"state": "done", "kind": reverse.get(kind, kind), "label": label, "service": service["label"] if service else issuer,
+                        "done_at": done_at, "done_by": done_by})
+    return entries

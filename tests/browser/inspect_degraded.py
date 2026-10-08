@@ -1,6 +1,6 @@
 """Parc : un materiel restitue « degrade » doit apparaitre dans la liste (filtre « Degrade »).
 Regression : un ecran saisi avec l'ancien nom de champ « numeroSerie » n'etait pas repris dans le parc.
-    python tests/browser/check_degraded.py [numero_de_serie]      (copie de la base de developpement, jamais l'originale)"""
+    python tests/browser/inspect_degraded.py [numero_de_serie]      (copie de la base de developpement, jamais l'originale)"""
 import sys
 import time
 from pathlib import Path

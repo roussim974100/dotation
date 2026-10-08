@@ -6,19 +6,22 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (6 octobre 2026, fin de journée)
 
-**État** : `dev` = **3.71.0**. La série du 06/10 (3.67.3 → 3.71.0) est sur `dev` : sécurité des sessions (3.67.3, 3.67.4) puis notifications (3.68.0 à 3.71.0). 3.67.3 est déjà fusionnée en préprod (PR n°36) ; le reste passe par une PR `dev` → `preprod` que le propriétaire fusionne. La production n'a **rien** de cette série : à déployer par lui, après test en préprod.
+**État des branches (fin de journée du 06/10)** : `dev` = **3.72.0** (`preprod` = 3.71.0) (PR n°36 puis n°37 `dev` → `preprod` fusionnées par le propriétaire) ; **`prod` = `main` = 3.67.1**. La série 3.67.3 → 3.71.0 (sécurité des sessions puis notifications 3.68.0 à 3.71.0) est donc en préprod, **pas en production**. Reste au propriétaire : tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod`, puis déploiement.
+
+**`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
 **À tester en préprod (propriétaire)** : (1) deux navigateurs, changement de mot de passe dans l'un → l'autre est déconnecté en moins d'une minute ; (2) `admin/admin` encore en place → fenêtre de changement obligatoire ; (3) cloche → « N ressources sans service référent » → choisir les services (Informatique = DSI proposé) ; (4) Admin > Services → ajouter les **titulaires** de chaque service ; (5) attribuer une ressource d'un service → la tâche « à fournir » apparaît chez les titulaires → « Fait » ; (6) restituer → « à fermer » pour un compte ; (7) page « Mes tâches », « Rouvrir ». Migrations 9 et 10 au premier démarrage (copie de sécurité automatique).
 
 **Avant la mise en production** : sauvegarde de la base ; prévenir les utilisateurs qu'ils devront **se reconnecter une fois** ; rattacher les ressources aux services et saisir les titulaires **avant** de compter sur les notifications (sans titulaire, tout retombe sur les administrateurs) ; faire changer les mots de passe `admin` restants.
 
 **Suite conseillée, dans l'ordre**
-1. **Retrait d'une ressource par un ajustement → tâche « à fermer »** (aujourd'hui seule la restitution la crée) : `models/adjustment.py` + `models/service_tasks.py`.
-2. **« Fait par X le … » dans la fiche du dossier** (lecture de `service_task_done`).
-3. **Six scénarios navigateur déjà en panne avant cette série** : `check_groups` (13 droits au lieu de 12), `check_update`, `check_dark_fiche`, `check_degraded`, `check_fiche`, `check_parc`. À réparer pour garder des tests fiables.
-4. Sécurité P2 : limitation des tentatives de connexion par compte, MFA admin, liste des sessions actives, forcer le changement de mot de passe après une réinitialisation par un administrateur.
-5. Reste de l'ajustement : PDF de l'ajustement, e-mail de la fiche de retraits, QR code sur les restitutions après « Enregistrer en attente ».
-6. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
+1. ✅ **Retrait d'une ressource par un ajustement → tâche « à fermer »** (3.72.0, 07/10).
+2. ✅ **« Tâches des services » avec « Fait par X le … » dans la fiche du dossier** (3.72.0, 07/10).
+3. ✅ **Scénarios navigateur** remis au vert (07/10) : 28 `check_*` passent ; `inspect_*` = outils d'inspection sur copie de base.
+4. 🟡 **Sécurité P2** : ✅ changement forcé après création / réinitialisation par un administrateur (3.72.0). **Verrouillage temporaire par compte : codé mais DÉSACTIVÉ par défaut, reporté** (décision du propriétaire le 08/10 : un verrouillage permet de bloquer volontairement un compte ; à reprendre plus tard, p. ex. avec un délai croissant entre les essais plutôt qu'un blocage dur ; activable par `APP_LOGIN_ACCOUNT_MAX_FAILURES=5`). **MFA : écarté pour le moment** (décision du 08/10). Reste possible : liste des sessions actives (registre de sessions côté serveur).
+5. **Reste de l'ajustement** : ✅ PDF de l'ajustement et ✅ e-mail (3.72.0, 08/10). Reste : QR code sur les restitutions après « Enregistrer en attente » — **à cadrer avec le propriétaire**.
+6. ✅ **Heures des PDF en heure locale** (3.72.0, 08/10) : réglage « Fuseau horaire » de l'organisation (Europe/Paris par défaut), conversion des heures enregistrées en UTC, en-tête des PDF compris. Reste possible : afficher aussi l'heure locale dans les e-mails `.eml` générés côté navigateur (ils utilisent déjà l'heure du navigateur).
+7. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
 
 **Pièges appris pendant cette série** (détail dans `AGENTS.md` §4 et §7) : ne jamais lancer `tests/_http_scenarios.py` à la main (il a écrasé la base locale le 06/10) ; les sessions posées à la main dans un test passent par `tests/_stamped_client.py` ; le harnais navigateur donne à `admin` un autre mot de passe (sinon `admin/admin` est reflaggé) ; `/api/forms` est limité à 30 créations par minute (neutraliser dans un test qui en crée beaucoup) ; une ressource ne se crée plus sans service du catalogue ; les scénarios qui modifient la base directement règlent `APP_NOTIFICATIONS_CACHE_SECONDS=1`.
 
@@ -26,7 +29,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.71.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.72.0**, `preprod`/`prod` en cours de promotion (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 

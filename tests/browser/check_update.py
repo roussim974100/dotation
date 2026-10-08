@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from browser_harness import Instance  # noqa: E402
+from browser_harness import Instance, ADMIN_PASSWORD  # noqa: E402
 from selenium.webdriver.common.by import By  # noqa: E402
 
 results = []
@@ -97,7 +97,7 @@ if __name__ == "__main__":
         check("aucune demande n'a été déposée", not (update_dir / "request.json").exists())
 
         driver.find_element(By.ID, "updatePassword").clear()
-        driver.find_element(By.ID, "updatePassword").send_keys("admin")  # compte admin par defaut d'une base vierge
+        driver.find_element(By.ID, "updatePassword").send_keys(ADMIN_PASSWORD)  # mot de passe du compte admin dans l'instance de test (harnais)
         click(driver, "#updateConfirm")
         time.sleep(1.2)
         banner = driver.find_element(By.ID, "updateBanner")

@@ -1,5 +1,34 @@
 # Historique des versions — À Quai
 
+## [3.72.0] - 2026-10-07 — Suite des notifications et sécurité des comptes
+
+### 🔔 Notifications
+- **Retrait d'une ressource par un ajustement → tâche « à fermer »** : quand un ajustement retire d'un dossier resté actif une ressource sans retour physique (compte, accès), le service émetteur reçoit la tâche, comme pour une restitution. L'ancienneté part du retrait. (Avant : seule la restitution la créait, donc un compte retiré par un ajustement n'était signalé à personne.)
+- **« Tâches des services » dans la fiche du dossier** : sous l'historique des ajustements, ce qui reste à faire (service, ancienneté, « en retard » / « escaladée ») puis ce qui est fait (**par qui, quand**). Aucune donnée sur la personne dans ce bloc ; rien d'affiché pour un dossier sans tâche ni pour qui ne peut pas lire le dossier. API : `GET /api/forms/<id>/service-tasks` (même droit que l'ouverture du dossier).
+
+### 🔒 Sécurité des comptes
+- **Verrouillage temporaire par compte — DÉSACTIVÉ PAR DÉFAUT** (décision du propriétaire, 08/10/2026 : un verrouillage permet de bloquer volontairement un compte en échouant exprès ; à reprendre plus tard). Le code reste, en option : `APP_LOGIN_ACCOUNT_MAX_FAILURES=5` l'active (5 échecs de mot de passe en 15 minutes bloquent les tentatives sur ce compte, même avec le bon mot de passe et même depuis une autre adresse ; seuls les échecs comptent, une connexion réussie remet à zéro ; un identifiant inconnu se comporte comme un compte connu ; la clé du compteur est un hachage, jamais l'identifiant tapé). `APP_LOGIN_ACCOUNT_WINDOW_MINUTES` (15) règle la durée. Sans la variable (0), rien n'est compté ni conservé.
+- **Débloquer** (utile seulement si le verrouillage est activé) : la liste Admin > Comptes affiche « Connexion bloquée » et propose « Débloquer la connexion » (journalisé).
+- **Mot de passe fixé par un administrateur** : à la création d'un compte et à la réinitialisation du mot de passe d'un **autre** compte, la personne doit en choisir un nouveau à sa première connexion (même fenêtre non fermable que pour `admin/admin`) — l'administrateur connaît ce mot de passe. Sur son propre compte, un administrateur n'est pas obligé de le rechanger. Le texte de la fenêtre le dit.
+
+### 📄 PDF et e-mail d'un ajustement
+- **Chaque ajustement a maintenant sa fiche PDF** (`GET /api/forms/<id>/pdf/ajustement/<id_ajustement>`, `backend/pdf/adjustment.py`) : bénéficiaire, service (et son changement), ressources ajoutées, ressources retirées avec leur état, date, auteur, et la signature — image manuscrite (en présentiel ou recueillie à distance), « signé à la place par … » avec le motif, ou « en attente de signature : ce document n'a pas encore valeur de preuve ». Même charte que les autres PDF, mêmes droits (export ; jamais pour un profil à données masquées).
+- **Dans l'historique des ajustements de la fiche** : « Télécharger le PDF » et « Envoyer par e-mail » (fichier `.eml` avec le PDF en pièce jointe, comme pour les restitutions), visibles seulement pour qui peut exporter. Ces boutons restent actifs sur une fiche signée (nouvel attribut `data-keep-enabled` de `applyLockState`, `app.js`).
+- Limite connue, déjà présente dans tous les PDF : les heures sont affichées telles qu'enregistrées (UTC), sans conversion en heure locale.
+
+### 🕒 Fuseau horaire de l'organisation
+- **Les heures des PDF et des exports sont maintenant à l'heure locale** de l'organisation (avant : heure UTC brute, soit 1 à 2 h de moins en France ; l'en-tête des PDF prenait l'heure du serveur, donc UTC sous Linux). Réglage **Administration > Personnalisation > Fuseau horaire**, `Europe/Paris` par défaut : il suit l'endroit où se situe l'organisation, quel que soit le fuseau du serveur. Aperçu de l'heure locale à la saisie, bouton « Utiliser le fuseau de ce navigateur », liste des fuseaux connus ; un nom inconnu est refusé avec un message clair.
+- **Seules les heures enregistrées avec un fuseau sont converties** (`utc_now()`, signatures, ajustements) : une date saisie à la main (`2026-09-01T09:00:00`, date de remise, date de prise de fonction) est affichée telle quelle, jamais décalée. Heure d'été et d'hiver gérées par les règles du fuseau (nuit du 25 au 26 octobre vérifiée).
+- Effet immédiat dans le processus qui enregistre le réglage ; les autres processus (plusieurs workers) le voient sous 30 s. Un réglage illisible en base retombe sur Europe/Paris, jamais d'erreur dans un PDF.
+- **Dépendance ajoutée : `tzdata`** (`backend/requirements.txt`) — nécessaire sous Windows ; déjà présente sous Linux. **Réinstaller les dépendances** (`pip install -r backend/requirements.txt`) après la mise à jour.
+- La fenêtre d'erreur de la page Personnalisation affiche désormais la raison donnée par le serveur (ex. « Fuseau horaire inconnu ») au lieu d'un texte générique.
+- Fichiers : `backend/utils.py` (`get_org_timezone`, `format_export_datetime`), `backend/models/settings.py`, `backend/routes/admin.py`, `backend/pdf/attribution.py`, `frontend/js/admin-branding.js`, `frontend/admin-personnalisation.html`.
+
+### 🧪 Tests
+- `tests/test_login_account_lock.py` (18 cas, le verrouillage y est activé explicitement), `tests/test_default_password_change.py` (+3), `tests/test_service_tasks.py` (+7 : ajustement, fiche), `tests/test_adjustment_pdf.py` (6 : contenu du PDF relu avec pypdf, droits, signature), `tests/test_timezone.py` (11 : été / hiver, heure sans fuseau, autre fuseau, validation, en-tête, PDF) ; scénarios navigateur `check_login_lock.py` (7), `check_fiche_taches.py` (9), `check_adjustment_pdf.py` (11), `check_fuseau.py` (11).
+- Fichiers : `backend/pdf/adjustment.py`, `backend/auth.py`, `backend/rate_store.py` (`count`, `clear`), `backend/routes/forms.py`, `backend/routes/pages.py`, `backend/routes/admin.py`, `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `frontend/js/form-service-tasks.js`, `frontend/js/admin.js`, `frontend/js/login.js`, `frontend/js/config.js`, `frontend/js/ui.js`, `frontend/form.html`.
+
+
 ## [3.71.0] - 2026-10-06 — Notifications, lot 4 : retards, escalade, page « Mes tâches »
 
 ### 🔔 Relances, escalade et une page pour tout voir

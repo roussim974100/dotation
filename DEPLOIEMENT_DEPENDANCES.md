@@ -49,6 +49,7 @@ systemctl status dotation
 |------------|---------|---------------------------------------------|
 | 2026-03-31 | fpdf2   | Génération PDF (remplacement du PDF brut maison) |
 | 2026-09-19 | cryptography | Chiffrement des sauvegardes (AES-256-GCM, scrypt). Importée à la demande : si elle manque, l'application démarre et seules les sauvegardes chiffrées sont indisponibles |
+| 2026-10-08 | tzdata | Base des fuseaux horaires (heure locale des PDF et exports ; réglage « Fuseau horaire »). Indispensable sous Windows, déjà fournie par le système sous Linux. Sans elle : repli sur UTC, aucune erreur |
 
 ---
 

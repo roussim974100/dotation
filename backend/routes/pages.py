@@ -11,7 +11,7 @@ from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, get_rate_limit_key, extract_first_forwarded_ip, check_user,
-    start_session, realign_session_password,
+    start_session, realign_session_password, is_account_locked, record_account_failure, clear_account_failures,
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
@@ -70,9 +70,18 @@ def login():
             return redirect("/login?error=invalid")
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
+        if is_account_locked(username):
+            # Trop d'echecs sur ce compte : on ne verifie meme plus le mot de passe (un attaquant ne peut pas deviner pendant le blocage).
+            with get_db() as connection:
+                insert_app_log(connection, "security", "login_blocked", "Connexion refusee : trop d'echecs sur le compte", "user",
+                               loggable_login_identifier(username), build_login_forensic_details(username, "account_locked"), actor="anonymous")
+            return redirect("/login?error=account_locked")
         auth_state = check_user(username, password)
+        if auth_state == "invalid":
+            record_account_failure(username)
 
         if auth_state == "ok":
+            clear_account_failures(username)
             start_session(username)
             with get_db() as connection:
                 insert_app_log(

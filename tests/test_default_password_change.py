@@ -115,21 +115,55 @@ def test_apres_le_changement_la_connexion_suivante_est_normale(compte):
     assert get_user_record(compte)["must_change_password"] == 0
 
 
-def test_un_administrateur_qui_fixe_le_mot_de_passe_leve_le_drapeau():
-    """Mot de passe choisi par un administrateur depuis Admin > Comptes : ce n'est plus celui d'origine."""
+def test_un_administrateur_qui_fixe_le_mot_de_passe_d_un_autre_le_force_a_le_changer():
+    """Un administrateur qui réinitialise le mot de passe d'un autre compte le connaît : la personne doit en choisir un nouveau."""
     cible = f"cible_{time.time_ns()}"
     assert create_user(cible, make_hash(ORIGINE), ["lecture"])
-    assert update_user(cible, must_change_password=1)
     admin = app.test_client()
     with admin.session_transaction() as s:
         s["user"] = "admin"
         s["csrf_token"] = "jeton"
     try:
+        assert get_user_record(cible)["must_change_password"] == 0
         resp = admin.put(f"/api/admin/users/{cible}", json={"password": NOUVEAU}, headers=H)
         assert resp.status_code == 200, resp.get_data(as_text=True)
-        assert get_user_record(cible)["must_change_password"] == 0
+        assert get_user_record(cible)["must_change_password"] == 1
+        client, _ = ouvrir_session(cible, NOUVEAU)  # il peut se connecter... mais rien d'autre qu'un changement de mot de passe
+        assert client.get("/api/admin/users").status_code == 403
+        done = client.post("/api/me/password", json={"current_password": NOUVEAU, "new_password": "Choisi-Par-Moi-2-Fois!"}, headers=H)
+        assert done.status_code == 200 and get_user_record(cible)["must_change_password"] == 0
     finally:
         delete_user(cible)
+
+
+def test_un_administrateur_qui_change_son_propre_mot_de_passe_n_est_pas_force_de_le_rechanger():
+    moi = f"moi_{time.time_ns()}"
+    assert create_user(moi, make_hash(ORIGINE), ["admin"])
+    try:
+        client, _ = ouvrir_session(moi, ORIGINE)
+        resp = client.put(f"/api/admin/users/{moi}", json={"password": NOUVEAU}, headers=H)
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert get_user_record(moi)["must_change_password"] == 0
+        assert client.get("/api/admin/users").status_code == 200  # sa session reste pleinement utilisable
+    finally:
+        delete_user(moi)
+
+
+def test_un_compte_cree_par_un_administrateur_doit_changer_son_mot_de_passe():
+    nom = f"cree_{time.time_ns()}"
+    admin = app.test_client()
+    with admin.session_transaction() as s:
+        s["user"] = "admin"
+        s["csrf_token"] = "jeton"
+    try:
+        resp = admin.post("/api/admin/users", json={"username": nom, "password": ORIGINE, "groups": ["lecture"]}, headers=H)
+        assert resp.status_code == 201, resp.get_data(as_text=True)
+        assert get_user_record(nom)["must_change_password"] == 1
+        client, destination = ouvrir_session(nom, ORIGINE)
+        assert destination == "/"  # la fenêtre de changement s'y ouvre
+        assert client.get("/api/forms").status_code == 403
+    finally:
+        delete_user(nom)
 
 
 def test_un_compte_ordinaire_n_est_pas_marque():

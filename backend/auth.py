@@ -174,6 +174,45 @@ def _is_login_rate_limited(ip: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Verrouillage temporaire PAR COMPTE : N echecs en 15 min -> plus aucune tentative sur ce compte jusqu'a ce que les echecs vieillissent.
+# Complete la limite par adresse IP (qui ne voit pas un attaquant reparti sur plusieurs adresses). Seuls les ECHECS comptent (une
+# connexion reussie remet a zero), et la cle est un hachage de l'identifiant tape : on ne conserve jamais ce qui a ete saisi dans le
+# champ identifiant (un mot de passe tape par erreur ici a deja fini au journal, cf. 3.62.1). S'applique aussi aux identifiants
+# inconnus : le message est le meme, aucun moyen de deviner quels comptes existent.
+# ---------------------------------------------------------------------------
+
+# DESACTIVE PAR DEFAUT (decision du proprietaire, 08/10/2026) : un verrouillage permet de bloquer volontairement un compte en echouant
+# expres. Le code reste, a activer plus tard avec APP_LOGIN_ACCOUNT_MAX_FAILURES=5 (0 = pas de verrouillage).
+ACCOUNT_MAX_FAILURES = int(os.environ.get("APP_LOGIN_ACCOUNT_MAX_FAILURES", "0"))
+ACCOUNT_WINDOW_SECONDS = int(os.environ.get("APP_LOGIN_ACCOUNT_WINDOW_MINUTES", "15")) * 60
+_ACCOUNT_SCOPE = "login_fail_account"
+
+
+def _account_key(username):
+    return hashlib.sha256(str(username or "").strip().lower().encode("utf-8")).hexdigest()[:24]
+
+
+def account_lock_enabled():
+    return ACCOUNT_MAX_FAILURES > 0
+
+
+def is_account_locked(username):
+    if not account_lock_enabled():
+        return False
+    return rate_store.count(_ACCOUNT_SCOPE, _account_key(username), ACCOUNT_WINDOW_SECONDS) >= ACCOUNT_MAX_FAILURES
+
+
+def record_account_failure(username):
+    if not account_lock_enabled():
+        return  # fonction desactivee : on ne conserve meme pas les echecs
+    rate_store.hit(_ACCOUNT_SCOPE, _account_key(username), 10 ** 9, ACCOUNT_WINDOW_SECONDS)  # on enregistre ; la decision se prend avec count()
+
+
+def clear_account_failures(username):
+    rate_store.clear(_ACCOUNT_SCOPE, _account_key(username))
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting générique par IP + scope (endpoints API sensibles).
 # Les compteurs sont partagés entre les processus gunicorn (voir rate_store.py).
 # ---------------------------------------------------------------------------

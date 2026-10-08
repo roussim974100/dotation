@@ -739,7 +739,7 @@ function openPasswordChangeModal({ forced = false } = {}) {
   backdrop.innerHTML = `
     <div class="password-change-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="pwdTitle">
       <h3 id="pwdTitle">${forced ? "Choisissez votre mot de passe" : "Changer le mot de passe"}</h3>
-      ${forced ? '<p class="alert alert-warning" style="font-size:0.88rem;">Ce compte utilise encore le mot de passe d’origine. Pour la sécurité de l’application, choisissez-en un nouveau avant de continuer.</p>' : ""}
+      ${forced ? '<p class="alert alert-warning" style="font-size:0.88rem;">Votre mot de passe est celui d’origine ou a été défini par un administrateur : il n’est donc pas confidentiel. Choisissez-en un nouveau avant de continuer.</p>' : ""}
       <div style="display:grid;gap:0.85rem;">
         <div>
           <label class="form-label" for="pwdCurrent">Mot de passe actuel</label>

@@ -189,13 +189,56 @@ def dossier_type_label(value):
     return DOSSIER_TYPE_LABELS.get(normalize_dossier_type(value), "Nouvelle arrivée")
 
 
+DEFAULT_TIMEZONE = "Europe/Paris"
+_TZ_CACHE_SECONDS = 30
+_tz_cache = {"at": 0.0, "name": None, "tz": None}
+
+
+def reset_timezone_cache():
+    """Appelee quand le reglage de fuseau change : l'effet est immediat dans ce processus."""
+    _tz_cache.update({"at": 0.0, "name": None, "tz": None})
+
+
+def get_org_timezone():
+    """Fuseau horaire de l'ORGANISATION (reglage `timezone`, Administration > Personnalisation ; Europe/Paris par defaut).
+    Il decide de l'heure affichee dans les PDF et exports, quel que soit le fuseau du serveur (souvent UTC sous Linux). Repli sur
+    Europe/Paris puis sur UTC si le nom est inconnu ou si la base des fuseaux (tzdata) manque : jamais d'exception pour un PDF."""
+    import time as _time
+    now = _time.monotonic()
+    if _tz_cache["tz"] is not None and now - _tz_cache["at"] < _TZ_CACHE_SECONDS:
+        return _tz_cache["tz"]
+    name = DEFAULT_TIMEZONE
+    try:
+        from models.settings import get_app_settings
+        name = (get_app_settings().get("timezone") or DEFAULT_TIMEZONE).strip() or DEFAULT_TIMEZONE
+    except Exception:  # noqa: BLE001 - base indisponible au demarrage, etc.
+        pass
+    from datetime import timezone as _timezone
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(name)
+    except Exception:  # noqa: BLE001 - nom inconnu ou tzdata absent
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(DEFAULT_TIMEZONE)
+        except Exception:  # noqa: BLE001
+            tz = _timezone.utc
+    _tz_cache.update({"at": now, "name": name, "tz": tz})
+    return tz
+
+
 def format_export_datetime(value):
+    """Date/heure pour les PDF et exports. Une valeur ENREGISTREE avec un fuseau (cas de `utc_now()`, en UTC) est convertie en heure
+    du fuseau de l'organisation ; une valeur SANS fuseau (date saisie a la main, `2026-09-01T09:00:00`) est affichee telle quelle :
+    on ne decale pas ce que la personne a tape."""
     if not value:
         return "-"
     text = str(value).strip()
     try:
         normalized = text.replace("Z", "+00:00")
         parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(get_org_timezone())
         return parsed.strftime("%d/%m/%Y %H:%M")
     except ValueError:
         pass

@@ -27,6 +27,7 @@ FIELDS = [
     ("brandingTheme", "theme_id", "foret", "select"),
     ("brandingDarkMode", "dark_mode_policy", "allowed", "select"),
     ("brandingOrgContext", "org_context", "association", "select"),
+    ("brandingTimezone", "timezone", "Indian/Reunion", "text"),
 ]
 
 results = []
@@ -87,7 +88,7 @@ def run(driver, base):
 
 
 RESTORE_KEYS = ("org_name", "dpo_email", "email_domains", "brand_logo_mode", "brand_logo_url", "theme_id", "dark_mode_policy", "org_context",
-                "beneficiary_types", "support_name", "support_email", "support_role", "restitution_phase1_unlock_days", "timing_warning_days", "parc_retention_years")
+                "beneficiary_types", "support_name", "support_email", "support_role", "restitution_phase1_unlock_days", "timing_warning_days", "parc_retention_years", "timezone")
 
 
 def put_settings(driver, values):
