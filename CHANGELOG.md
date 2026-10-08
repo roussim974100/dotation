@@ -1,5 +1,15 @@
 # Historique des versions — À Quai
 
+## [3.73.0] - 2026-10-08 — QR code proposé juste après « Enregistrer en attente » d'une restitution
+
+### 📱 Signature à distance d'une restitution : le QR code tout de suite
+- Sur l'écran de restitution, quand le mode de signature choisi est **« Signature à distance par lien »**, la fenêtre de fin de **« Enregistrer en attente »** propose maintenant **« Afficher le QR code »** (ou **« Plus tard »**). La personne est souvent encore devant l'agent : elle scanne le code avec son téléphone et signe, sans que l'agent ait à retrouver la ligne dans la liste puis le menu « ⋯ ».
+- **La redirection vers la liste n'a lieu qu'à la fermeture du QR code** (jusque-là, l'agent reste sur l'écran). Si le lien ne peut pas être créé, un message d'erreur s'affiche et l'agent **reste sur la page** pour réessayer.
+- **Rien n'est proposé** quand la signature a été recueillie sur place ou déclarée impossible (un simple « OK » comme avant). Un clic hors de la fenêtre vaut « Plus tard » : jamais de QR code déclenché par erreur.
+- Le lien et le QR sont ceux qui existaient déjà (même fenêtre, avertissement « localhost », date de validité, bouton « Copier le lien »). Aucun changement côté serveur, aucune migration.
+- Fichiers : `frontend/js/restitution.js`, `frontend/js/storage.js` (`showSignatureQr` attend la fermeture de la fenêtre et renvoie `false` si elle n'a pas pu s'ouvrir), `frontend/js/signature-qr.js` (option `onClose`), `frontend/restitution.html` (charge le générateur de QR). Les numéros `?v=` de `storage.js`, `signature-qr.js` et `branding.js` sont alignés sur toutes les pages.
+- Test : scénario navigateur `tests/browser/check_restitution_qr_attente.py` (22 vérifications : proposition seulement pour la signature à distance, QR affiché avec le lien de la restitution, redirection à la fermeture, « Plus tard », signature impossible, clic hors fenêtre, échec de création du lien).
+
 ## [3.72.1] - 2026-10-08 — Fuseau horaire plus clair ; blocage de l'adresse IP au lieu du compte
 
 ### 🔒 Connexion : on bloque l'adresse de celui qui insiste, plus le compte de sa cible
