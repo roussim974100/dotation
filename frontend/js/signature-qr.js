@@ -41,28 +41,35 @@ function sizeSignatureQr(svg) {
   svg.style.height = `${cells * pixels}px`;
 }
 
+let signatureQrOnClose = null;
+
 function closeSignatureQrDialog() {
   const modal = document.getElementById("signatureQrModal");
   if (!modal) return;
   modal.classList.add("d-none");
   modal.setAttribute("aria-hidden", "true");
   modal.innerHTML = "";
+  const callback = signatureQrOnClose;
+  signatureQrOnClose = null;
+  if (callback) callback();
 }
 
-// options : { url, title, subtitle, expiresAt }
+// options : { url, title, subtitle, expiresAt, onClose }. Renvoie true si la fenêtre est ouverte (onClose sera alors appelé à sa fermeture),
+// false sinon (un message d'erreur est affiché et onClose n'est jamais appelé).
 function showSignatureQrDialog(options = {}) {
   const url = String(options.url || "");
   if (!url) {
     showToast("Aucun lien de signature à afficher.", "error");
-    return;
+    return false;
   }
   let svg;
   try {
     svg = buildSignatureQrSvg(url);
   } catch (error) {
     showToast(error.message || "Impossible de générer le QR code.", "error");
-    return;
+    return false;
   }
+  signatureQrOnClose = typeof options.onClose === "function" ? options.onClose : null;
   let modal = document.getElementById("signatureQrModal");
   if (!modal) {
     modal = document.createElement("div");
@@ -110,6 +117,7 @@ function showSignatureQrDialog(options = {}) {
       window.prompt("Copiez ce lien :", url);
     }
   });
+  return true;
 }
 
 document.addEventListener("keydown", (event) => {
