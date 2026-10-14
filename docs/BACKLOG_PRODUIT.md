@@ -19,7 +19,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 2. ✅ **« Tâches des services » avec « Fait par X le … » dans la fiche du dossier** (3.72.0, 07/10).
 3. ✅ **Scénarios navigateur** remis au vert (07/10) : 28 `check_*` passent ; `inspect_*` = outils d'inspection sur copie de base.
 4. 🟡 **Sécurité P2** : ✅ changement forcé après création / réinitialisation par un administrateur (3.72.0). ✅ **Blocage de l'ADRESSE IP après 10 échecs, 15 minutes** (3.72.1, demandé par le propriétaire le 08/10 ; remplace le verrouillage par compte, retiré). **MFA : écarté pour le moment** (décision du 08/10). Reste possible : liste des sessions actives (registre de sessions côté serveur) ; liste / déblocage manuel des adresses bloquées dans l'administration (aujourd'hui le blocage expire seul au bout de 15 min).
-5. **Reste de l'ajustement** : ✅ PDF de l'ajustement et ✅ e-mail (3.72.0, 08/10). Reste : QR code sur les restitutions après « Enregistrer en attente » — **à cadrer avec le propriétaire**.
+5. **Reste de l'ajustement** : ✅ PDF de l'ajustement et ✅ e-mail (3.72.0, 08/10). ✅ QR code proposé après « Enregistrer en attente » d'une restitution en signature à distance (3.73.0, 08/10 ; option A du cadrage, hors Phase 1).
 6. ✅ **Fuseau horaire : champ avec suggestions, information heure d'été / d'hiver, fuseau écrit sur les signatures des PDF** (3.72.1, 08/10).
 6. ✅ **Heures des PDF en heure locale** (3.72.0, 08/10) : réglage « Fuseau horaire » de l'organisation (Europe/Paris par défaut), conversion des heures enregistrées en UTC, en-tête des PDF compris. Reste possible : afficher aussi l'heure locale dans les e-mails `.eml` générés côté navigateur (ils utilisent déjà l'heure du navigateur).
 7. P1 déjà listés plus bas (doublons de personnes, ancien modèle matériel, champs orphelins, déploiement réel) — **sur une copie de la base de production**, jamais sur `backend/dotation.db`.
@@ -30,7 +30,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` et `preprod` à **3.72.1**, `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.73.0**, `preprod` à 3.72.1, `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
@@ -62,7 +62,7 @@ Cadré le 21-22/09 avec trois experts (process métier, base de données, archit
 | ✅ 3.65.0 (fait le 26/09, complété le 28-29/09) | Interface d'ajustement (fenêtre, signature manuscrite, à distance puis recueillie, historique, reprise de matériel restitué), « Mise à jour » retiré du sélecteur de création, plus « Gérer les ressources » à côté de « Restituer » (3.67.2). **Reste** : PDF de l'ajustement, e-mail de la fiche de retraits (voir « Demandes utilisateur ») | M | P1 |
 | ✅ 3.67.1 (fait le 28/09) | Regroupement des dossiers par personne dans les 4 tableaux de bord (`groupDraftsByPerson`) — répond au symptôme visible des doublons (voir constat ci-dessous), mais ne fusionne pas les fiches « personne » elles-mêmes | M | P2 |
 
-**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. **Reste** : QR code sur les écrans de restitution après « Enregistrer en attente ».
+**Demande du 26/09, faite en 3.66.0** : QR code du lien de signature (personne présente) — menu « Signature en face à face » et bannière. ✅ QR code sur l'écran de restitution après « Enregistrer en attente » : fait en 3.73.0.
 
 ## 🟡 Notifications — « qui doit terminer cette action » (lot 1 livré en 3.68.0 le 06/10, lot 3 livré en 3.69.0 le 06/10, lot 2 livré en 3.70.0 le 06/10, lot 4 livré en 3.71.0 le 06/10)
 

@@ -2488,27 +2488,33 @@ async function showSignatureQr(id, kind) {
         : await ensureAssignmentSignatureLink(id);
     const draft = findDraftSummary(id);
     const titles = { restitution: "Signature de la restitution", adjustment: "Signature de l'ajustement" };
-    showSignatureQrDialog({
-      url: absoluteUrl,
-      title: titles[kind] || "Signature de l'attribution",
-      subtitle: draft?.title || "",
-      expiresAt: link?.expiresAt
+    // Attend la fermeture de la fenêtre (utile à qui enchaîne une redirection) ; renvoie false si elle n'a pas pu s'ouvrir.
+    return await new Promise((resolve) => {
+      const opened = showSignatureQrDialog({
+        url: absoluteUrl,
+        title: titles[kind] || "Signature de l'attribution",
+        subtitle: draft?.title || "",
+        expiresAt: link?.expiresAt,
+        onClose: () => resolve(true)
+      });
+      if (!opened) resolve(false);
     });
   } catch (error) {
     showToast(error.message || "Impossible de préparer le QR code de signature.", "error");
+    return false;
   }
 }
 
 async function showAssignmentSignatureQr(id) {
-  await showSignatureQr(id, "assignment");
+  return showSignatureQr(id, "assignment");
 }
 
 async function showRestitutionSignatureQr(id) {
-  await showSignatureQr(id, "restitution");
+  return showSignatureQr(id, "restitution");
 }
 
 async function showAdjustmentSignatureQr(id) {
-  await showSignatureQr(id, "adjustment");
+  return showSignatureQr(id, "adjustment");
 }
 
 async function copyRestitutionSignatureLink(id) {
