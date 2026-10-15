@@ -1,5 +1,12 @@
 # Historique des versions — À Quai
 
+## [3.73.1] - 2026-10-15 — Page de signature d'une restitution : seulement les informations utiles
+
+### 🐛 Plus de données techniques affichées au signataire
+- Sur la page publique de signature d'une restitution (et dans les exports Excel), le détail d'une ressource du catalogue sans valeur saisie (cas fréquent en **régularisation**) affichait toutes les données internes : identifiant `resource_…`, catégorie, service émetteur, `True`/`False`, schéma de champs complet.
+- Le détail ne reprend plus que ce qui a un sens pour la personne : les valeurs réellement saisies (« Marque : … », « Numéro de série : … »), sinon « Sans detail complementaire ». Les champs techniques et les structures (listes, objets, booléens) sont exclus.
+- Fichier : `backend/models/workflow.py` (`summarize_resource_item_details`). Aucune migration.
+
 ## [3.73.0] - 2026-10-08 — QR code proposé juste après « Enregistrer en attente » d'une restitution
 
 ### 📱 Signature à distance d'une restitution : le QR code tout de suite
