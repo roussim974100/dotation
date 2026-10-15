@@ -141,7 +141,14 @@ def summarize_dynamic_resource(resource):
 
 
 # Cles techniques de suivi a exclure du resume brut d'un item statique (non "fields").
-_ITEM_DETAIL_EXCLUDED_KEYS = {"selected", "conditionAttribution", "conditionNotes"}
+_ITEM_DETAIL_EXCLUDED_KEYS = {
+    "selected", "conditionAttribution", "conditionNotes", "assignedAt",
+    "id", "code", "label", "description", "category", "issuerService", "issuer_service",
+    "triggerKey", "trigger_key", "requiresReturn", "requires_return",
+    "hasAssignmentDate", "has_assignment_date", "hasAssignmentCondition", "has_assignment_condition",
+    "hasAssignmentNotes", "has_assignment_notes", "displayOrder", "display_order",
+    "fieldSchema", "field_schema", "fields", "details",
+}
 
 
 def summarize_resource_item_details(details):
@@ -151,12 +158,16 @@ def summarize_resource_item_details(details):
     # les valeurs d'un item statique (ordinateur, telephone...) en excluant les cles de suivi.
     if not isinstance(details, dict):
         return ""
-    if details.get("fields"):
+    if details.get("fields") or details.get("fieldSchema") or details.get("field_schema"):
+        # Ressource du catalogue (meme sans valeur saisie, ex. regularisation) : jamais de vidage brut.
         return summarize_dynamic_resource(details)
     return " - ".join(
         str(value).strip()
         for key, value in details.items()
-        if key not in _ITEM_DETAIL_EXCLUDED_KEYS and str(value or "").strip()
+        if key not in _ITEM_DETAIL_EXCLUDED_KEYS
+        and isinstance(value, (str, int, float))
+        and not isinstance(value, bool)
+        and str(value).strip()
     )
 
 
