@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (12 octobre 2026)
 
-**État des branches (12/10/2026)** : `preprod` = **3.72.1** (PR n°36 à n°41 fusionnées par le propriétaire) ; **`dev` = 3.73.1** (3.73.1 : page de signature d'une restitution sans données techniques ; 3.73.0 : QR code proposé après « Enregistrer en attente » d'une restitution + mode d'emploi de la mise en production) — **PR `dev` → `preprod` à ouvrir et fusionner par le propriétaire** (texte prêt, lien `compare/preprod...dev`) ; **`prod` = `main` = 3.67.1**. La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.0. Reste au propriétaire : fusionner la PR 3.73.0, tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python). La 3.72.1 et la 3.73.0 n'ont pas de migration (les migrations 9 et 10 viennent de la 3.68 à 3.71).
+**État des branches (12/10/2026)** : `preprod` = **3.73.1** (PR n°36 à n°44 fusionnées par le propriétaire) ; **`dev` = 3.73.2** (3.73.2 : pas de lien de signature d'une restitution sans état du matériel ; 3.73.1 : page de signature d'une restitution sans données techniques ; 3.73.0 : QR code proposé après « Enregistrer en attente » d'une restitution + mode d'emploi de la mise en production) — **PR `dev` → `preprod` à ouvrir et fusionner par le propriétaire** (texte prêt, lien `compare/preprod...dev`) ; **`prod` = `main` = 3.67.1**. La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.0. Reste au propriétaire : fusionner la PR 3.73.0, tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python). La 3.72.1 et la 3.73.0 n'ont pas de migration (les migrations 9 et 10 viennent de la 3.68 à 3.71).
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
@@ -30,7 +30,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.73.1**, `preprod` à 3.72.1 (PR 3.73.0 à fusionner), `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.73.2**, `preprod` à 3.73.1, `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 

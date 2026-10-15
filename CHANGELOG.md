@@ -1,5 +1,14 @@
 # Historique des versions — À Quai
 
+## [3.73.2] - 2026-10-15 — Pas de lien de signature d'une restitution sans état du matériel
+
+### 🐛 Un lien de restitution vide n'est plus possible
+- Il était possible de générer un lien (ou un QR code) de signature pour une restitution dont la **Phase 2** (état du matériel) n'était pas enregistrée : le signataire arrivait sur un récapitulatif **sans aucun matériel** (« Aucun materiel n'a ete renseigne ») et pouvait signer dans le vide.
+- Le serveur refuse désormais de créer le lien (`restitution_items_missing`) et l'application affiche : « Enregistrez d'abord l'état du matériel restitué (étape 2 de la restitution) avant de générer le lien de signature. » (QR code, copie du lien et e-mail).
+- Un lien déjà créé avant la correction reste valable : il affiche le matériel dès que la Phase 2 est enregistrée.
+- Fichiers : `backend/models/signature.py`, `backend/routes/signature.py` (le message accompagne le code d'erreur), `frontend/js/storage.js` (`ensureRestitutionSignatureLink`, `?v=20261015a` sur les 7 pages). Aucune migration.
+- Tests : `tests/test_restitution_link_needs_items.py` ; le scénario navigateur `check_restitution_qr_attente.py` crée maintenant un dossier avec une ressource (22 vérifications OK).
+
 ## [3.73.1] - 2026-10-15 — Page de signature d'une restitution : seulement les informations utiles
 
 ### 🐛 Plus de données techniques affichées au signataire

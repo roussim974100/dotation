@@ -53,7 +53,8 @@ def qr_open(driver):
 
 
 def dossier_actif(driver, nom):
-    body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": nom, "prenom": "Test", "qualite": "agent"}, "resources": {"additional": []},
+    body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": nom, "prenom": "Test", "qualite": "agent"}, "resources": {"additional": [{"id": 1, "code": "ordinateur", "label": "Ordinateur", "category": "materiel", "requiresReturn": True,
+                                                    "selected": True, "fields": {"marque": "X"}, "details": "", "assignedAt": "2026-09-01T09:00:00"}]},
             "validation": {"signatureDataUrl": PNG, "rgpdAccepted": True}, "workflow": {"status": "active"}, "meta": {}}
     created = api(driver, "POST", "/api/forms", body)
     return (created["json"].get("summary") or {}).get("id")
