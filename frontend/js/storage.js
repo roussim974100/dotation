@@ -2355,10 +2355,18 @@ async function ensureAssignmentSignatureLink(id) {
 async function ensureRestitutionSignatureLink(id, validityDays) {
   let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
   if (!result?.link || result.link.status !== "active" || !result.link.url) {
-    result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
-      method: "POST",
-      body: validityDays ? JSON.stringify({ validityDays }) : undefined
-    });
+    try {
+      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
+        method: "POST",
+        body: validityDays ? JSON.stringify({ validityDays }) : undefined
+      });
+    } catch (error) {
+      // Le serveur explique pourquoi (ex. état du matériel pas encore enregistré) : on l'affiche tel quel.
+      if (error?.payload?.message) {
+        error.message = error.payload.message;
+      }
+      throw error;
+    }
   }
   return {
     link: result.link,
