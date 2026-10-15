@@ -990,16 +990,23 @@ function buildDraftActionButtons(draft, options) {
       ? "openRestitution"
       : "editDraft";
 
-  // Action metier de l'etape, mise en avant a cote de "Ouvrir".
-  let stepAction = null;
-  if (pendingAdjustment) {
-    stepAction = { action: "openAdjustmentSignature", label: "Signer l'ajustement" };
-  } else if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
-    stepAction = { action: "openRestitution", label: "Restituer" };
+  // Action(s) metier de l'etape, mises en avant a cote de "Ouvrir". Deux peuvent coexister sur un dossier actif :
+  // "Gerer les ressources" (ajout/retrait partiel, la personne reste) et "Restituer" (depart complet de la
+  // personne) sont deux parcours distincts, pas une alternative.
+  const stepActions = [];
+  const hasPendingAdjustmentSignature = (draft.data?.ajustements || []).some((event) => event.status === "pending_signature");
+  const canAdjustHere = canAdjustDossier(sessionInfo) && status === "active";
+  if (canAdjustHere && hasPendingAdjustmentSignature) {
+    stepActions.push({ action: "openAdjustmentSignature", label: "Signer l'ajustement" });
+  } else if (canAdjustHere) {
+    stepActions.push({ action: "openAdjustment", label: "Gérer les ressources" });
+  }
+  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+    stepActions.push({ action: "openRestitution", label: "Restituer" });
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
-    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
-    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   }
 
   // Documents (PDF) — l'ordre suit la phase
@@ -1032,18 +1039,15 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
-  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  // Repartir de l'identite de la personne pour une nouvelle attribution : utile seulement quand il n'y a PLUS de
+  // dossier actif a ajuster (restitution terminee ou en cours). Sur un dossier "active", "Gerer les ressources"
+  // (ci-dessus) est le bon outil : proposer aussi ce bouton ne ferait que recreer le doublon qu'il visait a eviter.
   const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
-  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+  const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
-  // Ajuster un dossier actif (ajouter / retirer des ressources, changer le service) ; signer un ajustement resté en attente.
-  if (canAdjustDossier(sessionInfo) && status === "active") {
-    personItems.push({ action: "openAdjustment", id, label: "Ajuster les ressources / le service" });
-    if ((draft.data?.ajustements || []).some((event) => event.status === "pending_signature")) {
-      personItems.push({ action: "openAdjustmentSignature", id, label: "Signer l'ajustement en attente" });
-    }
-  }
+  // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
+  // (canAdjustHere) : rien à dupliquer dans le menu « … ».
 
   // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
   const qrItems = [];
@@ -1060,7 +1064,7 @@ function buildDraftActionButtons(draft, options) {
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
-      ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
+      ${stepActions.map((action) => `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${action.action}" data-id="${id}">${escapeHtml(action.label)}</button>`).join("")}
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
         { title: "Envoyer par e-mail", items: emailItems },
@@ -2077,21 +2081,28 @@ async function saveSimpleEmailDraft({ recipientEmail, subject, title, bodyLines,
   saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
 }
 
-async function fetchPdfDocument(id, kind) {
-  const isRestitution = kind === "restitution";
-  const config = isRestitution
-    ? {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
-        title: "Préparation du PDF restitution",
-        text: "Le bon de restitution est en cours de génération.",
-        fallbackName: `restitution-${id}.pdf`
-      }
-    : {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
-        title: "Préparation du PDF dossier",
-        text: "Le document est en cours de génération.",
-        fallbackName: `dossier-${id}.pdf`
-      };
+async function fetchPdfDocument(id, kind, extra) {
+  const configs = {
+    restitution: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
+      title: "Préparation du PDF restitution",
+      text: "Le bon de restitution est en cours de génération.",
+      fallbackName: `restitution-${id}.pdf`
+    },
+    ajustement: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf/ajustement/${encodeURIComponent(extra || "")}`,
+      title: "Préparation du PDF d'ajustement",
+      text: "La fiche d'ajustement est en cours de génération.",
+      fallbackName: `ajustement-${id}.pdf`
+    },
+    dossier: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
+      title: "Préparation du PDF dossier",
+      text: "Le document est en cours de génération.",
+      fallbackName: `dossier-${id}.pdf`
+    }
+  };
+  const config = configs[kind] || configs.dossier;
 
   showExportLoader(config.title, config.text);
   try {
@@ -2109,18 +2120,18 @@ async function fetchPdfDocument(id, kind) {
   }
 }
 
-async function preparePdfEmail(id, kind) {
+async function preparePdfEmail(id, kind, extra) {
   try {
     const result = await getDraftById(id);
     const draft = result
       ? { ...result.summary, data: result.data }
       : findDraftSummary(id);
-    const { blob, fileName } = await fetchPdfDocument(id, kind);
+    const { blob, fileName } = await fetchPdfDocument(id, kind, extra);
     const attachmentBase64 = toBase64(await blob.arrayBuffer());
     const recipientEmail = getPdfEmailRecipient(draft);
     const title = draft?.title || "Dossier";
     const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
-    const documentLabel = kind === "restitution" ? "PDF de restitution" : "PDF de dossier";
+    const documentLabel = { restitution: "PDF de restitution", ajustement: "fiche d'ajustement (PDF)" }[kind] || "PDF de dossier";
     const bodyLines = [
       "Bonjour,",
       "",
@@ -2149,7 +2160,9 @@ async function preparePdfEmail(id, kind) {
     showToast(
       error.message || (kind === "restitution"
         ? "Impossible de préparer l'e-mail du PDF restitution."
-        : "Impossible de préparer l'e-mail du PDF dossier."),
+        : kind === "ajustement"
+          ? "Impossible de préparer l'e-mail de la fiche d'ajustement."
+          : "Impossible de préparer l'e-mail du PDF dossier."),
       "error"
     );
   }
@@ -2161,6 +2174,19 @@ async function prepareDraftPdfEmail(id) {
 
 async function prepareRestitutionPdfEmail(id) {
   await preparePdfEmail(id, "restitution");
+}
+
+async function prepareAdjustmentPdfEmail(id, eventId) {
+  await preparePdfEmail(id, "ajustement", eventId);
+}
+
+async function exportAdjustmentPdf(id, eventId) {
+  try {
+    const { blob, fileName } = await fetchPdfDocument(id, "ajustement", eventId);
+    saveBlob(blob, fileName);
+  } catch (error) {
+    showToast("Impossible de générer le PDF de l'ajustement.", "error");
+  }
 }
 
 async function exportDraftPdf(id) {
@@ -2462,27 +2488,33 @@ async function showSignatureQr(id, kind) {
         : await ensureAssignmentSignatureLink(id);
     const draft = findDraftSummary(id);
     const titles = { restitution: "Signature de la restitution", adjustment: "Signature de l'ajustement" };
-    showSignatureQrDialog({
-      url: absoluteUrl,
-      title: titles[kind] || "Signature de l'attribution",
-      subtitle: draft?.title || "",
-      expiresAt: link?.expiresAt
+    // Attend la fermeture de la fenêtre (utile à qui enchaîne une redirection) ; renvoie false si elle n'a pas pu s'ouvrir.
+    return await new Promise((resolve) => {
+      const opened = showSignatureQrDialog({
+        url: absoluteUrl,
+        title: titles[kind] || "Signature de l'attribution",
+        subtitle: draft?.title || "",
+        expiresAt: link?.expiresAt,
+        onClose: () => resolve(true)
+      });
+      if (!opened) resolve(false);
     });
   } catch (error) {
     showToast(error.message || "Impossible de préparer le QR code de signature.", "error");
+    return false;
   }
 }
 
 async function showAssignmentSignatureQr(id) {
-  await showSignatureQr(id, "assignment");
+  return showSignatureQr(id, "assignment");
 }
 
 async function showRestitutionSignatureQr(id) {
-  await showSignatureQr(id, "restitution");
+  return showSignatureQr(id, "restitution");
 }
 
 async function showAdjustmentSignatureQr(id) {
-  await showSignatureQr(id, "adjustment");
+  return showSignatureQr(id, "adjustment");
 }
 
 async function copyRestitutionSignatureLink(id) {

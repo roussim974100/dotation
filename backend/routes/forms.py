@@ -550,6 +550,25 @@ def get_retraits_pdf(form_id):
         raise  # gestionnaire global : code d'erreur communicable, jamais le message brut (qui peut contenir une valeur)
 
 
+@bp.route("/api/forms/<form_id>/pdf/ajustement/<event_id>", methods=["GET"])
+@login_required
+def get_adjustment_pdf(form_id, event_id):
+    """PDF d'un ajustement : preuve de ce qui a ete ajoute, retire ou change et de la signature. Meme droit que les autres PDF."""
+    if not can_export_unmasked():
+        return jsonify({"error": "forbidden"}), 403
+    form_data = get_form(form_id)
+    if not form_data:
+        return jsonify({"error": "not_found"}), 404
+    from pdf.adjustment import build_adjustment_pdf_bytes
+    try:
+        pdf_bytes = build_adjustment_pdf_bytes(form_data.get("data", {}), event_id)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    beneficiaire = form_data.get("data", {}).get("beneficiaire", {})
+    filename = slugify_filename(f"ajustement_{beneficiaire.get('nom')}_{beneficiaire.get('prenom')}")
+    return download_response(pdf_bytes, f"{filename}.pdf", "application/pdf")
+
+
 @bp.route("/api/forms/<form_id>", methods=["GET"])
 @login_required
 def get_form_route(form_id):

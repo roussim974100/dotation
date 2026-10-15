@@ -1,5 +1,180 @@
 # Historique des versions — À Quai
 
+## [3.73.1] - 2026-10-15 — Page de signature d'une restitution : seulement les informations utiles
+
+### 🐛 Plus de données techniques affichées au signataire
+- Sur la page publique de signature d'une restitution (et dans les exports Excel), le détail d'une ressource du catalogue sans valeur saisie (cas fréquent en **régularisation**) affichait toutes les données internes : identifiant `resource_…`, catégorie, service émetteur, `True`/`False`, schéma de champs complet.
+- Le détail ne reprend plus que ce qui a un sens pour la personne : les valeurs réellement saisies (« Marque : … », « Numéro de série : … »), sinon « Sans detail complementaire ». Les champs techniques et les structures (listes, objets, booléens) sont exclus.
+- Fichier : `backend/models/workflow.py` (`summarize_resource_item_details`). Aucune migration.
+
+## [3.73.0] - 2026-10-08 — QR code proposé juste après « Enregistrer en attente » d'une restitution
+
+### 📱 Signature à distance d'une restitution : le QR code tout de suite
+- Sur l'écran de restitution, quand le mode de signature choisi est **« Signature à distance par lien »**, la fenêtre de fin de **« Enregistrer en attente »** propose maintenant **« Afficher le QR code »** (ou **« Plus tard »**). La personne est souvent encore devant l'agent : elle scanne le code avec son téléphone et signe, sans que l'agent ait à retrouver la ligne dans la liste puis le menu « ⋯ ».
+- **La redirection vers la liste n'a lieu qu'à la fermeture du QR code** (jusque-là, l'agent reste sur l'écran). Si le lien ne peut pas être créé, un message d'erreur s'affiche et l'agent **reste sur la page** pour réessayer.
+- **Rien n'est proposé** quand la signature a été recueillie sur place ou déclarée impossible (un simple « OK » comme avant). Un clic hors de la fenêtre vaut « Plus tard » : jamais de QR code déclenché par erreur.
+- Le lien et le QR sont ceux qui existaient déjà (même fenêtre, avertissement « localhost », date de validité, bouton « Copier le lien »). Aucun changement côté serveur, aucune migration.
+- Fichiers : `frontend/js/restitution.js`, `frontend/js/storage.js` (`showSignatureQr` attend la fermeture de la fenêtre et renvoie `false` si elle n'a pas pu s'ouvrir), `frontend/js/signature-qr.js` (option `onClose`), `frontend/restitution.html` (charge le générateur de QR). Les numéros `?v=` de `storage.js`, `signature-qr.js` et `branding.js` sont alignés sur toutes les pages.
+- Test : scénario navigateur `tests/browser/check_restitution_qr_attente.py` (22 vérifications : proposition seulement pour la signature à distance, QR affiché avec le lien de la restitution, redirection à la fermeture, « Plus tard », signature impossible, clic hors fenêtre, échec de création du lien).
+
+## [3.72.1] - 2026-10-08 — Fuseau horaire plus clair ; blocage de l'adresse IP au lieu du compte
+
+### 🔒 Connexion : on bloque l'adresse de celui qui insiste, plus le compte de sa cible
+- **10 échecs de connexion depuis une même adresse la bloquent pendant 15 minutes** (même avec le bon mot de passe ensuite). Le message dit pourquoi et combien de temps. Réglable : `APP_LOGIN_IP_MAX_FAILURES` (10, `0` = désactivé) et `APP_LOGIN_IP_BLOCK_MINUTES` (15).
+- **Un compte n'est plus jamais bloqué** : personne ne peut empêcher un collègue de se connecter en tapant de faux mots de passe à sa place (défaut du verrouillage par compte, qui était désactivé par défaut depuis la 3.72.0 et est **retiré** : plus de « Connexion bloquée » ni de « Débloquer la connexion » dans Admin > Comptes).
+- **Seuls les échecs comptent** (mot de passe faux, identifiant inconnu, jeton CSRF invalide, compte inactif) : une connexion réussie ne compte pas, donc un poste partagé ou un kiosque n'est pas pénalisé — et ne remet pas non plus le compteur à zéro. Le blocage commence au 10e échec et **ne se prolonge pas** si l'on insiste ; à sa fin, le compteur repart de zéro.
+- **L'adresse vient du serveur** (corrigée par ProxyFix selon les proxys de confiance), jamais d'un en-tête `X-Forwarded-For` falsifiable. Le blocage est journalisé (`login_ip_blocked`, l'adresse seulement : jamais l'identifiant ni le mot de passe).
+- À savoir : plusieurs personnes derrière **une même adresse publique** (réseau partagé sans proxy qui transmet l'adresse réelle) partagent le seuil ; derrière Traefik / nginx configurés, chaque poste garde son adresse. Un attaquant réparti sur de nombreuses adresses n'est pas arrêté par cette seule limite.
+
+### 🕒 Fuseau horaire : champ avec suggestions, heure d'été / d'hiver, fuseau écrit sur les signatures
+- **Champ où l'on peut écrire** (Administration > Personnalisation > Fuseau horaire) avec une liste de suggestions : on tape un nom (`Europe/Paris`) ou un lieu en français (« Réunion », « belgique » — sans accents ni majuscules) qui devient son nom de fuseau, ou on choisit dans la liste. Les cas courants viennent d'abord (France et outre-mer, Belgique, Suisse, Luxembourg, Canada, Maghreb, Afrique francophone), avec leur décalage ; les autres fuseaux suivent (419 au total, tous acceptés par le serveur). Un fuseau valide absent de la liste se tape et s'enregistre ; un nom inconnu est signalé tout de suite (champ marqué invalide) et refusé à l'enregistrement avec la raison.
+- **Heure d'été / heure d'hiver visibles** : sous le champ, quelle heure est en vigueur et **quand a lieu le prochain changement** (« Heure d'été en vigueur. Prochain changement d'heure : dimanche 25 octobre 2026, passage à l'heure d'hiver (UTC+1) »), ou « Ce fuseau n'a pas de changement d'heure ». Calculé dans les deux hémisphères et pour les demi-heures (Inde, UTC+5:30). La conversion des PDF suivait déjà ces changements (testée sur la nuit du 25 au 26 octobre).
+- **Le fuseau est écrit à côté des heures de signature et d'ajustement** dans les PDF : « 08/10/2026 09:03 (heure de Paris, UTC+2) ». Quelqu'un qui lit le document de loin ou plus tard sait à quelle heure il se réfère. Une date saisie à la main (remise, prise de fonction) n'est ni convertie ni étiquetée. Rappel : l'heure d'une signature est posée par le serveur, en UTC — le fuseau ou l'horloge de l'agent qui signe n'y change rien.
+- La fenêtre d'erreur de la page Personnalisation affiche la raison donnée par le serveur.
+- Fichiers : `backend/auth.py` (blocage d'adresse), `backend/routes/pages.py`, `backend/routes/admin.py`, `backend/utils.py` (`format_export_instant`, `timezone_label`), `backend/pdf/adjustment.py`, `frontend/js/admin-branding.js`, `frontend/admin-personnalisation.html`, `frontend/js/admin.js`, `frontend/js/login.js`.
+
+### 🍪 Cookies, et plus aucune dépendance à Internet
+- **Bibliothèques hébergées dans l'application** : Bootstrap 5.3.2, Chart.js 4.4.2 et CookieConsent 3.1.0 (`frontend/js/vendor`, `frontend/css/vendor`, licences MIT jointes) ne viennent plus de `cdn.jsdelivr.net`. Sur un intranet sans accès à Internet, ou derrière un pare-feu qui bloque ce CDN, les pages s'affichaient sans mise en forme et le bouton « Cookies » du pied de page **ne faisait rien** (la bibliothèque ne se chargeait pas, sans message). La politique de sécurité (`Content-Security-Policy`) n'autorise désormais que `'self'` pour les scripts, styles et polices : l'application ne contacte aucun serveur externe pour s'afficher.
+- Le lien vers `chart.min.css` (fichier inexistant, erreur 404 à chaque ouverture du tableau de bord) est supprimé. Les 29 pages qui chargent `branding.js` portent maintenant un `?v=` (elles n'en avaient pas : un navigateur pouvait garder l'ancienne version).
+- **Le bouton « Cookies » dit quand il échoue** : au lieu d'un échec silencieux, un message invite à recharger la page, et le clic suivant réessaie. L'attente du démarrage de la bibliothèque est désormais complète (une erreur remonte au lieu d'être perdue).
+- **La fenêtre « Préférences cookies » dit la vérité sur la session** : elle annonçait « publier_session — Durée : session navigateur », faux depuis la 3.67.3. Elle affiche les durées réelles, lues dans les réglages publics (`session.maxHours`, `session.idleMinutes`, donc `APP_SESSION_MAX_HOURS` / `APP_SESSION_IDLE_MINUTES`) : « 12 heures au maximum depuis la connexion, et fermeture après 1 heure sans activité ». Les deux autres cookies sont inchangés.
+- Le cookie `publier_session` ne contient que l'identifiant de connexion, une empreinte (HMAC, jamais le mot de passe), les dates de connexion et d'activité et le jeton CSRF.
+- **README** : les 7 variables d'environnement ajoutées depuis la 3.67 y figurent (durée de session, blocage d'adresse, retards et cache des tâches).
+
+### 🧪 Tests
+- `tests/test_login_ip_block.py` (15 : seuil, autre adresse non touchée, connexions réussies non comptées, blocage de 15 min non prolongé, adresse forgée ignorée, journal sans identifiant), `tests/test_timezone.py` (+4 : fuseau écrit à côté d'un instant), `tests/test_rate_store.py` (adapté au blocage d'adresse), `tests/test_no_external_assets.py` (33 : aucune page ne charge de ressource externe, bibliothèques servies, politique de sécurité sans CDN), scénarios navigateur `check_login_ip_block.py` (9), `check_fuseau.py` (26) et `check_cookies_hors_ligne.py` (9 : aucune requête externe, clic sur « Cookies »). Remplacent `test_login_account_lock.py` et `check_login_lock.py`.
+
+## [3.72.0] - 2026-10-07 — Suite des notifications et sécurité des comptes
+
+### 🔔 Notifications
+- **Retrait d'une ressource par un ajustement → tâche « à fermer »** : quand un ajustement retire d'un dossier resté actif une ressource sans retour physique (compte, accès), le service émetteur reçoit la tâche, comme pour une restitution. L'ancienneté part du retrait. (Avant : seule la restitution la créait, donc un compte retiré par un ajustement n'était signalé à personne.)
+- **« Tâches des services » dans la fiche du dossier** : sous l'historique des ajustements, ce qui reste à faire (service, ancienneté, « en retard » / « escaladée ») puis ce qui est fait (**par qui, quand**). Aucune donnée sur la personne dans ce bloc ; rien d'affiché pour un dossier sans tâche ni pour qui ne peut pas lire le dossier. API : `GET /api/forms/<id>/service-tasks` (même droit que l'ouverture du dossier).
+
+### 🔒 Sécurité des comptes
+- **Verrouillage temporaire par compte — DÉSACTIVÉ PAR DÉFAUT** (décision du propriétaire, 08/10/2026 : un verrouillage permet de bloquer volontairement un compte en échouant exprès ; à reprendre plus tard). Le code reste, en option : `APP_LOGIN_ACCOUNT_MAX_FAILURES=5` l'active (5 échecs de mot de passe en 15 minutes bloquent les tentatives sur ce compte, même avec le bon mot de passe et même depuis une autre adresse ; seuls les échecs comptent, une connexion réussie remet à zéro ; un identifiant inconnu se comporte comme un compte connu ; la clé du compteur est un hachage, jamais l'identifiant tapé). `APP_LOGIN_ACCOUNT_WINDOW_MINUTES` (15) règle la durée. Sans la variable (0), rien n'est compté ni conservé.
+- **Débloquer** (utile seulement si le verrouillage est activé) : la liste Admin > Comptes affiche « Connexion bloquée » et propose « Débloquer la connexion » (journalisé).
+- **Mot de passe fixé par un administrateur** : à la création d'un compte et à la réinitialisation du mot de passe d'un **autre** compte, la personne doit en choisir un nouveau à sa première connexion (même fenêtre non fermable que pour `admin/admin`) — l'administrateur connaît ce mot de passe. Sur son propre compte, un administrateur n'est pas obligé de le rechanger. Le texte de la fenêtre le dit.
+
+### 📄 PDF et e-mail d'un ajustement
+- **Chaque ajustement a maintenant sa fiche PDF** (`GET /api/forms/<id>/pdf/ajustement/<id_ajustement>`, `backend/pdf/adjustment.py`) : bénéficiaire, service (et son changement), ressources ajoutées, ressources retirées avec leur état, date, auteur, et la signature — image manuscrite (en présentiel ou recueillie à distance), « signé à la place par … » avec le motif, ou « en attente de signature : ce document n'a pas encore valeur de preuve ». Même charte que les autres PDF, mêmes droits (export ; jamais pour un profil à données masquées).
+- **Dans l'historique des ajustements de la fiche** : « Télécharger le PDF » et « Envoyer par e-mail » (fichier `.eml` avec le PDF en pièce jointe, comme pour les restitutions), visibles seulement pour qui peut exporter. Ces boutons restent actifs sur une fiche signée (nouvel attribut `data-keep-enabled` de `applyLockState`, `app.js`).
+- Limite connue, déjà présente dans tous les PDF : les heures sont affichées telles qu'enregistrées (UTC), sans conversion en heure locale.
+
+### 🕒 Fuseau horaire de l'organisation
+- **Les heures des PDF et des exports sont maintenant à l'heure locale** de l'organisation (avant : heure UTC brute, soit 1 à 2 h de moins en France ; l'en-tête des PDF prenait l'heure du serveur, donc UTC sous Linux). Réglage **Administration > Personnalisation > Fuseau horaire**, `Europe/Paris` par défaut : il suit l'endroit où se situe l'organisation, quel que soit le fuseau du serveur. Aperçu de l'heure locale à la saisie, bouton « Utiliser le fuseau de ce navigateur », liste des fuseaux connus ; un nom inconnu est refusé avec un message clair.
+- **Seules les heures enregistrées avec un fuseau sont converties** (`utc_now()`, signatures, ajustements) : une date saisie à la main (`2026-09-01T09:00:00`, date de remise, date de prise de fonction) est affichée telle quelle, jamais décalée. Heure d'été et d'hiver gérées par les règles du fuseau (nuit du 25 au 26 octobre vérifiée).
+- Effet immédiat dans le processus qui enregistre le réglage ; les autres processus (plusieurs workers) le voient sous 30 s. Un réglage illisible en base retombe sur Europe/Paris, jamais d'erreur dans un PDF.
+- **Dépendance ajoutée : `tzdata`** (`backend/requirements.txt`) — nécessaire sous Windows ; déjà présente sous Linux. **Réinstaller les dépendances** (`pip install -r backend/requirements.txt`) après la mise à jour.
+- La fenêtre d'erreur de la page Personnalisation affiche désormais la raison donnée par le serveur (ex. « Fuseau horaire inconnu ») au lieu d'un texte générique.
+- Fichiers : `backend/utils.py` (`get_org_timezone`, `format_export_datetime`), `backend/models/settings.py`, `backend/routes/admin.py`, `backend/pdf/attribution.py`, `frontend/js/admin-branding.js`, `frontend/admin-personnalisation.html`.
+
+### 🧪 Tests
+- `tests/test_login_account_lock.py` (18 cas, le verrouillage y est activé explicitement), `tests/test_default_password_change.py` (+3), `tests/test_service_tasks.py` (+7 : ajustement, fiche), `tests/test_adjustment_pdf.py` (6 : contenu du PDF relu avec pypdf, droits, signature), `tests/test_timezone.py` (11 : été / hiver, heure sans fuseau, autre fuseau, validation, en-tête, PDF) ; scénarios navigateur `check_login_lock.py` (7), `check_fiche_taches.py` (9), `check_adjustment_pdf.py` (11), `check_fuseau.py` (11).
+- Fichiers : `backend/pdf/adjustment.py`, `backend/auth.py`, `backend/rate_store.py` (`count`, `clear`), `backend/routes/forms.py`, `backend/routes/pages.py`, `backend/routes/admin.py`, `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `frontend/js/form-service-tasks.js`, `frontend/js/admin.js`, `frontend/js/login.js`, `frontend/js/config.js`, `frontend/js/ui.js`, `frontend/form.html`.
+
+
+## [3.71.0] - 2026-10-06 — Notifications, lot 4 : retards, escalade, page « Mes tâches »
+
+### 🔔 Relances, escalade et une page pour tout voir
+- **En retard après 3 jours** : une tâche de service plus ancienne est marquée « ⏰ En retard · N j » (en toutes lettres, pas seulement par la couleur), dans la liste, dans le panneau de la cloche (« N en retard ») et dans la page « Mes tâches ». L'ancienneté part de la création du dossier (à fournir) ou de la date de restitution (à fermer) ; une date future (départ planifié) n'est jamais en retard. Seuils réglables : `APP_TASK_LATE_DAYS` (3) et `APP_TASK_ESCALATE_DAYS` (7).
+- **Escaladée après 7 jours** : la tâche apparaît **aussi chez les administrateurs** (« ⚠ Escaladée aux administrateurs »), qui peuvent la terminer. Avant, un administrateur ne voyait que les tâches d'un service sans titulaire.
+- **Page « Mes tâches »** (`tasks.html`, lien « Tout voir » de la cloche et entrée du menu du compte) : toutes les tâches qui me concernent, filtrables par type et « seulement en retard », avec « Fait » sur chaque ligne.
+- **Terminées ces 30 derniers jours** : qui a fait quoi, et **« Rouvrir »** pour un « Fait » enregistré par erreur (la tâche revient chez tous les titulaires ; réservé aux titulaires du service et aux administrateurs ; journalisé).
+- **Pas de purge « à 90 jours » des « Fait »** (prévue au cadrage) : ces lignes sont la mémoire du « déjà fait » — les supprimer ferait réapparaître la tâche tant que le dossier existe. Seuls les « Fait » d'un dossier **supprimé** sont purgés (au démarrage, `purge_orphans`).
+- Pas d'e-mail : le retard est un état visible, pas un message envoyé.
+- Fichiers : `backend/models/service_tasks.py`, `backend/routes/notifications.py`, `backend/app.py` (purge au démarrage), `frontend/tasks.html`, `frontend/js/tasks.js`, `frontend/js/notifications.js` (tableaux réutilisables), `frontend/js/ui.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` : 29 cas (retard, seuils, escalade, réouverture, historique, masquage, purge, page). Scénario navigateur `tests/browser/check_tasks_page.py` (17 vérifications). `check_menu.py` attend le nouveau lien ; `check_session_terminee_ailleurs.py` laisse la page finir de charger avant de révoquer (course de timing).
+
+
+## [3.70.0] - 2026-10-06 — Notifications, lot 2 : tâches de service
+
+### 🔔 Ce que doit faire chaque service, et un « Fait » partagé
+- **« Ressources à fournir »** : dès qu'un dossier attribue une ressource (dossier en attente de signature ou actif, élément non rendu), **tous les titulaires du service de la ressource** reçoivent la tâche (créer le compte, l'accès, préparer le matériel). Elle disparaît si le dossier est annulé ou restitué, ou si l'élément est retiré.
+- **« Ressources à fermer »** : quand un dossier passe en restitution, les ressources **sans retour physique** (comptes, accès : « doit être restituée » décoché) deviennent une tâche pour le service émetteur — le matériel à rendre reste suivi par la restitution elle-même.
+- **« Fait »** (bouton sur chaque ligne de la fenêtre « Ressources à fournir / à fermer ») : enregistre qui et quand (`service_task_done`), et **la tâche disparaît pour tous les titulaires du service**. « À fournir » et « à fermer » sont deux décisions distinctes (le compte créé doit être fermé au départ). Le « Fait » est indépendant des lignes d'éléments : il survit à un nouvel enregistrement du dossier, et n'écrit rien dans le contenu (signé) du dossier.
+- **Repli sur les administrateurs** si le service n'a aucun titulaire actif (comptes supprimés, désactivés ou liste vide) : la ligne le précise. Une ressource sans service du catalogue reste dans la tâche « choisir le service ».
+- **Aucune donnée personnelle pour un profil masqué** : le nom de la personne n'est affiché qu'à un lecteur en portée complète ; un profil masqué voit « Dossier du jj/mm/aaaa ». Le lien « Ouvrir le dossier » n'apparaît que pour qui peut le lire. Rien dans le journal.
+- **Migration 10** (sauvegarde automatique avant application) : crée `service_task_done` et **considère l'existant comme traité** (tous les éléments des dossiers non brouillons) : sans cela, les centaines d'attributions historiques deviendraient d'un coup des tâches. Seuls les nouveaux éléments et les brouillons validés plus tard en créent.
+- Le calcul est mis en cache 30 s par compte (`APP_NOTIFICATIONS_CACHE_SECONDS`) ; le cache est vidé à chaque enregistrement de dossier et à chaque « Fait ».
+- **Pas encore** : retrait d'une ressource par un ajustement (→ « à fermer »), relances J+3 / escalade J+7, historique « Fait par X le … » dans la fiche du dossier, page « Mes tâches ».
+- Fichiers : `backend/models/service_tasks.py`, `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/models/forms.py` (vidage du cache), `backend/migrations.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_service_tasks.py` (16 cas : titulaires, partage du « Fait », refus, survie à un nouvel enregistrement, à fermer, repli administrateurs, masquage, migration) ; scénario navigateur `tests/browser/check_service_tasks.py` (15 vérifications, session d'un compte ordinaire).
+
+
+## [3.69.0] - 2026-10-06 — Notifications, lot 3 : tâches des administrateurs
+
+### 🔔 Trois nouvelles notifications pour les administrateurs
+- **Nouvelle version disponible** (droit `users.manage`) : « Nouvelle version disponible : x.y.z », avec la version installée et un lien vers l'écran de mise à jour. Lue dans le cache disque (`update_check.cached_status`) : **jamais d'appel réseau** pendant un contrôle de session ; une vérification périmée part en arrière-plan. Respecte `APP_UPDATE_CHECK=0`. Disparaît quand la version est installée.
+- **Sauvegarde automatique en échec** (droit `db.manage` ou son indicateur individuel) : même état que le bandeau de l'administration de la base (`backup_schedule.health`, niveau « erreur » : dernière sauvegarde en échec, ou plus aucune exécution). Marquée « ⚠ Urgent » en toutes lettres (pas seulement par la couleur) et placée en premier. Calcul mis en cache 60 s dans le processus (le fichier d'historique peut être gros).
+- **Demandes d'inscription à valider** (droit `users.manage`) : seulement leur nombre, **aucun identifiant** dans la notification ; lien vers Admin > Comptes. Diminue quand une demande est validée ou refusée.
+- Toujours calculées à partir de l'état réel : aucune notification à « marquer comme lue », elle disparaît quand la situation est réglée. Ordre : sauvegarde, version, inscriptions, ressources sans service.
+- Fichiers : `backend/models/notifications.py`, `backend/update_check.py`, `frontend/js/notifications.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` : 11 cas de plus (droits, cache, absence de réseau, ordre, compteur de session) ; `tests/browser/check_notifications.py` : 26 vérifications (inscription et version, clic jusqu'à la page).
+
+
+## [3.68.0] - 2026-10-06 — Notifications, lot 1
+
+### 🔔 Une cloche, des services et leurs titulaires
+- **Chaque ressource appartient à un service du catalogue**, et chaque service porte une **liste de comptes titulaires** (Admin > Services, fenêtre « Modifier le service »). Tous les titulaires reçoivent les notifications du service ; sans titulaire, ce seront les administrateurs. Le lien ressource → service est le libellé (« service émetteur » de la ressource, rebaptisé « Service référent » dans les formulaires) ; **renommer un service fait suivre ses ressources**, le supprimer les remet à choisir.
+- **Le service est obligatoire** à la création d'une ressource (formulaire, assistant, API : `issuer_service_required` / `issuer_service_unknown`). À la modification, un ancien texte inchangé reste toléré pour ne pas bloquer l'édition des ressources d'avant.
+- **Cloche dans l'en-tête** (toutes les pages avec le menu du compte) : compteur lu avec le contrôle de session déjà fait chaque minute (`notifications_count` dans `/api/session`, aucun sondage de plus), panneau déroulant accessible (clavier, Échap, libellé annonçant le nombre, région vocale polie). `frontend/js/notifications.js` n'est chargé qu'au premier clic.
+- **Première tâche, pour les administrateurs (`users.manage`)** : « N ressources sans service référent ». La fenêtre de choix regroupe les ressources par ancien nom (une décision par groupe), **pré-remplit une suggestion** (nom identique, appellation courante comme Informatique → DSI, ou libellé qui contient l'ancien nom) que l'administrateur valide ou change ; rien n'est modifié avant sa validation, l'opération est tout ou rien et l'ancienne valeur est conservée au journal. La tâche est **calculée** à partir des données : elle disparaît toute seule quand la dernière ressource est rattachée.
+- **Migration 9** (sauvegarde automatique avant application) : crée `service_referents` et ramène au libellé exact du catalogue les services qui n'en différaient que par la casse, les accents ou les espaces (dans la copie de production consultée, 13 ressources sur 24 sont déjà rattachées à un service du catalogue) ; les autres ne sont **jamais devinées**.
+- Aucune donnée personnelle dans une notification (type, ressource, service). Pas de nouveau droit en V1 : chaque tâche est limitée par le droit qui permet de la traiter.
+- **Pas encore** (lots suivants) : tâches des services (compte à créer à l'attribution, compte à fermer à la restitution, avec « Fait »), administrateurs (inscription en attente, nouvelle version, sauvegarde en échec), relances.
+- Fichiers : `backend/models/notifications.py`, `backend/routes/notifications.py`, `backend/migrations.py`, `backend/routes/admin.py`, `backend/routes/pages.py`, `frontend/js/ui.js`, `frontend/js/notifications.js`, `frontend/js/admin.js`, `frontend/js/admin-resource-wizard.js`, `frontend/admin-services.html`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_notifications.py` (21 cas) et `tests/browser/check_notifications.py` (22 vérifications : cloche, panneau, choix, titulaires). Les scénarios HTTP créent désormais leurs ressources avec un service existant du catalogue.
+
+
+## [3.67.4] - 2026-10-06
+
+### 🔒 Une session révoquée ailleurs est fermée tout de suite dans l'onglet déjà ouvert
+- **Constat** (préprod, 3.67.3) : après un changement de mot de passe dans un autre navigateur, l'ancien navigateur était bien refusé par le serveur, mais l'ancienne page restait affichée jusqu'à un rechargement manuel.
+- **Correctif** (`frontend/js/ui.js`, pages avec le menu du compte) : toute requête de l'application qui reçoit un 401 renvoie vers la connexion ; la session est aussi contrôlée au retour sur l'onglet et chaque minute. Ce contrôle (en-tête `X-Session-Check`, `backend/auth.py`) **ne prolonge pas** la session : un onglet laissé ouvert tombe bien en inactivité après 60 min.
+- **Message** de la page de connexion : « Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion) » à la place de « La session n'a pas pu être conservée. Vérifiez les cookies » (trompeur dans ce cas ; `frontend/js/config.js`, `login.js`).
+- Les pages publiques de signature ne sont pas concernées (pas de session).
+
+### 🧪 Tests
+- `tests/test_session_validity.py` : 2 cas de plus (le contrôle ne prolonge pas la session ; un onglet ouvert tombe en inactivité). Scénario navigateur `tests/browser/check_session_terminee_ailleurs.py` : mot de passe changé, compte désactivé, requête en 401, session valide non déconnectée (9 vérifications).
+
+## [3.67.3] - 2026-10-06
+
+### 🔒 Sécurité : une session ne survit plus au changement de mot de passe
+- **Faille corrigée** (signalée par l'utilisateur) : une session ouverte avec `admin/admin` restait active, avec tous les droits, après que le mot de passe a été changé par quelqu'un d'autre. Le cookie ne portait que le nom d'utilisateur et rien n'était revérifié en base.
+- **Empreinte de session** : le cookie contient désormais un HMAC du hash du mot de passe, comparé à chaque requête. Mot de passe changé (par l'utilisateur ou par un administrateur), compte désactivé, en attente ou supprimé → session refusée (401) et entrée `session_revoked` dans le journal de sécurité. Celui qui change son propre mot de passe reste connecté ; ses autres sessions sont fermées.
+- **Cycle de vie** : la connexion vide l'ancienne session (pas de fixation) ; durée maximale 12 h et inactivité maximale 60 min, réglables par `APP_SESSION_MAX_HOURS` et `APP_SESSION_IDLE_MINUTES`.
+- ⚠️ **À la mise à jour, tout le monde doit se reconnecter une fois** : les cookies émis avant ce correctif sont refusés (c'est voulu, cela ferme aussi les sessions éventuellement compromises).
+- **Mot de passe d'origine à changer** : le compte `admin` protégé par `admin` est marqué `must_change_password` — à l'installation, et au démarrage pour les installations déjà en service (ou une base restaurée depuis une ancienne archive). Tant qu'il n'est pas changé, le serveur ne répond qu'au changement de mot de passe (API : 403 `password_change_required` ; pages : retour à l'accueil) et une fenêtre non fermable (ni Annuler, ni Échap, ni clic à côté) s'ouvre d'elle-même. Le nouveau mot de passe doit différer de l'ancien. Seul le compte `admin` est visé ; un mot de passe fixé par un administrateur dans Admin > Comptes lève aussi le drapeau. Colonne ajoutée à `users.db` (sans migration numérotée : `ensure_users_schema`).
+- **Fenêtre de changement de mot de passe** : elle passait sous la bannière « Configuration initiale » (`z-index` 100 contre 1040) ; les messages d'erreur de complexité ne correspondaient pas aux codes du serveur (affichage d'un code technique au lieu d'une phrase).
+- Fichiers : `backend/auth.py`, `backend/app.py`, `backend/database.py`, `backend/routes/pages.py`, `backend/routes/admin.py`, `frontend/js/ui.js`, `frontend/css/style.css`.
+
+### 🧪 Tests
+- `tests/test_default_password_change.py` (26 cas) et le scénario navigateur `tests/browser/check_password_obligatoire.py` (vraie connexion, fenêtre, déblocage). Le harnais navigateur fabrique désormais un cookie de session valide (empreinte du mot de passe) et change le mot de passe de `admin` dans l'instance isolée.
+- `tests/test_session_validity.py` (11 tests). `tests/_stamped_client.py` complète les sessions posées à la main par les autres tests ; trois tests qui utilisaient un compte absent de la base ont été ajustés.
+
+## [3.67.2] - 2026-09-29
+
+### 🖥️ Deux parcours distincts sur un dossier actif
+- **« Gérer les ressources »** apparaît désormais à côté de **« Restituer »** sur un dossier actif : ajustement partiel (ajout/retrait, la personne reste) et restitution complète (départ) sont deux boutons séparés au lieu d'un seul. « Signer l'ajustement » prend la place du premier quand un geste reste à signer à distance, dans toutes les vues.
+- **« Nouvelle attribution pour cette personne »** ne s'affiche plus sur un dossier actif (cas qui recréait justement le doublon que « Gérer les ressources » vise à éviter) ; reste proposé sur un dossier restitué ou en restitution, là où il n'y a plus de dossier actif à ajuster.
+- Fichier : `frontend/js/storage.js`.
+
+### 🖥️ Reprise de matériel restitué dans l'ajustement
+- **« Reprendre un matériel déjà restitué »** dans la fenêtre « Gérer les ressources » : en ajoutant une ressource suivie par identifiant (n° de série…), les unités disponibles en stock sont désormais proposées et remplissent automatiquement les champs — même mécanisme que la création de dossier, jusqu'ici absent de l'ajustement (constaté par l'utilisateur : un PC restitué n'était jamais suggéré, il fallait ressaisir son numéro de série à la main).
+- Fichier : `frontend/js/adjustment.js` (`openAdjustmentReuseModal`, réimplémenté plutôt que partagé avec `app.js` car ce fichier est aussi chargé sur des pages sans lui).
+
+### 🧪 Tests
+- `tests/browser/check_person_grouping.py` : 20/20 vérifications (2 nouvelles : absence sur un dossier actif, présence sur un dossier restitué).
+- `tests/browser/check_adjustment_reuse_stock.py` (nouveau) : 12/12 vérifications, scénario complet (restitution via ajustement → unité en stock → reprise automatique sur un autre dossier).
+
 ## [3.67.1] - 2026-09-28
 
 ### 🖥️ Une ligne par personne dans les 4 tableaux de bord

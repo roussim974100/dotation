@@ -18,11 +18,12 @@ from database import get_db, normalize_reference_row, normalize_service_row
 from auth import (
     login_required, permission_required, admin_required,
     get_user_record, password_complexity_error, is_valid_username,
-    current_user, rate_limit,
+    current_user, rate_limit, realign_session_password,
     list_all_users, list_all_groups, update_group,
     create_user, update_user, delete_user, normalize_email,
 )
 from models.audit import current_actor, insert_app_log, insert_deleted_item
+from models.notifications import active_services, all_referents, find_service_by_label, forget_account, forget_service, rename_service
 from models.settings import (
     DEFAULT_APP_SETTINGS, THEME_PRESETS,
     get_app_settings, save_app_settings, SettingsValidationError,
@@ -375,6 +376,7 @@ def admin_settings_route():
         "support_email": settings.get("support_email") or "",
         "support_role": settings.get("support_role") or "",
         "restitution_phase1_unlock_days": settings.get("restitution_phase1_unlock_days") or DEFAULT_APP_SETTINGS["restitution_phase1_unlock_days"],
+        "timezone": settings.get("timezone") or DEFAULT_APP_SETTINGS["timezone"],
         "timing_warning_days": settings.get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"],
         "parc_retention_years": settings.get("parc_retention_years") or DEFAULT_APP_SETTINGS["parc_retention_years"],
     }
@@ -417,6 +419,7 @@ def update_admin_settings_route():
                 "support_email": payload.get("support_email"),
                 "support_role": payload.get("support_role"),
                 "restitution_phase1_unlock_days": optional_int("restitution_phase1_unlock_days", 0, 365),
+                "timezone": payload.get("timezone"),  # fuseau horaire de l'organisation (nom IANA, ex. Europe/Paris) : valide par save_app_settings
                 "timing_warning_days": optional_int("timing_warning_days", 0, 365),
                 "parc_retention_years": optional_int("parc_retention_years", 1, 30),
             })
@@ -979,7 +982,11 @@ def admin_services():
         rows = connection.execute(
             "SELECT * FROM service_catalog ORDER BY is_active DESC, label COLLATE NOCASE ASC"
         ).fetchall()
-    return jsonify([normalize_service_row(row) for row in rows])
+        referents = all_referents(connection)
+    services = [normalize_service_row(row) for row in rows]
+    for service in services:
+        service["referents"] = referents.get(service["id"], [])
+    return jsonify(services)
 
 
 @bp.route("/api/admin/services", methods=["POST"])
@@ -1050,6 +1057,8 @@ def update_admin_service(service_id):
             return jsonify({"error": "service_exists"}), 409
 
         next_is_active = bool_to_int(payload.get("is_active", bool(row["is_active"])))
+        if next_label != row["label"]:
+            rename_service(connection, row["label"], next_label)  # le lien ressource -> service est le libelle
         connection.execute(
             """
             UPDATE service_catalog
@@ -1089,6 +1098,7 @@ def delete_admin_service(service_id):
             (service_id,),
         ).rowcount
         if deleted:
+            forget_service(connection, service_id)
             insert_app_log(
                 connection,
                 "admin",
@@ -1206,6 +1216,19 @@ def admin_resources():
     return jsonify([normalize_reference_row(row) for row in rows])
 
 
+def _issuer_service_error(connection, issuer_service, previous=None):
+    """Chaque ressource est rattachee a un service du catalogue (notifications : ses titulaires la prennent en charge).
+    Exige un service actif du catalogue ; a la modification, un ancien texte INCHANGE est tolere (la tache « choisir le service »
+    des administrateurs le traite) pour ne pas bloquer l'edition d'une ressource d'avant cette regle."""
+    if previous is not None and str(issuer_service or "").strip() == str(previous or "").strip():
+        return None
+    if not str(issuer_service or "").strip():
+        return "issuer_service_required"
+    if not find_service_by_label(active_services(connection), issuer_service):
+        return "issuer_service_unknown"
+    return None
+
+
 @bp.route("/api/admin/resources", methods=["POST"])
 @login_required
 @permission_required("users.manage")
@@ -1221,6 +1244,9 @@ def create_admin_resource():
 
     now = utc_now()
     with get_db() as connection:
+        issuer_error = _issuer_service_error(connection, resource_data["issuer_service"])
+        if issuer_error:
+            return jsonify({"error": issuer_error}), 400
         existing = connection.execute("SELECT id FROM resource_catalog WHERE code = ?", (resource_data["code"],)).fetchone()
         if existing:
             return jsonify({"error": "resource_exists"}), 409
@@ -1296,6 +1322,9 @@ def update_admin_resource(resource_id):
         blocking = blocking_issues(validate_resource(resource_data))
         if blocking:
             return jsonify({"error": "invalid_resource", "issues": blocking}), 400
+        issuer_error = _issuer_service_error(connection, resource_data["issuer_service"], row["issuer_service"])
+        if issuer_error:
+            return jsonify({"error": issuer_error}), 400
         # Garde-fous de l'historique : le code sert de cle aux lignes deja saisies, et le champ identifiant
         # d'un suivi par objet ne peut plus etre change, masque ou supprime s'il a deja ete utilise.
         if next_code != row["code"] and connection.execute(
@@ -1469,6 +1498,7 @@ def create_admin_user():
 
     if not create_user(username, password_hash, valid_groups, service, is_active, status, db_manage, email, first_name, last_name):
         return jsonify({"error": "failed_to_create_user"}), 500
+    update_user(username, must_change_password=1)  # l'administrateur connait ce mot de passe : la personne choisira le sien a sa premiere connexion
 
     with get_db() as connection:
         insert_app_log(
@@ -1534,11 +1564,16 @@ def update_admin_user(username):
         if complexity_error:
             return jsonify({"error": complexity_error}), 400
         update_fields["password_hash"] = bcrypt.hashpw(payload["password"].encode(), bcrypt.gensalt()).decode()
+        # Un administrateur qui fixe le mot de passe D'UN AUTRE compte le connait : cette personne devra en choisir un nouveau a sa
+        # prochaine connexion. Sur son propre compte, il vient de le choisir lui-meme : rien a imposer.
+        update_fields["must_change_password"] = 0 if username == session.get("user") else 1
         password_changed = True
 
     if update_fields:
         if not update_user(username, **update_fields):
             return jsonify({"error": "failed_to_update_user"}), 500
+        if password_changed and username == session.get("user"):
+            realign_session_password(update_fields["password_hash"])  # l'admin qui change son propre mot de passe reste connecte
 
     with get_db() as connection:
         insert_app_log(
@@ -1575,6 +1610,7 @@ def delete_admin_user(username):
         return jsonify({"error": "failed_to_delete_user"}), 500
 
     with get_db() as connection:
+        forget_account(connection, username)  # il quitte les services dont il etait titulaire
         insert_deleted_item(
             connection,
             "user",

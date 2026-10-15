@@ -188,7 +188,7 @@ def test_stock_routes_refuse_anonymous_and_unauthorised_users():
     body = {"kind": "receipt", "quantity": 5}
     assert client.post("/api/stock/veste/movements", json=body, headers=headers).status_code in (401, 403)
     assert client.put("/api/stock/veste/threshold", json={"threshold": 3}, headers=headers).status_code in (401, 403)
-    assert client.post("/api/stock/veste/movements", json=body).status_code == 403  # sans jeton CSRF
+    assert client.post("/api/stock/veste/movements", json=body).status_code in (401, 403)  # sans jeton CSRF (compte inconnu : session refusee, 401)
 
 
 def test_import_sets_the_counted_stock_and_is_idempotent(db):

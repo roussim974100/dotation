@@ -73,7 +73,7 @@ def api(driver, method, path, body=None):
 def seed(driver):
     api(driver, "POST", "/api/setup/complete", {"org_name": "Ville de Démonstration", "dpo_email": "dpo@ville-demo.example", "org_context": "public_collectivite",
                                                  "beneficiary_types": "agent:Agent,elu:Élu(e)", "support_email": "aide@ville-demo.example"})
-    api(driver, "POST", "/api/admin/resources", {"code": "polo", "label": "Polo de service", "description": "", "category": "materiel", "issuer_service": "RH",
+    api(driver, "POST", "/api/admin/resources", {"code": "polo", "label": "Polo de service", "description": "", "category": "materiel", "issuer_service": "Ressources humaines",
         "requires_return": True, "has_assignment_date": True, "has_assignment_condition": True, "has_assignment_notes": True, "display_order": 500,
         "is_active": True, "tracking_mode": "quantity", "field_schema": [{"key": "quantite", "label": "Quantité", "type": "number", "required": True}]})
     api(driver, "POST", "/api/stock/polo/movements", {"kind": "receipt", "quantity": 3, "variant": "M", "notes": "test"})

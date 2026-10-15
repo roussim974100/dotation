@@ -67,7 +67,7 @@ with Instance() as inst:
     time.sleep(2)
     for code, label in (("poste_ui", "Poste UI"), ("casque_ui", "Casque UI")):
         api(driver, "POST", "/api/admin/resources", {
-            "code": code, "label": label, "description": "", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+            "code": code, "label": label, "description": "", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
             "has_assignment_date": False, "has_assignment_condition": False, "has_assignment_notes": False, "display_order": 990, "is_active": True,
             "field_schema": [{"key": "marque", "label": "Marque", "type": "text", "required": True}]})
     catalog = {r["code"]: r for r in api(driver, "GET", "/api/admin/resources")["json"]}

@@ -17,7 +17,7 @@ côté serveur, **HTML + JavaScript sans framework** côté navigateur, PDF gén
 
 | Question | Où regarder |
 |---|---|
-| Où en est le projet, qu'est-ce qui reste à faire ? | `docs/BACKLOG_PRODUIT.md` (vue d'ensemble, priorités, sprint en cours) |
+| Où en est le projet, qu'est-ce qui reste à faire ? | `docs/BACKLOG_PRODUIT.md` — **commencer par la section « 🔁 Reprise »** (état, tests à faire en préprod, suite conseillée, pièges), puis priorités et sprint en cours |
 | Qu'est-ce qui a changé, version par version ? | `CHANGELOG.md` (le plus récent en haut) |
 | Pourquoi les données sont organisées ainsi (dossier, champs, parc, stock) ? | `docs/ARCHITECTURE_DONNEES.md` — **à lire avant de toucher aux ressources ou aux champs** |
 | Circuit de mise en production, tests, diagnostic | `docs/REPRISE_MAJ.md` (§2 à §6 ; son §1 « où on en est » date du 20/09, l'état courant est dans le backlog) |
@@ -42,7 +42,7 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `routes/forms.py` | API des dossiers : création, mise à jour, restitution (`PATCH /api/forms/<id>/restitution`), Phase 1, régularisation, exports Excel/PDF |
 | `routes/pages.py` | pages HTML, connexion, `/api/session` (utilisateur courant, permissions, `data_scope`) |
 | `routes/admin.py` | administration (comptes, services, ressources, personnalisation, base de données) |
-| `routes/signature.py` | liens de signature à distance (attribution et restitution) |
+| `routes/signature.py` | liens de signature à distance (attribution, restitution, **ajustement**) ; `models/signature.py` (`signature_link_*`) pour ajouter un 4ᵉ type |
 | `routes/units.py`, `routes/stock.py`, `routes/inventory.py` | parc (objets suivis), stock, inventaire |
 | `models/forms.py` | `persist_form` : **chemin unique d'enregistrement d'un dossier** (resynchronise parc et stock) |
 | `models/workflow.py` | calcul des statuts (attribution, restitution) |
@@ -51,23 +51,27 @@ Version courante : `APP_BUILD_VERSION` dans `frontend/js/branding.js` (identique
 | `models/units.py`, `models/stock.py` | projections parc/stock (`sync_units_for_form`, `sync_stock_for_form`) |
 | `models/vocab.py` | libellés de statuts et types de bénéficiaires (source unique, publiés au navigateur) |
 | `models/settings.py` | paramètres de l'organisation |
-| `auth.py`, `permissions.py` | comptes, groupes, permissions, portée des données (`data_scope`) |
-| `migrations.py` | migrations de schéma numérotées, idempotentes, avec copie de sécurité avant application |
+| `auth.py`, `permissions.py` | **validité des sessions** (`enforce_session_validity`, `start_session`, voir §4) ; comptes, groupes, permissions, portée des données (`data_scope`) ; toutes les permissions sont éditables par groupe dans Admin > Comptes (`routes/admin.py`, `TOGGLEABLE_PERMISSIONS`), avec garde-fou anti-verrouillage sur `users.manage`/`db.manage` |
+| `app.py` (`PERMISSION_BACKFILLS`) | rattrape une fois pour toutes un droit ajouté après coup sur des groupes déjà en service (ex. `forms.adjust`), sans jamais réajouter un droit retiré volontairement — ajouter une ligne ici plutôt que de modifier `DEFAULT_GROUPS` pour un nouveau droit sur l'existant |
+| `models/notifications.py`, `models/service_tasks.py`, `routes/notifications.py` | **notifications** : tâches CALCULÉES (jamais stockées), `open_tasks(connection, user)` ; titulaires d'un service (`service_referents`) ; rattachement des ressources aux services ; voir §4 |
+| `migrations.py` | migrations de schéma numérotées, idempotentes, avec copie de sécurité avant application (10 migrations à ce jour) |
 | `pdf/attribution.py`, `pdf/restitution.py` | génération des PDF |
 | `config.py`, `environment.py` | chemins de données (`APP_DATA_DIR`), environnement (dev/preprod/prod) écrit par le script de déploiement |
 
 ### Navigateur (`frontend/`)
 
 Scripts **classiques** (pas de modules, pas de build) : les fonctions sont globales et partagées entre fichiers chargés
-sur une même page. Chaque page HTML liste ses scripts en bas ; `?v=AAAAMMJJx` sert à forcer le rechargement.
+sur une même page. Chaque page HTML liste ses scripts en bas ; `?v=AAAAMMJJx` sert à forcer le rechargement — **mettre à
+jour la version sur TOUTES les pages qui chargent ce fichier** (voir piège ci-dessous).
 
 | Fichier | Rôle |
 |---|---|
-| `js/storage.js` | appels API, listes des dossiers (4 tableaux de bord), menus d'actions, exports, **e-mails `.eml`** et PDF |
-| `js/app.js` | formulaire d'un dossier (`form.html`) : saisie, ressources, signature, actions d'un dossier signé |
+| `js/storage.js` | appels API, listes des dossiers (**4 tableaux de bord, regroupés par personne** — `groupDraftsByPerson`, une ligne par personne avec historique dépliable, dossiers toujours distincts en base), menus d'actions, exports, **e-mails `.eml`** et PDF |
+| `js/app.js` | formulaire d'un dossier (`form.html`) : saisie, ressources (dont reprise de matériel restitué, `openReuseResourceModal`), signature, actions d'un dossier signé |
 | `js/restitution-phase1.js`, `js/restitution.js` | restitution en deux phases : dates (`restitution-phase1.html`), état du matériel et signature (`restitution.html`) |
-| `js/signature-qr.js`, `js/vendor/qrcode-generator.js` | QR code d'un lien de signature (fenêtre, générateur embarqué MIT, aucun CDN) ; actions `showAssignmentSignatureQr` / `showRestitutionSignatureQr` dans `storage.js` |
-| `js/adjustment.js` | ajustement d'un dossier actif : fenêtre (retirer / ajouter / service / signature), signature d'un ajustement en attente, historique ; chargé après `storage.js` (listes et fiche) |
+| `js/signature-qr.js`, `js/vendor/qrcode-generator.js` | QR code d'un lien de signature (fenêtre, générateur embarqué MIT, aucun CDN ; `showSignatureQrDialog` renvoie `true` si ouverte et accepte `onClose`, `showSignatureQr` attend la fermeture et renvoie `false` en cas d'échec — **la page qui l'utilise doit charger `vendor/qrcode-generator.js` ET `signature-qr.js`**, ex. `restitution.html` après « Enregistrer en attente ») ; actions `showAssignmentSignatureQr` / `showRestitutionSignatureQr` / `showAdjustmentSignatureQr` dans `storage.js` |
+| `js/adjustment.js` | ajustement d'un dossier actif : fenêtre (retirer / ajouter — avec reprise de matériel restitué, `openAdjustmentReuseModal` / changer le service / signature), signature d'un ajustement en attente, historique ; chargé après `storage.js` (listes et fiche) |
+| `adjustment-signature.html`, `js/adjustment-signature.js` | page publique de signature à distance d'un ajustement (lien + QR) |
 | `js/ui.js` | composants partagés : `showToast`, `askConfirm`, dialogues de workflow (`askWorkflowDialog`), menu du compte |
 | `js/branding.js` | version, logo, pied de page, pastille d'environnement |
 | `js/admin*.js` | écrans d'administration |
@@ -78,9 +82,11 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 
 ### Tests (`tests/`)
 
-- `python -m pytest tests -q` : suite complète (~2 min).
+- `python -m pytest tests -q` : suite complète (~2 min). `tests/conftest.py` isole les bases (dossier temporaire) et installe `tests/_stamped_client.py` : une session posée à la main (`session_transaction`) est complétée comme une vraie connexion, sinon le contrôle de session la refuserait ; un test qui utilise un compte absent de la base reçoit 401.
+- **Ne jamais lancer `tests/_http_scenarios.py` à la main** : il crée, importe, répare des données. Sans `APP_DATA_DIR` il refuse de démarrer (depuis le 06/10) ; passer par `tests/test_http_endpoints.py`.
 - `RUN_BROWSER_TESTS=1 python -m pytest tests -q` : avec navigateur (~5 à 8 min).
 - `python tests/browser/check_<nom>.py` : scénarios navigateur isolés (serveur temporaire, base vierge, port 5055) ;
+  `check_*.py` = vrais tests (réussi/échec, code de sortie) ; `inspect_*.py` = outils d'inspection qui affichent l'état d'une **copie** de la base de développement (parc, fiche d'objet, contraste en mode sombre), sans verdict à ce jour ; un test qui saisit le mot de passe de `admin` importe `ADMIN_PASSWORD` du harnais (`browser_harness.py`) ;
   `tests/browser/browser_harness.py` (`Instance(copy_db=...)` pour travailler sur une **copie** d'une base).
 - Scénarios HTTP : `tests/_http_scenarios.py`, lus par `tests/test_http_endpoints.py`.
 
@@ -90,15 +96,35 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   recalculées par `persist_form`. Tout enregistrement de dossier passe par là (voir `docs/ARCHITECTURE_DONNEES.md`).
 - **Statuts** (`models/vocab.py`) : `draft`, `partial_assignment`, `awaiting_signature`, `active`, `partial_return`,
   `returned`, `cancelled`. Un dossier « en restitution » est `partial_return` dès l'enregistrement de la Phase 1.
-- **Types de dossier** : `arrivee`, `mise_a_jour` (ajout/retrait de ressources — **chaque mise à jour crée aujourd'hui un
-  nouveau dossier**, un chantier en cours doit permettre d'ajuster le dossier existant, voir le backlog),
-  `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne sans attribution enregistrée).
+- **Types de dossier** : `arrivee`, `mise_a_jour` (ancien type, retiré du sélecteur de création depuis 3.65.0 — voir
+  **ajustement** ci-dessous), `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne
+  sans attribution enregistrée).
+- **Ajustement d'un dossier actif** (`models/adjustment.py`, `PATCH /api/forms/<id>/ajustement`) : ajouter/retirer des
+  ressources ou changer le service **sans créer un nouveau dossier** — le dossier reste `active`, chaque geste a sa
+  propre signature. « Nouvelle attribution pour cette personne » ne doit plus être utilisée sur un dossier actif (menu
+  masqué depuis 3.67.2) : c'est justement le cas qui créait des doublons.
+- **Regroupement par personne** (`groupDraftsByPerson`, `storage.js`) : les 4 tableaux de bord n'affichent qu'une ligne
+  par personne (fusion par `personId` **et** par identité nom+prénom+service, en secours pour les dossiers créés avant
+  qu'une action ne reprenne le `personId`). Les dossiers restent des documents distincts et immuables ; seul
+  l'affichage fusionne. Pour qu'un nouveau dossier reste bien rattaché à la même personne, reprendre son `personId`
+  via le champ caché `#retraitsSourcePersonId` (déjà fait pour « mise à jour », « nouvelle attribution » et
+  « changement de service »).
 - **Portée des données** : un groupe `data_scope = "masked"` (RGPD) voit des données masquées et **ne peut générer aucun
   PDF ni export**, même avec `forms.export`. Serveur : `can_export_unmasked()` (`routes/forms.py`). Navigateur :
   `canExportUnmasked(user)` (`storage.js`). Garder les deux alignés.
 - **Permissions** : `forms.create`, `forms.edit`, `forms.delete`, `forms.export`, `forms.restitution`,
   `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
   (`permissions.py`).
+- **Sessions** (3.67.3) : le cookie porte `user`, `pwd_fp` (HMAC du hash du mot de passe), `login_at`, `last_seen`. Un `before_request` (`app.py` → `auth.enforce_session_validity`) le rapproche de la base à chaque requête : mot de passe changé, compte désactivé/en attente/supprimé, durée absolue (12 h) ou inactivité (60 min) dépassées → session vidée, 401, `session_revoked` au journal. Toute connexion passe par `start_session` (vide l'ancienne session) ; tout changement de **son propre** mot de passe appelle `realign_session_password`. Ne jamais écrire `session["user"] = ...` à la main dans le code applicatif. Réglages : `APP_SESSION_MAX_HOURS`, `APP_SESSION_IDLE_MINUTES`. Côté navigateur (`ui.js`, `initSessionWatch`, pages avec `#userMenu` seulement) : un 401 de l'API renvoie vers `/login?error=session` ; la session est contrôlée au retour sur l'onglet et chaque minute avec l'en-tête `X-Session-Check`, qui ne compte pas comme une activité. Les textes de la page de connexion viennent de `config.js` (priment sur le défaut de `login.js`).
+- **Mot de passe d'origine** (3.67.3) : `users.must_change_password`, posé sur `admin` par le seed et par `flag_default_credentials()` (`database.py`, appelée à chaque `ensure_users_schema`, donc au démarrage et après une restauration) tant que son mot de passe est `admin`. Tant qu'il est levé, `auth.enforce_password_change` (before_request) ne laisse passer que `/api/session`, `/api/csrf-token`, `/api/me/password`, les réglages publics, l'accueil et les fichiers statiques ; `ui.js` ouvre alors la fenêtre non fermable (`openPasswordChangeModal({forced:true})`). Dans les tests, `conftest.py` démarque `admin` (`release_default_admin`) ; le harnais navigateur lui donne un autre mot de passe (un simple drapeau serait reposé par la prochaine importation de l'application).
+- **Cookies** : `publier_session` (HttpOnly, SameSite=Lax, Secure auto, expire à `APP_SESSION_MAX_HOURS`) ; sa durée est AFFICHÉE dans la fenêtre « Préférences cookies » (`branding.js`, `describeSessionCookieLifetime`, lue dans `/api/settings/public` → `session`). **Toute modification de durée, de nom ou d'attribut d'un cookie se reporte dans cette fenêtre et dans le CHANGELOG** (elle avait annoncé « session navigateur » alors que le cookie durait 12 h). **Aucune ressource externe** : Bootstrap, Chart.js, CookieConsent et le générateur de QR sont embarqués (`frontend/js/vendor/README.md` : versions et mise à jour) ; ne jamais ajouter un `<script src="https://…">` ou un CDN dans la politique de sécurité (`tests/test_no_external_assets.py` échoue). CookieConsent ne se construit pas pour un robot (`hideFromBots`) : un test Selenium masque `navigator.webdriver`.
+- **Notifications / services** (lot 1) : une ressource est liée à un service par le **libellé** (`resource_catalog.issuer_service` = libellé exact d'un service actif de `service_catalog`) ; un service a des comptes titulaires (`service_referents`, `dotation.db`, noms de comptes de `users.db` : un compte supprimé ou désactivé est écarté à la lecture). Renommer un service met à jour ses ressources (`rename_service`) ; en supprimer un les rend « sans service » → tâche des administrateurs. Une tâche = un calcul sur les données (`models/notifications.py`), pas une ligne à clore à la main ; aucune donnée personnelle dedans. Côté navigateur : cloche et compteur dans `ui.js` (`initNotificationBell`, `updateNotificationBadge`, alimentés par `/api/session`), panneau et fenêtres dans `js/notifications.js` (chargé au premier clic, types décrits par `NOTIFICATION_KINDS`). Pour ajouter un type : une fonction `*_task(user)` + une ligne dans `open_tasks` (l'ordre = l'urgence) + une entrée `NOTIFICATION_KINDS` ; elle est recalculée à chaque contrôle de session, donc **jamais de réseau ni de lecture lourde sans `_cached`**. Tâches des administrateurs (lot 3) : sauvegarde en échec (`db.manage`), nouvelle version (`update_check.cached_status`, cache disque), inscriptions en attente (`users.manage`, un nombre, aucun nom). Créer une ressource par l'API exige un service existant au catalogue (les scénarios de test le font).
+- **Tâches de service** (lot 2, `models/service_tasks.py`) : « à fournir » = élément attribué (`dotation_items.assigned`) d'un dossier `partial_assignment`/`awaiting_signature`/`active` non rendu ; « à fermer » = dossier `partial_return`/`returned` et ressource `requires_return` faux. Adressées aux titulaires du service de la ressource (`issuer_service`), sinon aux administrateurs. Seul le « Fait » est stocké (`service_task_done`, clé `(kind, form_id, item_key)`, indépendant de `persist_form` qui recrée les lignes d'éléments) ; `persist_form` vide le cache des tâches. Migration 10 : l'existant est « déjà fait » (jamais de tâches sur l'historique). Le nom de la personne n'est donné qu'à une portée `full`. Les routes d'écriture de « Fait » vérifient que la tâche est bien adressée à l'appelant (sinon 404, pas de fuite). Les scénarios navigateur qui modifient la base directement doivent régler `APP_NOTIFICATIONS_CACHE_SECONDS=1`.
+- **Retard et escalade** (lot 4) : `service_tasks()` ajoute `age_days`/`late`/`escalated` à chaque ligne (seuils `LATE_DAYS`=3, `ESCALATE_DAYS`=7, variables `APP_TASK_*`). Une tâche escaladée est aussi visible des administrateurs (`users.manage`). Les « Fait » ne sont **jamais purgés par l'âge** (ils sont la mémoire du déjà fait) : seulement ceux d'un dossier supprimé (`purge_orphans`, au démarrage). `reopen()` annule un « Fait » (titulaires du service et administrateurs, 30 derniers jours, journalisé). Page `tasks.html` + `js/tasks.js` : les tableaux viennent de `notifications.js` (`mountServiceTasks`, `mountRecentDone`) — un seul endroit à maintenir. Tests qui créent beaucoup de dossiers : neutraliser le limiteur de `/api/forms` (30/min).
+- **Blocage d'adresse IP à la connexion** (`auth.py`, 3.72.1) : `record_login_failure(ip)` compte les ÉCHECS (tout POST /login qui n'aboutit pas : mot de passe, identifiant inconnu, CSRF, compte inactif) ; à `LOGIN_IP_MAX_FAILURES` (10) l'adresse est bloquée `LOGIN_IP_BLOCK_SECONDS` (15 min) ; `_is_login_rate_limited(ip)` = adresse bloquée (lecture seule, ne prolonge pas). Clé = `get_rate_limit_key()` (remote_addr corrigée par ProxyFix, jamais X-Forwarded-For brut). **Jamais de blocage de compte** (un tiers pourrait bloquer un collègue). Les tests qui échouent exprès doivent utiliser une adresse à eux (`198.51.100.x`) et la nettoyer ; attention : l'application fait confiance à `X-Forwarded-For` d'un appelant *privé* (les plages de documentation comptent comme privées), pas d'un public (`8.8.4.4`).
+- **Fuseau horaire** : les dates sont stockées en UTC avec fuseau (`utc_now()`) ; `utils.format_export_datetime` les convertit dans le fuseau de l'organisation (`get_org_timezone`, réglage `timezone`, Europe/Paris par défaut) et n'ose JAMAIS décaler une date sans fuseau (saisie à la main). Un INSTANT (signature, ajustement) s'affiche avec `format_export_instant` : « 08/10/2026 09:03 (heure de Paris, UTC+2) » ; toute nouvelle date affichée dans un PDF/export passe par l'une de ces deux fonctions ; ne pas utiliser `datetime.now()` nu (heure du serveur). Dépendance `tzdata` (Windows).
+- **PDF d'un ajustement** : `pdf/adjustment.py` (réutilise `_AQuaiDoc`), route `/api/forms/<id>/pdf/ajustement/<event_id>` ; boutons dans `renderAdjustmentHistory` (`adjustment.js`), `fetchPdfDocument(id, 'ajustement', eventId)` dans `storage.js`. Une fiche signée désactive tous ses boutons (`applyLockState`) : un bouton qui doit rester actif porte `data-keep-enabled`.
+- **Fiche du dossier** : `form-service-tasks.js` (chargé par `form.html`) lit `/api/forms/<id>/service-tasks` ; la tâche « à fermer » naît aussi d'un retrait par ajustement (élément `returned` dans un dossier actif).
 - **Signatures** : jamais exposées sans authentification ; affichage protégé par mot de passe.
 - **E-mails** : l'application ne les envoie pas ; elle prépare un fichier `.eml` que l'utilisateur ouvre dans sa
   messagerie (fonctions `prepare*Email` de `storage.js`).
@@ -109,6 +135,7 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
 
 1. Travailler sur la branche **`dev`**. Promotion `dev` → `preprod` → `prod` **par Pull Request** ; le propriétaire
    fusionne lui-même. La production se déploie depuis la branche **`prod`** (pas `main`).
+   `main` (branche par défaut de GitHub) ne s'aligne qu'**après** la mise en production : une PR `preprod` → `main` ne se fusionne pas avant, sinon le README affiche une version non déployée.
 2. **Ne jamais utiliser `git add -A` ni `git add .`** : ajouter les fichiers un par un. Une base de production a déjà été
    publiée par erreur (le dépôt est public). Ne jamais committer de base (`*.db`), de journal ni de secret.
 3. **Demander avant de changer le numéro de version** (`branding.js`, entête du `README.md`, `CHANGELOG.md`).
@@ -142,3 +169,14 @@ Variables utiles : `APP_DATA_DIR`, `APP_LOG_LEVEL`, `APP_DEBUG_ENDPOINTS=1`, `AP
   action à effet (envoi, suppression) sur le bouton secondaire.
 - Flask : impossible d'ajouter une route après la première requête ; relancer le serveur après une modification.
 - GitHub : l'outil `gh` n'est pas installé sur le poste de développement ; les PR sont ouvertes par le navigateur.
+- **Cache-busting incomplet** (trouvé le 28/09) : `admin.js` et `app.js` n'avaient *aucun* `?v=...` sur leurs pages,
+  `adjustment.js` était resté sur une version périmée. Un navigateur déjà ouvert peut exécuter du code obsolète
+  indéfiniment, même après un rechargement simple (F5) — seul un rechargement forcé (Ctrl+F5) ou la navigation privée
+  le contourne à coup sûr. **Toujours vérifier que le `?v=` a bien été mis à jour sur CHAQUE page qui charge le
+  fichier modifié**, pas seulement celle qu'on teste.
+- **Régularisation et unité de parc bloquée** (`models/units.py`, `derive_state`) : un dossier de régularisation
+  (`assigned_at` rétrodaté avant la création réelle du brouillon) peut produire un événement `reserved` daté *après*
+  son `assigned`. `derive_state` traite les événements triés par date : sans `_FORM_RELATIONSHIP_SETTLED`, la
+  réservation de ce dossier n'était jamais levée et l'unité restait affichée « réservée » pour toujours, même après
+  restitution (corrigé en 3.66.1, migration 8 pour rattraper l'existant).
+- **Script de scénarios lancé à la main** (06/10) : `_http_scenarios.py` lancé sans `APP_DATA_DIR` a tourné sur `backend/dotation.db` (copie de la production) : 13 dossiers de test, réglages d'organisation écrasés, faux logo, groupe `lecteur_masque`. Réparé depuis `db_backups/` (sauvegarde `avant_assistant_*` + réglages du 28/09). Pour tester un flux sur de vraies données : `browser_harness.Instance(copy_db=...)` ou une instance temporaire sur le port 5055.

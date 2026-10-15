@@ -452,6 +452,11 @@ def persist_form(payload, allow_locked_update=False):
             if source_form_id and retraits_items:
                 _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items)
 
+    try:
+        from models.notifications import clear_cache
+        clear_cache()  # les taches de service (a fournir / a fermer) dependent des elements de ce dossier
+    except Exception:  # noqa: BLE001 - une notification ne doit jamais empecher l'enregistrement d'un dossier
+        pass
     return get_form(form_id)
 
 

@@ -1997,6 +1997,8 @@ button.export-menu__item {
 
 .export-filter-modal__dialog {
   width: min(480px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -2117,7 +2119,7 @@ button.export-menu__item {
 .password-change-modal__backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1080; /* au-dessus de la bannière de configuration (1040) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2128,6 +2130,8 @@ button.export-menu__item {
 
 .password-change-modal__dialog {
   width: min(440px, 100%);
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -2648,6 +2652,9 @@ button.export-menu__item {
 .workflow-dialog__panel {
   position: relative;
   width: min(100%, 38rem);
+  max-height: min(90vh, 640px);
+  display: flex;
+  flex-direction: column;
   padding: 1.35rem;
   border: 1px solid rgba(212, 221, 230, 0.9);
   border-radius: 24px;
@@ -2659,6 +2666,7 @@ button.export-menu__item {
   display: flex;
   gap: 0.9rem;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 .workflow-dialog__header p {
@@ -2681,6 +2689,12 @@ button.export-menu__item {
   padding: 0;
   list-style: none;
   border-top: 1px solid rgba(15, 91, 141, 0.10);
+  /* Beaucoup de ressources incompletes (ex: "Attribution partielle") rendent cette liste tres longue : elle
+     defile seule, le bouton OK (hors de ce bloc) reste toujours visible. min-height:0 est indispensable, sinon
+     un enfant flex ne peut jamais se restreindre sous la hauteur de son contenu et ne defile pas. */
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .workflow-dialog__item {
@@ -2734,9 +2748,11 @@ button.export-menu__item {
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
+/* Ambre plutot que rouge : ce statut signale une ressource pas encore completement renseignee, jamais un
+   blocage reel (le dossier reste modifiable) - voir getWorkflowStepStateLabel, ui.js. */
 .workflow-dialog__item.is-error .workflow-dialog__bullet {
-  border-color: #b84a4a;
-  background: #b84a4a;
+  border-color: #c89e30;
+  background: #f1d48b;
   box-shadow: inset 0 0 0 2px #ffffff;
 }
 
@@ -2750,7 +2766,7 @@ button.export-menu__item {
 }
 
 .workflow-dialog__item.is-error .workflow-dialog__state {
-  color: #b84a4a;
+  color: #8a4b12;
   font-weight: 600;
 }
 
@@ -2760,6 +2776,7 @@ button.export-menu__item {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 1.1rem;
+  flex-shrink: 0;
 }
 
 .signature-validity-dialog__panel {
@@ -3571,6 +3588,15 @@ button.export-menu__item {
 
 [data-color-mode="dark"] .workflow-dialog__item.is-active .workflow-dialog__state {
   color: var(--brand);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__bullet {
+  border-color: #c89e30;
+  background: color-mix(in srgb, #694b00 60%, #f1d48b);
+}
+
+[data-color-mode="dark"] .workflow-dialog__item.is-error .workflow-dialog__state {
+  color: #e8a060;
 }
 
 [data-color-mode="dark"] .workflow-dialog__item.is-done .workflow-dialog__state {
@@ -5419,3 +5445,194 @@ section.content-card[id^="db-"] {
 [data-color-mode="dark"] .dashboard-nav__link.is-active .dashboard-nav__count {
   background: rgba(0, 0, 0, 0.3);
 }
+
+/* Notifications : cloche de l'en-tête, panneau et choix du service référent (js/notifications.js) */
+.notification-bell {
+  position: relative;
+  min-width: 2.75rem;
+}
+
+.notification-bell__count {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #b42318;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
+.notification-panel {
+  position: fixed;
+  z-index: 1070; /* au-dessus de la bannière (1040), sous les fenêtres (1080) */
+  max-height: min(70vh, 32rem);
+  overflow-y: auto;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text, inherit);
+  box-shadow: 0 18px 44px rgba(15, 55, 84, 0.22);
+}
+
+.notification-panel__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.notification-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.notification-item {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.notification-item__title {
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+}
+
+.notification-item__urgent {
+  font-weight: 700;
+  color: #b42318;
+}
+
+[data-color-mode="dark"] .notification-item__urgent {
+  color: #f19b92;
+}
+
+.notification-item__detail {
+  margin: 0 0 0.6rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.notification-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.assign-services {
+  width: min(560px, 100%);
+}
+
+.assign-services__group {
+  margin-bottom: 1rem;
+}
+
+.assign-services__resources {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.service-referents {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.service-referents__item {
+  margin: 0;
+}
+
+.service-tasks {
+  width: min(860px, 100%);
+}
+
+.service-tasks__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .service-tasks__table thead {
+    position: absolute;
+    left: -9999px;
+  }
+
+  .service-tasks__table tr {
+    display: block;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .service-tasks__table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0;
+    padding: 0.2rem 0;
+  }
+
+  .service-tasks__table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+  }
+}
+
+.notification-panel__all {
+  margin: 0.85rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.service-tasks__late {
+  font-weight: 600;
+  color: #b54708;
+}
+
+.service-tasks__late--escalated {
+  color: #b42318;
+}
+
+[data-color-mode="dark"] .service-tasks__late {
+  color: #f5b668;
+}
+
+[data-color-mode="dark"] .service-tasks__late--escalated {
+  color: #f19b92;
+}
+
+.service-tasks__feedback {
+  min-height: 1.4rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.tasks-page__section {
+  margin-bottom: 1.25rem;
+}
+
+.tasks-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+

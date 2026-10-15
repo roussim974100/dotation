@@ -788,14 +788,26 @@ async function initRestitutionPage() {
           steps: createRestitutionWorkflowSteps(workflowLabels, 2)
         });
         await saveRestitution(payload, { keepPending: true });
-        await window.askWorkflowDialog({
+        // Signature « à distance par lien » : la personne est souvent encore là, on propose tout de suite le QR code à scanner.
+        // (Le QR est sur le bouton de confirmation : un clic hors de la fenêtre renvoie « secondary » = « Plus tard », sans effet.)
+        const offerQr = payload.signatureStatus === "deferred" && typeof showRestitutionSignatureQr === "function";
+        const choice = await window.askWorkflowDialog({
           title: "Restitution enregistrée en attente",
-          text: "La restitution reste modifiable et pourra être finalisée plus tard.",
+          text: offerQr
+            ? "La restitution reste modifiable. Si la personne est présente, elle peut signer maintenant en scannant un QR code avec son téléphone."
+            : "La restitution reste modifiable et pourra être finalisée plus tard.",
           steps: workflowLabels.map((label) => ({ label, status: "done" })),
           hideSpinner: true,
           showConfirm: true,
-          confirmLabel: "OK"
+          confirmLabel: offerQr ? "Afficher le QR code" : "OK",
+          secondaryLabel: offerQr ? "Plus tard" : ""
         });
+        if (offerQr && choice === "confirm") {
+          const shown = await showRestitutionSignatureQr(id);
+          if (shown === false) {
+            return; // le message d'erreur est à l'écran : on reste sur la page pour que la personne puisse réessayer
+          }
+        }
         window.location.href = "restitutions-pending.html";
       } catch (error) {
         window.closeWorkflowDialog();
@@ -837,7 +849,9 @@ async function initRestitutionPage() {
           text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",
           steps: workflowLabels.map((label) => ({ label, status: "done" }))
         });
-        if (["returned", "awaiting_signature"].includes(response?.summary?.status || "")) {
+        // "awaiting_signature" veut dire que la restitution est complete mais pas encore signee : feter ce
+        // moment-la donnerait l'impression que c'est fait alors que la signature (l'evenement reel) reste a venir.
+        if (response?.summary?.status === "returned") {
           await window.playCompletionCelebration("boat");
         }
         const choice = await window.askWorkflowDialog({

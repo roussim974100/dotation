@@ -77,7 +77,8 @@ function normalizeBrandingSettings(raw = {}) {
     support_email: raw.support_email || "",
     restitution_phase1_unlock_days: raw.restitution_phase1_unlock_days ?? "1",
     timing_warning_days: raw.timing_warning_days ?? "3",
-    parc_retention_years: raw.parc_retention_years ?? "5"
+    parc_retention_years: raw.parc_retention_years ?? "5",
+    timezone: raw.timezone || "Europe/Paris"
   };
 }
 
@@ -97,7 +98,8 @@ function collectBrandingPayload() {
     support_email: brandingById("brandingSupportEmail")?.value.trim(),
     restitution_phase1_unlock_days: parseInt(brandingById("brandingPhase1UnlockDays")?.value || "1", 10),
     timing_warning_days: parseInt(brandingById("brandingTimingWarningDays")?.value || "3", 10),
-    parc_retention_years: parseInt(brandingById("brandingParcRetentionYears")?.value || "5", 10)
+    parc_retention_years: parseInt(brandingById("brandingParcRetentionYears")?.value || "5", 10),
+    timezone: (resolveTimezone(brandingById("brandingTimezone")?.value) || brandingById("brandingTimezone")?.value || "Europe/Paris").trim()
   });
 }
 
@@ -169,9 +171,10 @@ function describeBrandingChanges(previous, next) {
   const phase1Change = describeValueChange("Fenêtre de modification de la phase 1 (jours)", previous.restitution_phase1_unlock_days, next.restitution_phase1_unlock_days);
   const timingChange = describeValueChange("Seuil d'alerte pilotage (jours)", previous.timing_warning_days, next.timing_warning_days);
   const retentionChange = describeValueChange("Conservation de l'historique du parc (ans)", previous.parc_retention_years, next.parc_retention_years);
+  const timezoneChange = describeValueChange("Fuseau horaire", previous.timezone, next.timezone);
 
   [orgChange, dpoChange, emailDomainsChange, themeChange, darkModeChange, supportNameChange, supportEmailChange, supportRoleChange, orgContextChange, beneficiaryTypesChange,
-    phase1Change, timingChange, retentionChange].filter(Boolean).forEach((item) => {
+    phase1Change, timingChange, retentionChange, timezoneChange].filter(Boolean).forEach((item) => {
     changes.push(item);
   });
 
@@ -295,6 +298,9 @@ async function loadBrandingSettings() {
   if (brandingById("brandingPhase1UnlockDays")) brandingById("brandingPhase1UnlockDays").value = raw.restitution_phase1_unlock_days ?? "1";
   if (brandingById("brandingTimingWarningDays")) brandingById("brandingTimingWarningDays").value = raw.timing_warning_days ?? "3";
   if (brandingById("brandingParcRetentionYears")) brandingById("brandingParcRetentionYears").value = raw.parc_retention_years ?? "5";
+  if (brandingById("brandingTimezone")) {
+    setTimezoneValue(raw.timezone);
+  }
 
   toggleLogoFields(raw.brand_logo_mode);
   updateBrandingPreview(payload.logoUrl, raw.org_name || payload.orgName);
@@ -430,17 +436,19 @@ async function saveBrandingSettings() {
       }
     });
   } catch (error) {
+    // Le serveur explique un refus de validation en français (ex. « Fuseau horaire inconnu ») ; un code technique ou « HTTP 500 » reste masqué.
+    const serverReason = /^[A-ZÀ-Ý«]/.test(error?.message || "") && !/^HTTP /.test(error.message) ? error.message : "";
     updateBrandingSaveStep(steps, "save", "error");
     renderBrandingSaveDialog({
       title: "Enregistrement interrompu",
-      text: "La personnalisation n'a pas pu être enregistrée. Vérifiez les informations saisies puis réessayez.",
+      text: `La personnalisation n'a pas pu être enregistrée.${serverReason ? ` ${serverReason}` : " Vérifiez les informations saisies puis réessayez."}`,
       steps,
       showConfirm: true,
       confirmLabel: "Fermer",
       hideSpinner: true,
       onConfirm: closeBrandingSaveDialog
     });
-    showBrandingNotice("Impossible d'enregistrer la personnalisation.", "danger");
+    showBrandingNotice(`Impossible d'enregistrer la personnalisation.${serverReason ? ` ${serverReason}` : ""}`, "danger");
   } finally {
     if (saveButton) {
       saveButton.disabled = false;
@@ -485,7 +493,221 @@ async function uploadBrandingLogo() {
   }
 }
 
+// Fuseau horaire de l'organisation : une liste déroulante, avec d'abord les cas courants en français (France et outre-mer, pays
+// voisins, Canada, Maghreb et Afrique francophone), puis tous les fuseaux connus du navigateur regroupés par région.
+// Décrire les groupes par des données (TIMEZONE_GROUPS) : en ajouter un = ajouter une entrée, sans toucher au rendu.
+const TIMEZONE_GROUPS = [
+  { label: "France et outre-mer", zones: {
+    "Europe/Paris": "France métropolitaine", "America/Martinique": "Martinique", "America/Guadeloupe": "Guadeloupe", "America/Cayenne": "Guyane",
+    "Indian/Reunion": "La Réunion", "Indian/Mayotte": "Mayotte", "America/Miquelon": "Saint-Pierre-et-Miquelon",
+    "Pacific/Noumea": "Nouvelle-Calédonie", "Pacific/Tahiti": "Polynésie française (Tahiti)", "Pacific/Wallis": "Wallis-et-Futuna" } },
+  { label: "Europe francophone", zones: {
+    "Europe/Brussels": "Belgique", "Europe/Zurich": "Suisse", "Europe/Luxembourg": "Luxembourg", "Europe/Monaco": "Monaco" } },
+  { label: "Canada", zones: { "America/Toronto": "Québec et Ontario", "America/Halifax": "Provinces de l'Atlantique", "America/Vancouver": "Colombie-Britannique" } },
+  { label: "Afrique francophone", zones: {
+    "Africa/Algiers": "Algérie", "Africa/Tunis": "Tunisie", "Africa/Casablanca": "Maroc", "Africa/Dakar": "Sénégal", "Africa/Abidjan": "Côte d'Ivoire" } },
+];
+
+function browserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function timezoneOffsetLabel(name) {
+  try {
+    return new Intl.DateTimeFormat("fr-FR", { timeZone: name, timeZoneName: "shortOffset" }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function timezoneOptionLabel(name, friendly) {
+  const offset = timezoneOffsetLabel(name);
+  return `${friendly ? `${friendly} — ` : ""}${name}${offset ? ` (${offset})` : ""}`;
+}
+
+function allKnownTimezones() {
+  try {
+    return typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// Champ à saisie libre avec suggestions : on peut taper un nom IANA (Europe/Paris), un lieu en français (« Réunion », « Belgique »)
+// ou choisir dans la liste. TIMEZONE_CHOICES garde, pour chaque fuseau proposé, son libellé : c'est ce qui permet de retrouver
+// « Indian/Reunion » à partir de « Réunion » (comparaison sans accents ni majuscules).
+let TIMEZONE_CHOICES = [];
+
+function normalizeTimezoneText(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function buildTimezoneOptions() {
+  const list = brandingById("brandingTimezoneList");
+  if (!list) {
+    return;
+  }
+  const used = new Set();
+  const choices = [];
+  TIMEZONE_GROUPS.forEach((group) => {
+    Object.entries(group.zones).forEach(([name, friendly]) => {
+      used.add(name);
+      choices.push({ name, friendly, label: timezoneOptionLabel(name, friendly) });
+    });
+  });
+  allKnownTimezones().filter((name) => !used.has(name)).forEach((name) => {
+    choices.push({ name, friendly: "", label: timezoneOptionLabel(name, "") });
+  });
+  if (!choices.some((choice) => choice.name === "UTC")) {
+    choices.push({ name: "UTC", friendly: "", label: timezoneOptionLabel("UTC", "") });
+  }
+  TIMEZONE_CHOICES = choices;
+  const escape = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  list.innerHTML = choices.map((choice) => `<option value="${escape(choice.name)}" label="${escape(choice.label)}"></option>`).join("");
+}
+
+// Ce que la personne a tapé : un nom exact, ou un lieu qui ne correspond qu'à UN fuseau. null = inconnu (le serveur le vérifiera aussi).
+function resolveTimezone(text) {
+  const wanted = normalizeTimezoneText(text);
+  if (!wanted) {
+    return null;
+  }
+  const exact = TIMEZONE_CHOICES.find((choice) => normalizeTimezoneText(choice.name) === wanted);
+  if (exact) {
+    return exact.name;
+  }
+  const named = TIMEZONE_CHOICES.filter((choice) => choice.friendly && normalizeTimezoneText(choice.friendly).includes(wanted));
+  if (named.length === 1) {
+    return named[0].name;
+  }
+  const byCity = TIMEZONE_CHOICES.filter((choice) => normalizeTimezoneText(choice.name.split("/").pop()) === wanted);
+  return byCity.length === 1 ? byCity[0].name : null;
+}
+
+// Un fuseau valide pour le navigateur mais absent de la liste (ex. alias) reste utilisable : on teste en le formatant.
+function isUsableTimezone(name) {
+  try {
+    new Intl.DateTimeFormat("fr-FR", { timeZone: name });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function setTimezoneValue(name) {
+  const input = brandingById("brandingTimezone");
+  if (!input) {
+    return;
+  }
+  input.value = name || "Europe/Paris";
+  updateTimezonePreview();
+}
+
+// Décalage (en minutes) d'un fuseau à une date donnée, lu dans la base des fuseaux du navigateur (donc règles d'été / d'hiver comprises).
+function timezoneOffsetMinutes(name, date) {
+  const text = new Intl.DateTimeFormat("en-US", { timeZone: name, timeZoneName: "longOffset" }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "GMT";
+  const match = text.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+  if (!match) {
+    return 0;  // « GMT » seul : décalage nul
+  }
+  return (match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3] || 0));
+}
+
+// Heure d'été / d'hiver : le fuseau en observe-t-il une, laquelle est en vigueur, et quand a lieu le prochain changement ?
+// (heure d'été = le décalage le plus élevé des deux saisons, dans les deux hémisphères)
+function timezoneChangeInfo(name, from = new Date()) {
+  const offsetNow = timezoneOffsetMinutes(name, from);
+  const january = timezoneOffsetMinutes(name, new Date(Date.UTC(from.getUTCFullYear(), 0, 15)));
+  const july = timezoneOffsetMinutes(name, new Date(Date.UTC(from.getUTCFullYear(), 6, 15)));
+  const info = { offsetNow, observesDst: january !== july, isDst: january !== july && offsetNow === Math.max(january, july), nextChange: null, nextOffset: null };
+  let previous = offsetNow;
+  for (let day = 1; day <= 400 && info.observesDst; day += 1) {
+    const date = new Date(from.getTime() + day * 86400000);
+    const offset = timezoneOffsetMinutes(name, date);
+    if (offset !== previous) {
+      info.nextChange = date;
+      info.nextOffset = offset;
+      break;
+    }
+  }
+  return info;
+}
+
+function formatOffsetMinutes(minutes) {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = Math.abs(minutes);
+  return `UTC${sign}${Math.floor(abs / 60)}${abs % 60 ? `:${String(abs % 60).padStart(2, "0")}` : ""}`;
+}
+
+function describeTimezoneChange(name, from = new Date()) {
+  const info = timezoneChangeInfo(name, from);
+  if (!info.observesDst) {
+    return "Ce fuseau n'a pas de changement d'heure : le décalage est le même toute l'année.";
+  }
+  const season = info.isDst ? "Heure d'été en vigueur" : "Heure d'hiver en vigueur";
+  if (!info.nextChange) {
+    return `${season}.`;
+  }
+  const day = info.nextChange.toLocaleDateString("fr-FR", { timeZone: name, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const toDst = info.nextOffset > info.offsetNow;
+  return `${season}. Prochain changement d'heure : ${day}, passage à l'${toDst ? "heure d'été" : "heure d'hiver"} (${formatOffsetMinutes(info.nextOffset)}). Les heures des PDF suivent ce changement automatiquement.`;
+}
+
+function updateTimezonePreview() {
+  const select = brandingById("brandingTimezone");
+  const preview = brandingById("brandingTimezonePreview");
+  if (!select || !preview) {
+    return;
+  }
+  const name = select.value.trim();
+  select.setAttribute("aria-invalid", "false");
+  if (!isUsableTimezone(name)) {
+    select.setAttribute("aria-invalid", name ? "true" : "false");
+    preview.textContent = name
+      ? "Fuseau inconnu : choisissez-en un dans la liste ou tapez un nom comme Europe/Paris."
+      : "Europe/Paris par défaut.";
+    return;
+  }
+  try {
+    const time = new Date().toLocaleTimeString("fr-FR", { timeZone: name, hour: "2-digit", minute: "2-digit" });
+    const offset = timezoneOffsetLabel(name);
+    preview.textContent = `Il est actuellement ${time} dans ce fuseau${offset ? ` (${offset})` : ""}. ${describeTimezoneChange(name)}`;
+  } catch (error) {
+    preview.textContent = "Fuseau inconnu de ce navigateur : il sera vérifié à l'enregistrement.";
+  }
+}
+
+function initTimezoneField() {
+  const input = brandingById("brandingTimezone");
+  if (!input) {
+    return;
+  }
+  buildTimezoneOptions();
+  input.addEventListener("input", updateTimezonePreview);
+  // À la sortie du champ (ou au choix d'une suggestion) : « Réunion » devient « Indian/Reunion » si ce lieu est sans ambiguïté.
+  input.addEventListener("change", () => {
+    const resolved = resolveTimezone(input.value);
+    if (resolved) {
+      input.value = resolved;
+    }
+    updateTimezonePreview();
+  });
+  brandingById("brandingTimezoneDetect")?.addEventListener("click", () => {
+    const detected = browserTimezone();
+    if (detected) {
+      setTimezoneValue(detected);
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  updateTimezonePreview();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  initTimezoneField();
   if (!brandingById("brandingOrgName")) {
     return;
   }

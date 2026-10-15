@@ -1414,7 +1414,8 @@ function applyLockState(locked) {
       return;
     }
     // Boutons qui doivent rester accessibles sur dossier verrouillé
-    if (element.hasAttribute("data-back-to-index") || element.id === "showSignatureBtn") {
+    // data-keep-enabled : consultation / export qui ne modifie rien (ex. PDF et e-mail d'un ajustement dans l'historique)
+    if (element.hasAttribute("data-back-to-index") || element.hasAttribute("data-keep-enabled") || element.id === "showSignatureBtn") {
       element.disabled = false;
       return;
     }
@@ -3173,7 +3174,9 @@ async function saveDraft(signaturePad) {
       steps: workflowLabels.map((label) => ({ label, status: "done" }))
     });
 
-    if (["active", "awaiting_signature"].includes(result.summary.status || "") && typeof window.playCompletionCelebration === "function") {
+    // "awaiting_signature" veut dire que les champs sont complets mais pas encore signes : feter ce moment-la
+    // donnerait l'impression que c'est fait alors que la signature (l'evenement reel) reste a venir.
+    if (result.summary.status === "active" && typeof window.playCompletionCelebration === "function") {
       await window.playCompletionCelebration("confetti");
     }
 

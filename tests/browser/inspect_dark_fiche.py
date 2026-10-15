@@ -1,6 +1,6 @@
 """Fiche d'un objet du Parc en MODE SOMBRE : dates de l'historique de vie visibles (contraste >= 4,5 : WCAG AA), heure affichee
 quand elle est connue. Copie de la base de developpement, jamais l'originale.
-    python tests/browser/check_dark_fiche.py [numero_de_serie] [chemin_capture.png]"""
+    python tests/browser/inspect_dark_fiche.py [numero_de_serie] [chemin_capture.png]"""
 import sys
 import time
 from pathlib import Path

@@ -55,5 +55,5 @@ Commande : `python -m pip_audit -r backend/requirements.txt --progress-spinner o
 PyPI). Résultat : **aucune vulnérabilité connue** sur `flask 3.1.3`, `bcrypt 5.0.0`, `fpdf2 2.8.7`, `werkzeug 3.1.7`,
 `pytest 9.0.3`, `cryptography 50.0.1` et leurs dépendances. À relancer avant chaque mise en production (le résultat dépend de
 la base de vulnérabilités du jour). Non couvert par cet outil : les bibliothèques chargées depuis un CDN par les pages
-(Bootstrap 5.3.2, cookieconsent 3.1.0) — à revoir manuellement lors d'une montée de version.
+(Bootstrap 5.3.2, Chart.js 4.4.2, cookieconsent 3.1.0) — **embarquées dans l'application depuis la 3.72.1** (plus de CDN, plus de dépendance à un tiers à l'exécution ; politique de sécurité `'self'` seulement) — à revoir manuellement lors d'une montée de version (`frontend/js/vendor/README.md`).
 

@@ -1,5 +1,5 @@
 """Test navigateur du Parc sur une COPIE de la base de prod : « A verifier » (lignes sans identifiant, doublons) et fusion.
-    python tests/browser/check_parc.py [--merge]
+    python tests/browser/inspect_parc.py [--merge]
 """
 import sys
 import time

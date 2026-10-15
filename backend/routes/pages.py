@@ -11,11 +11,13 @@ from auth import (
     login_required, admin_required, has_permission,
     get_user_record, password_complexity_error, is_valid_username,
     get_request_client_ip, get_rate_limit_key, extract_first_forwarded_ip, check_user,
+    start_session, realign_session_password, record_login_failure, LOGIN_IP_BLOCK_SECONDS,
     current_user, normalize_email,
     _is_login_rate_limited, rate_limit,
 )
 from account_rules import normalize_person_name
 from models.audit import insert_app_log, read_login_attempt_context
+from models.notifications import open_tasks_count
 from models.settings import DEFAULT_APP_SETTINGS, get_app_settings, build_public_settings_payload
 import re
 
@@ -58,21 +60,31 @@ def build_login_forensic_details(username, auth_state):
 # Auth
 # ---------------------------------------------------------------------------
 
+def _count_login_failure(ip):
+    """Un echec de connexion de plus pour cette adresse ; au seuil elle est bloquee et le blocage est journalise (l'adresse seulement :
+    jamais l'identifiant ni le mot de passe tapes)."""
+    if record_login_failure(ip):
+        with get_db() as connection:
+            insert_app_log(connection, "security", "login_ip_blocked", "Adresse bloquee : trop d'echecs de connexion", "ip", ip,
+                           {"ip": ip, "minutes": LOGIN_IP_BLOCK_SECONDS // 60}, actor="anonymous")
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if _is_login_rate_limited(get_rate_limit_key()):
-            return redirect("/login?error=rate_limited")
+        ip = get_rate_limit_key()
+        if _is_login_rate_limited(ip):
+            return redirect("/login?error=rate_limited")  # adresse bloquee (10 echecs, 15 min) : on ne verifie meme plus les identifiants
         submitted_token = request.form.get("csrf_token") or ""
         if not submitted_token or not secrets.compare_digest(submitted_token, session.get("csrf_token", "")):
+            _count_login_failure(ip)
             return redirect("/login?error=invalid")
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         auth_state = check_user(username, password)
 
         if auth_state == "ok":
-            session["user"] = username
-            session.modified = True
+            start_session(username)
             with get_db() as connection:
                 insert_app_log(
                     connection,
@@ -84,9 +96,12 @@ def login():
                     {"ip": get_request_client_ip()},
                     actor=username,
                 )
+            if (get_user_record(username) or {}).get("must_change_password"):
+                return redirect("/")  # la fenetre de changement de mot de passe s'y ouvre (ui.js)
             settings = get_app_settings()
             setup_completed = settings.get("setup_completed", "0") == "1"
             return redirect("/setup.html" if not setup_completed else "/")
+        _count_login_failure(ip)
         with get_db() as connection:
             insert_app_log(
                 connection,
@@ -443,7 +458,11 @@ def client_context_route():
 @bp.route("/api/session", methods=["GET"])
 @login_required
 def session_route():
-    return jsonify(current_user())
+    user = current_user()
+    if user:
+        with get_db() as connection:
+            user["notifications_count"] = open_tasks_count(connection, user)  # lu a chaque controle de session (ui.js)
+    return jsonify(user)
 
 
 @bp.route("/api/me/password", methods=["POST"])
@@ -458,16 +477,19 @@ def change_own_password():
     record = get_user_record(user["username"])
     if not record or not bcrypt.checkpw(current_pw.encode(), record["password_hash"].encode()):
         return jsonify({"error": "invalid_current_password"}), 403
+    if new_pw == current_pw:
+        return jsonify({"error": "password_unchanged"}), 400
     complexity_error = password_complexity_error(new_pw)
     if complexity_error:
         return jsonify({"error": complexity_error}), 400
     new_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
     with get_users_db() as conn:
         conn.execute(
-            "UPDATE users SET password_hash=?, updated_at=? WHERE username=?",
+            "UPDATE users SET password_hash=?, must_change_password=0, updated_at=? WHERE username=?",
             (new_hash, utc_now(), user["username"])
         )
         conn.commit()
+    realign_session_password(new_hash)  # sa session reste ouverte ; toutes les autres sont refusees (auth.session_invalid_reason)
     with get_db() as connection:
         insert_app_log(connection, "security", "password_self_change", "Changement de mot de passe", details={
             "username": user["username"],

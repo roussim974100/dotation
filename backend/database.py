@@ -55,6 +55,8 @@ def ensure_users_schema():
         for column in ("email", "first_name", "last_name"):
             if columns and column not in columns:
                 connection.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        if columns and "must_change_password" not in columns:
+            connection.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0")
         # Droit de gestion du parc : donne au groupe admin s'il ne l'a pas encore (idempotent).
         import json as _json
         has_groups = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='groups'").fetchone()
@@ -71,6 +73,30 @@ def ensure_users_schema():
                 permissions.append("parc.manage")
                 connection.execute("UPDATE groups SET permissions_json = ? WHERE key = 'admin'", (_json.dumps(permissions),))
         connection.commit()
+    flag_default_credentials()
+
+
+def flag_default_credentials():
+    """Compte `admin` encore protege par le mot de passe d'origine `admin` -> changement obligatoire a la prochaine
+    connexion (must_change_password). Idempotent ; couvre les installations existantes, une base restauree depuis une
+    ancienne archive et une installation neuve. Retourne True si le drapeau vient d'etre pose."""
+    import bcrypt
+    with get_users_db() as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(users)")}
+        if "must_change_password" not in columns:
+            return False
+        row = connection.execute("SELECT password_hash, must_change_password FROM users WHERE username = 'admin'").fetchone()
+        if not row or row[1]:
+            return False
+        try:
+            is_default = bcrypt.checkpw(b"admin", str(row[0]).encode())
+        except ValueError:  # hash illisible : on n'y touche pas
+            return False
+        if not is_default:
+            return False
+        connection.execute("UPDATE users SET must_change_password = 1 WHERE username = 'admin'")
+        connection.commit()
+        return True
 
 
 def normalize_reference_row(row):

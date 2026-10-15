@@ -48,11 +48,11 @@ def resource(code, label):
             "selected": True, "fields": {"marque": "X"}, "details": "", "assignedAt": "2026-09-01T09:00:00"}
 
 
-def create_dossier(driver, resources, person_id="", nom="GUERRIERO", prenom="Lilou", service="DRH"):
+def create_dossier(driver, resources, person_id="", nom="GUERRIERO", prenom="Lilou", service="DRH", status="active"):
     body = {"dossier": {"type": "arrivee"}, "beneficiaire": {"nom": nom, "prenom": prenom, "qualite": "agent", "service": service},
             "resources": {"additional": resources},
             "validation": {"signatureDataUrl": PNG, "rgpdAccepted": True},
-            "workflow": {"status": "active"}, "meta": ({"personId": person_id} if person_id else {})}
+            "workflow": {"status": status}, "meta": ({"personId": person_id} if person_id else {})}
     created = api(driver, "POST", "/api/forms", body)
     summary = created["json"].get("summary") or {}
     return summary.get("id"), summary.get("personId")
@@ -84,6 +84,31 @@ with Instance() as inst:
 
     toggle_text = js(driver, "return document.querySelector('[data-person-history-open]')?.textContent.trim() || ''")
     check("le chevron annonce les 2 autres dossiers", "2 autres dossiers" in toggle_text, toggle_text)
+
+    step_labels = js(driver, """
+        const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('GUERRIERO'));
+        return [...row.querySelectorAll('.draft-actions__primary .btn-outline-primary')].map(b => b.textContent.trim());
+    """)
+    check("« Gérer les ressources » et « Restituer » coexistent (2 parcours distincts)",
+          "Gérer les ressources" in step_labels and "Restituer" in step_labels, str(step_labels))
+
+    # "Nouvelle attribution pour cette personne" ne doit plus apparaître sur un dossier actif : "Gérer les
+    # ressources" est le bon outil, le proposer aussi recréerait le doublon qu'il visait à éviter.
+    check("« Nouvelle attribution pour cette personne » absent sur un dossier actif", not js(driver, """
+        const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('GUERRIERO'));
+        return Boolean(row.querySelector('[data-action="newAssignmentForPerson"]'));
+    """))
+
+    # Mais reste utile une fois le dossier restitué : il n'y a alors plus rien à ajuster.
+    id_returned, _ = create_dossier(driver, [resource("veste", "Veste")], nom="DUPONT", prenom="Anne", status="returned")
+    driver.get(inst.url("/restitutions-completed.html"))
+    check("la liste affiche le dossier restitué de Dupont", wait_for(lambda: "DUPONT" in js(driver, "return document.body.innerText").upper()))
+    check("« Nouvelle attribution pour cette personne » reste proposé sur un dossier restitué", wait_for(lambda: js(driver, """
+        const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('DUPONT'));
+        return Boolean(row && row.querySelector('[data-action="newAssignmentForPerson"]'));
+    """)))
+    driver.get(inst.url("/assignments-completed.html"))
+    wait_for(lambda: "GUERRIERO" in js(driver, "return document.body.innerText").upper())
 
     progress = js(driver, """
         const row = [...document.querySelectorAll('tr.draft-row')].find(r => r.innerText.includes('GUERRIERO'));

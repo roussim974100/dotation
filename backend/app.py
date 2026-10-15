@@ -3,6 +3,8 @@ from flask.sessions import SecureCookieSessionInterface
 import gzip
 import os
 import secrets
+from datetime import timedelta
+from auth import enforce_session_validity, enforce_password_change, SESSION_MAX_HOURS
 from proxy import AutoProxyFix
 
 from config import get_app_secret_key, AUTH_CONFIG_PATH
@@ -52,6 +54,20 @@ for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
 app.config["SESSION_COOKIE_NAME"] = "publier_session"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=SESSION_MAX_HOURS)
+
+
+@app.before_request
+def reject_stale_session():
+    """Refuse une session devenue invalide (mot de passe change, compte desactive ou supprime, expiration).
+    Declare avant validate_csrf : une session videe ici ne passe plus la verification CSRF et recoit 401."""
+    enforce_session_validity()
+
+
+@app.before_request
+def require_password_change():
+    """Compte au mot de passe d'origine : rien d'autre que le changement du mot de passe (voir auth.enforce_password_change)."""
+    return enforce_password_change()
 
 
 @app.before_request
@@ -121,16 +137,17 @@ def disable_frontend_cache(response):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-    # CSP : self uniquement + CDN Bootstrap/CookieConsent autorisés explicitement
+    # CSP : self uniquement. Bootstrap, Chart.js, CookieConsent et le QR code sont embarqués (frontend/js/vendor, frontend/css/vendor) :
+    # l'application ne contacte aucun serveur externe pour s'afficher (intranet sans Internet).
     # unsafe-inline nécessaire pour les styles Bootstrap injectés dynamiquement
     response.headers.setdefault(
         "Content-Security-Policy",
         (
             "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https:; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
+            "font-src 'self'; "
             "connect-src 'self'; "
             "frame-ancestors 'self'"
         ),
@@ -173,6 +190,7 @@ def init_users_db():
                 email TEXT NOT NULL DEFAULT '',
                 first_name TEXT NOT NULL DEFAULT '',
                 last_name TEXT NOT NULL DEFAULT '',
+                must_change_password INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -284,7 +302,7 @@ def seed_default_groups(connection):
 
 
 def seed_default_admin(connection):
-    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas."""
+    """Crée l'utilisateur admin/admin par défaut s'il n'existe pas ; son mot de passe devra être changé à la première connexion."""
     import bcrypt
     user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if user_count > 0:
@@ -296,6 +314,9 @@ def seed_default_admin(connection):
         "INSERT INTO users (username, password_hash, is_active, status, service, db_manage, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
         ("admin", password_hash, 1, "active", "", 0, now, now)
     )
+    # Mot de passe d'origine : a changer des la premiere connexion (si la colonne existe ; sinon ensure_users_schema la creera et posera le drapeau)
+    if any(row[1] == "must_change_password" for row in connection.execute("PRAGMA table_info(users)")):
+        connection.execute("UPDATE users SET must_change_password = 1 WHERE username = 'admin'")
     connection.execute(
         "INSERT OR IGNORE INTO user_groups (username, group_key) VALUES (?,?)",
         ("admin", "admin")
@@ -587,6 +608,11 @@ def init_db():
                 print(f"[demarrage] {_step.__name__} ignoree : {_exc}")
         from migrations import run_pending_migrations
         run_pending_migrations(connection)  # migrations numerotees (identifiants de champs...), copie de securite avant
+        try:
+            from models.service_tasks import purge_orphans
+            purge_orphans(connection)  # « Fait » d'un dossier supprime (la table existe apres la migration 10)
+        except Exception as _exc:  # noqa: BLE001 - jamais bloquant au demarrage
+            print(f"[demarrage] purge des taches orphelines ignoree : {_exc}")
         # Parc : tables d'unites et de journal ; reprise unique de l'historique existant (idempotente).
         from models.units import backfill_units, ensure_units_schema
         ensure_units_schema(connection)
