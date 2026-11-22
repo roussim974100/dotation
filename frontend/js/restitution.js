@@ -826,6 +826,20 @@ async function initRestitutionPage() {
         "Finalisation du retour au tableau de bord"
       ];
       try {
+        const payload = buildRestitutionPayload(false);
+        if (payload.status === "partial_return") {
+          const closeAnyway = await askConfirm(
+            "Au moins un objet est marqué « Non restitué » : sans confirmation, le dossier restera « en cours » tant que ce n'est pas résolu. " +
+            "Clôturer quand même le dossier (ex. matériel mutualisé qui ne repasse jamais individuellement par le stock) ? " +
+            "L'objet garde son état « Non restitué » dans l'historique, seul le dossier passe à « Terminée ».",
+            { confirmLabel: "Clôturer quand même", cancelLabel: "Revenir en arrière" }
+          );
+          if (!closeAnyway) {
+            return;
+          }
+          payload.closeAnyway = true;
+        }
+
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution est en cours de préparation.",
@@ -843,7 +857,7 @@ async function initRestitutionPage() {
           text: "Les informations sont en cours d'enregistrement.",
           steps: createRestitutionWorkflowSteps(workflowLabels, 2)
         });
-        const response = await saveRestitution(buildRestitutionPayload(false), { keepPending: false });
+        const response = await saveRestitution(payload, { keepPending: false });
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",

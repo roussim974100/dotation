@@ -1,5 +1,14 @@
 # Historique des versions — À Quai
 
+## [3.74.1] - 2026-11-22 — Clôturer une restitution malgré un objet « Non restitué », page de diagnostic
+
+### 🔓 « Non restitué » ne bloque plus le dossier si on confirme la clôture
+- Un objet marqué « Non restitué » (ex. matériel mutualisé — PC de télétravail — qui ne repasse jamais individuellement par le stock) maintenait le dossier « en cours » indéfiniment, sans échappatoire.
+- Sur `restitution.html`, « Enregistrer la restitution » propose maintenant une confirmation **« Clôturer quand même »** quand c'est la seule raison du blocage. L'objet garde son état réel (« Non restitué ») dans l'historique ; seul le statut agrégé du dossier passe à « Terminée ». Action journalisée (`closed_despite_missing_items`).
+- Nouvelle page **« Pourquoi ce dossier est bloqué ? »** (`restitution-blocage.html`), accessible depuis le menu « ⋯ » d'un dossier « Restitution partielle » : explique en clair quel objet bloque, et propose le même bouton de clôture forcée sans repasser par tout le formulaire de restitution.
+- Fichiers : `backend/models/workflow.py` (`derive_restitution_workflow_status`, `compute_effective_workflow_status`), `backend/routes/forms.py` (`update_restitution`), `backend/routes/pages.py`, `frontend/js/restitution.js`, `frontend/js/storage.js`, `frontend/restitution-blocage.html` + `frontend/js/restitution-blocage.js` (nouveaux). Aucune migration.
+- Tests : `tests/test_restitution_close_anyway.py` (4 cas).
+
 ## [3.74.0] - 2026-11-22 — Annuler une suppression, blocage des doublons de numéro de série
 
 ### ↩️ Toast « Annuler » après la suppression d'un dossier

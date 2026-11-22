@@ -529,10 +529,13 @@ def collect_resource_validation_errors(payload):
 # Statut workflow effectif
 # ---------------------------------------------------------------------------
 
-def derive_restitution_workflow_status(item_states, signature_status="", signature_data=""):
+def derive_restitution_workflow_status(item_states, signature_status="", signature_data="", force_closed=False):
+    """`force_closed` : l'operateur a choisi de clore le dossier malgre un objet « Non restitue » (ex. materiel
+    mutualise qui ne repasse jamais individuellement par le stock). L'etat de l'objet reste tel quel dans
+    l'historique ; seul le statut AGREGE du dossier passe outre."""
     states = list((item_states or {}).values())
     base_status = "returned"
-    if states and any((state or {}).get("state") == "non_restitue" for state in states):
+    if not force_closed and states and any((state or {}).get("state") == "non_restitue" for state in states):
         base_status = "partial_return"
 
     # Une restitution préparée pour signature à distance ne doit pas être
@@ -572,6 +575,7 @@ def compute_effective_workflow_status(payload):
             restitution.get("items", {}),
             restitution.get("signatureStatus") or "",
             restitution.get("signatureDataUrl") or "",
+            force_closed=bool(restitution.get("closedDespiteMissingItems")),
         )
 
     validation = payload.get("validation", {})

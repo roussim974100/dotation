@@ -1046,6 +1046,10 @@ function buildDraftActionButtons(draft, options) {
   const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
+  // Dossier resté « en cours » : diagnostic + clôture forcée si la seule raison est un objet "Non restitué".
+  if (status === "partial_return") {
+    personItems.push({ action: "openRestitutionBlockage", id, label: "Pourquoi ce dossier est bloqué ?" });
+  }
   // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
   // (canAdjustHere) : rien à dupliquer dans le menu « … ».
 
@@ -1502,6 +1506,10 @@ function newAssignmentForPerson(id) {
 
 function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
+}
+
+function openRestitutionBlockage(id) {
+  window.location.href = `restitution-blocage.html?id=${encodeURIComponent(id)}`;
 }
 
 // Modale "Nouvelle restitution" : une restitution part toujours d'une attribution
@@ -3536,7 +3544,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("emptyStateNewRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
-    editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
+    editDraft, openRestitution, openRestitutionBlockage, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,

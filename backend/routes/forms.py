@@ -794,12 +794,18 @@ def update_restitution(form_id):
     payload["restitution"]["signedAt"] = patch.get("signedAt", payload["restitution"].get("signedAt"))
     payload["restitution"]["signataireDecision"] = patch.get("signataireDecision", payload["restitution"].get("signataireDecision"))
     payload["restitution"]["signataireComment"] = patch.get("signataireComment", payload["restitution"].get("signataireComment"))
+    close_anyway = bool(patch.get("closeAnyway"))
     computed_status = derive_restitution_workflow_status(
         payload["restitution"].get("items", {}),
         payload["restitution"].get("signatureStatus") or "",
         payload["restitution"].get("signatureDataUrl") or "",
+        force_closed=close_anyway,
     )
     payload["restitution"]["pendingFinalization"] = bool(patch.get("keepPending"))
+    # Trace la decision de cloturer malgre un objet « Non restitue » (ex. materiel mutualise qui ne repasse jamais
+    # individuellement par le stock) : l'objet garde son etat reel, seul le statut agrege du dossier passe outre,
+    # et compute_effective_workflow_status doit continuer a en tenir compte aux enregistrements suivants.
+    payload["restitution"]["closedDespiteMissingItems"] = close_anyway
     payload["workflow"]["status"] = "partial_return" if patch.get("keepPending") else computed_status
 
     form_data = persist_form(payload, allow_locked_update=True)
@@ -814,6 +820,7 @@ def update_restitution(form_id):
             {
                 "status": payload.get("workflow", {}).get("status"),
                 "returned_at": payload.get("restitution", {}).get("returnedAt"),
+                "closed_despite_missing_items": close_anyway,
             },
             target_label=form_data.get("summary", {}).get("title"),
         )

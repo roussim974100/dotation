@@ -264,6 +264,12 @@ def restitution_phase1_page():
     return send_from_directory(FRONTEND_DIR, "restitution-phase1.html")
 
 
+@bp.route("/restitution-blocage.html")
+@login_required
+def restitution_blocage_page():
+    return send_from_directory(FRONTEND_DIR, "restitution-blocage.html")
+
+
 @bp.route("/about.html")
 @login_required
 def about_page():

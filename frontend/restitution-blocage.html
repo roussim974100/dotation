@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="assets/app-icon.svg">
+<link rel="preload" as="image" href="/assets/a-quai-logo.png">
+<title>Pourquoi ce dossier est bloqué ?</title>
+<link href="/css/vendor/bootstrap.min.css?v=20261008g" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-shell">
+<a class="skip-link" href="#main">Aller au contenu</a>
+<header class="app-header app-header--compact">
+  <div class="container app-header__inner">
+    <div class="app-brand" data-home-link>
+      <img class="app-logo" data-brand-logo src="/assets/a-quai-logo.png" alt="Logo collectivité">
+      <div>
+        <h1 class="app-title">Pourquoi ce dossier est bloqué ?</h1>
+        <p class="app-subtitle">Diagnostic d'une restitution restée « en cours » et, si besoin, clôture forcée.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-outline-light" href="restitutions-pending.html">← Restitutions en cours</a>
+      <details id="userMenu" class="user-menu">
+        <summary class="btn btn-outline-light" id="userMenuBtn">Mon compte</summary>
+        <div class="user-menu__panel">
+          <div class="user-menu__header">
+            <span class="user-menu__name" id="userMenuName"></span>
+            <span class="user-menu__role" id="userMenuRole"></span>
+          </div>
+          <button class="user-menu__item" type="button" id="darkModeToggle">Mode sombre</button>
+          <button class="user-menu__item" type="button" id="changePasswordBtn">Changer le mot de passe</button>
+          <a id="execDashboardLink" class="user-menu__item d-none" href="executive-dashboard.html">Synthèse</a>
+          <a id="adminLink" class="user-menu__item d-none" href="admin.html">Administration</a>
+          <div class="user-menu__sep"></div>
+          <a class="user-menu__item user-menu__item--danger" href="/logout">Déconnexion</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="container py-4 py-lg-5">
+  <div id="blocageLoader" class="page-loader">
+    <div class="page-loader__panel">
+      <div class="page-loader__spinner"></div>
+      <strong>Chargement</strong>
+      <p>Analyse du dossier.</p>
+    </div>
+  </div>
+
+  <section class="hero-panel mb-4">
+    <div>
+      <p class="panel-eyebrow">Diagnostic</p>
+      <h2 class="panel-title" id="blocageTitle">Dossier</h2>
+      <p class="panel-text" id="blocageSubtitle"></p>
+    </div>
+    <div class="hero-panel__meta">
+      <div class="status-pill" id="blocageStatusPill"></div>
+    </div>
+  </section>
+
+  <section class="content-card" id="blocageReasonCard">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Constat</p>
+        <h3 class="section-title">Ce qui bloque la clôture</h3>
+      </div>
+    </div>
+    <div id="blocageReasonBody"></div>
+  </section>
+
+  <section class="content-card mt-4 d-none" id="blocageForceCard">
+    <div class="section-heading">
+      <div>
+        <p class="panel-eyebrow">Si cette liste ne reviendra jamais à zéro</p>
+        <h3 class="section-title">Clôturer le dossier quand même</h3>
+      </div>
+    </div>
+    <p class="panel-text">Les objets listés ci-dessus restent marqués « Non restitué » dans l'historique du dossier (rien n'est perdu ni masqué) : seul le statut du dossier passe à « Terminée ». L'action est journalisée.</p>
+    <button class="btn btn-warning" type="button" id="forceCloseBtn">Clôturer quand même</button>
+  </section>
+</main>
+
+<script src="/js/vendor/bootstrap.bundle.min.js?v=20261008g"></script>
+<script src="js/branding.js?v=20261008h"></script>
+<script src="js/ui.js?v=20261122a"></script>
+<script src="js/storage.js?v=20261122b"></script>
+<script src="js/restitution-blocage.js?v=20261122a"></script>
+</body>
+</html>
