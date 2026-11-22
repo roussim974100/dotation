@@ -96,6 +96,18 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   recalculées par `persist_form`. Tout enregistrement de dossier passe par là (voir `docs/ARCHITECTURE_DONNEES.md`).
 - **Statuts** (`models/vocab.py`) : `draft`, `partial_assignment`, `awaiting_signature`, `active`, `partial_return`,
   `returned`, `cancelled`. Un dossier « en restitution » est `partial_return` dès l'enregistrement de la Phase 1.
+- **Progression / Pilotage du tableau de bord** (3.74.3) : deux fonctions distinctes dans `models/workflow.py`, choisies
+  par `row_to_summary` (`models/forms.py`) selon la phase du dossier — ne jamais réutiliser l'une à la place de l'autre.
+  `summarize_assignment_progress` = complétude de la **saisie à l'attribution** (champs remplis), pour un dossier pas
+  encore en restitution. `summarize_restitution_progress` = avancement **réel de la restitution** (objets réglés sur
+  objets à restituer), dès qu'un dossier entre en phase de restitution — sinon un dossier de régularisation (champs
+  jamais saisis par nature) affiche « 0/4 » alors que le matériel a bien été rendu (constat du 22/11). États d'un objet
+  qui comptent comme « réglé » sans bloquer la clôture : `RESOLVED_RESTITUTION_STATES` (`conforme`, `degrade`, `perdu`,
+  `autre`, `mutualise`) — seul `non_restitue` bloque (`derive_restitution_workflow_status`). `mutualise` : objet qui ne
+  repasse jamais individuellement par le stock (ex. PC de télétravail transféré directement) ; à garder synchronisé
+  avec `restitutionStateLabels` (`frontend/js/restitution.js`) et `returnedStates` (`frontend/js/dashboard-preview.js`).
+  `closedDespiteMissingItems` (clôture forcée, `forms.restitution_force`) fait afficher « Clôturé malgré du matériel
+  manquant » plutôt que « en retard », sans changer la fraction.
 - **Types de dossier** : `arrivee`, `mise_a_jour` (ancien type, retiré du sélecteur de création depuis 3.65.0 — voir
   **ajustement** ci-dessous), `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne
   sans attribution enregistrée).

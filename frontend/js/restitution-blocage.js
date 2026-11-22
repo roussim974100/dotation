@@ -74,7 +74,7 @@ async function initRestitutionBlockagePage() {
       <ul>
         ${pendingItems.map(([key, state]) => `<li><strong>${blocageEsc(itemLabel(data, key))}</strong>${state.notes ? ` — ${blocageEsc(state.notes)}` : ""}</li>`).join("")}
       </ul>
-      <p>Pour résoudre normalement : rouvrez <a href="restitution.html?id=${encodeURIComponent(id)}">la page de restitution</a> et repassez l'objet sur « Restitué », « Perdu » ou « Autre ».</p>
+      <p>Pour résoudre normalement : rouvrez <a href="restitution.html?id=${encodeURIComponent(id)}">la page de restitution</a> et repassez l'objet sur « Restitué », « Perdu », « Autre », ou « Mutualisé » s'il ne revient jamais individuellement (ex. PC de télétravail transféré directement à la personne suivante) — ce dernier choix ne bloque pas la clôture et garde le motif visible dans le dossier.</p>
     `;
 
     if (!canForceClose) {

@@ -13,7 +13,7 @@ from auth import current_user
 from models.audit import insert_audit_event, insert_app_log
 from models.workflow import (
     collect_resource_entries, collect_resource_validation_errors,
-    compute_effective_workflow_status, summarize_assignment_progress,
+    compute_effective_workflow_status, summarize_assignment_progress, summarize_restitution_progress,
     summarize_resource_item_details, is_restitution_eligible_material_details,
     describe_assignment_condition, extract_items, normalize_resource_field_schema,
 )
@@ -537,6 +537,17 @@ def align_payload_field_names(connection, payload):
     return payload
 
 
+def _has_restitution_data(payload):
+    """Mime hasRestitutionData (frontend/js/storage.js) : un retrait fait par un ajustement (adjustmentId) n'engage
+    pas la restitution du dossier a lui seul."""
+    restitution = payload.get("restitution") or {}
+    if restitution.get("returnedAt") or restitution.get("notes") or restitution.get("reason") \
+            or restitution.get("signatureDataUrl") or restitution.get("signatureReason"):
+        return True
+    items = restitution.get("items") or {}
+    return any(not (item or {}).get("adjustmentId") for item in items.values())
+
+
 def row_to_summary(row, warning_days=None):
     payload = {}
     try:
@@ -544,7 +555,16 @@ def row_to_summary(row, warning_days=None):
     except (TypeError, json.JSONDecodeError):
         payload = {}
     effective_status = compute_effective_workflow_status(payload)
-    progress = summarize_assignment_progress(payload, warning_days)
+    # Une fois entre en phase de restitution, "Progression"/"Pilotage" doivent refleter l'avancement REEL de la
+    # restitution (objets rendus), pas la completude de la saisie a l'attribution (sans rapport, voir le constat
+    # du 22/11 sur un dossier de regularisation a 0/4 alors que 3 objets sur 4 etaient bien rendus).
+    in_restitution_phase = effective_status in ("returned", "partial_return") or (
+        effective_status == "awaiting_signature" and _has_restitution_data(payload)
+    )
+    progress = (
+        summarize_restitution_progress(payload, warning_days) if in_restitution_phase
+        else summarize_assignment_progress(payload, warning_days)
+    )
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],

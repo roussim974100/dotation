@@ -536,10 +536,15 @@ function summarizeDraftProgressFromPayload(payload = {}) {
 function getDraftProgressMetrics(draft) {
   if (Number.isFinite(draft.completedResources) && Number.isFinite(draft.totalResources)) {
     const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(draft.status);
+    // En phase de restitution, "late"/le libellé viennent de summarize_restitution_progress (backend) et sont
+    // déjà parlants ("Restitution en retard") : ne pas les écraser par le "À compléter" pensé pour l'attribution
+    // (date de prise de poste dépassée), qui ne veut rien dire une fois la restitution en cours.
+    const inRestitutionPhase = ["returned", "partial_return"].includes(draft.status)
+      || (draft.status === "awaiting_signature" && hasRestitutionData(draft));
     let timingStatus = draft.timingStatus || "neutral";
     let timingLabel = draft.timingLabel || "À planifier";
-    // Neutraliser le retard pour les dossiers où la personne est en poste
-    if (isOnboarded && timingStatus === "late") {
+    // Neutraliser le retard pour les dossiers où la personne est en poste (hors restitution)
+    if (isOnboarded && !inRestitutionPhase && timingStatus === "late") {
       timingStatus = "neutral";
       timingLabel = draft.completedResources >= draft.totalResources ? "Prêt" : "À compléter";
     }

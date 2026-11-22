@@ -1,5 +1,25 @@
 # Historique des versions — À Quai
 
+## [3.74.4] - 2026-11-22 — Ressources immatérielles dans Progression, cache robuste à tout redémarrage
+
+### 🔧 Les ressources immatérielles (email, VPN, zone alarme) comptaient comme jamais rendues
+- Constat en conditions réelles (Dominique GIRAUD, Alexia LEROUYER) : leur accès e-mail, sélectionné à l'attribution, n'a pas de case « Non restitué/Conforme » comme un objet physique — son traitement (désactivation d'accès) est suivi à part dans `restitution.immaterielActions`, jamais dans `restitution.items`. `summarize_restitution_progress` (3.74.3) les comptait donc comme indéfiniment en attente. Corrigé : une ressource immatérielle est désormais jugée réglée via `immaterielActions[clé].actionDone`, pas via l'état « matériel ». Même correction côté infobulle au survol du statut (`frontend/js/dashboard-preview.js`), qui dupliquait le même calcul sans le savoir.
+- `frontend/js/storage.js` (`getDraftProgressMetrics`) : le repli « Prêt »/« À compléter » pensé pour l'attribution (date de prise de poste dépassée) ne doit plus s'appliquer une fois un dossier en phase de restitution — il masquait « Restitution en retard » derrière un libellé qui ne voulait rien dire pour une restitution.
+
+### 🔒 Le cache de la liste des dossiers résiste maintenant à tout redémarrage du serveur
+- Le correctif ETag de la 3.74.3 (version de l'appli dans l'empreinte) ne suffisait pas en itération rapide : plusieurs correctifs de calcul se sont succédé ce soir sous le même numéro de version avant qu'on pense à l'incrémenter, donc le cache restait valide malgré le redémarrage. Nouvel identifiant `_PROCESS_BOOT_ID` (`backend/routes/forms.py`), régénéré à chaque chargement du module : **tout** redémarrage invalide désormais le cache, qu'on bump la version ou non.
+- Fichiers : `backend/models/workflow.py`, `backend/routes/forms.py`, `frontend/js/storage.js`, `frontend/js/dashboard-preview.js`. Aucune migration.
+- Tests : `tests/test_restitution_progress.py` (+1 cas), `tests/test_forms_list_etag_version.py` (+1 cas).
+
+## [3.74.3] - 2026-11-22 — Progression/Pilotage réalistes en restitution, état « Mutualisé »
+
+### 📊 Les colonnes Progression et Pilotage mesurent enfin la restitution, pas l'attribution
+- Constat (dossier de Camille SIMONETTI) : une fois un dossier en restitution, « Progression » et « Pilotage » continuaient d'afficher la **complétude de saisie à l'attribution** (champs remplis), sans rapport avec ce qui a été rendu. Un dossier de régularisation (champs jamais saisis par nature) affichait « 0/4 » alors que 3 objets sur 4 avaient bien été rendus, et « Pilotage » pouvait afficher « Prêt » ou « En retard » sans que ça veuille dire quoi que ce soit pour une restitution.
+- Nouvelle fonction `summarize_restitution_progress` (`backend/models/workflow.py`), utilisée pour « Progression »/« Pilotage » dès qu'un dossier entre en phase de restitution (`partial_return`, `returned`, ou `awaiting_signature` avec des données de restitution) : « Progression » compte les objets réellement réglés (rendus, perdus, mutualisés...) sur les objets à restituer ; « Pilotage » affiche **Restitution terminée**, **Restitution en cours**, **Restitution en retard** (au-delà du seuil configuré en Admin > Personnalisation) ou **Clôturé malgré du matériel manquant** (dossier clos via `closeAnyway`, 3.74.1 — la fraction reste honnête, mais il n'y a plus rien à relancer). Hors restitution (attribution active), rien ne change.
+- Nouvel état de restitution **« Mutualisé »** (`restitution.html`), pour un objet qui ne repasse jamais individuellement par le stock (ex. PC de télétravail transféré directement à la personne suivante) : comme « Perdu »/« Autre », ne bloque pas la clôture du dossier, mais le motif reste visible dans l'historique — à préférer à « Non restitué » + « Clôturer quand même » quand le cas est connu d'avance.
+- Fichiers : `backend/models/workflow.py`, `backend/models/forms.py` (`row_to_summary`), `frontend/js/restitution.js`, `frontend/js/restitution-blocage.js`, `frontend/js/dashboard-preview.js` (aperçu au survol, déjà correct pour conforme/dégradé mais pas pour perdu/autre — corrigé au passage). Aucune migration.
+- Tests : `tests/test_restitution_progress.py` (10 cas).
+
 ## [3.74.2] - 2026-11-22 — Droit dédié pour clôturer malgré un objet non restitué
 
 ### 🔒 `forms.restitution_force` : droit séparé, réservé à l'administrateur par défaut

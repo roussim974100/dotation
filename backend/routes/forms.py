@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape as xml_escape
@@ -14,6 +15,7 @@ from utils import (
 )
 from database import get_db, normalize_reference_row
 from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
+from environment import raw_version
 from models.adjustment import apply_adjustment, complete_adjustment_signature, public_event
 def can_export_unmasked():
     """Export/PDF : droit forms.export ET portee de donnees complete. Les exports ne sont pas masques,
@@ -43,6 +45,13 @@ def csv_cell(value):
     return text
 
 bp = Blueprint("forms", __name__)
+
+# Identifiant unique de CE processus serveur (genere une fois, au chargement du module) : entre dans l'ETag de
+# GET /api/forms pour que tout redemarrage invalide le cache de liste, meme sans bump de version. S'appuyer sur
+# la seule version (raw_version()) ne suffit pas en iteration rapide : plusieurs correctifs du code de calcul
+# peuvent se succeder sous le MEME numero de version avant qu'on pense a l'incrementer, et un navigateur garde
+# alors servie une reponse perimee en 304 (constat du 22/11, apres les correctifs Progression/Pilotage 3.74.3).
+_PROCESS_BOOT_ID = uuid.uuid4().hex
 
 
 def download_response(file_bytes, filename, content_type):
@@ -268,9 +277,11 @@ def list_forms():
             params,
         ).fetchone()
         warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
-        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage et de la date du jour
-        # (statuts En retard / En danger) : sans eux, un 304 servirait des donnees perimees.
-        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}"
+        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage, de la date du jour
+        # (statuts En retard / En danger) et de la version de l'application : sans eux, un 304 servirait des
+        # donnees perimees - notamment juste apres une mise a jour qui change le CALCUL du resume (ex. 3.74.3,
+        # Progression/Pilotage) sans toucher updated_at des dossiers deja en base.
+        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}:{raw_version()}:{_PROCESS_BOOT_ID}"
         etag = hashlib.md5(etag_source.encode()).hexdigest()
 
         # La compression gzip transforme l'ETag en validateur faible (W/...) : on compare la valeur nue.
