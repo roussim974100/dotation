@@ -1,5 +1,21 @@
 # Historique des versions — À Quai
 
+## [3.76.0] - 2026-11-22 — Fusion manuelle des doublons de personnes
+
+Suite du constat de l'audit de pérennité (47 fiches « personne » pour 34 dossiers sur la copie de production) :
+une fusion automatique par identité avait été tentée en session autonome puis annulée, car elle entrait en
+conflit avec le garde-fou qui refuse de deviner qu'une personne est la même sans `personId` explicite repris
+(pour ne jamais fusionner deux homonymes différents). Ce correctif reste dans cet esprit.
+
+- **Admin > Base de données > Doublons de personnes** : analyse en lecture seule qui ne regroupe que les fiches
+  ayant exactement le même nom, prénom et service ; fusion manuelle, un couple à la fois, avec confirmation.
+  Aucun dossier n'est supprimé ni modifié dans son contenu — seul leur rattachement (`person_id`) est repointé
+  vers la fiche conservée, colonne et `payload_json` compris. Copie de sécurité de la base avant chaque fusion,
+  comme pour le rattachement des champs orphelins.
+- Testé via une instance isolée (copie jetable de la base réelle, jamais `backend/dotation.db` lui-même) :
+  scan, fusion, intégrité des deux dossiers d'origine après fusion. Un bug trouvé pendant ce test (le message de
+  succès écrasait la liste des doublons restants) a été corrigé et revérifié.
+
 ## [3.75.0] - 2026-11-22 — Remédiation P0→P2 de l'audit de pérennité (session autonome)
 
 Suite à l'audit de pérennité du 22/11/2026 (`scripts/Audit_Perennite_A_Quai_2026-11-22.pdf`), traité en session
