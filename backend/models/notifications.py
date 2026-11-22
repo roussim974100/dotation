@@ -140,7 +140,7 @@ def backup_failed_task(user):
         return None
 
     def compute():
-        import backup_schedule
+        import backup_schedule  # charge seulement si le cache a expire (notifications verifiees a chaque session) : pas un cycle
         import backup_targets
         try:
             return backup_schedule.health(backup_targets.load_config())
@@ -157,7 +157,7 @@ def update_available_task(user):
     """Nouvelle version disponible (cache disque, jamais de reseau ici). Reserve a ceux qui gerent les mises a jour."""
     if not can_manage(user):
         return None
-    import update_check
+    import update_check  # charge a la demande (controle de session) : pas un cycle
     state = update_check.cached_status()
     if not state.get("available"):
         return None

@@ -57,3 +57,14 @@ Toute valeur qui ne correspond à rien est **conservée** : affichée dans « Au
 - Types de bénéficiaires : `valeur:Libellé` ou `valeur:Libellé|mandat` (type qui porte un mandat ; `elu` sans drapeau garde son mandat pour les anciennes bases).
 - Paramétrage exportable/importable (`config_transfer.py`) : **additif**, avec aperçu, une ressource existante n'est jamais modifiée.
 - Schémas de champs : 60 champs, 120 caractères de libellé, 200 options au maximum ; un libellé sans lettre latine donne une clé `champ_N`.
+
+## 9. Scalabilité SQLite — seuils de surveillance
+
+Mode **WAL** activé sur les deux bases (`database.py`), `timeout=10s`, `foreign_keys=ON` : lectures non bloquées par une écriture en cours, adapté à plusieurs processus serveur. Validé le 22/11/2026 (audit de pérennité) : 12 processus Python séparés écrivant en même temps (`POST /api/forms`, chemin réel `persist_form`) sur une base jetable, 360 écritures, **0 erreur "database is locked"**. gunicorn n'étant pas utilisable sur Windows (dépend de `fork()`), ce test substitue des processus concurrents distincts à de vrais workers — même question posée à SQLite, résultat transposable.
+
+**Aucune action requise aujourd'hui.** Signaux à surveiller avant d'envisager un autre moteur (aucun n'est atteint actuellement) :
+- des erreurs `database is locked` apparaissent en usage normal (hors script de test mal isolé, cf. §6) ;
+- le contrôle de santé quotidien (`models/health.py`) met sensiblement plus longtemps à s'exécuter ;
+- le fichier `.db` approche plusieurs Go sur un disque lent (ralentit la sauvegarde en ligne, `backup.snapshot_sqlite`).
+
+Si l'un de ces signaux apparaît : chercher d'abord la requête ou la transaction la plus longue avant d'envisager un changement de moteur (coût de migration bien plus élevé que celui d'une optimisation ciblée).

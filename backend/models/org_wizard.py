@@ -183,7 +183,7 @@ class PlanChanged(Exception):
 def safety_copy():
     """Copie de la base principale avant application ; retourne le nom du fichier ou None (l'echec est signale, pas bloquant)."""
     try:
-        import backup
+        import backup  # charge a la demande (assistant d'organisation, tres rare) : pas un cycle
         from config import DB_PATH
         os.makedirs(backup.BACKUP_DIR, exist_ok=True)
         name = f"avant_assistant_{utc_now().replace(':', '').replace('-', '')[:15]}.db"

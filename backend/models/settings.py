@@ -5,6 +5,7 @@ import sqlite3
 import urllib.request
 
 import environment
+import auth
 
 from database import get_db
 from utils import utc_now, slugify_field_key
@@ -406,7 +407,6 @@ def get_dpo_email(settings=None):
 def _session_durations():
     """Durees REELLES de la session (variables APP_SESSION_MAX_HOURS / APP_SESSION_IDLE_MINUTES) : la fenetre des cookies ne doit pas
     annoncer autre chose que ce que fait le serveur."""
-    import auth
     return {"maxHours": auth.SESSION_MAX_HOURS, "idleMinutes": auth.SESSION_IDLE_MINUTES}
 
 

@@ -1930,7 +1930,7 @@ def db_import():
             finally:
                 saved.close()
                 live.close()
-        import backup as _backup
+        import backup as _backup  # charge a la demande (restauration rare) : evite les dependances crypto au demarrage, pas un cycle
         _backup.restore_sqlite(tmp_path, DB_PATH)
         os.unlink(tmp_path)
         from migrations import upgrade_after_restore
