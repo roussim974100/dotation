@@ -210,15 +210,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function scan() {
+  async function scan(note) {
     scanBtn.disabled = true;
+    const prefix = note ? `<p class="mb-3">✅ ${escapeHtml(note)}</p>` : "";
     try {
       const response = await fetch("/api/admin/person-duplicates", { credentials: "same-origin" });
       if (!response.ok) throw new Error("Analyse impossible.");
       const report = await response.json();
       const groups = report.groups || [];
       if (!groups.length) {
-        showDbResult("personDupResult", "ok", "Aucun doublon : chaque identité (nom, prénom, service) n'a qu'une seule fiche.", "");
+        showDbResult("personDupResult", "ok", "Aucun doublon : chaque identité (nom, prénom, service) n'a qu'une seule fiche.", prefix);
         return;
       }
       const html = groups.map((group) => {
@@ -229,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ].join("");
         return `<div class="table-responsive mb-3"><table class="table table-sm mb-0"><thead><tr><th>Personne</th><th>Service</th><th>Créée le</th><th class="text-end">Dossiers</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div>`;
       }).join("");
-      showDbResult("personDupResult", "warning", `${groups.length} identité(s) avec plusieurs fiches.`, html);
+      showDbResult("personDupResult", "warning", `${groups.length} identité(s) avec plusieurs fiches.`, prefix + html);
     } catch (error) {
       showDbResult("personDupResult", "error", error.message || "Analyse impossible.", "");
     } finally {
@@ -257,15 +258,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Fusion impossible.");
-      await scan();
-      showDbResult("personDupResult", "ok", `Fusion faite : ${data.movedDossiers} dossier(s) rattaché(s). Copie de sécurité faite avant.`, "");
+      await scan(`Fusion faite : ${data.movedDossiers} dossier(s) rattaché(s). Copie de sécurité faite avant.`);
     } catch (error) {
       showDbResult("personDupResult", "error", error.message || "Fusion impossible.", "");
       btn.disabled = false;
     }
   });
 
-  scanBtn.addEventListener("click", scan);
+  scanBtn.addEventListener("click", () => scan());
 });
 
 
