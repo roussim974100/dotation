@@ -1,5 +1,14 @@
 # Historique des versions — À Quai
 
+## [3.74.2] - 2026-11-22 — Droit dédié pour clôturer malgré un objet non restitué
+
+### 🔒 `forms.restitution_force` : droit séparé, réservé à l'administrateur par défaut
+- Le droit d'avoir permis en 3.74.1 (`closeAnyway`) reposait sur `forms.restitution`, déjà détenu par de nombreux groupes (administration, direction, gestion, rédaction) — trop large pour une action qui peut masquer du matériel jamais revenu.
+- Nouveau droit dédié **`forms.restitution_force`**, éditable par groupe dans Admin > Comptes, **donné par défaut au seul groupe `admin`** (`PERMISSION_BACKFILLS`, jamais ajouté automatiquement à `administration` ni aux autres). `PATCH /api/forms/<id>/restitution` avec `closeAnyway` refuse (403) sans ce droit, même avec `forms.restitution`.
+- Le bouton « Clôturer quand même » (`restitution.html`) et la page `restitution-blocage.html` vérifient ce droit avant de le proposer ; sans lui, un message explique qui contacter.
+- Fichiers : `backend/app.py`, `backend/routes/admin.py`, `backend/routes/forms.py`, `frontend/js/admin.js`, `frontend/js/restitution.js`, `frontend/js/restitution-blocage.js`. Aucune migration (le rattrapage se fait via `PERMISSION_BACKFILLS`, comme `forms.adjust` en 3.65.0).
+- Tests : `tests/test_restitution_close_anyway.py` (+1 cas : `forms.restitution` seul ne suffit plus).
+
 ## [3.74.1] - 2026-11-22 — Clôturer une restitution malgré un objet « Non restitué », page de diagnostic
 
 ### 🔓 « Non restitué » ne bloque plus le dossier si on confirme la clôture

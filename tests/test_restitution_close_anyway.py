@@ -102,3 +102,33 @@ def test_page_de_diagnostic_accessible_connecte():
     response = client.get("/restitution-blocage.html")
     assert response.status_code == 200
     assert b"restitution-blocage.js" in response.data
+
+
+def test_closeanyway_reserve_a_forms_restitution_force_pas_a_forms_restitution_seul():
+    """forms.restitution (restitutions normales) ne doit pas suffire a passer outre un objet non restitue :
+    c'est un droit sensible, distinct, reserve a l'administrateur par defaut (voir AGENTS.md)."""
+    import bcrypt
+    from auth import create_user, delete_user
+
+    create_user("sans.force", bcrypt.hashpw(b"MotDePasse-Complexe-1!", bcrypt.gensalt()).decode(), ["gestion"])
+    try:
+        admin = client_for()
+        form_id = create_active_dossier(admin, "DROIT_LIMITE")
+        mark_phase1_validated(form_id)
+        limited = client_for("sans.force")
+
+        forbidden = limited.patch(f"/api/forms/{form_id}/restitution", json={
+            "returnedAt": "2026-11-20", "items": items(), "signatureStatus": "signed", "signatureDataUrl": PNG,
+            "closeAnyway": True,
+        }, headers=H)
+        assert forbidden.status_code == 403
+        assert forbidden.get_json()["error"] == "forbidden"
+
+        # La restitution normale (sans closeAnyway) reste autorisee avec forms.restitution seul.
+        allowed = limited.patch(f"/api/forms/{form_id}/restitution", json={
+            "returnedAt": "2026-11-20", "items": items(), "signatureStatus": "signed", "signatureDataUrl": PNG,
+        }, headers=H)
+        assert allowed.status_code == 200, allowed.get_data(as_text=True)[:300]
+        assert allowed.get_json()["summary"]["status"] == "partial_return"
+    finally:
+        delete_user("sans.force")

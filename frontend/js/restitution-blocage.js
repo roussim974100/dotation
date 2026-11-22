@@ -40,7 +40,7 @@ async function initRestitutionBlockagePage() {
 
   try {
     const session = await getSessionInfo();
-    const canForceClose = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.restitution"));
+    const canForceClose = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.restitution_force"));
 
     const form = await requestJson(`/api/forms/${encodeURIComponent(id)}`);
     const data = form.data;
@@ -77,7 +77,9 @@ async function initRestitutionBlockagePage() {
       <p>Pour résoudre normalement : rouvrez <a href="restitution.html?id=${encodeURIComponent(id)}">la page de restitution</a> et repassez l'objet sur « Restitué », « Perdu » ou « Autre ».</p>
     `;
 
-    if (canForceClose) {
+    if (!canForceClose) {
+      reasonBody.innerHTML += "<p class=\"text-muted\">Vous n'avez pas le droit de clôturer ce dossier malgré tout — demandez à un administrateur (droit « Clôturer une restitution malgré un objet « Non restitué » »).</p>";
+    } else {
       forceCard.classList.remove("d-none");
       document.getElementById("forceCloseBtn").addEventListener("click", async () => {
         const confirmed = await askConfirm(

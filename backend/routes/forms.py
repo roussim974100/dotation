@@ -773,6 +773,10 @@ def update_restitution(form_id):
         return jsonify({"error": "not_found"}), 404
 
     patch = request.get_json(silent=True) or {}
+    # Droit dedie et plus restrictif que forms.restitution : passer outre un objet "Non restitue" peut masquer
+    # du materiel jamais revenu, pas juste enregistrer une restitution normale.
+    if patch.get("closeAnyway") and not has_permission("forms.restitution_force"):
+        return jsonify({"error": "forbidden"}), 403
     payload = existing["data"]
     payload.setdefault("workflow", {})
     payload.setdefault("restitution", {})

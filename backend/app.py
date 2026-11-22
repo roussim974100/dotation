@@ -223,7 +223,7 @@ def init_users_db():
 # bases existantes tant qu'on ne pensait pas a repercuter le changement dans les deux.
 DEFAULT_GROUPS = [
     ("admin", "Administrateur", "Accès complet à la gestion des utilisateurs et configurations",
-     ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
+     ["users.manage", "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.delete", "forms.view_all", "forms.export", "forms.restitution", "forms.restitution_force", "forms.adjust", "db.manage", "unc.view_all", "parc.manage"], "full"),
     ("user", "Utilisateur", "Accès aux formulaires et restitutions",
      ["forms.read_list", "forms.read_detail", "forms.create", "forms.view_all"], "full"),
     ("administration", "Administration", "Complet total et gestion des utilisateurs",
@@ -246,6 +246,10 @@ DEFAULT_GROUPS = [
 # identifiant unique qui ne sera jamais réutilisé.
 PERMISSION_BACKFILLS = [
     ("2026-09-28-forms-adjust", "forms.adjust", {"admin", "administration"}),
+    # Cloturer une restitution malgre un objet "Non restitue" (3.74.1) : droit sensible (peut masquer du materiel
+    # jamais revenu), reserve aux administrateurs par defaut - pas a "administration" ni aux autres groupes qui
+    # avaient deja forms.restitution. A activer au besoin par groupe dans Admin > Comptes.
+    ("2026-11-22-forms-restitution-force", "forms.restitution_force", {"admin"}),
 ]
 
 

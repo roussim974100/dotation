@@ -828,6 +828,15 @@ async function initRestitutionPage() {
       try {
         const payload = buildRestitutionPayload(false);
         if (payload.status === "partial_return") {
+          const session = await getSessionInfo();
+          const canForceClose = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.restitution_force"));
+          if (!canForceClose) {
+            await showRestitutionInfoDialog(
+              "Dossier non clôturable",
+              "Au moins un objet est marqué « Non restitué » : le dossier reste « en cours » tant que ce n'est pas résolu (objet rendu, ou repassé en « Perdu »/« Autre »). Vous n'avez pas le droit de clôturer malgré tout — demandez à un administrateur si c'est voulu (ex. matériel mutualisé)."
+            );
+            return;
+          }
           const closeAnyway = await askConfirm(
             "Au moins un objet est marqué « Non restitué » : sans confirmation, le dossier restera « en cours » tant que ce n'est pas résolu. " +
             "Clôturer quand même le dossier (ex. matériel mutualisé qui ne repasse jamais individuellement par le stock) ? " +

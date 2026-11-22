@@ -591,7 +591,7 @@ def admin_groups():
 # Tenu a jour avec PERMISSION_INFO dans frontend/js/admin.js (memes cles).
 TOGGLEABLE_PERMISSIONS = {
     "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution",
-    "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "unc.view_all",
+    "forms.restitution_force", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "unc.view_all",
     "parc.manage", "users.manage", "db.manage",
 }
 
