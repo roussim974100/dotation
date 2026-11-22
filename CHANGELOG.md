@@ -1,5 +1,29 @@
 # Historique des versions — À Quai
 
+## [3.75.0] - 2026-11-22 — Remédiation P0→P2 de l'audit de pérennité (session autonome)
+
+Suite à l'audit de pérennité du 22/11/2026 (`scripts/Audit_Perennite_A_Quai_2026-11-22.pdf`), traité en session
+autonome pendant l'absence du propriétaire. Détail complet, décisions et items reportés : rapport de session
+(`scripts/Rapport_Session_Autonome_2026-11-22.pdf`, non gitté).
+
+### 🔒 P0 — Filets de sécurité
+- **Permissions unifiées** : `backend/permissions.py` (module orphelin, sa propre copie périmée de `DEFAULT_GROUPS`, déconnectée du vrai système) supprimé ; ses 6 tests, qui ne vérifiaient que ce module mort, remplacés par des tests qui vérifient le vrai `app.py:DEFAULT_GROUPS` et la cohérence `TOGGLEABLE_PERMISSIONS` / `PERMISSION_INFO`.
+- **Échec silencieux de synchronisation du parc détecté** : nouvel invariant `unsyncedUnitAssignments` (`models/health.py`) — un objet « attribué » dans un dossier sans unité de parc correspondante (`sync_units_for_form` avait échoué en silence) est désormais signalé au contrôle de santé.
+- **Sauvegarde non restaurable refusée** : `run_send` (`backup_targets.py`) vérifie désormais chaque archive (`diagnose_archive` : intégrité, tables, comptes) avant de l'envoyer, plutôt que de ne suivre que le succès de l'envoi.
+
+### 🟡 P1 — Validé, écrit et testé (rien exécuté sur de vraies données)
+- **Déploiement concurrent validé en local** : 12 processus séparés, 360 écritures (`POST /api/forms`), 0 `database is locked` — documenté dans `docs/ARCHITECTURE_DONNEES.md` §9 (gunicorn indisponible sur Windows, processus concurrents utilisés à la place, même question posée à SQLite).
+- **Conversion de l'ancien format matériel/immatériel** : nouveau module `models/legacy_conversion.py`, écrit et testé sur données synthétiques, volontairement **non branché** sur une route ni un script d'exécution — prêt pour une revue avant un lancement sur une copie de production.
+- **Doublons de personnes : tenté puis annulé.** La correction (rechercher une personne existante par identité avant d'en créer une nouvelle) entre en conflit avec un garde-fou délibéré déjà en place (`tests/test_person_grouping.py` : « sans reprise explicite du personId, ne jamais deviner qu'il s'agit de la même personne », pour ne jamais fusionner deux homonymes différents). Code annulé ; décision à trancher par le propriétaire (voir rapport de session).
+
+### 🧹 P2 — Consolidation structurelle
+- **Permissions** : 15 des 17 contrôles manuels de `routes/forms.py` remplacés par `@permission_required(...)`, déjà la norme partout ailleurs.
+- **Imports différés clarifiés** : celui de `models/settings.py` (aucun cycle réel) remonté en tête de fichier ; les 3 autres (chargement paresseux de `backup`/`update_check`, volontaire) commentés pour ne plus être confondus avec un contournement de cycle.
+- **Champs orphelins → notifications** : nouvelle tâche `orphan_fields` (réservée à `users.manage`), pour que ce contrôle ne reste plus un bouton qu'on oublie de cliquer.
+- **Non traités dans cette session** (trop volumineux/risqués pour une session sans supervision) : exposer les résumés de ressources dynamiques via l'API (3 implémentations divergentes aujourd'hui), découper `routes/admin.py` (1951 lignes) et `routes/forms.py`. Détail et plan dans le rapport de session.
+
+Tests : +25 cas sur 6 nouveaux fichiers de test, suite complète verte à chaque étape (660 passed avant la version finale).
+
 ## [3.74.4] - 2026-11-22 — Ressources immatérielles dans Progression, cache robuste à tout redémarrage
 
 ### 🔧 Les ressources immatérielles (email, VPN, zone alarme) comptaient comme jamais rendues
