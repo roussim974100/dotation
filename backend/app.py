@@ -19,7 +19,6 @@ from models.forms import migrate_field_suggestions_from_history
 import importlib
 import pkgutil
 import routes as _routes_pkg
-from permissions import validate_permissions_at_startup
 
 
 class _AutoSecureSessionInterface(SecureCookieSessionInterface):
@@ -42,10 +41,6 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("APP_MAX_UPLOAD_MB", "100"
 app.wsgi_app = AutoProxyFix(app.wsgi_app)
 from observability import init_observability
 init_observability(app)  # identifiant de requete, code d'erreur communicable, journal fichier sans donnee personnelle
-
-# Valider les permissions au démarrage (dev uniquement)
-if os.environ.get("FLASK_ENV") == "development":
-    validate_permissions_at_startup()
 
 for _importer, _modname, _ispkg in pkgutil.iter_modules(_routes_pkg.__path__):
     _mod = importlib.import_module(f"routes.{_modname}")
