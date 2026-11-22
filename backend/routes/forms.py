@@ -980,8 +980,9 @@ def delete_form(form_id):
             "SELECT title, dossier_id, payload_json FROM dotation_forms WHERE id = ?",
             (form_id,),
         ).fetchone()
+        trash_id = None
         if row:
-            insert_deleted_item(
+            trash_id = insert_deleted_item(
                 connection,
                 "form",
                 form_id,
@@ -1016,4 +1017,37 @@ def delete_form(form_id):
 
     if not deleted:
         return jsonify({"error": "not_found"}), 404
-    return jsonify({"deleted": True})
+    return jsonify({"deleted": True, "trash_id": trash_id})
+
+
+@bp.route("/api/forms/trash/<trash_id>/restore", methods=["POST"])
+@login_required
+def restore_deleted_form(trash_id):
+    """Annulation immediate d'une suppression de dossier (toast « Annuler »), ouverte a qui peut supprimer
+    un dossier (pas reservee aux administrateurs, contrairement a la corbeille d'Admin > Base de donnees)."""
+    if not has_permission("forms.delete"):
+        return jsonify({"error": "forbidden"}), 403
+    with get_db() as connection:
+        row = connection.execute(
+            "SELECT * FROM deleted_items WHERE id = ? AND item_type = 'form'",
+            (trash_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+        payload = json.loads(row["payload_json"] or "{}")
+        try:
+            form_data = persist_form(payload, allow_locked_update=True)
+        except AppError as error:
+            return jsonify({"error": error.code}), error.status
+        connection.execute("DELETE FROM deleted_items WHERE id = ?", (trash_id,))
+        insert_app_log(
+            connection,
+            "dossier",
+            "form_restored",
+            "Suppression de dossier annulee",
+            "form",
+            row["item_key"],
+            {"title": row["item_label"]},
+            target_label=row["item_label"],
+        )
+    return jsonify({"summary": _summary_without_data(form_data)})

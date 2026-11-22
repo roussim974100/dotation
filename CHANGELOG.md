@@ -1,5 +1,22 @@
 # Historique des versions — À Quai
 
+## [3.74.0] - 2026-11-22 — Annuler une suppression, blocage des doublons de numéro de série
+
+### ↩️ Toast « Annuler » après la suppression d'un dossier
+- Supprimer un dossier (seul ou en groupe) propose désormais un bouton **« Annuler »** directement dans le message de confirmation (8 secondes), sans passer par la corbeille d'administration.
+- Nouvelle route `POST /api/forms/trash/<id>/restore`, ouverte à la permission `forms.delete` (pas réservée aux administrateurs, contrairement à `/api/admin/trash/<id>/restore`). `DELETE /api/forms/<id>` renvoie maintenant l'identifiant de corbeille (`trash_id`).
+- Fichiers : `backend/models/audit.py` (`insert_deleted_item` renvoie l'id), `backend/routes/forms.py`, `frontend/js/ui.js` (`showToast` accepte une action), `frontend/js/storage.js`, `frontend/css/style.css`. Aucune migration.
+- Tests : `tests/test_resource_duplicate_block.py`.
+
+### 🔒 Un numéro de série déjà attribué ailleurs bloque désormais l'enregistrement
+- La saisie manuelle d'un numéro de série (ou tout champ identifiant d'une ressource dynamique) déjà détenu par un **autre dossier actif** n'était qu'un avertissement affiché à la saisie, sans effet sur l'enregistrement. `persist_form` (chemin unique d'enregistrement d'un dossier) refuse maintenant la sauvegarde (409, `resource_already_held`) — à la création, à la modification et lors d'un ajustement.
+- L'avertissement non bloquant existant (pendant la saisie) est conservé tel quel ; seul l'enregistrement final est désormais bloquant.
+- Fichiers : `backend/models/forms.py` (`_find_duplicate_resource_label`), `frontend/js/app.js`, `frontend/js/adjustment.js` (message traduit). Aucune migration.
+- Tests : `tests/test_resource_duplicate_block.py`.
+
+### 📄 E-mail de la fiche de retraits (déjà fait, backlog mis à jour)
+- Vérifié : le bouton « Envoyer par e-mail » de chaque PDF d'ajustement (`prepareAdjustmentPdfEmail`, livré en 3.72.0) répond déjà à ce besoin. Pas de changement de code ; `docs/BACKLOG_PRODUIT.md` mis à jour pour refléter l'état réel.
+
 ## [3.73.2] - 2026-10-15 — Pas de lien de signature d'une restitution sans état du matériel
 
 ### 🐛 Un lien de restitution vide n'est plus possible

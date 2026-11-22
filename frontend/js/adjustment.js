@@ -15,7 +15,8 @@ const ADJUSTMENT_STATUS_LABELS = { signed: "Signé", pending_signature: "Signatu
 const ADJUSTMENT_ERRORS = {
   form_conflict: "Le dossier a été modifié depuis son ouverture. Fermez cette fenêtre, rouvrez l'ajustement et recommencez.",
   forbidden: "Votre profil ne permet pas d'ajuster un dossier.",
-  masked_scope_read_only: "Votre profil (données masquées) ne permet pas d'ajuster un dossier."
+  masked_scope_read_only: "Votre profil (données masquées) ne permet pas d'ajuster un dossier.",
+  resource_already_held: "Le numéro de série saisi est déjà attribué à un autre dossier actif. Vérifiez qu'il a bien été restitué, ou corrigez la saisie."
 };
 
 function adjEsc(value) {

@@ -1444,13 +1444,44 @@ async function saveFormData(payload) {
 }
 
 async function deleteDraft(id) {
+  let trashId = null;
   try {
-    await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
+    const result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
+    trashId = result?.trash_id || null;
   } finally {
     removeCachedDraft(id);
   }
+  return trashId;
+}
+
+async function restoreDeletedDraft(trashId) {
+  await requestJson(`${API_BASE}/trash/${encodeURIComponent(trashId)}/restore`, {
+    method: "POST"
+  });
+  await renderDraftList();
+}
+
+function offerUndoDelete(trashIds, message) {
+  const ids = (Array.isArray(trashIds) ? trashIds : [trashIds]).filter(Boolean);
+  if (!ids.length) {
+    showToast(message, "success");
+    return;
+  }
+  showToast(message, "success", 8000, {
+    label: "Annuler",
+    onClick: async () => {
+      try {
+        for (const trashId of ids) {
+          await restoreDeletedDraft(trashId);
+        }
+        showToast(ids.length > 1 ? "Suppressions annulées." : "Suppression annulée.", "success");
+      } catch (error) {
+        showToast("Impossible d'annuler la suppression.", "error");
+      }
+    }
+  });
 }
 
 function newForm() {
@@ -3035,10 +3066,12 @@ async function deleteSelectedDrafts() {
     return;
   }
 
+  const trashIds = [];
   for (const id of ids) {
-    await deleteDraft(id);
+    trashIds.push(await deleteDraft(id));
   }
   await renderDraftList();
+  offerUndoDelete(trashIds, ids.length > 1 ? `${ids.length} dossiers supprimés.` : "Dossier supprimé.");
 }
 function bindSelectionActions(canExport, canDelete) {
   // Branche le "tout sélectionner" et les actions groupées.
@@ -3124,8 +3157,9 @@ async function removeDraft(id) {
     return;
   }
 
-  await deleteDraft(id);
+  const trashId = await deleteDraft(id);
   await renderDraftList();
+  offerUndoDelete(trashId, `Dossier « ${item.summary.title} » supprimé.`);
 }
 
 function formatDate(value) {

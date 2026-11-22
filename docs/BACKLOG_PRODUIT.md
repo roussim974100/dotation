@@ -4,9 +4,9 @@ Dernière revue : **8 octobre 2026** (série 3.67.3 → 3.72.1 ; 3.67.4 : décon
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
-## 🔁 Reprise — où on en est (12 octobre 2026)
+## 🔁 Reprise — où on en est (22 novembre 2026)
 
-**État des branches (12/10/2026)** : `preprod` = **3.73.1** (PR n°36 à n°44 fusionnées par le propriétaire) ; **`dev` = 3.73.2** (3.73.2 : pas de lien de signature d'une restitution sans état du matériel ; 3.73.1 : page de signature d'une restitution sans données techniques ; 3.73.0 : QR code proposé après « Enregistrer en attente » d'une restitution + mode d'emploi de la mise en production) — **PR `dev` → `preprod` à ouvrir et fusionner par le propriétaire** (texte prêt, lien `compare/preprod...dev`) ; **`prod` = `main` = 3.67.1**. La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.0. Reste au propriétaire : fusionner la PR 3.73.0, tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python). La 3.72.1 et la 3.73.0 n'ont pas de migration (les migrations 9 et 10 viennent de la 3.68 à 3.71).
+**État des branches (22/11/2026)** : `dev` = **3.74.0** (toast « Annuler » après suppression d'un dossier, blocage d'un numéro de série déjà attribué ailleurs, bilan de l'e-mail de la fiche de retraits — voir CHANGELOG) ; `preprod` = **3.73.2** (PR n°36 à n°44 fusionnées par le propriétaire le 15/10, **rien bougé depuis**) ; `prod` = `main` = **3.67.1** (`main` a été alignée sur `dev` jusqu'à la 3.73.1 le 15/10, en avance sur `prod` — à surveiller à la prochaine mise en prod). La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.x + 3.74.0. **PR `dev` → `preprod` à ouvrir** pour la 3.74.0. Reste au propriétaire : tester la préprod (checklist ci-dessous, complétée par la 3.74.0 : suppression d'un dossier puis « Annuler » dans le toast ; tenter de saisir deux fois le même numéro de série sur deux dossiers actifs), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière — aucune migration depuis, le document reste valable). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python).
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
@@ -30,7 +30,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.73.2**, `preprod` à 3.73.1, `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` à **3.74.0**, `preprod` à 3.73.2 (à fusionner), `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
@@ -106,7 +106,7 @@ Idée du propriétaire : prévenir la personne en charge d'une action (ex. crée
 | ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
 | ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
 | Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |
-| E-mail de la fiche de retraits | Le PDF de retraits (`/api/forms/<id>/retraits-pdf`) n'a pas d'équivalent « Envoyer par e-mail » ; à reprendre dans l'écran d'ajustement (livré en 3.65.0) plutôt que sur l'ancien type « mise à jour » | S | P2 |
+| ✅ E-mail de la fiche de retraits (en fait : fait en 3.72.0, bouton « Envoyer par e-mail » déjà câblé sur chaque PDF d'ajustement, `prepareAdjustmentPdfEmail`) | Vérifié le 22/11 : la demande portait sur l'ancien PDF `/api/forms/<id>/pdf/retraits` (type « mise à jour », en voie de retrait) ; elle est satisfaite depuis 3.72.0 par l'écran d'ajustement, qui a son propre bouton e-mail par geste. Pas de changement sur l'ancien flux, volontairement laissé tel quel | S | P2 |
 
 ## Backlogs plus anciens : où ils en sont
 
@@ -120,12 +120,12 @@ Idée du propriétaire : prévenir la personne en charge d'une action (ex. crée
 - Mode sombre (`dark_mode_not_tech_debt`) : **ne pas relancer de chantier**, ce n'est pas de la dette.
 
 **Vraiment encore ouverts, non planifiés :**
-- Toast « Annuler » après suppression d'un dossier (`backlog_ergonomie_sprints`).
+- ✅ Toast « Annuler » après suppression d'un dossier (`backlog_ergonomie_sprints`) : fait le 22/11 (`showToast` accepte une action, route `POST /api/forms/trash/<id>/restore` ouverte à `forms.delete`, pas réservée aux administrateurs).
 - Cartes empilées sur mobile (`backlog_ergonomie_sprints`) — jamais pu être testé par l'automatisation du navigateur (le redimensionnement de fenêtre ne change pas la largeur perçue).
 - Historique/cycle de vie du parc + assistant de création de ressource (`backlog_historique_parc`) : plan validé, rien codé.
 - Cohérence de la navigation, moins de clics (`backlog_navigation_audit`) : audit fait le 19/09, rien codé.
 - Case « Responsable de service » sur les comptes, pour de futurs e-mails automatiques (`feature_reprise_materiel_restitue`) : recoupe le signataire de substitution décidé pour le chantier en cours (3.63.0) — à concevoir ensemble plutôt que séparément.
-- Blocage d'une saisie manuelle d'un n° de série déjà attribué ailleurs (`feature_reprise_materiel_restitue`).
+- ✅ Blocage d'une saisie manuelle d'un n° de série déjà attribué ailleurs (`feature_reprise_materiel_restitue`) : fait le 22/11, bloquant à l'enregistrement (`persist_form`, code `resource_already_held`) en plus de l'avertissement existant ; l'avertissement non bloquant reste affiché pendant la saisie.
 - Typage progressif (`@ts-check` + JSDoc) sur `storage.js`/`admin.js` (`backlog_typage_typescript`) : backlog de version future, faible priorité.
 
 ## Repères
