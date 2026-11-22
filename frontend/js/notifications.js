@@ -29,6 +29,12 @@
       actionLabel: "Voir les demandes",
       run: goTo,
     },
+    orphan_fields: {
+      title: (task) => plural(task.count, "nom de champ à examiner dans les dossiers", "noms de champ à examiner dans les dossiers"),
+      detail: (task) => task.repairable ? `${plural(task.repairable, "peut", "peuvent")} être rattaché(s) automatiquement.` : "Aucun rattachement automatique possible : à examiner au cas par cas.",
+      actionLabel: "Voir la santé des champs",
+      run: goTo,
+    },
     service_provision: {
       title: (task) => plural(task.count, "ressource à fournir", "ressources à fournir"),
       detail: () => "Préparez ou créez ce qui a été attribué (compte, accès, matériel), puis cliquez « Fait » : la tâche disparaît pour tout votre service.",
