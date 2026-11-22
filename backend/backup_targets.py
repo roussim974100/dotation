@@ -218,6 +218,15 @@ def run_send(destination, password=None, trigger="manual", app_version=""):
     filename = None
     try:
         blob, manifest = backup.create_archive(password, app_version)
+        # Verifie que l'archive produite est effectivement RESTAURABLE avant de l'envoyer (integrite SQLite,
+        # tables attendues, au moins un compte) : sans ca, le suivi de sante (backup_schedule.health) ne
+        # controlait que le succes du PROCESSUS de sauvegarde, jamais la restaurabilite du contenu produit -
+        # une archive corrompue ne se decouvrait qu'au moment ou on en avait besoin (audit de perennite du
+        # 22/11/2026, recommandation P0 n°2).
+        diagnosis = backup.diagnose_archive(blob, password)
+        if diagnosis["level"] == "error":
+            problems = "; ".join(issue for db in diagnosis["databases"] for issue in db.get("issues", []))
+            raise backup.BackupError("restore_check_failed", f"Archive produite mais non restaurable : {problems or 'echec du controle'}.")
         filename = backup.archive_filename(bool(password))
         send_archive(destination, blob, filename)
         entry = {"trigger": trigger, "destination_id": destination["id"], "destination": destination["label"],
