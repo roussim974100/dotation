@@ -197,6 +197,78 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+// Doublons de personnes : fiches "personne" partageant la même identité (nom+prénom+service).
+document.addEventListener("DOMContentLoaded", () => {
+  const scanBtn = document.getElementById("personDupScanBtn");
+  if (!scanBtn) return;
+
+  function formatDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    } catch {
+      return iso || "?";
+    }
+  }
+
+  async function scan(note) {
+    scanBtn.disabled = true;
+    const prefix = note ? `<p class="mb-3">✅ ${escapeHtml(note)}</p>` : "";
+    try {
+      const response = await fetch("/api/admin/person-duplicates", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Analyse impossible.");
+      const report = await response.json();
+      const groups = report.groups || [];
+      if (!groups.length) {
+        showDbResult("personDupResult", "ok", "Aucun doublon : chaque identité (nom, prénom, service) n'a qu'une seule fiche.", prefix);
+        return;
+      }
+      const html = groups.map((group) => {
+        const [primary, ...others] = group.persons;
+        const rows = [
+          `<tr><td>${escapeHtml(primary.nom)} ${escapeHtml(primary.prenom)}</td><td>${escapeHtml(primary.service || "—")}</td><td>${formatDate(primary.created_at)}</td><td class="text-end">${primary.dossiers}</td><td class="text-muted">conservée (la plus ancienne)</td></tr>`,
+          ...others.map((p) => `<tr><td>${escapeHtml(p.nom)} ${escapeHtml(p.prenom)}</td><td>${escapeHtml(p.service || "—")}</td><td>${formatDate(p.created_at)}</td><td class="text-end">${p.dossiers}</td><td><button class="btn btn-sm btn-outline-primary person-dup-merge-btn" data-keep-id="${escapeHtml(primary.id)}" data-drop-id="${escapeHtml(p.id)}" data-dossiers="${p.dossiers}" type="button">Fusionner dans la fiche conservée</button></td></tr>`),
+        ].join("");
+        return `<div class="table-responsive mb-3"><table class="table table-sm mb-0"><thead><tr><th>Personne</th><th>Service</th><th>Créée le</th><th class="text-end">Dossiers</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }).join("");
+      showDbResult("personDupResult", "warning", `${groups.length} identité(s) avec plusieurs fiches.`, prefix + html);
+    } catch (error) {
+      showDbResult("personDupResult", "error", error.message || "Analyse impossible.", "");
+    } finally {
+      scanBtn.disabled = false;
+    }
+  }
+
+  document.getElementById("personDupResult")?.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".person-dup-merge-btn");
+    if (!btn) return;
+    const { keepId, dropId, dossiers } = btn.dataset;
+    const ok = await window.askConfirm(
+      `${dossiers} dossier(s) seront rattachés à la fiche conservée. Aucun dossier n'est supprimé ni modifié dans son contenu. Une copie de sécurité de la base sera faite avant. Confirmer la fusion ?`,
+      { title: "Fusionner ces deux fiches ?", confirmLabel: "Fusionner" }
+    );
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      const csrf = await getCsrfToken();
+      const response = await fetch("/api/admin/person-duplicates/merge", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body: JSON.stringify({ keepId, dropId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Fusion impossible.");
+      await scan(`Fusion faite : ${data.movedDossiers} dossier(s) rattaché(s). Copie de sécurité faite avant.`);
+    } catch (error) {
+      showDbResult("personDupResult", "error", error.message || "Fusion impossible.", "");
+      btn.disabled = false;
+    }
+  });
+
+  scanBtn.addEventListener("click", () => scan());
+});
+
+
 // Paramétrage : aperçu puis application (import additif).
 document.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("configImportFile");

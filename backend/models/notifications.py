@@ -23,6 +23,7 @@ KIND_RESOURCES_MISSING_SERVICE = "resources_missing_service"
 KIND_BACKUP_FAILED = "backup_failed"
 KIND_UPDATE_AVAILABLE = "update_available"
 KIND_SIGNUPS_PENDING = "signups_pending"
+KIND_ORPHAN_FIELDS = "orphan_fields"
 
 _CACHE_SECONDS = 60
 # Taches de service : le cache est vide a chaque enregistrement de dossier (models/forms.persist_form) et a chaque « Fait » ;
@@ -140,7 +141,7 @@ def backup_failed_task(user):
         return None
 
     def compute():
-        import backup_schedule
+        import backup_schedule  # charge seulement si le cache a expire (notifications verifiees a chaque session) : pas un cycle
         import backup_targets
         try:
             return backup_schedule.health(backup_targets.load_config())
@@ -157,7 +158,7 @@ def update_available_task(user):
     """Nouvelle version disponible (cache disque, jamais de reseau ici). Reserve a ceux qui gerent les mises a jour."""
     if not can_manage(user):
         return None
-    import update_check
+    import update_check  # charge a la demande (controle de session) : pas un cycle
     state = update_check.cached_status()
     if not state.get("available"):
         return None
@@ -177,12 +178,34 @@ def signups_pending_task(user):
     return {"kind": KIND_SIGNUPS_PENDING, "count": count, "link": "/admin-comptes.html"} if count else None
 
 
+def orphan_fields_task(connection, user):
+    """Noms de champ a examiner dans les dossiers (page Sante des champs, Admin > Base de donnees) : un controle
+    "self-service" sans rappel reste lettre morte (constat de l'audit de perennite du 22/11/2026) - desormais une
+    tache comme les autres plutot qu'un bouton a penser a cliquer."""
+    if not can_manage(user):
+        return None
+
+    def compute():
+        from models.field_health import scan_orphan_fields
+        try:
+            return scan_orphan_fields(connection)
+        except Exception:  # noqa: BLE001 - un scan illisible ne doit jamais empecher de lire le reste des notifications
+            return {"orphans": []}
+
+    result = _cached("orphan_fields", compute)
+    orphans = result.get("orphans") or []
+    if not orphans:
+        return None
+    return {"kind": KIND_ORPHAN_FIELDS, "count": len(orphans), "repairable": result.get("repairable", 0), "link": "/admin-db.html"}
+
+
 def open_tasks(connection, user):
     """Taches ouvertes visibles par cet utilisateur (calculees a l'instant), les plus urgentes d'abord."""
     tasks = [backup_failed_task(user), update_available_task(user), signups_pending_task(user)]
     tasks.extend(_service_tasks_cached(connection, user))
     if can_manage(user):
         tasks.append(missing_service_task(connection))
+        tasks.append(orphan_fields_task(connection, user))
     return [task for task in tasks if task]
 
 

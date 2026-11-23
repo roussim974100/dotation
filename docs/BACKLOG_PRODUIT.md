@@ -4,9 +4,9 @@ Dernière revue : **8 octobre 2026** (série 3.67.3 → 3.72.1 ; 3.67.4 : décon
 
 Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CHANGELOG, `docs/audit/` et la mémoire du projet.
 
-## 🔁 Reprise — où on en est (12 octobre 2026)
+## 🔁 Reprise — où on en est (22 novembre 2026)
 
-**État des branches (12/10/2026)** : `preprod` = **3.72.1** (PR n°36 à n°41 fusionnées par le propriétaire) ; **`dev` = 3.73.1** (3.73.1 : page de signature d'une restitution sans données techniques ; 3.73.0 : QR code proposé après « Enregistrer en attente » d'une restitution + mode d'emploi de la mise en production) — **PR `dev` → `preprod` à ouvrir et fusionner par le propriétaire** (texte prêt, lien `compare/preprod...dev`) ; **`prod` = `main` = 3.67.1**. La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.0. Reste au propriétaire : fusionner la PR 3.73.0, tester la préprod (checklist ci-dessous), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python). La 3.72.1 et la 3.73.0 n'ont pas de migration (les migrations 9 et 10 viennent de la 3.68 à 3.71).
+**État des branches (23/11/2026)** : `dev` = **3.76.1** (PR dev→preprod à ouvrir), `preprod` = `prod` = **3.76.0**. PR #46 (`dev`→`preprod`) et PR #47 (`preprod`→`prod`) fusionnées par le propriétaire le 22/11, **déployé en production et e-mail d'annonce envoyé le 23/11** (série sessions + notifications + 3.72.x à 3.76.0, dont la remédiation P0→P2 de l'audit de pérennité — voir CHANGELOG et `scripts/Rapport_Session_Autonome_2026-11-22.pdf`). Correctif urgent 3.76.1 (23/11, demandé par le propriétaire) : matériel restitué qui bloquait l'enregistrement d'un autre dossier — voir CHANGELOG.
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
@@ -30,7 +30,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.73.1**, `preprod` à 3.72.1 (PR 3.73.0 à fusionner), `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` = `preprod` = `prod` à **3.76.0** (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
@@ -86,10 +86,10 @@ Idée du propriétaire : prévenir la personne en charge d'une action (ex. crée
 
 | Sujet | Détail | Priorité |
 |---|---|---|
-| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). Le regroupement par personne dans les tableaux de bord (3.67.1) masque le symptôme visible (une personne = une ligne, même avec plusieurs `personId`, grâce au repli par identité), mais aucune fusion des fiches « personne » elles-mêmes n'a été faite | P1 |
-| Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. Projet dédié, à mener sur une copie de production | P1 |
-| Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production ; le bouton « Rattacher » n'a jamais été cliqué dessus | P1 |
-| Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers (validé par syntaxe et par ses tests seulement) | P1 |
+| Doublons de personnes | 47 fiches « personne » pour 34 dossiers sur la copie de production (trouvé en 3.61.0). Une fusion AUTOMATIQUE par identité avait été tentée puis annulée (conflit avec le garde-fou de `tests/test_person_grouping.py`). **Outil de fusion MANUELLE livré en 3.76.0** (Admin > Base de données > Doublons de personnes) : ne regroupe que les identités exactes, fusion au cas par cas avec confirmation, aucun dossier supprimé ni modifié. Reste à faire : utiliser l'outil sur la vraie base pour traiter les 47 fiches | P1 |
+| Ancien modèle matériel/immatériel | 7 dossiers sur 34 (copie de prod) n'utilisent que ce format, ~150 références dans le code. **Logique de conversion écrite et testée le 22/11/2026** (`backend/models/legacy_conversion.py`, données synthétiques uniquement) ; reste à l'exécuter via un script dédié sur une copie de production, après revue | P1 |
+| Réparation des champs orphelins | La page Santé des champs signale 6 noms de champs rattachables sur la copie de production. **Rattaché aux notifications le 22/11/2026** (tâche `orphan_fields`, réservée à `users.manage`) pour que ce ne soit plus un bouton à penser à cliquer | P1 |
+| Déploiement réel | `setup/deploy-common.sh` n'a jamais tourné sur un vrai serveur Linux à plusieurs workers. **Concurrence SQLite validée en local le 22/11/2026** (12 processus, 360 écritures, 0 verrou — gunicorn indisponible sur Windows, voir `docs/ARCHITECTURE_DONNEES.md` §9) ; reste à valider gunicorn/gestion de processus sur un vrai serveur Linux | P1 |
 | ✅ Identifiant saisi journalisé en clair lors d'un échec de connexion (trouvé le 24/09, corrigé en 3.62.1) | Corrigé : l'identifiant n'est conservé que s'il correspond à un compte ; migration 6 pour les entrées existantes. Reste à l'exploitation : faire changer le mot de passe concerné | P1 |
 | ✅ Scan de vulnérabilités des dépendances (fait le 26/09) | `pip-audit` : aucune vulnérabilité connue (détail dans `docs/AUDIT_SECURITE_2026-09.md`). À relancer avant chaque mise en production ; les bibliothèques chargées par CDN (Bootstrap, cookieconsent) restent à revoir à la main | P1 |
 | Défilement horizontal du tableau « Restitutions en cours » à 1100 px (constaté le 26/09) | `tests/browser/test_no_horizontal_scroll.py` échoue sur la copie de la base de production (tableau de 869 px dans un cadre de 852 px), **y compris avant les travaux du 24-26/09** : lié aux lignes « Sortie (régularisation) » ajoutées depuis la dernière mesure du 19/09. À reprendre avec les colonnes secondaires (`DASHBOARD_COLUMNS.secondary`) | P2 |
@@ -106,7 +106,7 @@ Idée du propriétaire : prévenir la personne en charge d'une action (ex. crée
 | ✅ Bouton « Envoyer par e-mail » sur les écrans de restitution (demande du 24/09, fait le 24/09) | Phase 1 : à la validation, proposition d'un e-mail d'information. Phase 2 (et Phase 1 en consultation) : boutons « Télécharger le PDF » / « Envoyer par e-mail » dans la barre du bas (`renderRestitutionFollowUpActions`, `frontend/js/storage.js`, chargé désormais par les deux pages). Après « Enregistrer la restitution » : envoi proposé. Corrigé au passage : l'export PDF plantait hors des listes (chargeur d'export absent de `form.html` et des écrans de restitution), ce qui cassait aussi « Télécharger le PDF » / « Envoyer par e-mail » sur la fiche d'attribution signée. Scénario : `tests/browser/check_restitution_email.py` | S | P1 |
 | ~~Menu e-mail pendant une restitution commencée~~ | Vérifié le 24/09 : pas de bug. L'enregistrement de la Phase 1 passe le dossier en `partial_return`, le menu propose donc bien les e-mails de restitution | — | — |
 | Destinataires en copie | Le `.eml` ne vise que la personne (adresse de messagerie attribuée ou `beneficiaire.email`). Pour une restitution, le responsable de service et le service RH/informatique sont souvent concernés : à concevoir avec la case « Responsable de service » (voir plus bas). Sans adresse connue, le brouillon part sans destinataire et rien ne le signale | S | P2 |
-| E-mail de la fiche de retraits | Le PDF de retraits (`/api/forms/<id>/retraits-pdf`) n'a pas d'équivalent « Envoyer par e-mail » ; à reprendre dans l'écran d'ajustement (livré en 3.65.0) plutôt que sur l'ancien type « mise à jour » | S | P2 |
+| ✅ E-mail de la fiche de retraits (en fait : fait en 3.72.0, bouton « Envoyer par e-mail » déjà câblé sur chaque PDF d'ajustement, `prepareAdjustmentPdfEmail`) | Vérifié le 22/11 : la demande portait sur l'ancien PDF `/api/forms/<id>/pdf/retraits` (type « mise à jour », en voie de retrait) ; elle est satisfaite depuis 3.72.0 par l'écran d'ajustement, qui a son propre bouton e-mail par geste. Pas de changement sur l'ancien flux, volontairement laissé tel quel | S | P2 |
 
 ## Backlogs plus anciens : où ils en sont
 
@@ -120,12 +120,12 @@ Idée du propriétaire : prévenir la personne en charge d'une action (ex. crée
 - Mode sombre (`dark_mode_not_tech_debt`) : **ne pas relancer de chantier**, ce n'est pas de la dette.
 
 **Vraiment encore ouverts, non planifiés :**
-- Toast « Annuler » après suppression d'un dossier (`backlog_ergonomie_sprints`).
+- ✅ Toast « Annuler » après suppression d'un dossier (`backlog_ergonomie_sprints`) : fait le 22/11 (`showToast` accepte une action, route `POST /api/forms/trash/<id>/restore` ouverte à `forms.delete`, pas réservée aux administrateurs).
 - Cartes empilées sur mobile (`backlog_ergonomie_sprints`) — jamais pu être testé par l'automatisation du navigateur (le redimensionnement de fenêtre ne change pas la largeur perçue).
 - Historique/cycle de vie du parc + assistant de création de ressource (`backlog_historique_parc`) : plan validé, rien codé.
 - Cohérence de la navigation, moins de clics (`backlog_navigation_audit`) : audit fait le 19/09, rien codé.
 - Case « Responsable de service » sur les comptes, pour de futurs e-mails automatiques (`feature_reprise_materiel_restitue`) : recoupe le signataire de substitution décidé pour le chantier en cours (3.63.0) — à concevoir ensemble plutôt que séparément.
-- Blocage d'une saisie manuelle d'un n° de série déjà attribué ailleurs (`feature_reprise_materiel_restitue`).
+- ✅ Blocage d'une saisie manuelle d'un n° de série déjà attribué ailleurs (`feature_reprise_materiel_restitue`) : fait le 22/11, bloquant à l'enregistrement (`persist_form`, code `resource_already_held`) en plus de l'avertissement existant ; l'avertissement non bloquant reste affiché pendant la saisie.
 - Typage progressif (`@ts-check` + JSDoc) sur `storage.js`/`admin.js` (`backlog_typage_typescript`) : backlog de version future, faible priorité.
 
 ## Repères

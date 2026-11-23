@@ -1,5 +1,128 @@
 # Historique des versions — À Quai
 
+## [3.76.1] - 2026-11-23 — Correctif : matériel restitué bloquant l'enregistrement d'un autre dossier
+
+Constat réel (signalé par le propriétaire) : impossible d'enregistrer un dossier, même sans rien modifier, à
+cause du blocage « numéro de série déjà attribué à un autre dossier actif » (3.76.0). Cause : un dossier de
+restitution clos (`returned`) n'avait jamais reçu de condition de retour explicite pour un de ses objets
+(saisie incomplète à la finalisation) ; la synchronisation du parc laissait donc l'unité « attribuée » à ce
+dossier pourtant terminé, indéfiniment.
+
+- `backend/models/units.py` (`sync_units_for_form`) : un dossier clos (`returned`) dont un objet n'a aucune
+  condition de retour enregistrée est désormais considéré rendu par défaut, au lieu de rester « attribué » à
+  un dossier déjà terminé.
+- `backend/models/forms.py` (`_find_duplicate_resource_label`) : filet de sécurité complémentaire — un
+  enregistrement qui ne modifie pas la valeur en conflit (inchangée depuis le dernier enregistrement de CE
+  dossier) n'est plus bloqué ; seule une saisie qui *crée* ou *change vers* un nouveau conflit l'est.
+- Donnée réelle corrigée sur la copie de développement (sauvegarde avant écriture, comme les autres réparations
+  admin) : l'unité concernée n'est plus faussement « attribuée » à son dossier de restitution terminé.
+- Vérifié en navigateur (Chrome, instance isolée sur copie jetable) : la fiche concernée s'enregistre à
+  nouveau sans erreur. Tests ajoutés : `tests/test_units.py`, `tests/test_resource_duplicate_block.py`.
+
+## [3.76.0] - 2026-11-22 — Fusion manuelle des doublons de personnes
+
+Suite du constat de l'audit de pérennité (47 fiches « personne » pour 34 dossiers sur la copie de production) :
+une fusion automatique par identité avait été tentée en session autonome puis annulée, car elle entrait en
+conflit avec le garde-fou qui refuse de deviner qu'une personne est la même sans `personId` explicite repris
+(pour ne jamais fusionner deux homonymes différents). Ce correctif reste dans cet esprit.
+
+- **Admin > Base de données > Doublons de personnes** : analyse en lecture seule qui ne regroupe que les fiches
+  ayant exactement le même nom, prénom et service ; fusion manuelle, un couple à la fois, avec confirmation.
+  Aucun dossier n'est supprimé ni modifié dans son contenu — seul leur rattachement (`person_id`) est repointé
+  vers la fiche conservée, colonne et `payload_json` compris. Copie de sécurité de la base avant chaque fusion,
+  comme pour le rattachement des champs orphelins.
+- Testé via une instance isolée (copie jetable de la base réelle, jamais `backend/dotation.db` lui-même) :
+  scan, fusion, intégrité des deux dossiers d'origine après fusion. Un bug trouvé pendant ce test (le message de
+  succès écrasait la liste des doublons restants) a été corrigé et revérifié.
+
+## [3.75.0] - 2026-11-22 — Remédiation P0→P2 de l'audit de pérennité (session autonome)
+
+Suite à l'audit de pérennité du 22/11/2026 (`scripts/Audit_Perennite_A_Quai_2026-11-22.pdf`), traité en session
+autonome pendant l'absence du propriétaire. Détail complet, décisions et items reportés : rapport de session
+(`scripts/Rapport_Session_Autonome_2026-11-22.pdf`, non gitté).
+
+### 🔒 P0 — Filets de sécurité
+- **Permissions unifiées** : `backend/permissions.py` (module orphelin, sa propre copie périmée de `DEFAULT_GROUPS`, déconnectée du vrai système) supprimé ; ses 6 tests, qui ne vérifiaient que ce module mort, remplacés par des tests qui vérifient le vrai `app.py:DEFAULT_GROUPS` et la cohérence `TOGGLEABLE_PERMISSIONS` / `PERMISSION_INFO`.
+- **Échec silencieux de synchronisation du parc détecté** : nouvel invariant `unsyncedUnitAssignments` (`models/health.py`) — un objet « attribué » dans un dossier sans unité de parc correspondante (`sync_units_for_form` avait échoué en silence) est désormais signalé au contrôle de santé.
+- **Sauvegarde non restaurable refusée** : `run_send` (`backup_targets.py`) vérifie désormais chaque archive (`diagnose_archive` : intégrité, tables, comptes) avant de l'envoyer, plutôt que de ne suivre que le succès de l'envoi.
+
+### 🟡 P1 — Validé, écrit et testé (rien exécuté sur de vraies données)
+- **Déploiement concurrent validé en local** : 12 processus séparés, 360 écritures (`POST /api/forms`), 0 `database is locked` — documenté dans `docs/ARCHITECTURE_DONNEES.md` §9 (gunicorn indisponible sur Windows, processus concurrents utilisés à la place, même question posée à SQLite).
+- **Conversion de l'ancien format matériel/immatériel** : nouveau module `models/legacy_conversion.py`, écrit et testé sur données synthétiques, volontairement **non branché** sur une route ni un script d'exécution — prêt pour une revue avant un lancement sur une copie de production.
+- **Doublons de personnes : tenté puis annulé.** La correction (rechercher une personne existante par identité avant d'en créer une nouvelle) entre en conflit avec un garde-fou délibéré déjà en place (`tests/test_person_grouping.py` : « sans reprise explicite du personId, ne jamais deviner qu'il s'agit de la même personne », pour ne jamais fusionner deux homonymes différents). Code annulé ; décision à trancher par le propriétaire (voir rapport de session).
+
+### 🧹 P2 — Consolidation structurelle
+- **Permissions** : 15 des 17 contrôles manuels de `routes/forms.py` remplacés par `@permission_required(...)`, déjà la norme partout ailleurs.
+- **Imports différés clarifiés** : celui de `models/settings.py` (aucun cycle réel) remonté en tête de fichier ; les 3 autres (chargement paresseux de `backup`/`update_check`, volontaire) commentés pour ne plus être confondus avec un contournement de cycle.
+- **Champs orphelins → notifications** : nouvelle tâche `orphan_fields` (réservée à `users.manage`), pour que ce contrôle ne reste plus un bouton qu'on oublie de cliquer.
+- **Non traités dans cette session** (trop volumineux/risqués pour une session sans supervision) : exposer les résumés de ressources dynamiques via l'API (3 implémentations divergentes aujourd'hui), découper `routes/admin.py` (1951 lignes) et `routes/forms.py`. Détail et plan dans le rapport de session.
+
+Tests : +25 cas sur 6 nouveaux fichiers de test, suite complète verte à chaque étape (660 passed avant la version finale).
+
+## [3.74.4] - 2026-11-22 — Ressources immatérielles dans Progression, cache robuste à tout redémarrage
+
+### 🔧 Les ressources immatérielles (email, VPN, zone alarme) comptaient comme jamais rendues
+- Constat en conditions réelles (Dominique GIRAUD, Alexia LEROUYER) : leur accès e-mail, sélectionné à l'attribution, n'a pas de case « Non restitué/Conforme » comme un objet physique — son traitement (désactivation d'accès) est suivi à part dans `restitution.immaterielActions`, jamais dans `restitution.items`. `summarize_restitution_progress` (3.74.3) les comptait donc comme indéfiniment en attente. Corrigé : une ressource immatérielle est désormais jugée réglée via `immaterielActions[clé].actionDone`, pas via l'état « matériel ». Même correction côté infobulle au survol du statut (`frontend/js/dashboard-preview.js`), qui dupliquait le même calcul sans le savoir.
+- `frontend/js/storage.js` (`getDraftProgressMetrics`) : le repli « Prêt »/« À compléter » pensé pour l'attribution (date de prise de poste dépassée) ne doit plus s'appliquer une fois un dossier en phase de restitution — il masquait « Restitution en retard » derrière un libellé qui ne voulait rien dire pour une restitution.
+
+### 🔒 Le cache de la liste des dossiers résiste maintenant à tout redémarrage du serveur
+- Le correctif ETag de la 3.74.3 (version de l'appli dans l'empreinte) ne suffisait pas en itération rapide : plusieurs correctifs de calcul se sont succédé ce soir sous le même numéro de version avant qu'on pense à l'incrémenter, donc le cache restait valide malgré le redémarrage. Nouvel identifiant `_PROCESS_BOOT_ID` (`backend/routes/forms.py`), régénéré à chaque chargement du module : **tout** redémarrage invalide désormais le cache, qu'on bump la version ou non.
+- Fichiers : `backend/models/workflow.py`, `backend/routes/forms.py`, `frontend/js/storage.js`, `frontend/js/dashboard-preview.js`. Aucune migration.
+- Tests : `tests/test_restitution_progress.py` (+1 cas), `tests/test_forms_list_etag_version.py` (+1 cas).
+
+## [3.74.3] - 2026-11-22 — Progression/Pilotage réalistes en restitution, état « Mutualisé »
+
+### 📊 Les colonnes Progression et Pilotage mesurent enfin la restitution, pas l'attribution
+- Constat (dossier de Camille SIMONETTI) : une fois un dossier en restitution, « Progression » et « Pilotage » continuaient d'afficher la **complétude de saisie à l'attribution** (champs remplis), sans rapport avec ce qui a été rendu. Un dossier de régularisation (champs jamais saisis par nature) affichait « 0/4 » alors que 3 objets sur 4 avaient bien été rendus, et « Pilotage » pouvait afficher « Prêt » ou « En retard » sans que ça veuille dire quoi que ce soit pour une restitution.
+- Nouvelle fonction `summarize_restitution_progress` (`backend/models/workflow.py`), utilisée pour « Progression »/« Pilotage » dès qu'un dossier entre en phase de restitution (`partial_return`, `returned`, ou `awaiting_signature` avec des données de restitution) : « Progression » compte les objets réellement réglés (rendus, perdus, mutualisés...) sur les objets à restituer ; « Pilotage » affiche **Restitution terminée**, **Restitution en cours**, **Restitution en retard** (au-delà du seuil configuré en Admin > Personnalisation) ou **Clôturé malgré du matériel manquant** (dossier clos via `closeAnyway`, 3.74.1 — la fraction reste honnête, mais il n'y a plus rien à relancer). Hors restitution (attribution active), rien ne change.
+- Nouvel état de restitution **« Mutualisé »** (`restitution.html`), pour un objet qui ne repasse jamais individuellement par le stock (ex. PC de télétravail transféré directement à la personne suivante) : comme « Perdu »/« Autre », ne bloque pas la clôture du dossier, mais le motif reste visible dans l'historique — à préférer à « Non restitué » + « Clôturer quand même » quand le cas est connu d'avance.
+- Fichiers : `backend/models/workflow.py`, `backend/models/forms.py` (`row_to_summary`), `frontend/js/restitution.js`, `frontend/js/restitution-blocage.js`, `frontend/js/dashboard-preview.js` (aperçu au survol, déjà correct pour conforme/dégradé mais pas pour perdu/autre — corrigé au passage). Aucune migration.
+- Tests : `tests/test_restitution_progress.py` (10 cas).
+
+## [3.74.2] - 2026-11-22 — Droit dédié pour clôturer malgré un objet non restitué
+
+### 🔒 `forms.restitution_force` : droit séparé, réservé à l'administrateur par défaut
+- Le droit d'avoir permis en 3.74.1 (`closeAnyway`) reposait sur `forms.restitution`, déjà détenu par de nombreux groupes (administration, direction, gestion, rédaction) — trop large pour une action qui peut masquer du matériel jamais revenu.
+- Nouveau droit dédié **`forms.restitution_force`**, éditable par groupe dans Admin > Comptes, **donné par défaut au seul groupe `admin`** (`PERMISSION_BACKFILLS`, jamais ajouté automatiquement à `administration` ni aux autres). `PATCH /api/forms/<id>/restitution` avec `closeAnyway` refuse (403) sans ce droit, même avec `forms.restitution`.
+- Le bouton « Clôturer quand même » (`restitution.html`) et la page `restitution-blocage.html` vérifient ce droit avant de le proposer ; sans lui, un message explique qui contacter.
+- Fichiers : `backend/app.py`, `backend/routes/admin.py`, `backend/routes/forms.py`, `frontend/js/admin.js`, `frontend/js/restitution.js`, `frontend/js/restitution-blocage.js`. Aucune migration (le rattrapage se fait via `PERMISSION_BACKFILLS`, comme `forms.adjust` en 3.65.0).
+- Tests : `tests/test_restitution_close_anyway.py` (+1 cas : `forms.restitution` seul ne suffit plus).
+
+## [3.74.1] - 2026-11-22 — Clôturer une restitution malgré un objet « Non restitué », page de diagnostic
+
+### 🔓 « Non restitué » ne bloque plus le dossier si on confirme la clôture
+- Un objet marqué « Non restitué » (ex. matériel mutualisé — PC de télétravail — qui ne repasse jamais individuellement par le stock) maintenait le dossier « en cours » indéfiniment, sans échappatoire.
+- Sur `restitution.html`, « Enregistrer la restitution » propose maintenant une confirmation **« Clôturer quand même »** quand c'est la seule raison du blocage. L'objet garde son état réel (« Non restitué ») dans l'historique ; seul le statut agrégé du dossier passe à « Terminée ». Action journalisée (`closed_despite_missing_items`).
+- Nouvelle page **« Pourquoi ce dossier est bloqué ? »** (`restitution-blocage.html`), accessible depuis le menu « ⋯ » d'un dossier « Restitution partielle » : explique en clair quel objet bloque, et propose le même bouton de clôture forcée sans repasser par tout le formulaire de restitution.
+- Fichiers : `backend/models/workflow.py` (`derive_restitution_workflow_status`, `compute_effective_workflow_status`), `backend/routes/forms.py` (`update_restitution`), `backend/routes/pages.py`, `frontend/js/restitution.js`, `frontend/js/storage.js`, `frontend/restitution-blocage.html` + `frontend/js/restitution-blocage.js` (nouveaux). Aucune migration.
+- Tests : `tests/test_restitution_close_anyway.py` (4 cas).
+
+## [3.74.0] - 2026-11-22 — Annuler une suppression, blocage des doublons de numéro de série
+
+### ↩️ Toast « Annuler » après la suppression d'un dossier
+- Supprimer un dossier (seul ou en groupe) propose désormais un bouton **« Annuler »** directement dans le message de confirmation (8 secondes), sans passer par la corbeille d'administration.
+- Nouvelle route `POST /api/forms/trash/<id>/restore`, ouverte à la permission `forms.delete` (pas réservée aux administrateurs, contrairement à `/api/admin/trash/<id>/restore`). `DELETE /api/forms/<id>` renvoie maintenant l'identifiant de corbeille (`trash_id`).
+- Fichiers : `backend/models/audit.py` (`insert_deleted_item` renvoie l'id), `backend/routes/forms.py`, `frontend/js/ui.js` (`showToast` accepte une action), `frontend/js/storage.js`, `frontend/css/style.css`. Aucune migration.
+- Tests : `tests/test_resource_duplicate_block.py`.
+
+### 🔒 Un numéro de série déjà attribué ailleurs bloque désormais l'enregistrement
+- La saisie manuelle d'un numéro de série (ou tout champ identifiant d'une ressource dynamique) déjà détenu par un **autre dossier actif** n'était qu'un avertissement affiché à la saisie, sans effet sur l'enregistrement. `persist_form` (chemin unique d'enregistrement d'un dossier) refuse maintenant la sauvegarde (409, `resource_already_held`) — à la création, à la modification et lors d'un ajustement.
+- L'avertissement non bloquant existant (pendant la saisie) est conservé tel quel ; seul l'enregistrement final est désormais bloquant.
+- Fichiers : `backend/models/forms.py` (`_find_duplicate_resource_label`), `frontend/js/app.js`, `frontend/js/adjustment.js` (message traduit). Aucune migration.
+- Tests : `tests/test_resource_duplicate_block.py`.
+
+### 📄 E-mail de la fiche de retraits (déjà fait, backlog mis à jour)
+- Vérifié : le bouton « Envoyer par e-mail » de chaque PDF d'ajustement (`prepareAdjustmentPdfEmail`, livré en 3.72.0) répond déjà à ce besoin. Pas de changement de code ; `docs/BACKLOG_PRODUIT.md` mis à jour pour refléter l'état réel.
+
+## [3.73.2] - 2026-10-15 — Pas de lien de signature d'une restitution sans état du matériel
+
+### 🐛 Un lien de restitution vide n'est plus possible
+- Il était possible de générer un lien (ou un QR code) de signature pour une restitution dont la **Phase 2** (état du matériel) n'était pas enregistrée : le signataire arrivait sur un récapitulatif **sans aucun matériel** (« Aucun materiel n'a ete renseigne ») et pouvait signer dans le vide.
+- Le serveur refuse désormais de créer le lien (`restitution_items_missing`) et l'application affiche : « Enregistrez d'abord l'état du matériel restitué (étape 2 de la restitution) avant de générer le lien de signature. » (QR code, copie du lien et e-mail).
+- Un lien déjà créé avant la correction reste valable : il affiche le matériel dès que la Phase 2 est enregistrée.
+- Fichiers : `backend/models/signature.py`, `backend/routes/signature.py` (le message accompagne le code d'erreur), `frontend/js/storage.js` (`ensureRestitutionSignatureLink`, `?v=20261015a` sur les 7 pages). Aucune migration.
+- Tests : `tests/test_restitution_link_needs_items.py` ; le scénario navigateur `check_restitution_qr_attente.py` crée maintenant un dossier avec une ressource (22 vérifications OK).
+
 ## [3.73.1] - 2026-10-15 — Page de signature d'une restitution : seulement les informations utiles
 
 ### 🐛 Plus de données techniques affichées au signataire

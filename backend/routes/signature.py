@@ -92,7 +92,7 @@ def create_form_restitution_signature_link_route(form_id):
                 link_type="restitution",
             )
     except AppError as error:
-        return jsonify({"error": error.code}), error.status
+        return jsonify({"error": error.code, "message": error.message}), error.status
     return jsonify({"link": serialize_signature_link(link_row)}), 201
 
 

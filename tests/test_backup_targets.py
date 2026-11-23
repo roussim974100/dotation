@@ -116,3 +116,20 @@ def test_send_refuses_unsafe_file_names(env):
     with pytest.raises(targets.TargetError) as error:
         targets.send_archive(_dest(env), b"x", "../evasion.zip")
     assert error.value.code == "bad_filename"
+
+
+def test_run_send_refuses_to_send_a_backup_that_would_not_restore(env):
+    """22/11/2026 (audit de perennite, P0 n°2) : une archive produite mais non restaurable (ici, aucun compte
+    dans users.db - personne ne pourrait se reconnecter apres restauration) ne doit jamais etre envoyee ni
+    journalisee comme un succes. Avant ce correctif, run_send l'aurait envoyee sans la verifier."""
+    conn = sqlite3.connect(str(env["tmp"] / "users.db"))
+    conn.execute("DELETE FROM users")  # users.db valide mais SANS AUCUN COMPTE
+    conn.commit()
+    conn.close()
+    destination = targets.save_destinations([_dest(env)])[0]
+    with pytest.raises(backup.BackupError) as error:
+        targets.run_send(destination, "motdepasse-solide", trigger="manual")
+    assert error.value.code == "restore_check_failed"
+    assert list(Path(env["share"]).iterdir()) == []  # rien envoye
+    history = targets.read_history()
+    assert history[0]["ok"] is False and history[0]["code"] == "restore_check_failed"
