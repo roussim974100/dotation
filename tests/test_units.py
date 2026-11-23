@@ -143,6 +143,35 @@ def test_double_attribution_is_recorded_as_an_anomaly(db):
     assert unit(db)["holder_form_id"] == "F2"
 
 
+def test_dossier_returned_sans_etat_de_retour_explicite_libere_quand_meme_l_unite(db):
+    """23/11 : un dossier clos (« returned ») dont un objet n'a jamais reçu de condition de retour explicite
+    (saisie incomplète à la finalisation, constat réel sur une fiche de restitution) ne doit pas laisser
+    l'unité « attribuée » indéfiniment : elle bloquerait alors tout autre dossier saisissant plus tard le
+    même identifiant pour un matériel légitimement réattribué (constat réel sur une fiche d'arrivée)."""
+    add_form(db, "F1", status="returned")
+    add_item(db, "F1", "SN1")  # condition="pending" par défaut, returned_at=None : jamais renseigné
+    sync_units_for_form(db, "F1")
+    assert unit(db)["status"] == "in_stock" and unit(db)["holder_form_id"] is None
+    event_type, note = [(e["event_type"], e["notes"]) for e in db.execute(
+        "SELECT * FROM resource_unit_events WHERE unit_id = ? ORDER BY occurred_at, seq", (unit(db)["id"],))][-1]
+    assert event_type == "returned"
+    assert "non renseigné" in note
+
+
+@pytest.mark.parametrize("condition", ["perdu", "autre", "mutualise"])
+def test_dossier_returned_avec_un_etat_explicite_non_mappe_n_est_pas_transforme_en_rendu(db, condition):
+    """Repéré par la revue automatique (Codex) sur la 1re version du correctif ci-dessus : le repli ne doit
+    s'appliquer qu'à un objet jamais renseigné (« pending »), pas à un état explicitement saisi mais que
+    units.py ne sait pas encore convertir en événement (perdu, autre, mutualisé —
+    cf. RESOLVED_RESTITUTION_STATES dans workflow.py). Sinon un objet réellement perdu serait à tort remis
+    « en stock » avec un événement immuable affirmant qu'il a été rendu conforme."""
+    add_form(db, "F1", status="returned")
+    add_item(db, "F1", "SN1", condition)
+    sync_units_for_form(db, "F1")
+    assert [e[0] for e in events(db)] == ["assigned"]
+    assert unit(db)["status"] == "assigned"
+
+
 def test_resources_without_identifier_field_are_ignored(db):
     add_form(db, "F1"); add_item(db, "F1", "X", code="veste")
     assert sync_units_for_form(db, "F1") == 0
