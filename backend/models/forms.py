@@ -273,10 +273,29 @@ def _sanitize_unc_acces(payload):
     return payload
 
 
-def _find_duplicate_resource_label(connection, payload, items, exclude_form_id):
+def _previous_identifier_value(existing_payload, item_key, identifier_key):
+    """Valeur deja enregistree de ce champ identifiant pour cette ressource, avant la sauvegarde en cours
+    (None si la ressource est nouvelle ou n'etait pas selectionnee)."""
+    if not existing_payload:
+        return None
+    for resource in existing_payload.get("resources", {}).get("additional", []) or []:
+        if not isinstance(resource, dict) or (resource.get("code") or resource.get("id")) != item_key:
+            continue
+        if not resource.get("selected"):
+            return None
+        fields = resource.get("fields") or {}
+        return str(fields.get(identifier_key) or fields.get(identifier_key.lower()) or "").strip()
+    return None
+
+
+def _find_duplicate_resource_label(connection, payload, items, exclude_form_id, existing_payload=None):
     """Libelle de la premiere ressource actuellement detenue par CE dossier dont l'identifiant saisi a la main
     (n° de serie, immatriculation...) est deja detenu par un AUTRE dossier actif, sinon None. Memes regles que
-    l'avertissement non bloquant du formulaire (routes/inventory.py: current_holder), mais bloquant a l'enregistrement."""
+    l'avertissement non bloquant du formulaire (routes/inventory.py: current_holder), mais bloquant a l'enregistrement.
+    Si la valeur n'a pas change depuis le dernier enregistrement de CE dossier, le conflit n'est pas de son fait
+    (l'unite a ete reattribuee ailleurs depuis) : on ne bloque alors que la modification qui creerait/changerait
+    la valeur en conflit, pas une sauvegarde qui n'y touche pas (constat du 23/11 sur un brouillon ancien jamais
+    corrige depuis la reattribution de son materiel a un autre dossier)."""
     held_keys = {item["item_key"] for item in items if item["assigned"] and not item["returned"]}
     for resource in payload.get("resources", {}).get("additional", []) or []:
         if not isinstance(resource, dict):
@@ -291,6 +310,8 @@ def _find_duplicate_resource_label(connection, payload, items, exclude_form_id):
         fields = resource.get("fields") or {}
         value = str(fields.get(identifier_key) or fields.get(identifier_key.lower()) or "").strip()
         if not value:
+            continue
+        if value == _previous_identifier_value(existing_payload, item_key, identifier_key):
             continue
         if find_holder_unit(connection, str(resource.get("code") or ""), value, exclude_form_id):
             return resource.get("label") or str(item_key)
@@ -360,12 +381,13 @@ def persist_form(payload, allow_locked_update=False):
             "SELECT id, dossier_id, created_at, signature_data, payload_json FROM dotation_forms WHERE id = ?",
             (form_id,),
         ).fetchone()
+        existing_payload = None
         if exists:
             existing_payload = json.loads(exists["payload_json"])
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
                 raise AppError("form_locked", "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
             row["created_at"] = exists["created_at"]
-        duplicate_label = _find_duplicate_resource_label(connection, payload, items, form_id)
+        duplicate_label = _find_duplicate_resource_label(connection, payload, items, form_id, existing_payload)
         if duplicate_label:
             raise AppError("resource_already_held", f"« {duplicate_label} » est déjà attribué à un autre dossier actif.", 409)
         person_id, dossier_id = sync_person_and_dossier(connection, payload, exists)
