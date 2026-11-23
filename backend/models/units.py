@@ -311,6 +311,15 @@ def sync_units_for_form(connection, form_id, keys=None):
         condition = item["return_condition"] or "pending"
         event = ("returned" if condition in READY_CONDITIONS else "returned_degraded" if condition in DEGRADED_CONDITIONS
                  else "lost" if condition == "non_restitue" else None)
+        fallback_note = None
+        if not event and form["status"] == "returned":
+            # Dossier clos (restitution terminee) sans etat de retour explicite pour cet objet (saisie
+            # incomplete au moment de la finalisation, constat du 23/11) : on ne peut pas laisser
+            # l'unite « attribuee » indefiniment a un dossier deja termine, ca bloquerait tout autre dossier
+            # qui saisirait plus tard le meme identifiant pour un materiel legitimement reattribue.
+            event = "returned"
+            condition = "conforme"
+            fallback_note = "État de retour non renseigné à la clôture du dossier ; objet considéré rendu par défaut"
         # Dossier signe (ou restitution qui prouve l'attribution) : attribution effective. Brouillon : simple
         # reservation de l'objet, qui evite qu'un autre dossier le choisisse en meme temps.
         origin = "regularisation" if form["dossier_type"] == "sortie" else "dossier"
@@ -330,12 +339,12 @@ def sync_units_for_form(connection, form_id, keys=None):
         added += _record(connection, unit_id, "assigned", assigned_when, f"assign:{form_id}", form_id, label, source="dossier")
         if event:
             returned_when = _when(item["returned_at"] or form["returned_at"] or form["updated_at"])
-            note = None
+            note = fallback_note
             if returned_when < assigned_when:
                 # Un retour ne peut pas preceder l'attribution : il est ramene a l'attribution (ce qui classe aussi un retour
                 # « du jour » apres l'attribution du jour). On n'annote que si la date est reellement anterieure.
                 if returned_when[:10] < assigned_when[:10]:
-                    note = f"Date de restitution ({returned_when[:10]}) antérieure à l'attribution : ramenée à la date d'attribution"
+                    note = f"Date de restitution ({returned_when[:10]}) antérieure à l'attribution : ramenée à la date d'attribution" + (f" ({fallback_note})" if fallback_note else "")
                 returned_when = assigned_when
             added += _record(connection, unit_id, event, returned_when, f"{event}:{form_id}", form_id, label,
                              condition=condition, notes=note, source="dossier")

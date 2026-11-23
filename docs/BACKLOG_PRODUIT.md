@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (22 novembre 2026)
 
-**État des branches (23/11/2026)** : `dev` = `preprod` = `prod` = **3.76.0**. PR #46 (`dev`→`preprod`) et PR #47 (`preprod`→`prod`) fusionnées par le propriétaire le 22/11, **déployé en production et e-mail d'annonce envoyé le 23/11** (série sessions + notifications + 3.72.x à 3.76.0, dont la remédiation P0→P2 de l'audit de pérennité — voir CHANGELOG et `scripts/Rapport_Session_Autonome_2026-11-22.pdf`). Les trois branches sont alignées : plus de retard à rattraper pour l'instant.
+**État des branches (23/11/2026)** : `dev` = **3.76.1** (PR dev→preprod à ouvrir), `preprod` = `prod` = **3.76.0**. PR #46 (`dev`→`preprod`) et PR #47 (`preprod`→`prod`) fusionnées par le propriétaire le 22/11, **déployé en production et e-mail d'annonce envoyé le 23/11** (série sessions + notifications + 3.72.x à 3.76.0, dont la remédiation P0→P2 de l'audit de pérennité — voir CHANGELOG et `scripts/Rapport_Session_Autonome_2026-11-22.pdf`). Correctif urgent 3.76.1 (23/11, demandé par le propriétaire) : matériel restitué qui bloquait l'enregistrement d'un autre dossier — voir CHANGELOG.
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 

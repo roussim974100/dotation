@@ -1,5 +1,24 @@
 # Historique des versions — À Quai
 
+## [3.76.1] - 2026-11-23 — Correctif : matériel restitué bloquant l'enregistrement d'un autre dossier
+
+Constat réel (signalé par le propriétaire) : impossible d'enregistrer un dossier, même sans rien modifier, à
+cause du blocage « numéro de série déjà attribué à un autre dossier actif » (3.76.0). Cause : un dossier de
+restitution clos (`returned`) n'avait jamais reçu de condition de retour explicite pour un de ses objets
+(saisie incomplète à la finalisation) ; la synchronisation du parc laissait donc l'unité « attribuée » à ce
+dossier pourtant terminé, indéfiniment.
+
+- `backend/models/units.py` (`sync_units_for_form`) : un dossier clos (`returned`) dont un objet n'a aucune
+  condition de retour enregistrée est désormais considéré rendu par défaut, au lieu de rester « attribué » à
+  un dossier déjà terminé.
+- `backend/models/forms.py` (`_find_duplicate_resource_label`) : filet de sécurité complémentaire — un
+  enregistrement qui ne modifie pas la valeur en conflit (inchangée depuis le dernier enregistrement de CE
+  dossier) n'est plus bloqué ; seule une saisie qui *crée* ou *change vers* un nouveau conflit l'est.
+- Donnée réelle corrigée sur la copie de développement (sauvegarde avant écriture, comme les autres réparations
+  admin) : l'unité concernée n'est plus faussement « attribuée » à son dossier de restitution terminé.
+- Vérifié en navigateur (Chrome, instance isolée sur copie jetable) : la fiche concernée s'enregistre à
+  nouveau sans erreur. Tests ajoutés : `tests/test_units.py`, `tests/test_resource_duplicate_block.py`.
+
 ## [3.76.0] - 2026-11-22 — Fusion manuelle des doublons de personnes
 
 Suite du constat de l'audit de pérennité (47 fiches « personne » pour 34 dossiers sur la copie de production) :

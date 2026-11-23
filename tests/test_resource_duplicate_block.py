@@ -9,6 +9,7 @@ if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
 from app import app
+from database import get_db
 
 H = {"X-CSRF-Token": "jeton"}
 
@@ -41,6 +42,48 @@ def test_un_meme_numero_de_serie_bloque_un_second_dossier_actif():
     second = create_dossier(client, "SECOND")
     assert second.status_code == 409, second.get_data(as_text=True)[:300]
     assert second.get_json()["error"] == "resource_already_held"
+
+
+def test_reenregistrer_sans_toucher_au_numero_devenu_conflictuel_n_est_pas_bloque():
+    """23/11 (constat réel sur une fiche d'arrivée) : un dossier déjà enregistré, dont le matériel a depuis été
+    légitimement réattribué à un autre dossier actif, ne doit pas empêcher d'enregistrer une modification qui
+    ne touche pas à ce champ (le conflit n'est pas créé par cette sauvegarde). Seule une saisie qui change
+    cette valeur reste bloquée si elle crée un nouveau conflit.
+    Le conflit préexistant (matériel réattribué depuis que ce dossier a été enregistré) ne peut plus être
+    recréé par l'API elle-même (le blocage est désormais systématique) : on simule la donnée historique par
+    une écriture directe, comme elle a pu exister avant l'introduction de ce blocage (22/11)."""
+    client = client_for()
+    nouveau = create_dossier(client, "NOUVEAU", serial="SN-LIBRE", status="draft")
+    assert nouveau.status_code == 201, nouveau.get_data(as_text=True)[:300]
+    form_id = nouveau.get_json()["summary"]["id"]
+
+    ancien = create_dossier(client, "ANCIEN", serial="SN-STALE-2")
+    assert ancien.status_code == 201, ancien.get_data(as_text=True)[:300]
+
+    # Donnée historique simulée : la fiche de NOUVEAU porte encore ce numéro de série, devenu obsolète
+    # depuis qu'ANCIEN détient réellement l'unité (écriture directe, hors API, pour reproduire un état
+    # antérieur au blocage du 22/11).
+    import json as _json
+    with get_db() as connection:
+        row = connection.execute("SELECT payload_json FROM dotation_forms WHERE id = ?", (form_id,)).fetchone()
+        stale_payload = _json.loads(row["payload_json"])
+        stale_payload["resources"]["additional"][0]["fields"]["numeroSerie"] = "SN-STALE-2"
+        connection.execute("UPDATE dotation_forms SET payload_json = ? WHERE id = ?",
+                            (_json.dumps(stale_payload, ensure_ascii=False), form_id))
+
+    # NOUVEAU rouvre sa fiche et l'enregistre sans toucher au matériel : pas bloqué.
+    payload = client.get(f"/api/forms/{form_id}").get_json()["data"]
+    payload["beneficiaire"]["fonction"] = "Agent administratif"
+    updated = client.put(f"/api/forms/{form_id}", json=payload, headers=H)
+    assert updated.status_code == 200, updated.get_data(as_text=True)[:300]
+
+    # Mais une saisie qui change réellement ce champ vers une autre valeur déjà prise ailleurs reste bloquée.
+    payload["resources"]["additional"][0]["fields"]["numeroSerie"] = "SN-STALE-2-AUTRE"
+    ancien2 = create_dossier(client, "ANCIEN2", serial="SN-STALE-2-AUTRE")
+    assert ancien2.status_code == 201, ancien2.get_data(as_text=True)[:300]
+    blocked = client.put(f"/api/forms/{form_id}", json=payload, headers=H)
+    assert blocked.status_code == 409, blocked.get_data(as_text=True)[:300]
+    assert blocked.get_json()["error"] == "resource_already_held"
 
 
 def test_reenregistrer_le_meme_dossier_n_est_pas_bloque_par_sa_propre_unite():
