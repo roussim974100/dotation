@@ -46,7 +46,8 @@ const restitutionStateLabels = {
   degrade: "Endommage",
   non_restitue: "Non restitue",
   perdu: "Perdu",
-  autre: "Autre"
+  autre: "Autre",
+  mutualise: "Mutualise (transfert direct)"
 };
 
 function todayDateInputValue() {
@@ -143,7 +144,8 @@ function normalizeRestitutionState(value) {
     degrade: "degrade",
     non_restitue: "non_restitue",
     perdu: "perdu",
-    autre: "autre"
+    autre: "autre",
+    mutualise: "mutualise"
   };
   return mapping[value] || "conforme";
 }
@@ -303,6 +305,10 @@ function renderRestitutionItems(items, existingStates) {
             <label class="choice-chip">
               <input type="radio" name="rest_state_${item.itemKey}" value="autre" ${currentState === "autre" ? "checked" : ""}>
               <span>Autre</span>
+            </label>
+            <label class="choice-chip" title="Objet mutualise qui ne repasse jamais individuellement par le stock (ex. PC de teletravail transfere directement a la personne suivante). Ne bloque pas la cloture du dossier.">
+              <input type="radio" name="rest_state_${item.itemKey}" value="mutualise" ${currentState === "mutualise" ? "checked" : ""}>
+              <span>Mutualise</span>
             </label>
           </div>
         </div>
@@ -826,6 +832,29 @@ async function initRestitutionPage() {
         "Finalisation du retour au tableau de bord"
       ];
       try {
+        const payload = buildRestitutionPayload(false);
+        if (payload.status === "partial_return") {
+          const session = await getSessionInfo();
+          const canForceClose = Boolean(session?.permissions?.includes("*") || session?.permissions?.includes("forms.restitution_force"));
+          if (!canForceClose) {
+            await showRestitutionInfoDialog(
+              "Dossier non clôturable",
+              "Au moins un objet est marqué « Non restitué » : le dossier reste « en cours » tant que ce n'est pas résolu — objet rendu, repassé en « Perdu »/« Autre », ou « Mutualisé » s'il ne revient jamais individuellement (ex. PC de télétravail transféré directement). Vous n'avez pas le droit de clôturer malgré tout — demandez à un administrateur si aucun de ces états ne convient."
+            );
+            return;
+          }
+          const closeAnyway = await askConfirm(
+            "Au moins un objet est marqué « Non restitué » : sans confirmation, le dossier restera « en cours » tant que ce n'est pas résolu. " +
+            "S'il s'agit d'un objet mutualisé qui ne revient jamais individuellement, préférez revenir en arrière et choisir l'état « Mutualisé » pour cet objet : le motif restera visible dans le dossier. " +
+            "Sinon, clôturer quand même ? L'objet garde son état « Non restitué » dans l'historique, seul le dossier passe à « Terminée ».",
+            { confirmLabel: "Clôturer quand même", cancelLabel: "Revenir en arrière" }
+          );
+          if (!closeAnyway) {
+            return;
+          }
+          payload.closeAnyway = true;
+        }
+
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution est en cours de préparation.",
@@ -843,7 +872,7 @@ async function initRestitutionPage() {
           text: "Les informations sont en cours d'enregistrement.",
           steps: createRestitutionWorkflowSteps(workflowLabels, 2)
         });
-        const response = await saveRestitution(buildRestitutionPayload(false), { keepPending: false });
+        const response = await saveRestitution(payload, { keepPending: false });
         window.showWorkflowDialog({
           title: "Enregistrement de la restitution",
           text: "La restitution a été enregistrée. L'application finalise maintenant le retour vers le tableau de bord.",

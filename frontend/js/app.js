@@ -3210,7 +3210,9 @@ async function saveDraft(signaturePad) {
         ? "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
         : error.message === "form_conflict"
           ? "Cette fiche a été modifiée par une autre personne (ou dans un autre onglet) depuis son ouverture. Rechargez la page pour voir la dernière version, puis refaites votre modification : rien n'a été écrasé."
-          : "Impossible d'enregistrer la fiche."
+          : error.message === "resource_already_held"
+            ? "Le numéro de série saisi est déjà attribué à un autre dossier actif. Vérifiez qu'il a bien été restitué, ou corrigez la saisie."
+            : "Impossible d'enregistrer la fiche."
     );
   }
 }

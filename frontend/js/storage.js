@@ -536,10 +536,15 @@ function summarizeDraftProgressFromPayload(payload = {}) {
 function getDraftProgressMetrics(draft) {
   if (Number.isFinite(draft.completedResources) && Number.isFinite(draft.totalResources)) {
     const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(draft.status);
+    // En phase de restitution, "late"/le libellé viennent de summarize_restitution_progress (backend) et sont
+    // déjà parlants ("Restitution en retard") : ne pas les écraser par le "À compléter" pensé pour l'attribution
+    // (date de prise de poste dépassée), qui ne veut rien dire une fois la restitution en cours.
+    const inRestitutionPhase = ["returned", "partial_return"].includes(draft.status)
+      || (draft.status === "awaiting_signature" && hasRestitutionData(draft));
     let timingStatus = draft.timingStatus || "neutral";
     let timingLabel = draft.timingLabel || "À planifier";
-    // Neutraliser le retard pour les dossiers où la personne est en poste
-    if (isOnboarded && timingStatus === "late") {
+    // Neutraliser le retard pour les dossiers où la personne est en poste (hors restitution)
+    if (isOnboarded && !inRestitutionPhase && timingStatus === "late") {
       timingStatus = "neutral";
       timingLabel = draft.completedResources >= draft.totalResources ? "Prêt" : "À compléter";
     }
@@ -1046,6 +1051,10 @@ function buildDraftActionButtons(draft, options) {
   const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
+  // Dossier resté « en cours » : diagnostic + clôture forcée si la seule raison est un objet "Non restitué".
+  if (status === "partial_return") {
+    personItems.push({ action: "openRestitutionBlockage", id, label: "Pourquoi ce dossier est bloqué ?" });
+  }
   // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
   // (canAdjustHere) : rien à dupliquer dans le menu « … ».
 
@@ -1444,13 +1453,44 @@ async function saveFormData(payload) {
 }
 
 async function deleteDraft(id) {
+  let trashId = null;
   try {
-    await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
+    const result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
+    trashId = result?.trash_id || null;
   } finally {
     removeCachedDraft(id);
   }
+  return trashId;
+}
+
+async function restoreDeletedDraft(trashId) {
+  await requestJson(`${API_BASE}/trash/${encodeURIComponent(trashId)}/restore`, {
+    method: "POST"
+  });
+  await renderDraftList();
+}
+
+function offerUndoDelete(trashIds, message) {
+  const ids = (Array.isArray(trashIds) ? trashIds : [trashIds]).filter(Boolean);
+  if (!ids.length) {
+    showToast(message, "success");
+    return;
+  }
+  showToast(message, "success", 8000, {
+    label: "Annuler",
+    onClick: async () => {
+      try {
+        for (const trashId of ids) {
+          await restoreDeletedDraft(trashId);
+        }
+        showToast(ids.length > 1 ? "Suppressions annulées." : "Suppression annulée.", "success");
+      } catch (error) {
+        showToast("Impossible d'annuler la suppression.", "error");
+      }
+    }
+  });
 }
 
 function newForm() {
@@ -1471,6 +1511,10 @@ function newAssignmentForPerson(id) {
 
 function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
+}
+
+function openRestitutionBlockage(id) {
+  window.location.href = `restitution-blocage.html?id=${encodeURIComponent(id)}`;
 }
 
 // Modale "Nouvelle restitution" : une restitution part toujours d'une attribution
@@ -3035,10 +3079,12 @@ async function deleteSelectedDrafts() {
     return;
   }
 
+  const trashIds = [];
   for (const id of ids) {
-    await deleteDraft(id);
+    trashIds.push(await deleteDraft(id));
   }
   await renderDraftList();
+  offerUndoDelete(trashIds, ids.length > 1 ? `${ids.length} dossiers supprimés.` : "Dossier supprimé.");
 }
 function bindSelectionActions(canExport, canDelete) {
   // Branche le "tout sélectionner" et les actions groupées.
@@ -3124,8 +3170,9 @@ async function removeDraft(id) {
     return;
   }
 
-  await deleteDraft(id);
+  const trashId = await deleteDraft(id);
   await renderDraftList();
+  offerUndoDelete(trashId, `Dossier « ${item.summary.title} » supprimé.`);
 }
 
 function formatDate(value) {
@@ -3502,7 +3549,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("emptyStateNewRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
-    editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
+    editDraft, openRestitution, openRestitutionBlockage, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,

@@ -481,7 +481,7 @@ function _getToastStack() {
   return stack;
 }
 
-function showToast(message, type, duration) {
+function showToast(message, type, duration, action) {
   const _type = type || "info";
   const _duration = typeof duration === "number" ? duration : 4000;
   const icons = { success: "✓", error: "✕", warning: "⚠", info: "ℹ" };
@@ -506,13 +506,25 @@ function showToast(message, type, duration) {
   closeBtn.setAttribute("aria-label", "Fermer");
   closeBtn.textContent = "×";
 
-  toast.append(icon, msg, closeBtn);
-
   const dismiss = () => {
     if (toast.classList.contains("is-dismissing")) return;
     toast.classList.add("is-dismissing");
     toast.addEventListener("animationend", () => toast.remove(), { once: true });
   };
+
+  if (action && action.label && typeof action.onClick === "function") {
+    const actionBtn = document.createElement("button");
+    actionBtn.className = "toast__action";
+    actionBtn.type = "button";
+    actionBtn.textContent = action.label;
+    actionBtn.addEventListener("click", () => {
+      dismiss();
+      action.onClick();
+    });
+    toast.append(icon, msg, actionBtn, closeBtn);
+  } else {
+    toast.append(icon, msg, closeBtn);
+  }
 
   closeBtn.addEventListener("click", dismiss);
   stack.appendChild(toast);
@@ -869,7 +881,7 @@ function loadNotificationsScript() {
   }
   notificationsScriptPromise = notificationsScriptPromise || new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "/js/notifications.js?v=20261006j";
+    script.src = "/js/notifications.js?v=20261122a";
     script.onload = resolve;
     script.onerror = () => {
       notificationsScriptPromise = null;

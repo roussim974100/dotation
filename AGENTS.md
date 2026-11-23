@@ -96,6 +96,18 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   recalculées par `persist_form`. Tout enregistrement de dossier passe par là (voir `docs/ARCHITECTURE_DONNEES.md`).
 - **Statuts** (`models/vocab.py`) : `draft`, `partial_assignment`, `awaiting_signature`, `active`, `partial_return`,
   `returned`, `cancelled`. Un dossier « en restitution » est `partial_return` dès l'enregistrement de la Phase 1.
+- **Progression / Pilotage du tableau de bord** (3.74.3) : deux fonctions distinctes dans `models/workflow.py`, choisies
+  par `row_to_summary` (`models/forms.py`) selon la phase du dossier — ne jamais réutiliser l'une à la place de l'autre.
+  `summarize_assignment_progress` = complétude de la **saisie à l'attribution** (champs remplis), pour un dossier pas
+  encore en restitution. `summarize_restitution_progress` = avancement **réel de la restitution** (objets réglés sur
+  objets à restituer), dès qu'un dossier entre en phase de restitution — sinon un dossier de régularisation (champs
+  jamais saisis par nature) affiche « 0/4 » alors que le matériel a bien été rendu (constat du 22/11). États d'un objet
+  qui comptent comme « réglé » sans bloquer la clôture : `RESOLVED_RESTITUTION_STATES` (`conforme`, `degrade`, `perdu`,
+  `autre`, `mutualise`) — seul `non_restitue` bloque (`derive_restitution_workflow_status`). `mutualise` : objet qui ne
+  repasse jamais individuellement par le stock (ex. PC de télétravail transféré directement) ; à garder synchronisé
+  avec `restitutionStateLabels` (`frontend/js/restitution.js`) et `returnedStates` (`frontend/js/dashboard-preview.js`).
+  `closedDespiteMissingItems` (clôture forcée, `forms.restitution_force`) fait afficher « Clôturé malgré du matériel
+  manquant » plutôt que « en retard », sans changer la fraction.
 - **Types de dossier** : `arrivee`, `mise_a_jour` (ancien type, retiré du sélecteur de création depuis 3.65.0 — voir
   **ajustement** ci-dessous), `changement_service`, `sortie` (dont la **régularisation** : restitution d'une personne
   sans attribution enregistrée).
@@ -113,8 +125,10 @@ Pages de liste : `index.html` (attributions en cours), `assignments-completed.ht
   PDF ni export**, même avec `forms.export`. Serveur : `can_export_unmasked()` (`routes/forms.py`). Navigateur :
   `canExportUnmasked(user)` (`storage.js`). Garder les deux alignés.
 - **Permissions** : `forms.create`, `forms.edit`, `forms.delete`, `forms.export`, `forms.restitution`,
-  `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
-  (`permissions.py`).
+  `forms.restitution_force`, `forms.adjust`, `forms.read_list`, `forms.read_detail`, `forms.view_all`, `parc.manage`, `unc.view_all`, `users.manage`, `db.manage`
+  (`permissions.py`). `forms.restitution_force` (3.74.1) : clôturer une restitution malgré un objet « Non restitué »
+  (`PATCH /api/forms/<id>/restitution` avec `closeAnyway`) — droit sensible, réservé à `admin` par défaut
+  (`PERMISSION_BACKFILLS`), pas à `administration` ni aux autres groupes qui ont déjà `forms.restitution`.
 - **Sessions** (3.67.3) : le cookie porte `user`, `pwd_fp` (HMAC du hash du mot de passe), `login_at`, `last_seen`. Un `before_request` (`app.py` → `auth.enforce_session_validity`) le rapproche de la base à chaque requête : mot de passe changé, compte désactivé/en attente/supprimé, durée absolue (12 h) ou inactivité (60 min) dépassées → session vidée, 401, `session_revoked` au journal. Toute connexion passe par `start_session` (vide l'ancienne session) ; tout changement de **son propre** mot de passe appelle `realign_session_password`. Ne jamais écrire `session["user"] = ...` à la main dans le code applicatif. Réglages : `APP_SESSION_MAX_HOURS`, `APP_SESSION_IDLE_MINUTES`. Côté navigateur (`ui.js`, `initSessionWatch`, pages avec `#userMenu` seulement) : un 401 de l'API renvoie vers `/login?error=session` ; la session est contrôlée au retour sur l'onglet et chaque minute avec l'en-tête `X-Session-Check`, qui ne compte pas comme une activité. Les textes de la page de connexion viennent de `config.js` (priment sur le défaut de `login.js`).
 - **Mot de passe d'origine** (3.67.3) : `users.must_change_password`, posé sur `admin` par le seed et par `flag_default_credentials()` (`database.py`, appelée à chaque `ensure_users_schema`, donc au démarrage et après une restauration) tant que son mot de passe est `admin`. Tant qu'il est levé, `auth.enforce_password_change` (before_request) ne laisse passer que `/api/session`, `/api/csrf-token`, `/api/me/password`, les réglages publics, l'accueil et les fichiers statiques ; `ui.js` ouvre alors la fenêtre non fermable (`openPasswordChangeModal({forced:true})`). Dans les tests, `conftest.py` démarque `admin` (`release_default_admin`) ; le harnais navigateur lui donne un autre mot de passe (un simple drapeau serait reposé par la prochaine importation de l'application).
 - **Cookies** : `publier_session` (HttpOnly, SameSite=Lax, Secure auto, expire à `APP_SESSION_MAX_HOURS`) ; sa durée est AFFICHÉE dans la fenêtre « Préférences cookies » (`branding.js`, `describeSessionCookieLifetime`, lue dans `/api/settings/public` → `session`). **Toute modification de durée, de nom ou d'attribut d'un cookie se reporte dans cette fenêtre et dans le CHANGELOG** (elle avait annoncé « session navigateur » alors que le cookie durait 12 h). **Aucune ressource externe** : Bootstrap, Chart.js, CookieConsent et le générateur de QR sont embarqués (`frontend/js/vendor/README.md` : versions et mise à jour) ; ne jamais ajouter un `<script src="https://…">` ou un CDN dans la politique de sécurité (`tests/test_no_external_assets.py` échoue). CookieConsent ne se construit pas pour un robot (`hideFromBots`) : un test Selenium masque `navigator.webdriver`.

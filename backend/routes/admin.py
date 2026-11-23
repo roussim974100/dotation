@@ -591,7 +591,7 @@ def admin_groups():
 # Tenu a jour avec PERMISSION_INFO dans frontend/js/admin.js (memes cles).
 TOGGLEABLE_PERMISSIONS = {
     "forms.read_list", "forms.read_detail", "forms.create", "forms.edit", "forms.restitution",
-    "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "unc.view_all",
+    "forms.restitution_force", "forms.adjust", "forms.export", "forms.delete", "forms.view_all", "unc.view_all",
     "parc.manage", "users.manage", "db.manage",
 }
 
@@ -1897,6 +1897,56 @@ def field_health_repair():
     return jsonify(report)
 
 
+@bp.route("/api/admin/person-duplicates", methods=["GET"])
+@login_required
+@permission_required("db.manage")
+def person_duplicates_scan():
+    """Fiches "personne" partageant la meme identite (nom+prenom+service) - lecture seule."""
+    from models.person_duplicates import scan_person_duplicates
+    with get_db() as conn:
+        return jsonify({"groups": scan_person_duplicates(conn)})
+
+
+@bp.route("/api/admin/person-duplicates/merge", methods=["POST"])
+@login_required
+@permission_required("db.manage")
+@rate_limit(max_requests=10, window_seconds=600, scope="person_duplicates_merge")
+def person_duplicates_merge():
+    """Fusionne deux fiches "personne" EXPLICITEMENT choisies par l'administrateur (jamais automatique - voir
+    models/person_duplicates.py). Aucun dossier n'est supprime, seul leur rattachement est repointe. Copie de
+    securite de la base avant, comme pour le rattachement des champs orphelins."""
+    from models.person_duplicates import merge_persons
+    body = request.get_json(silent=True) or {}
+    keep_id = (body.get("keepId") or "").strip()
+    drop_id = (body.get("dropId") or "").strip()
+    if not keep_id or not drop_id:
+        return jsonify({"error": "missing_ids"}), 400
+    os.makedirs(_BACKUP_DIR, exist_ok=True)
+    from datetime import datetime as _dt, timezone as _tz
+    backup_path = os.path.join(_BACKUP_DIR, f"dotation_avant_fusion_personnes_{_dt.now(_tz.utc).strftime('%Y%m%d_%H%M%S')}.db")
+    if os.path.exists(DB_PATH):
+        source = sqlite3.connect(DB_PATH)
+        target = sqlite3.connect(backup_path)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
+    try:
+        with get_db() as conn:
+            report = merge_persons(conn, keep_id, drop_id)
+            insert_app_log(conn, "admin", "person_duplicates_merged", "Fusion de deux fiches personne",
+                            details={"keepId": keep_id, "dropId": drop_id, **report})
+    except ValueError as exc:
+        msgs = {
+            "same_person": "Les deux fiches sont identiques.",
+            "person_not_found": "Fiche personne introuvable.",
+            "identity_mismatch": "Ces deux fiches n'ont pas la même identité : fusion refusée.",
+        }
+        return jsonify({"error": str(exc), "message": msgs.get(str(exc), str(exc))}), 400
+    return jsonify(report)
+
+
 @bp.route("/api/admin/db/import", methods=["POST"])
 @login_required
 @permission_required("db.manage")
@@ -1930,7 +1980,7 @@ def db_import():
             finally:
                 saved.close()
                 live.close()
-        import backup as _backup
+        import backup as _backup  # charge a la demande (restauration rare) : evite les dependances crypto au demarrage, pas un cycle
         _backup.restore_sqlite(tmp_path, DB_PATH)
         os.unlink(tmp_path)
         from migrations import upgrade_after_restore

@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape as xml_escape
@@ -13,7 +14,8 @@ from utils import (
     dossier_type_label, slugify_filename, AppError,
 )
 from database import get_db, normalize_reference_row
-from auth import login_required, has_permission, get_request_client_ip, rate_limit, current_user
+from auth import login_required, permission_required, has_permission, get_request_client_ip, rate_limit, current_user
+from environment import raw_version
 from models.adjustment import apply_adjustment, complete_adjustment_signature, public_event
 def can_export_unmasked():
     """Export/PDF : droit forms.export ET portee de donnees complete. Les exports ne sont pas masques,
@@ -43,6 +45,13 @@ def csv_cell(value):
     return text
 
 bp = Blueprint("forms", __name__)
+
+# Identifiant unique de CE processus serveur (genere une fois, au chargement du module) : entre dans l'ETag de
+# GET /api/forms pour que tout redemarrage invalide le cache de liste, meme sans bump de version. S'appuyer sur
+# la seule version (raw_version()) ne suffit pas en iteration rapide : plusieurs correctifs du code de calcul
+# peuvent se succeder sous le MEME numero de version avant qu'on pense a l'incrementer, et un navigateur garde
+# alors servie une reponse perimee en 304 (constat du 22/11, apres les correctifs Progression/Pilotage 3.74.3).
+_PROCESS_BOOT_ID = uuid.uuid4().hex
 
 
 def download_response(file_bytes, filename, content_type):
@@ -185,10 +194,9 @@ def build_excel_workbook(rows, item_rows):
 
 @bp.route("/api/forms/field-suggestions", methods=["GET"])
 @login_required
+@permission_required("forms.read_list")
 def field_suggestions():
     """Retourne les valeurs mémorisées pour un champ donné (table field_suggestions)."""
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
     field_key = (request.args.get("field") or "").strip()
     if not field_key or len(field_key) > 64:
         return jsonify([])
@@ -201,14 +209,13 @@ def field_suggestions():
 
 @bp.route("/api/forms/unc-paths", methods=["GET"])
 @login_required
+@permission_required("forms.read_list")
 def list_unc_paths():
     """Retourne les chemins UNC mémorisés selon les droits :
     - admin ou unc.view_all → tous les chemins
     - utilisateur avec service → chemins de son service uniquement
     - sinon → liste vide (pas d'accès aux suggestions UNC)
     """
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
     user = current_user()
     can_view_all = has_permission("unc.view_all")
     user_service = (user or {}).get("service") or ""
@@ -229,9 +236,8 @@ def list_unc_paths():
 
 @bp.route("/api/forms", methods=["GET"])
 @login_required
+@permission_required("forms.read_list")
 def list_forms():
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
     status = request.args.get("status")
     search = request.args.get("search")
 
@@ -268,9 +274,11 @@ def list_forms():
             params,
         ).fetchone()
         warning_days = int(get_app_settings(connection).get("timing_warning_days") or DEFAULT_APP_SETTINGS["timing_warning_days"])
-        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage et de la date du jour
-        # (statuts En retard / En danger) : sans eux, un 304 servirait des donnees perimees.
-        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}"
+        # Le resume depend aussi de l'utilisateur (filtre service), du seuil de pilotage, de la date du jour
+        # (statuts En retard / En danger) et de la version de l'application : sans eux, un 304 servirait des
+        # donnees perimees - notamment juste apres une mise a jour qui change le CALCUL du resume (ex. 3.74.3,
+        # Progression/Pilotage) sans toucher updated_at des dossiers deja en base.
+        etag_source = f"{fingerprint[0]}:{fingerprint[1]}:{(user or {}).get('username', '')}:{can_view_all}:{warning_days}:{datetime.now().date().isoformat()}:{raw_version()}:{_PROCESS_BOOT_ID}"
         etag = hashlib.md5(etag_source.encode()).hexdigest()
 
         # La compression gzip transforme l'ETag en validateur faible (W/...) : on compare la valeur nue.
@@ -504,9 +512,8 @@ def export_restitution_forms_pdf_batch():
 
 @bp.route("/api/forms/<form_id>/retrait-items", methods=["GET"])
 @login_required
+@permission_required("forms.read_list")
 def get_retrait_items(form_id):
-    if not has_permission("forms.read_list"):
-        return jsonify({"error": "forbidden"}), 403
     with get_db() as conn:
         items = conn.execute(
             """
@@ -571,9 +578,8 @@ def get_adjustment_pdf(form_id, event_id):
 
 @bp.route("/api/forms/<form_id>", methods=["GET"])
 @login_required
+@permission_required("forms.read_detail")
 def get_form_route(form_id):
-    if not has_permission("forms.read_detail"):
-        return jsonify({"error": "forbidden"}), 403
     form_data = get_form(form_id)
     if not form_data:
         return jsonify({"error": "not_found"}), 404
@@ -582,11 +588,10 @@ def get_form_route(form_id):
 
 @bp.route("/api/forms/quick-draft", methods=["POST"])
 @login_required
+@permission_required("forms.create")
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def quick_draft():
     """Crée un dossier brouillon minimal (nom + prénom requis)."""
-    if not has_permission("forms.create"):
-        return jsonify({"error": "forbidden"}), 403
     data = request.get_json(silent=True) or {}
     nom = (data.get("nom") or "").strip()
     prenom = (data.get("prenom") or "").strip()
@@ -609,13 +614,13 @@ def quick_draft():
 
 @bp.route("/api/forms/regularisation", methods=["POST"])
 @login_required
+@permission_required("forms.create")
+@permission_required("forms.restitution")
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def create_regularisation_restitution():
     """Crée un dossier de restitution pour une personne qui n'a jamais eu d'attribution
     saisie (départ avant enregistrement). Le dossier naît directement en restitution
     en cours, avec les ressources à récupérer sélectionnées dans le catalogue."""
-    if not (has_permission("forms.create") and has_permission("forms.restitution")):
-        return jsonify({"error": "forbidden"}), 403
     data = request.get_json(silent=True) or {}
     nom = (data.get("nom") or "").strip()
     prenom = (data.get("prenom") or "").strip()
@@ -672,10 +677,9 @@ def create_regularisation_restitution():
 
 @bp.route("/api/forms", methods=["POST"])
 @login_required
+@permission_required("forms.create")
 @rate_limit(max_requests=30, window_seconds=60, scope="forms_create")
 def create_form():
-    if not has_permission("forms.create"):
-        return jsonify({"error": "forbidden"}), 403
     payload = request.get_json(silent=True) or {}
     try:
         form_data = persist_form(payload)
@@ -687,9 +691,8 @@ def create_form():
 
 @bp.route("/api/forms/<form_id>", methods=["PUT"])
 @login_required
+@permission_required("forms.edit")
 def update_form(form_id):
-    if not has_permission("forms.edit"):
-        return jsonify({"error": "forbidden"}), 403
     viewer = current_user()
     if viewer and viewer.get("data_scope") == "masked":
         # Un profil dont les donnees sont masquees a la lecture ne peut pas enregistrer : il renverrait les valeurs masquees
@@ -716,10 +719,8 @@ def update_form(form_id):
 
 @bp.route("/api/forms/<form_id>/reopen", methods=["POST"])
 @login_required
+@permission_required("forms.edit")
 def reopen_form(form_id):
-    if not has_permission("forms.edit"):
-        return jsonify({"error": "forbidden"}), 403
-
     with get_db() as connection:
         row = connection.execute(
             "SELECT id, dossier_id, status, title, payload_json FROM dotation_forms WHERE id = ?",
@@ -765,14 +766,17 @@ def reopen_form(form_id):
 
 @bp.route("/api/forms/<form_id>/restitution", methods=["PATCH"])
 @login_required
+@permission_required("forms.restitution")
 def update_restitution(form_id):
-    if not has_permission("forms.restitution"):
-        return jsonify({"error": "forbidden"}), 403
     existing = get_form(form_id)
     if not existing:
         return jsonify({"error": "not_found"}), 404
 
     patch = request.get_json(silent=True) or {}
+    # Droit dedie et plus restrictif que forms.restitution : passer outre un objet "Non restitue" peut masquer
+    # du materiel jamais revenu, pas juste enregistrer une restitution normale.
+    if patch.get("closeAnyway") and not has_permission("forms.restitution_force"):
+        return jsonify({"error": "forbidden"}), 403
     payload = existing["data"]
     payload.setdefault("workflow", {})
     payload.setdefault("restitution", {})
@@ -794,12 +798,18 @@ def update_restitution(form_id):
     payload["restitution"]["signedAt"] = patch.get("signedAt", payload["restitution"].get("signedAt"))
     payload["restitution"]["signataireDecision"] = patch.get("signataireDecision", payload["restitution"].get("signataireDecision"))
     payload["restitution"]["signataireComment"] = patch.get("signataireComment", payload["restitution"].get("signataireComment"))
+    close_anyway = bool(patch.get("closeAnyway"))
     computed_status = derive_restitution_workflow_status(
         payload["restitution"].get("items", {}),
         payload["restitution"].get("signatureStatus") or "",
         payload["restitution"].get("signatureDataUrl") or "",
+        force_closed=close_anyway,
     )
     payload["restitution"]["pendingFinalization"] = bool(patch.get("keepPending"))
+    # Trace la decision de cloturer malgre un objet « Non restitue » (ex. materiel mutualise qui ne repasse jamais
+    # individuellement par le stock) : l'objet garde son etat reel, seul le statut agrege du dossier passe outre,
+    # et compute_effective_workflow_status doit continuer a en tenir compte aux enregistrements suivants.
+    payload["restitution"]["closedDespiteMissingItems"] = close_anyway
     payload["workflow"]["status"] = "partial_return" if patch.get("keepPending") else computed_status
 
     form_data = persist_form(payload, allow_locked_update=True)
@@ -814,6 +824,7 @@ def update_restitution(form_id):
             {
                 "status": payload.get("workflow", {}).get("status"),
                 "returned_at": payload.get("restitution", {}).get("returnedAt"),
+                "closed_despite_missing_items": close_anyway,
             },
             target_label=form_data.get("summary", {}).get("title"),
         )
@@ -892,9 +903,8 @@ def sign_adjustment(form_id, event_id):
 
 @bp.route("/api/forms/<form_id>/restitution-phase1-validate", methods=["POST"])
 @login_required
+@permission_required("forms.restitution")
 def validate_restitution_phase1(form_id):
-    if not has_permission("forms.restitution"):
-        return jsonify({"error": "forbidden"}), 403
     existing = get_form(form_id)
     if not existing:
         return jsonify({"error": "not_found"}), 404
@@ -923,9 +933,8 @@ def validate_restitution_phase1(form_id):
 
 @bp.route("/api/forms/<form_id>/restitution-phase1-unlock", methods=["POST"])
 @login_required
+@permission_required("forms.restitution")
 def unlock_restitution_phase1(form_id):
-    if not has_permission("forms.restitution"):
-        return jsonify({"error": "forbidden"}), 403
     existing = get_form(form_id)
     if not existing:
         return jsonify({"error": "not_found"}), 404
@@ -972,16 +981,16 @@ def unlock_restitution_phase1(form_id):
 
 @bp.route("/api/forms/<form_id>", methods=["DELETE"])
 @login_required
+@permission_required("forms.delete")
 def delete_form(form_id):
-    if not has_permission("forms.delete"):
-        return jsonify({"error": "forbidden"}), 403
     with get_db() as connection:
         row = connection.execute(
             "SELECT title, dossier_id, payload_json FROM dotation_forms WHERE id = ?",
             (form_id,),
         ).fetchone()
+        trash_id = None
         if row:
-            insert_deleted_item(
+            trash_id = insert_deleted_item(
                 connection,
                 "form",
                 form_id,
@@ -1016,4 +1025,36 @@ def delete_form(form_id):
 
     if not deleted:
         return jsonify({"error": "not_found"}), 404
-    return jsonify({"deleted": True})
+    return jsonify({"deleted": True, "trash_id": trash_id})
+
+
+@bp.route("/api/forms/trash/<trash_id>/restore", methods=["POST"])
+@login_required
+@permission_required("forms.delete")
+def restore_deleted_form(trash_id):
+    """Annulation immediate d'une suppression de dossier (toast « Annuler »), ouverte a qui peut supprimer
+    un dossier (pas reservee aux administrateurs, contrairement a la corbeille d'Admin > Base de donnees)."""
+    with get_db() as connection:
+        row = connection.execute(
+            "SELECT * FROM deleted_items WHERE id = ? AND item_type = 'form'",
+            (trash_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+        payload = json.loads(row["payload_json"] or "{}")
+        try:
+            form_data = persist_form(payload, allow_locked_update=True)
+        except AppError as error:
+            return jsonify({"error": error.code}), error.status
+        connection.execute("DELETE FROM deleted_items WHERE id = ?", (trash_id,))
+        insert_app_log(
+            connection,
+            "dossier",
+            "form_restored",
+            "Suppression de dossier annulee",
+            "form",
+            row["item_key"],
+            {"title": row["item_label"]},
+            target_label=row["item_label"],
+        )
+    return jsonify({"summary": _summary_without_data(form_data)})

@@ -414,3 +414,34 @@ def test_le_compteur_de_session_compte_toutes_les_taches(monkeypatch, tmp_path):
     fake_check_file(monkeypatch, tmp_path, "99.0.0")
     admin = client_for()
     assert admin.get("/api/session").get_json()["notifications_count"] == len(my_tasks(admin)["tasks"]) >= 2
+
+
+# ---- 22/11/2026 : champs orphelins rattachés aux notifications (un controle self-service sans rappel reste lettre morte) ----
+
+def fake_orphan_scan(monkeypatch, orphans, repairable=0):
+    from models import field_health
+    monkeypatch.setattr(field_health, "scan_orphan_fields", lambda connection: {"orphans": orphans, "repairable": repairable, "unmatched": len(orphans) - repairable})
+    notif.clear_cache()
+
+
+def test_des_champs_orphelins_deviennent_une_tache_pour_les_administrateurs(monkeypatch, compte):
+    fake_orphan_scan(monkeypatch, [{"field": "x"}, {"field": "y"}], repairable=1)
+    task = task_of(client_for(), notif.KIND_ORPHAN_FIELDS)
+    assert task == {"kind": notif.KIND_ORPHAN_FIELDS, "count": 2, "repairable": 1, "link": "/admin-db.html"}
+    assert task_of(client_for(compte), notif.KIND_ORPHAN_FIELDS) is None  # reserve a users.manage
+
+
+def test_aucun_champ_orphelin_n_est_pas_une_tache():
+    notif.clear_cache()
+    assert task_of(client_for(), notif.KIND_ORPHAN_FIELDS) is None
+
+
+def test_le_scan_des_champs_orphelins_est_mis_en_cache(monkeypatch):
+    from models import field_health
+    calls = []
+    monkeypatch.setattr(field_health, "scan_orphan_fields", lambda connection: calls.append(1) or {"orphans": [{"field": "x"}], "repairable": 0})
+    notif.clear_cache()
+    admin = client_for()
+    for _ in range(3):
+        my_tasks(admin)
+    assert len(calls) == 1

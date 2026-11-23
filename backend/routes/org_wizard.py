@@ -68,7 +68,7 @@ def org_wizard_apply():
 @permission_required("users.manage")
 def startup_checklist():
     """Ce qu'il reste a faire pour bien demarrer : chaque point est calcule sur l'etat reel (pas sur des cases cochees a la main)."""
-    import backup_schedule
+    import backup_schedule  # charge a la demande (checklist de demarrage, peu appelee) : pas un cycle
     import backup_targets
     with get_db() as connection:
         settings = get_app_settings(connection)
