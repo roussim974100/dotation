@@ -6,7 +6,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## 🔁 Reprise — où on en est (22 novembre 2026)
 
-**État des branches (22/11/2026)** : `dev` = **3.76.0** (série 3.74.x du soir + remédiation P0→P2 de l'audit de pérennité en session autonome + fusion manuelle des doublons de personnes — voir CHANGELOG et `scripts/Rapport_Session_Autonome_2026-11-22.pdf`) ; `preprod` = **3.73.2** (PR n°36 à n°44 fusionnées par le propriétaire le 15/10, **PR dev→preprod ouverte le 22/11 pour la 3.76.0, à fusionner**) ; `prod` = `main` = **3.67.1** (`main` a été alignée sur `dev` jusqu'à la 3.73.1 le 15/10, en avance sur `prod` — à surveiller à la prochaine mise en prod). La production n'a **rien** de la série sessions + notifications + 3.72.x + 3.73.x + 3.74.x. **PR `dev` → `preprod` à ouvrir**. Reste au propriétaire : tester la préprod (checklist ci-dessous, complétée par la 3.74.x : suppression d'un dossier puis « Annuler » dans le toast ; tenter de saisir deux fois le même numéro de série sur deux dossiers actifs ; sur une restitution avec un objet « Non restitué », tenter « Clôturer quand même » depuis `restitution.html` et depuis le menu « ⋯ » → « Pourquoi ce dossier est bloqué ? » ; marquer un objet « Mutualisé » et vérifier que les colonnes Progression/Pilotage du tableau de bord affichent le bon décompte et un libellé clair une fois en restitution), puis PR `preprod` → `prod` et déploiement **en suivant `docs/DEPLOIEMENT_PROD_3.73.md`** (avant / pendant / après / retour arrière — aucune migration depuis, le document reste valable). **Au déploiement : réinstaller les dépendances** (`tzdata`, fait par `deploy.sh`, il faut un accès au dépôt Python).
+**État des branches (23/11/2026)** : `dev` = `preprod` = `prod` = **3.76.0**. PR #46 (`dev`→`preprod`) et PR #47 (`preprod`→`prod`) fusionnées par le propriétaire le 22/11, **déployé en production et e-mail d'annonce envoyé le 23/11** (série sessions + notifications + 3.72.x à 3.76.0, dont la remédiation P0→P2 de l'audit de pérennité — voir CHANGELOG et `scripts/Rapport_Session_Autonome_2026-11-22.pdf`). Les trois branches sont alignées : plus de retard à rattraper pour l'instant.
 
 **`main` (branche par défaut de GitHub, affiche le README)** : elle ne sert à rien au déploiement (la production se déploie depuis `prod`) ; elle sert à afficher le bon README. Une PR `preprod` → `main` peut exister : **ne la fusionner qu'après la mise en production**, sinon GitHub affiche « 3.71.0 » alors que la production est en 3.67.1. Ordre voulu : `dev` → `preprod` → test → `prod` → déploiement → alignement de `main`. L'historique des trois branches est relié par des commits « ours » (voir `docs/REPRISE_MAJ.md`).
 
@@ -30,7 +30,7 @@ Ce document est la vue d'ensemble ; le détail de chaque chantier vit dans le CH
 
 ## Version courante
 
-`dev` à **3.76.0**, `preprod` à 3.73.2 (PR ouverte, à fusionner), `prod` à 3.67.1 (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
+`dev` = `preprod` = `prod` à **3.76.0** (voir CHANGELOG). `forms.adjust` se rattrape désormais automatiquement au démarrage sur les installations existantes (3.66.1) — ne demande plus d'action manuelle.
 
 ## ✅ P0 — Sécurité des sessions (trouvé le 06/10, terminé le 06/10 en 3.67.3)
 
