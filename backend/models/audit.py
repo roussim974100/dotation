@@ -7,13 +7,14 @@ from auth import get_request_client_ip, extract_first_forwarded_ip
 
 
 def insert_deleted_item(connection, item_type, item_key, item_label, payload):
+    trash_id = generate_id("trash")
     connection.execute(
         """
         INSERT INTO deleted_items (id, item_type, item_key, item_label, payload_json, deleted_by, deleted_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            generate_id("trash"),
+            trash_id,
             item_type,
             item_key,
             item_label,
@@ -22,6 +23,7 @@ def insert_deleted_item(connection, item_type, item_key, item_label, payload):
             utc_now(),
         ),
     )
+    return trash_id
 
 CLIENT_CONTEXT_COOKIE_NAME = "dotation_client_context_v1"
 

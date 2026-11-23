@@ -102,3 +102,35 @@ def hit(scope, key, max_requests, window_seconds, now=None, path=None):
         "Compteur de limitation de debit indisponible apres %d tentatives (%s) : repli sur un compteur par processus", _LOCK_RETRIES + 1, last_error
     )
     return _hit_memory(scope, key, max_requests, window_seconds, now)
+
+
+def count(scope, key, window_seconds, now=None, path=None):
+    """Nombre d'entrees comptees dans la fenetre, SANS rien enregistrer (pour decider avant de compter). 0 si la base est indisponible :
+    un compteur en panne ne doit jamais bloquer une connexion."""
+    now = time.time() if now is None else now
+    try:
+        connection = _connect(path)
+        try:
+            _ensure_schema(connection, path or DB_USERS_PATH)
+            return connection.execute(
+                "SELECT COUNT(*) FROM rate_limit_hits WHERE scope = ? AND key = ? AND ts >= ?", (scope, key, now - window_seconds)).fetchone()[0]
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        with _lock:
+            return len([t for t in _memory.get((scope, key), []) if now - t < window_seconds])
+
+
+def clear(scope, key, path=None):
+    """Remet un compteur a zero (ex. connexion reussie : les echecs precedents ne comptent plus)."""
+    try:
+        connection = _connect(path)
+        try:
+            _ensure_schema(connection, path or DB_USERS_PATH)
+            connection.execute("DELETE FROM rate_limit_hits WHERE scope = ? AND key = ?", (scope, key))
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        pass
+    with _lock:
+        _memory.pop((scope, key), None)

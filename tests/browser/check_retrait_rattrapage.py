@@ -53,7 +53,7 @@ with Instance() as inst:
     driver.get(inst.url("/index.html"))
     time.sleep(2)
     api(driver, "POST", "/api/admin/resources", {
-        "code": "poste_rattrapage", "label": "Poste rattrapage", "description": "", "category": "materiel", "issuer_service": "DSI",
+        "code": "poste_rattrapage", "label": "Poste rattrapage", "description": "", "category": "materiel", "issuer_service": "Informatique",
         "requires_return": True, "has_assignment_date": False, "has_assignment_condition": False, "has_assignment_notes": False,
         "display_order": 990, "is_active": True, "tracking_mode": "unit",
         "field_schema": [{"key": "numero_de_serie", "label": "N° de série", "type": "text", "required": True, "identifier": True}]})

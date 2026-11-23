@@ -6,11 +6,19 @@ import os
 import re
 import sys
 
+if not os.environ.get("APP_DATA_DIR"):
+    # Ces scenarios creent, modifient, importent et reparent des donnees : lances sans base isolee, ils s'executent
+    # sur backend/dotation.db (copie de la production). Passer par pytest (tests/test_http_endpoints.py) ou poser APP_DATA_DIR.
+    sys.exit("Refus : APP_DATA_DIR n'est pas defini, ces scenarios modifieraient la vraie base. Lancer via pytest.")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 import app as app_module  # noqa: E402  (cree des bases vierges dans APP_DATA_DIR)
 
 app = app_module.app
+import _stamped_client  # noqa: E402  (sessions posees a la main = sessions valides)
+_stamped_client.install(app)
+_stamped_client.release_default_admin()
 results = {}
 
 # Endpoints volontairement publics (pas d'authentification attendue).
@@ -204,7 +212,7 @@ admin.put("/api/admin/settings", json={"timing_warning_days": 3}, headers=H)
 
 # Anciens dossiers : valeurs saisies sous d'anciens noms (nomPoste, numeroSerie, adresse), catalogue aux noms actuels (nom_du_poste...).
 admin.post("/api/admin/resources", json={
-    "code": "poste_ancien", "label": "Poste ancien", "description": "", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+    "code": "poste_ancien", "label": "Poste ancien", "description": "", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
     "has_assignment_date": True, "has_assignment_condition": True, "has_assignment_notes": True, "display_order": 900, "is_active": True, "tracking_mode": "unit",
     "field_schema": [{"key": "nom_du_poste", "label": "Nom du poste", "type": "text", "required": False},
                      {"key": "marque", "label": "Marque", "type": "text", "required": True},
@@ -239,7 +247,7 @@ _types = [{"key": "N° de série", "label": "N° de série", "type": "text", "re
           {"key": "notes", "label": "Notes", "type": "textarea"},
           {"key": "libellé étrange !", "label": "Libellé étrange !", "type": "text"}]
 _r = admin.post("/api/admin/resources", json={
-    "code": "custom_e2e", "label": "Ressource E2E", "description": "", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+    "code": "custom_e2e", "label": "Ressource E2E", "description": "", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
     "has_assignment_date": True, "has_assignment_condition": True, "has_assignment_notes": True, "display_order": 901, "is_active": True,
     "tracking_mode": "unit", "field_schema": _types}, headers=H)
 results["e2e_create_status"] = _r.status_code
@@ -362,7 +370,7 @@ with _gudb() as _uc:
     _uc.execute("INSERT OR REPLACE INTO groups (key, label, description, permissions_json, data_scope, created_at, updated_at) VALUES ('lecteur_masque','Lecteur masque','',?,'masked','2026-01-01','2026-01-01')",
                 (json.dumps(["forms.read_list", "forms.read_detail", "forms.view_all", "forms.edit"]),))
 _real_get_user_record = _auth.get_user_record
-_auth.get_user_record = lambda username: ({"username": "masque", "groups": ["lecteur_masque"], "active": True, "role": "user"} if username == "masque" else _real_get_user_record(username))
+_auth.get_user_record = lambda username: ({"username": "masque", "groups": ["lecteur_masque"], "active": True, "role": "user", "password_hash": "x", "status": "active"} if username == "masque" else _real_get_user_record(username))
 masked = app.test_client()
 with masked.session_transaction() as _s:
     _s["user"] = "masque"
@@ -450,6 +458,7 @@ _SENTINELS = ["NOMSENTINELLE", "PRENOMSENTINELLE", "SERIESENTINELLE123", "sentin
               "CHAMPSENTINELLE", "OPTIONSENTINELLE", "DESCSENTINELLE", "PARTAGESENTINELLE", "COMMENTAIRESENTINELLE", "SERVICESENTINELLE"]
 admin.put("/api/admin/settings", json={"org_name": "ORGSENTINELLE", "support_email": "sentinelle@exemple.fr", "dpo_email": "dpo-sentinelle@exemple.fr",
                                         "support_name": "NOMSENTINELLE Support"}, headers=H)
+admin.post("/api/admin/services", json={"label": "SERVICESENTINELLE", "is_active": True}, headers=H)  # le service d'une ressource doit exister au catalogue (3.68)
 admin.post("/api/admin/resources", json={"code": "diag_sentinelle", "label": "LIBELLESENTINELLE", "description": "DESCSENTINELLE", "category": "materiel",
                                          "issuer_service": "SERVICESENTINELLE", "requires_return": True, "tracking_mode": "unit", "display_order": 970, "is_active": True,
                                          "field_schema": [{"key": "num", "label": "CHAMPSENTINELLE", "type": "select", "options": ["OPTIONSENTINELLE", "autre"],
@@ -486,7 +495,7 @@ results["diag_guard_misses"] = _unsafe
 results["diag_forbidden_for_anonymous"] = anonymous.get("/api/admin/diagnostic").status_code
 
 # ---- Stock par quantite avec des noms de champs LIBRES : les roles explicites font foi (plus de noms de cle en dur) ----
-admin.post("/api/admin/resources", json={"code": "stock_libre", "label": "Stock libre", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+admin.post("/api/admin/resources", json={"code": "stock_libre", "label": "Stock libre", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
                                           "tracking_mode": "quantity", "display_order": 980, "is_active": True,
                                           "field_schema": [{"key": "qte_en_stock", "label": "Combien", "type": "number", "role": "quantity"},
                                                            {"key": "taille_pointure", "label": "Pointure", "type": "text", "role": "variant"}]}, headers=H)
@@ -499,7 +508,7 @@ admin.post("/api/forms", json={"dossier": {"type": "arrivee"}, "beneficiaire": {
 _lvl = next((x for x in (admin.get("/api/stock").get_json() or {}).get("resources", []) if x["resource_code"] == "stock_libre"), {})
 results["stock_libre_levels"] = [_lvl.get("has_quantity_field"), _lvl.get("has_variant"), [(v["variant"], v["reserved"]) for v in _lvl.get("variants", [])]]
 # sans role explicite ni nom habituel : reste a 1 par remise, et le catalogue l'explique
-admin.post("/api/admin/resources", json={"code": "stock_sans_role", "label": "Stock sans role", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+admin.post("/api/admin/resources", json={"code": "stock_sans_role", "label": "Stock sans role", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
                                           "tracking_mode": "quantity", "display_order": 981, "is_active": True,
                                           "field_schema": [{"key": "nombre_de_pieces", "label": "Nombre de pieces", "type": "number"}]}, headers=H)
 _q = admin.get("/api/admin/catalog/quality").get_json() or {}
@@ -507,7 +516,7 @@ results["stock_sans_role_issue"] = any(r.get("code") == "stock_sans_role" for r 
 
 # ---- Suppression d'une ressource : refusee si des dossiers la portent, permise sinon ----
 results["delete_used_resource"] = [admin.delete(f"/api/admin/resources/{_rid}", headers=H).status_code]
-admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)
+admin.post("/api/admin/resources", json={"code": "jamais_utilisee", "label": "Jamais utilisee", "category": "immateriel", "issuer_service": "Informatique", "requires_return": False, "display_order": 990, "is_active": True, "field_schema": []}, headers=H)
 _unused = next((r["id"] for r in (admin.get("/api/admin/resources").get_json() or []) if r.get("code") == "jamais_utilisee"), None)
 results["delete_unused_resource"] = admin.delete(f"/api/admin/resources/{_unused}", headers=H).status_code if _unused else None
 
@@ -531,7 +540,7 @@ results["lock_without_base_still_saves"] = admin.put(f"/api/forms/{_lid}", json=
 
 # ---- 3.60.1 : un retrait via un dossier « mise a jour » resynchronise le parc du dossier SOURCE (bug corrige) ----
 admin.post("/api/admin/resources", json={
-    "code": "poste_retrait360", "label": "Poste retrait 360", "description": "", "category": "materiel", "issuer_service": "DSI",
+    "code": "poste_retrait360", "label": "Poste retrait 360", "description": "", "category": "materiel", "issuer_service": "Informatique",
     "requires_return": True, "has_assignment_date": False, "has_assignment_condition": False, "has_assignment_notes": False,
     "display_order": 990, "is_active": True, "tracking_mode": "unit",
     "field_schema": [{"key": "numero_de_serie", "label": "N° de série", "type": "text", "required": True, "identifier": True}],

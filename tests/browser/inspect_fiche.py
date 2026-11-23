@@ -1,5 +1,5 @@
 """Affiche le contenu reel d'une fiche d'objet du Parc (historique de vie) sur une copie de la base de developpement.
-    python tests/browser/check_fiche.py [numero_de_serie]"""
+    python tests/browser/inspect_fiche.py [numero_de_serie]"""
 import sys
 import time
 from pathlib import Path

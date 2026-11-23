@@ -19,7 +19,7 @@ window.APP_TEXT = {
     securityText: "Cet outil est réservé aux utilisateurs habilités pour la gestion des attributions de ressources.",
     supportText: "En cas de difficulté, rapprochez-vous de l'administration de l'application.",
     errorInvalid: "Identifiants invalides. Vérifiez votre saisie puis réessayez.",
-    errorSession: "La session n'a pas pu être conservée. Vérifiez les cookies du navigateur puis reconnectez-vous.",
+    errorSession: "Votre session n'est plus valide (inactivité, mot de passe modifié, compte désactivé ou déconnexion). Reconnectez-vous ; si cela se répète, vérifiez les cookies du navigateur.",
     errorPending: "Votre compte est en attente de validation par un administrateur.",
     errorDisabled: "Votre compte est désactivé. Rapprochez-vous d'un administrateur.",
     noticeSignupPending: "Votre demande d'inscription a été enregistrée. Un administrateur doit maintenant valider votre compte."

@@ -141,7 +141,14 @@ def summarize_dynamic_resource(resource):
 
 
 # Cles techniques de suivi a exclure du resume brut d'un item statique (non "fields").
-_ITEM_DETAIL_EXCLUDED_KEYS = {"selected", "conditionAttribution", "conditionNotes"}
+_ITEM_DETAIL_EXCLUDED_KEYS = {
+    "selected", "conditionAttribution", "conditionNotes", "assignedAt",
+    "id", "code", "label", "description", "category", "issuerService", "issuer_service",
+    "triggerKey", "trigger_key", "requiresReturn", "requires_return",
+    "hasAssignmentDate", "has_assignment_date", "hasAssignmentCondition", "has_assignment_condition",
+    "hasAssignmentNotes", "has_assignment_notes", "displayOrder", "display_order",
+    "fieldSchema", "field_schema", "fields", "details",
+}
 
 
 def summarize_resource_item_details(details):
@@ -151,12 +158,16 @@ def summarize_resource_item_details(details):
     # les valeurs d'un item statique (ordinateur, telephone...) en excluant les cles de suivi.
     if not isinstance(details, dict):
         return ""
-    if details.get("fields"):
+    if details.get("fields") or details.get("fieldSchema") or details.get("field_schema"):
+        # Ressource du catalogue (meme sans valeur saisie, ex. regularisation) : jamais de vidage brut.
         return summarize_dynamic_resource(details)
     return " - ".join(
         str(value).strip()
         for key, value in details.items()
-        if key not in _ITEM_DETAIL_EXCLUDED_KEYS and str(value or "").strip()
+        if key not in _ITEM_DETAIL_EXCLUDED_KEYS
+        and isinstance(value, (str, int, float))
+        and not isinstance(value, bool)
+        and str(value).strip()
     )
 
 
@@ -431,6 +442,91 @@ def summarize_assignment_progress(payload, warning_days=None):
     }
 
 
+# Etats d'un objet en restitution qui ne bloquent PAS la cloture du dossier (seul "non_restitue" bloque, voir
+# derive_restitution_workflow_status) : "mutualise" couvre un objet qui ne repasse jamais individuellement par
+# le stock (ex. PC de teletravail mutualise, transfere directement a la personne suivante). Memes valeurs que
+# `restitutionStateLabels` dans frontend/js/restitution.js - garder les deux synchronises.
+RESOLVED_RESTITUTION_STATES = {"conforme", "degrade", "perdu", "autre", "mutualise"}
+
+
+def summarize_restitution_progress(payload, warning_days=None):
+    """Avancement RÉEL de la restitution (combien d'objets ont un état réglé : rendu, perdu, mutualisé...),
+    par opposition à `summarize_assignment_progress` qui mesure la complétude de la SAISIE à l'attribution
+    (sans rapport avec la restitution). Utilisé pour les colonnes Progression/Pilotage une fois le dossier
+    entré en phase de restitution (voir row_to_summary)."""
+    if warning_days is None:
+        warning_days = int(DEFAULT_APP_SETTINGS["timing_warning_days"])
+    restitution = payload.get("restitution") or {}
+    immateriel_actions = restitution.get("immaterielActions") or {}
+
+    returnable_items = []
+    for item in extract_items(payload):
+        if not item.get("assigned"):
+            continue
+        if item.get("category") != "immateriel":
+            try:
+                details = json.loads(item.get("details_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                details = {}
+            # Absent (ancien format materiel/immateriel fixe) -> toujours un objet physique a restituer.
+            if isinstance(details, dict) and details.get("requiresReturn") is False:
+                continue
+        returnable_items.append(item)
+
+    total = len(returnable_items)
+    due_at = restitution.get("missionEndAt") or restitution.get("returnedAt") or ""
+
+    if total == 0:
+        return {
+            "startAt": due_at, "completed": 0, "total": 0, "ratio": 0,
+            "timingStatus": "neutral", "timingLabel": "Aucun objet à restituer",
+        }
+
+    def _is_resolved(item):
+        # Une ressource immaterielle (email, VPN, zone alarme...) n'est jamais "rendue" au sens physique : son
+        # traitement (desactivation d'acces) est suivi a part dans restitution.immaterielActions (actionDone),
+        # pas dans restitution.items (qui resterait indefiniment "pending" pour elle).
+        if item.get("category") == "immateriel":
+            return bool((immateriel_actions.get(item["item_key"]) or {}).get("actionDone"))
+        return item["return_condition"] in RESOLVED_RESTITUTION_STATES
+
+    completed = sum(1 for item in returnable_items if _is_resolved(item))
+    ratio = round(completed / total, 4)
+
+    if completed >= total:
+        return {
+            "startAt": due_at, "completed": completed, "total": total, "ratio": 1,
+            "timingStatus": "ok", "timingLabel": "Restitution terminée",
+        }
+
+    # Dossier clos malgre un objet non restitue (ex. materiel mutualise, voir PATCH .../restitution avec
+    # closeAnyway) : rien a relancer. La fraction reste honnete (3/4), mais "Pilotage" ne doit plus dire "en
+    # retard"/"en cours" puisqu'il n'y a plus rien a traiter administrativement.
+    if restitution.get("closedDespiteMissingItems"):
+        return {
+            "startAt": due_at, "completed": completed, "total": total, "ratio": ratio,
+            "timingStatus": "ok", "timingLabel": "Clôturé malgré du matériel manquant",
+        }
+
+    days_late = None
+    if due_at:
+        try:
+            due_date = datetime.strptime(due_at[:10], "%Y-%m-%d").date()
+            days_late = (datetime.now().date() - due_date).days
+        except ValueError:
+            days_late = None
+
+    if days_late is not None and days_late > warning_days:
+        timing_status, timing_label = "late", "Restitution en retard"
+    else:
+        timing_status, timing_label = "warning", "Restitution en cours"
+
+    return {
+        "startAt": due_at, "completed": completed, "total": total, "ratio": ratio,
+        "timingStatus": timing_status, "timingLabel": timing_label,
+    }
+
+
 def collect_resource_validation_errors(payload):
     errors = []
     materiel = payload.get("materiel", {})
@@ -518,10 +614,13 @@ def collect_resource_validation_errors(payload):
 # Statut workflow effectif
 # ---------------------------------------------------------------------------
 
-def derive_restitution_workflow_status(item_states, signature_status="", signature_data=""):
+def derive_restitution_workflow_status(item_states, signature_status="", signature_data="", force_closed=False):
+    """`force_closed` : l'operateur a choisi de clore le dossier malgre un objet « Non restitue » (ex. materiel
+    mutualise qui ne repasse jamais individuellement par le stock). L'etat de l'objet reste tel quel dans
+    l'historique ; seul le statut AGREGE du dossier passe outre."""
     states = list((item_states or {}).values())
     base_status = "returned"
-    if states and any((state or {}).get("state") == "non_restitue" for state in states):
+    if not force_closed and states and any((state or {}).get("state") == "non_restitue" for state in states):
         base_status = "partial_return"
 
     # Une restitution préparée pour signature à distance ne doit pas être
@@ -561,6 +660,7 @@ def compute_effective_workflow_status(payload):
             restitution.get("items", {}),
             restitution.get("signatureStatus") or "",
             restitution.get("signatureDataUrl") or "",
+            force_closed=bool(restitution.get("closedDespiteMissingItems")),
         )
 
     validation = payload.get("validation", {})

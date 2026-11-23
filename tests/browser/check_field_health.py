@@ -43,7 +43,7 @@ with Instance() as inst:
     time.sleep(2)
     schema = [{"key": "nom_du_poste", "label": "Nom du poste", "type": "text"}, {"key": "marque", "label": "Marque", "type": "text"},
               {"key": "numero_de_serie", "label": "N° de série", "type": "text", "identifier": True, "required": True}, {"key": "adresse_email", "label": "Adresse e-mail", "type": "text"}]
-    created = api(driver, "POST", "/api/admin/resources", {"code": "poste_sante", "label": "Poste santé", "description": "", "category": "materiel", "issuer_service": "DSI",
+    created = api(driver, "POST", "/api/admin/resources", {"code": "poste_sante", "label": "Poste santé", "description": "", "category": "materiel", "issuer_service": "Informatique",
                                                              "requires_return": True, "has_assignment_date": True, "display_order": 950, "is_active": True, "tracking_mode": "unit", "field_schema": schema})
     check("ressource créée", created["status"] in (200, 201), str(created)[:400])
     rid = next((r["id"] for r in api(driver, "GET", "/api/admin/resources")["json"] if r["code"] == "poste_sante"), None)

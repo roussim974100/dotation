@@ -536,10 +536,15 @@ function summarizeDraftProgressFromPayload(payload = {}) {
 function getDraftProgressMetrics(draft) {
   if (Number.isFinite(draft.completedResources) && Number.isFinite(draft.totalResources)) {
     const isOnboarded = ["active", "returned", "partial_return", "cancelled"].includes(draft.status);
+    // En phase de restitution, "late"/le libellé viennent de summarize_restitution_progress (backend) et sont
+    // déjà parlants ("Restitution en retard") : ne pas les écraser par le "À compléter" pensé pour l'attribution
+    // (date de prise de poste dépassée), qui ne veut rien dire une fois la restitution en cours.
+    const inRestitutionPhase = ["returned", "partial_return"].includes(draft.status)
+      || (draft.status === "awaiting_signature" && hasRestitutionData(draft));
     let timingStatus = draft.timingStatus || "neutral";
     let timingLabel = draft.timingLabel || "À planifier";
-    // Neutraliser le retard pour les dossiers où la personne est en poste
-    if (isOnboarded && timingStatus === "late") {
+    // Neutraliser le retard pour les dossiers où la personne est en poste (hors restitution)
+    if (isOnboarded && !inRestitutionPhase && timingStatus === "late") {
       timingStatus = "neutral";
       timingLabel = draft.completedResources >= draft.totalResources ? "Prêt" : "À compléter";
     }
@@ -990,16 +995,23 @@ function buildDraftActionButtons(draft, options) {
       ? "openRestitution"
       : "editDraft";
 
-  // Action metier de l'etape, mise en avant a cote de "Ouvrir".
-  let stepAction = null;
-  if (pendingAdjustment) {
-    stepAction = { action: "openAdjustmentSignature", label: "Signer l'ajustement" };
-  } else if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
-    stepAction = { action: "openRestitution", label: "Restituer" };
+  // Action(s) metier de l'etape, mises en avant a cote de "Ouvrir". Deux peuvent coexister sur un dossier actif :
+  // "Gerer les ressources" (ajout/retrait partiel, la personne reste) et "Restituer" (depart complet de la
+  // personne) sont deux parcours distincts, pas une alternative.
+  const stepActions = [];
+  const hasPendingAdjustmentSignature = (draft.data?.ajustements || []).some((event) => event.status === "pending_signature");
+  const canAdjustHere = canAdjustDossier(sessionInfo) && status === "active";
+  if (canAdjustHere && hasPendingAdjustmentSignature) {
+    stepActions.push({ action: "openAdjustmentSignature", label: "Signer l'ajustement" });
+  } else if (canAdjustHere) {
+    stepActions.push({ action: "openAdjustment", label: "Gérer les ressources" });
+  }
+  if (options.canRestitution && status === "active" && !inRestitutionsPendingView) {
+    stepActions.push({ action: "openRestitution", label: "Restituer" });
   } else if (inRestitutionPhase && canRequestRestitutionSignature(draft, options)) {
-    stepAction = { action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareRestitutionSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   } else if (!inRestitutionPhase && status !== "active" && canRequestAssignmentSignature(draft, options)) {
-    stepAction = { action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" };
+    stepActions.push({ action: "prepareAssignmentSignatureEmail", label: status === "awaiting_signature" ? "Renvoyer le lien de signature" : "Envoyer le lien de signature" });
   }
 
   // Documents (PDF) — l'ordre suit la phase
@@ -1032,18 +1044,19 @@ function buildDraftActionButtons(draft, options) {
     }
   }
 
-  // Depuis un dossier deja finalise : repartir de l'identite de la personne pour une nouvelle attribution.
+  // Repartir de l'identite de la personne pour une nouvelle attribution : utile seulement quand il n'y a PLUS de
+  // dossier actif a ajuster (restitution terminee ou en cours). Sur un dossier "active", "Gerer les ressources"
+  // (ci-dessus) est le bon outil : proposer aussi ce bouton ne ferait que recreer le doublon qu'il visait a eviter.
   const canCreate = sessionInfo?.permissions?.includes("*") || sessionInfo?.permissions?.includes("forms.create");
-  const personItems = (canCreate && ["active", "returned", "partial_return"].includes(status))
+  const personItems = (canCreate && ["returned", "partial_return"].includes(status))
     ? [{ action: "newAssignmentForPerson", id, label: "Nouvelle attribution pour cette personne" }]
     : [];
-  // Ajuster un dossier actif (ajouter / retirer des ressources, changer le service) ; signer un ajustement resté en attente.
-  if (canAdjustDossier(sessionInfo) && status === "active") {
-    personItems.push({ action: "openAdjustment", id, label: "Ajuster les ressources / le service" });
-    if ((draft.data?.ajustements || []).some((event) => event.status === "pending_signature")) {
-      personItems.push({ action: "openAdjustmentSignature", id, label: "Signer l'ajustement en attente" });
-    }
+  // Dossier resté « en cours » : diagnostic + clôture forcée si la seule raison est un objet "Non restitué".
+  if (status === "partial_return") {
+    personItems.push({ action: "openRestitutionBlockage", id, label: "Pourquoi ce dossier est bloqué ?" });
   }
+  // "Gérer les ressources" / "Signer l'ajustement" sont déjà proposés en bouton principal ci-dessus
+  // (canAdjustHere) : rien à dupliquer dans le menu « … ».
 
   // Signature en face à face : QR code à scanner (mêmes conditions que la demande de signature par e-mail).
   const qrItems = [];
@@ -1060,7 +1073,7 @@ function buildDraftActionButtons(draft, options) {
   return `
     <div class="draft-actions__primary">
       <button class="btn btn-sm btn-primary" type="button" data-action="${openAction}" data-id="${id}">Ouvrir</button>
-      ${stepAction ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${stepAction.action}" data-id="${id}">${escapeHtml(stepAction.label)}</button>` : ""}
+      ${stepActions.map((action) => `<button class="btn btn-sm btn-outline-primary" type="button" data-action="${action.action}" data-id="${id}">${escapeHtml(action.label)}</button>`).join("")}
       ${renderRowActionMenu([
         { title: "Documents", items: pdfItems },
         { title: "Envoyer par e-mail", items: emailItems },
@@ -1440,13 +1453,44 @@ async function saveFormData(payload) {
 }
 
 async function deleteDraft(id) {
+  let trashId = null;
   try {
-    await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
+    const result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
+    trashId = result?.trash_id || null;
   } finally {
     removeCachedDraft(id);
   }
+  return trashId;
+}
+
+async function restoreDeletedDraft(trashId) {
+  await requestJson(`${API_BASE}/trash/${encodeURIComponent(trashId)}/restore`, {
+    method: "POST"
+  });
+  await renderDraftList();
+}
+
+function offerUndoDelete(trashIds, message) {
+  const ids = (Array.isArray(trashIds) ? trashIds : [trashIds]).filter(Boolean);
+  if (!ids.length) {
+    showToast(message, "success");
+    return;
+  }
+  showToast(message, "success", 8000, {
+    label: "Annuler",
+    onClick: async () => {
+      try {
+        for (const trashId of ids) {
+          await restoreDeletedDraft(trashId);
+        }
+        showToast(ids.length > 1 ? "Suppressions annulées." : "Suppression annulée.", "success");
+      } catch (error) {
+        showToast("Impossible d'annuler la suppression.", "error");
+      }
+    }
+  });
 }
 
 function newForm() {
@@ -1467,6 +1511,10 @@ function newAssignmentForPerson(id) {
 
 function openRestitution(id) {
   window.location.href = `restitution-phase1.html?id=${encodeURIComponent(id)}`;
+}
+
+function openRestitutionBlockage(id) {
+  window.location.href = `restitution-blocage.html?id=${encodeURIComponent(id)}`;
 }
 
 // Modale "Nouvelle restitution" : une restitution part toujours d'une attribution
@@ -2077,21 +2125,28 @@ async function saveSimpleEmailDraft({ recipientEmail, subject, title, bodyLines,
   saveBlob(new Blob([emailContent], { type: "message/rfc822;charset=utf-8" }), fileName);
 }
 
-async function fetchPdfDocument(id, kind) {
-  const isRestitution = kind === "restitution";
-  const config = isRestitution
-    ? {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
-        title: "Préparation du PDF restitution",
-        text: "Le bon de restitution est en cours de génération.",
-        fallbackName: `restitution-${id}.pdf`
-      }
-    : {
-        endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
-        title: "Préparation du PDF dossier",
-        text: "Le document est en cours de génération.",
-        fallbackName: `dossier-${id}.pdf`
-      };
+async function fetchPdfDocument(id, kind, extra) {
+  const configs = {
+    restitution: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/restitution-pdf`,
+      title: "Préparation du PDF restitution",
+      text: "Le bon de restitution est en cours de génération.",
+      fallbackName: `restitution-${id}.pdf`
+    },
+    ajustement: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf/ajustement/${encodeURIComponent(extra || "")}`,
+      title: "Préparation du PDF d'ajustement",
+      text: "La fiche d'ajustement est en cours de génération.",
+      fallbackName: `ajustement-${id}.pdf`
+    },
+    dossier: {
+      endpoint: `${API_BASE}/${encodeURIComponent(id)}/pdf`,
+      title: "Préparation du PDF dossier",
+      text: "Le document est en cours de génération.",
+      fallbackName: `dossier-${id}.pdf`
+    }
+  };
+  const config = configs[kind] || configs.dossier;
 
   showExportLoader(config.title, config.text);
   try {
@@ -2109,18 +2164,18 @@ async function fetchPdfDocument(id, kind) {
   }
 }
 
-async function preparePdfEmail(id, kind) {
+async function preparePdfEmail(id, kind, extra) {
   try {
     const result = await getDraftById(id);
     const draft = result
       ? { ...result.summary, data: result.data }
       : findDraftSummary(id);
-    const { blob, fileName } = await fetchPdfDocument(id, kind);
+    const { blob, fileName } = await fetchPdfDocument(id, kind, extra);
     const attachmentBase64 = toBase64(await blob.arrayBuffer());
     const recipientEmail = getPdfEmailRecipient(draft);
     const title = draft?.title || "Dossier";
     const fullName = `${draft?.prenom || ""} ${draft?.nom || ""}`.trim();
-    const documentLabel = kind === "restitution" ? "PDF de restitution" : "PDF de dossier";
+    const documentLabel = { restitution: "PDF de restitution", ajustement: "fiche d'ajustement (PDF)" }[kind] || "PDF de dossier";
     const bodyLines = [
       "Bonjour,",
       "",
@@ -2149,7 +2204,9 @@ async function preparePdfEmail(id, kind) {
     showToast(
       error.message || (kind === "restitution"
         ? "Impossible de préparer l'e-mail du PDF restitution."
-        : "Impossible de préparer l'e-mail du PDF dossier."),
+        : kind === "ajustement"
+          ? "Impossible de préparer l'e-mail de la fiche d'ajustement."
+          : "Impossible de préparer l'e-mail du PDF dossier."),
       "error"
     );
   }
@@ -2161,6 +2218,19 @@ async function prepareDraftPdfEmail(id) {
 
 async function prepareRestitutionPdfEmail(id) {
   await preparePdfEmail(id, "restitution");
+}
+
+async function prepareAdjustmentPdfEmail(id, eventId) {
+  await preparePdfEmail(id, "ajustement", eventId);
+}
+
+async function exportAdjustmentPdf(id, eventId) {
+  try {
+    const { blob, fileName } = await fetchPdfDocument(id, "ajustement", eventId);
+    saveBlob(blob, fileName);
+  } catch (error) {
+    showToast("Impossible de générer le PDF de l'ajustement.", "error");
+  }
 }
 
 async function exportDraftPdf(id) {
@@ -2329,10 +2399,18 @@ async function ensureAssignmentSignatureLink(id) {
 async function ensureRestitutionSignatureLink(id, validityDays) {
   let result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`);
   if (!result?.link || result.link.status !== "active" || !result.link.url) {
-    result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
-      method: "POST",
-      body: validityDays ? JSON.stringify({ validityDays }) : undefined
-    });
+    try {
+      result = await requestJson(`${API_BASE}/${encodeURIComponent(id)}/restitution-signature-link`, {
+        method: "POST",
+        body: validityDays ? JSON.stringify({ validityDays }) : undefined
+      });
+    } catch (error) {
+      // Le serveur explique pourquoi (ex. état du matériel pas encore enregistré) : on l'affiche tel quel.
+      if (error?.payload?.message) {
+        error.message = error.payload.message;
+      }
+      throw error;
+    }
   }
   return {
     link: result.link,
@@ -2462,27 +2540,33 @@ async function showSignatureQr(id, kind) {
         : await ensureAssignmentSignatureLink(id);
     const draft = findDraftSummary(id);
     const titles = { restitution: "Signature de la restitution", adjustment: "Signature de l'ajustement" };
-    showSignatureQrDialog({
-      url: absoluteUrl,
-      title: titles[kind] || "Signature de l'attribution",
-      subtitle: draft?.title || "",
-      expiresAt: link?.expiresAt
+    // Attend la fermeture de la fenêtre (utile à qui enchaîne une redirection) ; renvoie false si elle n'a pas pu s'ouvrir.
+    return await new Promise((resolve) => {
+      const opened = showSignatureQrDialog({
+        url: absoluteUrl,
+        title: titles[kind] || "Signature de l'attribution",
+        subtitle: draft?.title || "",
+        expiresAt: link?.expiresAt,
+        onClose: () => resolve(true)
+      });
+      if (!opened) resolve(false);
     });
   } catch (error) {
     showToast(error.message || "Impossible de préparer le QR code de signature.", "error");
+    return false;
   }
 }
 
 async function showAssignmentSignatureQr(id) {
-  await showSignatureQr(id, "assignment");
+  return showSignatureQr(id, "assignment");
 }
 
 async function showRestitutionSignatureQr(id) {
-  await showSignatureQr(id, "restitution");
+  return showSignatureQr(id, "restitution");
 }
 
 async function showAdjustmentSignatureQr(id) {
-  await showSignatureQr(id, "adjustment");
+  return showSignatureQr(id, "adjustment");
 }
 
 async function copyRestitutionSignatureLink(id) {
@@ -2995,10 +3079,12 @@ async function deleteSelectedDrafts() {
     return;
   }
 
+  const trashIds = [];
   for (const id of ids) {
-    await deleteDraft(id);
+    trashIds.push(await deleteDraft(id));
   }
   await renderDraftList();
+  offerUndoDelete(trashIds, ids.length > 1 ? `${ids.length} dossiers supprimés.` : "Dossier supprimé.");
 }
 function bindSelectionActions(canExport, canDelete) {
   // Branche le "tout sélectionner" et les actions groupées.
@@ -3084,8 +3170,9 @@ async function removeDraft(id) {
     return;
   }
 
-  await deleteDraft(id);
+  const trashId = await deleteDraft(id);
   await renderDraftList();
+  offerUndoDelete(trashId, `Dossier « ${item.summary.title} » supprimé.`);
 }
 
 function formatDate(value) {
@@ -3462,7 +3549,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("emptyStateNewRestitutionBtn")?.addEventListener("click", () => { void openNewRestitutionModal(); });
 
   const DRAFT_ACTION_MAP = {
-    editDraft, openRestitution, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
+    editDraft, openRestitution, openRestitutionBlockage, newAssignmentForPerson, exportDraftPdf, exportRestitutionPdf,
     shareSignatureLink, copyRestitutionSignatureLink,
     prepareAssignmentInfoEmail, prepareRestitutionInfoEmail,
     prepareDraftPdfEmail, prepareRestitutionPdfEmail,

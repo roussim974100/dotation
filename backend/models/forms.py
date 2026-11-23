@@ -13,12 +13,13 @@ from auth import current_user
 from models.audit import insert_audit_event, insert_app_log
 from models.workflow import (
     collect_resource_entries, collect_resource_validation_errors,
-    compute_effective_workflow_status, summarize_assignment_progress,
+    compute_effective_workflow_status, summarize_assignment_progress, summarize_restitution_progress,
     summarize_resource_item_details, is_restitution_eligible_material_details,
-    describe_assignment_condition, extract_items,
+    describe_assignment_condition, extract_items, normalize_resource_field_schema,
 )
 from models.dossier import sync_person_and_dossier
-from models.inventory import align_fields, align_with_embedded_schema, schema_key_set
+from models.inventory import align_fields, align_with_embedded_schema, schema_key_set, resolve_identifier_key
+from models.units import find_holder_unit
 from models.settings import get_app_settings, DEFAULT_APP_SETTINGS, get_dpo_email
 from utils import generate_id
 
@@ -272,6 +273,30 @@ def _sanitize_unc_acces(payload):
     return payload
 
 
+def _find_duplicate_resource_label(connection, payload, items, exclude_form_id):
+    """Libelle de la premiere ressource actuellement detenue par CE dossier dont l'identifiant saisi a la main
+    (n° de serie, immatriculation...) est deja detenu par un AUTRE dossier actif, sinon None. Memes regles que
+    l'avertissement non bloquant du formulaire (routes/inventory.py: current_holder), mais bloquant a l'enregistrement."""
+    held_keys = {item["item_key"] for item in items if item["assigned"] and not item["returned"]}
+    for resource in payload.get("resources", {}).get("additional", []) or []:
+        if not isinstance(resource, dict):
+            continue
+        item_key = resource.get("code") or resource.get("id")
+        if item_key not in held_keys:
+            continue
+        schema = normalize_resource_field_schema(resource.get("fieldSchema") or resource.get("field_schema") or [])
+        identifier_key = resolve_identifier_key(schema)
+        if not identifier_key:
+            continue
+        fields = resource.get("fields") or {}
+        value = str(fields.get(identifier_key) or fields.get(identifier_key.lower()) or "").strip()
+        if not value:
+            continue
+        if find_holder_unit(connection, str(resource.get("code") or ""), value, exclude_form_id):
+            return resource.get("label") or str(item_key)
+    return None
+
+
 def persist_form(payload, allow_locked_update=False):
     if not payload.get("beneficiaire", {}).get("nom") or not payload.get("beneficiaire", {}).get("prenom"):
         raise AppError("invalid_form_data", "Les champs nom et prénom sont obligatoires.")
@@ -340,6 +365,9 @@ def persist_form(payload, allow_locked_update=False):
             if existing_payload.get("meta", {}).get("lockedAt") and not allow_locked_update:
                 raise AppError("form_locked", "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée.")
             row["created_at"] = exists["created_at"]
+        duplicate_label = _find_duplicate_resource_label(connection, payload, items, form_id)
+        if duplicate_label:
+            raise AppError("resource_already_held", f"« {duplicate_label} » est déjà attribué à un autre dossier actif.", 409)
         person_id, dossier_id = sync_person_and_dossier(connection, payload, exists)
         row["dossier_id"] = dossier_id
         row["person_id"] = person_id
@@ -452,6 +480,11 @@ def persist_form(payload, allow_locked_update=False):
             if source_form_id and retraits_items:
                 _apply_retraits_to_source(connection, form_id, source_form_id, retraits_items)
 
+    try:
+        from models.notifications import clear_cache
+        clear_cache()  # les taches de service (a fournir / a fermer) dependent des elements de ce dossier
+    except Exception:  # noqa: BLE001 - une notification ne doit jamais empecher l'enregistrement d'un dossier
+        pass
     return get_form(form_id)
 
 
@@ -504,6 +537,17 @@ def align_payload_field_names(connection, payload):
     return payload
 
 
+def _has_restitution_data(payload):
+    """Mime hasRestitutionData (frontend/js/storage.js) : un retrait fait par un ajustement (adjustmentId) n'engage
+    pas la restitution du dossier a lui seul."""
+    restitution = payload.get("restitution") or {}
+    if restitution.get("returnedAt") or restitution.get("notes") or restitution.get("reason") \
+            or restitution.get("signatureDataUrl") or restitution.get("signatureReason"):
+        return True
+    items = restitution.get("items") or {}
+    return any(not (item or {}).get("adjustmentId") for item in items.values())
+
+
 def row_to_summary(row, warning_days=None):
     payload = {}
     try:
@@ -511,7 +555,16 @@ def row_to_summary(row, warning_days=None):
     except (TypeError, json.JSONDecodeError):
         payload = {}
     effective_status = compute_effective_workflow_status(payload)
-    progress = summarize_assignment_progress(payload, warning_days)
+    # Une fois entre en phase de restitution, "Progression"/"Pilotage" doivent refleter l'avancement REEL de la
+    # restitution (objets rendus), pas la completude de la saisie a l'attribution (sans rapport, voir le constat
+    # du 22/11 sur un dossier de regularisation a 0/4 alors que 3 objets sur 4 etaient bien rendus).
+    in_restitution_phase = effective_status in ("returned", "partial_return") or (
+        effective_status == "awaiting_signature" and _has_restitution_data(payload)
+    )
+    progress = (
+        summarize_restitution_progress(payload, warning_days) if in_restitution_phase
+        else summarize_assignment_progress(payload, warning_days)
+    )
     summary = {
         "id": row["id"],
         "dossierId": row["dossier_id"],

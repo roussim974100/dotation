@@ -1,6 +1,9 @@
+import hashlib
+import hmac
 import json
 import os
 import re
+import time
 import bcrypt
 from datetime import datetime
 from functools import wraps
@@ -113,6 +116,7 @@ def create_user(username, password_hash, groups, service="", is_active=True, sta
 # Colonnes modifiables de users : liste blanche, car les noms de colonnes sont inseres dans le SQL.
 UPDATABLE_USER_COLUMNS = frozenset({
     "password_hash", "is_active", "status", "service", "db_manage", "email", "first_name", "last_name",
+    "must_change_password",
 })
 
 
@@ -158,15 +162,37 @@ def delete_user(username):
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting login : max 10 tentatives par IP sur une fenetre glissante de 10 minutes.
+# Limitation des connexions par adresse IP : 10 echecs -> adresse bloquee 15 minutes (voir ci-dessous).
 # ---------------------------------------------------------------------------
 
-_LOGIN_MAX_ATTEMPTS = 10
-_LOGIN_WINDOW_SECONDS = 600
+# Seuil et duree de blocage d'une ADRESSE IP : N echecs de connexion -> plus aucune tentative depuis cette adresse pendant la duree du
+# blocage (15 min). Seuls les ECHECS comptent (mot de passe faux, identifiant inconnu, jeton CSRF invalide, compte inactif) : une
+# connexion reussie ne compte pas, donc un poste partage ou un kiosque n'est pas penalise. On bloque l'ADRESSE de celui qui insiste,
+# jamais le compte de sa cible : personne ne peut empecher un collegue de se connecter en tapant de faux mots de passe a sa place.
+# La cle est l'adresse vue par le serveur (corrigee par ProxyFix selon les proxys de confiance), jamais un en-tete fourni par le client.
+# APP_LOGIN_IP_MAX_FAILURES=0 desactive la limitation.
+LOGIN_IP_MAX_FAILURES = int(os.environ.get("APP_LOGIN_IP_MAX_FAILURES", "10"))
+LOGIN_IP_BLOCK_SECONDS = int(os.environ.get("APP_LOGIN_IP_BLOCK_MINUTES", "15")) * 60
+_LOGIN_FAILURE_SCOPE = "login_fail_ip"
+_LOGIN_BLOCK_SCOPE = "login_ip_block"
 
 
 def _is_login_rate_limited(ip: str) -> bool:
-    return rate_store.hit("login", ip, _LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
+    """Cette adresse est-elle bloquee en ce moment ? (lecture seule : une tentative refusee ne prolonge pas le blocage)"""
+    return rate_store.count(_LOGIN_BLOCK_SCOPE, ip, LOGIN_IP_BLOCK_SECONDS) > 0
+
+
+def record_login_failure(ip: str) -> bool:
+    """Compte un echec de connexion pour cette adresse ; au seuil, la bloque pour LOGIN_IP_BLOCK_SECONDS et remet son compteur a zero.
+    Retourne True si l'adresse vient d'etre bloquee."""
+    if LOGIN_IP_MAX_FAILURES <= 0:
+        return False
+    rate_store.hit(_LOGIN_FAILURE_SCOPE, ip, 10 ** 9, LOGIN_IP_BLOCK_SECONDS)  # on enregistre ; la decision se prend avec count()
+    if rate_store.count(_LOGIN_FAILURE_SCOPE, ip, LOGIN_IP_BLOCK_SECONDS) < LOGIN_IP_MAX_FAILURES:
+        return False
+    rate_store.hit(_LOGIN_BLOCK_SCOPE, ip, 10 ** 9, LOGIN_IP_BLOCK_SECONDS)  # debut du blocage
+    rate_store.clear(_LOGIN_FAILURE_SCOPE, ip)  # a la fin du blocage on repart de zero
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +294,118 @@ def build_user_context(username):
         "first_name": (user.get("first_name") or "") if user else "",
         "last_name": (user.get("last_name") or "") if user else "",
         "email": (user.get("email") or "") if user else "",
+        "must_change_password": bool(user.get("must_change_password")) if user else False,
     }
+
+
+# ---------------------------------------------------------------------------
+# Validite des sessions : le cookie ne prouve qu'une connexion passee. A chaque requete on le rapproche de la base,
+# sinon un changement de mot de passe, une desactivation ou une suppression de compte laisserait la session ouverte.
+# ---------------------------------------------------------------------------
+
+SESSION_MAX_HOURS = float(os.environ.get("APP_SESSION_MAX_HOURS", "12"))       # duree absolue depuis la connexion
+SESSION_IDLE_MINUTES = float(os.environ.get("APP_SESSION_IDLE_MINUTES", "60"))  # inactivite maximale
+_SESSION_TOUCH_SECONDS = 60  # evite de reecrire le cookie a chaque requete
+
+
+def password_fingerprint(password_hash):
+    """Empreinte du hash de mot de passe (HMAC avec la cle de l'application) : change des qu'un mot de passe change,
+    sans exposer le hash dans le cookie."""
+    from flask import current_app
+    key = str(current_app.secret_key or "").encode()
+    return hmac.new(key, str(password_hash or "").encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def start_session(username, user_record=None):
+    """Ouvre une session neuve (l'ancienne est videe : pas de fixation de session)."""
+    record = user_record or get_user_record(username)
+    session.clear()
+    now = int(time.time())
+    session["user"] = username
+    session["pwd_fp"] = password_fingerprint(record["password_hash"]) if record else ""
+    session["login_at"] = now
+    session["last_seen"] = now
+    session.permanent = True
+    session.modified = True
+
+
+def realign_session_password(new_password_hash):
+    """Apres un changement de mot de passe par l'utilisateur lui-meme : sa session courante reste valide."""
+    session["pwd_fp"] = password_fingerprint(new_password_hash)
+    session.modified = True
+
+
+def session_invalid_reason():
+    """None si la session courante est valide (ou absente), sinon le motif de son rejet."""
+    username = session.get("user")
+    if not username:
+        return None
+    now = int(time.time())
+    try:
+        login_at = int(session.get("login_at"))
+        last_seen = int(session.get("last_seen"))
+    except (TypeError, ValueError):
+        return "legacy"  # cookie anterieur a ce controle : on exige une nouvelle connexion
+    if now - login_at > SESSION_MAX_HOURS * 3600:
+        return "expired"
+    if now - last_seen > SESSION_IDLE_MINUTES * 60:
+        return "idle"
+    record = get_user_record(username)
+    if not record:
+        return "user_missing"
+    if record.get("status") in ("pending", "disabled") or not record.get("is_active", True):
+        return "user_disabled"
+    if not hmac.compare_digest(str(session.get("pwd_fp") or ""), password_fingerprint(record["password_hash"])):
+        return "password_changed"
+    # Un simple controle du navigateur (ui.js, en-tete X-Session-Check) ne compte pas comme une activite : sinon un onglet
+    # laisse ouvert ne tomberait jamais en inactivite.
+    if now - last_seen >= _SESSION_TOUCH_SECONDS and not request.headers.get("X-Session-Check"):
+        session["last_seen"] = now
+    return None
+
+
+def enforce_session_validity():
+    """before_request : vide la session si elle n'est plus valide et journalise le motif."""
+    username = session.get("user")
+    reason = session_invalid_reason()
+    if reason is None:
+        return
+    session.clear()
+    try:
+        from models.audit import insert_app_log
+        with get_db() as connection:
+            insert_app_log(connection, "security", "session_revoked", "Session refusee", "user", username,
+                           {"reason": reason, "ip": get_request_client_ip()}, actor=username)
+    except Exception:
+        pass
+
+
+# Compte au mot de passe d'origine (admin/admin) : tant qu'il n'est pas change, seules ces routes repondent.
+_PASSWORD_CHANGE_API = frozenset({
+    "/api/session", "/api/csrf-token", "/api/me/password", "/api/settings/public", "/api/settings/logo", "/api/client-context",
+})
+_PASSWORD_CHANGE_PAGES = frozenset({"/", "/index.html", "/login", "/logout"})
+_PASSWORD_CHANGE_STATIC_PREFIXES = ("/css/", "/js/", "/assets/")
+
+
+def enforce_password_change():
+    """before_request : un compte marque `must_change_password` ne peut rien faire d'autre que changer son mot de passe.
+    API -> 403 `password_change_required` ; page -> retour a l'accueil, ou la fenetre de changement s'ouvre d'elle-meme
+    (ui.js). Voir flag_default_credentials (database.py)."""
+    username = session.get("user")
+    if not username:
+        return None
+    record = get_user_record(username)
+    if not record or not record.get("must_change_password"):
+        return None
+    path = request.path
+    if path.startswith("/api/"):
+        if path in _PASSWORD_CHANGE_API:
+            return None
+        return jsonify({"error": "password_change_required"}), 403
+    if path in _PASSWORD_CHANGE_PAGES or path.startswith(_PASSWORD_CHANGE_STATIC_PREFIXES) or path in ("/favicon.ico", "/app-icon.svg"):
+        return None
+    return redirect("/")
 
 
 def current_user():

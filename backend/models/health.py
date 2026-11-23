@@ -49,6 +49,43 @@ def resync_flat_copies(connection):
     return len(ids)
 
 
+def unsynced_unit_assignments(connection):
+    """Dossiers ou un objet suivi par unite (ex. ordinateur, ecran - identifie par un numero de serie) est marque
+    attribue dans la copie a plat (dotation_items) mais n'a AUCUNE unite de parc correspondante actuellement a son
+    nom (resource_units). Signe que sync_units_for_form (appele par persist_form) a echoue silencieusement : son
+    erreur n'est capturee que par un `warning` dans le journal applicatif, jamais remontee ni bloquante (voir
+    persist_form, backend/models/forms.py) - angle mort signale par l'audit de perennite du 22/11/2026 (aucun
+    invariant existant ne le detectait). Un objet sans numero de serie saisi est ignore : sync_units_for_form
+    ne tente alors rien non plus, ce n'est pas un echec."""
+    from models.inventory import align_fields, normalize_identifier, _fields_of
+    from models.units import unit_identifier_keys
+    try:
+        keys = unit_identifier_keys(connection)
+        if not keys:
+            return 0
+        count = 0
+        for row in connection.execute("SELECT form_id, item_key, details_json FROM dotation_items WHERE assigned = 1").fetchall():
+            config = keys.get(row["item_key"])
+            if not config:
+                continue
+            try:
+                details = json.loads(row["details_json"] or "{}")
+            except (TypeError, ValueError):
+                continue
+            fields = align_fields(_fields_of(details), config["fields"])
+            if not normalize_identifier(fields.get(config["identifier"])):
+                continue
+            held = connection.execute(
+                "SELECT 1 FROM resource_units WHERE holder_form_id = ? AND resource_code = ? AND status IN ('assigned', 'reserved') LIMIT 1",
+                (row["form_id"], row["item_key"]),
+            ).fetchone()
+            if not held:
+                count += 1
+        return count
+    except Exception:  # noqa: BLE001 - base ancienne (colonnes/tables absentes) : rien a controler, comme les autres invariants
+        return 0
+
+
 def stock_and_unit_invariants(connection):
     """Invariants des stocks et du parc (comptages seulement) : soldes négatifs, mouvements d'une ressource inconnue, objets sans
     identifiant, ressources de stock saisies sur plusieurs lignes dans un même dossier."""
@@ -67,6 +104,7 @@ def stock_and_unit_invariants(connection):
             "SELECT COUNT(*) FROM resource_units u JOIN dotation_items i ON i.form_id = u.holder_form_id AND i.item_key = u.resource_code "
             "WHERE u.status = 'assigned' AND i.returned = 1"),
         "duplicateItemLines": count("SELECT COUNT(*) FROM (SELECT 1 FROM dotation_items WHERE assigned = 1 GROUP BY form_id, item_key HAVING COUNT(*) > 1)"),
+        "unsyncedUnitAssignments": unsynced_unit_assignments(connection),
     }
 
 
@@ -92,7 +130,8 @@ def database_health(connection):
     labels = {"stockNegativeBalances": "solde(s) de stock négatif(s)", "stockMovementsUnknownResource": "mouvement(s) de stock d'une ressource inconnue",
               "retraitsNonRepercutes": "objet(s) du parc encore attribué(s) alors que le dossier les indique rendus (retrait non répercuté)",
               "unitsWithoutIdentifier": "objet(s) du parc sans identifiant", "unitsUnknownResource": "objet(s) du parc d'une ressource inconnue",
-              "duplicateItemLines": "ressource(s) saisie(s) sur plusieurs lignes dans un même dossier (risque de calcul de stock faussé)"}
+              "duplicateItemLines": "ressource(s) saisie(s) sur plusieurs lignes dans un même dossier (risque de calcul de stock faussé)",
+              "unsyncedUnitAssignments": "objet(s) attribué(s) dans le dossier mais absent(s) du parc (échec silencieux de synchronisation à rattraper)"}
     for key, label in labels.items():
         if invariants[key]:
             problems.append(f"{invariants[key]} {label}.")

@@ -11,7 +11,7 @@ from browser_harness import Instance  # noqa: E402
 PAGES = ["index.html", "assignments-completed.html", "restitutions-pending.html", "form.html", "parc.html", "admin.html", "admin-comptes.html",
          "admin-ressources.html", "admin-db.html", "admin-personnalisation.html", "logs.html", "trash.html", "help.html", "account.html",
          "executive-dashboard.html"]
-EXPECTED = ["Administration", "Synthèse", "Parc matériel", "Base de données", "Mon profil", "Mode sombre", "Changer le mot de passe", "Aide générale", "Déconnexion"]
+EXPECTED = ["Administration", "Synthèse", "Parc matériel", "Base de données", "Mon profil", "Mes tâches", "Mode sombre", "Changer le mot de passe", "Aide générale", "Déconnexion"]
 
 JS = """
 const items = [...document.querySelectorAll('#userMenu .user-menu__panel .user-menu__item')].filter(e => e.offsetParent !== null || e.closest('#userMenu'))

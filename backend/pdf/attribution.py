@@ -1,6 +1,6 @@
 import io
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 from fpdf import FPDF
 
 from utils import (
@@ -29,7 +29,7 @@ class _AQuaiDoc(FPDF):
         self._org_name = org_name
         self._brand_logo = brand_logo_bytes
         self._aq_logo = aq_logo_bytes
-        self._generated_at = format_export_datetime(datetime.now().isoformat())
+        self._generated_at = format_export_datetime(datetime.now(timezone.utc).isoformat())  # converti dans le fuseau de l'organisation
 
     def _scale_logo(self, png_bytes, max_w, max_h):
         w, h = _get_png_size(png_bytes)

@@ -164,6 +164,12 @@ def create_signature_link(connection, form_id, actor=None, expires_in_hours=72, 
             raise AppError("restitution_not_ready", "La restitution doit être préparée avant de générer un lien.")
         if restitution.get("signatureDataUrl"):
             raise AppError("already_signed", "Cette restitution est déjà signée.")
+        # Sans état de matériel enregistré (Phase 2), le signataire verrait un récapitulatif vide et signerait dans le vide.
+        if not restitution.get("items"):
+            raise AppError(
+                "restitution_items_missing",
+                "Enregistrez d'abord l'état du matériel restitué (étape 2 de la restitution) avant de générer le lien de signature.",
+            )
     elif link_type == "adjustment":
         pending = next((e for e in payload.get("ajustements") or [] if e.get("status") == "pending_signature"), None)
         if not pending:

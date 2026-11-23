@@ -1414,7 +1414,8 @@ function applyLockState(locked) {
       return;
     }
     // Boutons qui doivent rester accessibles sur dossier verrouillé
-    if (element.hasAttribute("data-back-to-index") || element.id === "showSignatureBtn") {
+    // data-keep-enabled : consultation / export qui ne modifie rien (ex. PDF et e-mail d'un ajustement dans l'historique)
+    if (element.hasAttribute("data-back-to-index") || element.hasAttribute("data-keep-enabled") || element.id === "showSignatureBtn") {
       element.disabled = false;
       return;
     }
@@ -3173,7 +3174,9 @@ async function saveDraft(signaturePad) {
       steps: workflowLabels.map((label) => ({ label, status: "done" }))
     });
 
-    if (["active", "awaiting_signature"].includes(result.summary.status || "") && typeof window.playCompletionCelebration === "function") {
+    // "awaiting_signature" veut dire que les champs sont complets mais pas encore signes : feter ce moment-la
+    // donnerait l'impression que c'est fait alors que la signature (l'evenement reel) reste a venir.
+    if (result.summary.status === "active" && typeof window.playCompletionCelebration === "function") {
       await window.playCompletionCelebration("confetti");
     }
 
@@ -3207,7 +3210,9 @@ async function saveDraft(signaturePad) {
         ? "Cette fiche est signée et verrouillée. Elle ne peut plus être modifiée."
         : error.message === "form_conflict"
           ? "Cette fiche a été modifiée par une autre personne (ou dans un autre onglet) depuis son ouverture. Rechargez la page pour voir la dernière version, puis refaites votre modification : rien n'a été écrasé."
-          : "Impossible d'enregistrer la fiche."
+          : error.message === "resource_already_held"
+            ? "Le numéro de série saisi est déjà attribué à un autre dossier actif. Vérifiez qu'il a bien été restitué, ou corrigez la saisie."
+            : "Impossible d'enregistrer la fiche."
     );
   }
 }

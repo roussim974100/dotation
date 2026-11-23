@@ -45,7 +45,7 @@ with Instance() as inst:
     check("aide à la saisie conservée", got.get("numero_serie", {}).get("placeholder") == "SN-0000")
     check("champ identifiant et obligatoire conservés", got.get("numero_serie", {}).get("identifier") is True and got["numero_serie"].get("required") is True)
 
-    created = api(driver, "POST", "/api/admin/resources", {"code": "res_hors", "label": "Ressource à désactiver", "category": "materiel", "issuer_service": "DSI", "requires_return": True,
+    created = api(driver, "POST", "/api/admin/resources", {"code": "res_hors", "label": "Ressource à désactiver", "category": "materiel", "issuer_service": "Informatique", "requires_return": True,
                                                             "display_order": 960, "is_active": True, "tracking_mode": "unit",
                                                             "field_schema": [{"key": "numero_serie", "label": "N° de série", "type": "text", "identifier": True, "required": True}]})
     rid = next((r["id"] for r in api(driver, "GET", "/api/admin/resources")["json"] if r["code"] == "res_hors"), None)

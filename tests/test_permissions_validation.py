@@ -1,149 +1,65 @@
-"""
-Test du système de validation des permissions au démarrage.
-Vérifie que validate_permissions_at_startup() détecte correctement les problèmes.
-"""
+"""Vérifie le VRAI système de permissions (backend/app.py:DEFAULT_GROUPS, celui réellement utilisé au démarrage),
+pas une copie orpheline. L'ancien backend/permissions.py définissait son propre DEFAULT_GROUPS, déconnecté de celui-ci
+(déjà périmé : il lui manquait forms.restitution_force) ; ses 6 tests passaient indéfiniment sans aucun rapport avec
+le système réellement exposé aux utilisateurs. Supprimé le 22/11/2026 (audit de pérennité, recommandation R1) : ce
+fichier teste maintenant directement app.py:DEFAULT_GROUPS, et la cohérence TOGGLEABLE_PERMISSIONS (routes/admin.py)
+/ PERMISSION_INFO (frontend/js/admin.js) — même principe que test_version_consistency.py."""
+import re
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+from pathlib import Path
 
-from permissions import (
-    ROUTES_REQUIRED_PERMISSIONS,
-    DEFAULT_GROUPS,
-    validate_permissions_at_startup,
-    has_permission_in_group,
-    get_group_permissions,
-)
+ROOT = Path(__file__).parent.parent
+backend_path = str(ROOT / "backend")
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
 
-
-def test_all_required_permissions_exist():
-    """Vérifie que toutes les permissions requises sont définies dans les groupes."""
-    print("\n[OK] Test 1: Verifier que les permissions requises existent")
-
-    all_required_perms = set()
-    for route, perms in ROUTES_REQUIRED_PERMISSIONS.items():
-        all_required_perms.update(perms)
-
-    # Vérifier que les groupes principaux (non-redaction) ont toutes les perms
-    critical_groups = ["admin", "administration", "direction", "gestion"]
-
-    for group_name in critical_groups:
-        group_perms = DEFAULT_GROUPS[group_name]
-        missing = all_required_perms - set(group_perms)
-        assert not missing, f"Le groupe {group_name} manque des permissions: {missing}"
-
-    print(f"   Tous les groupes critiques ont les permissions requises [PASS]")
+from app import DEFAULT_GROUPS
+from routes.admin import TOGGLEABLE_PERMISSIONS
 
 
-def test_redaction_confidentiality():
-    """Vérifie que le groupe redaction ne peut pas voir tous les dossiers."""
-    print("\n[OK] Test 2: Verifier la confidentialite du groupe redaction")
-
-    redaction_perms = DEFAULT_GROUPS["redaction"]
-
-    # redaction ne doit PAS avoir forms.view_all (pour raison de confidentialité)
-    assert "forms.view_all" not in redaction_perms, \
-        "redaction ne doit pas avoir forms.view_all pour respecter la confidentialité"
-
-    # Mais doit avoir les perms de base
-    assert "forms.read_list" in redaction_perms
-    assert "forms.read_detail" in redaction_perms
-    assert "forms.create" in redaction_perms
-
-    print(f"   redaction n'a pas forms.view_all (confidentialite OK) [PASS]")
+def _group_perms(key):
+    return next(perms for group_key, _label, _desc, perms, _scope in DEFAULT_GROUPS if group_key == key)
 
 
-def test_lecture_group_limited_perms():
-    """Vérifie que le groupe lecture a des permissions limitées."""
-    print("\n[OK] Test 3: Verifier que lecture a des permissions limitees")
-
-    lecture_perms = set(DEFAULT_GROUPS["lecture"])
-
-    # Lecture peut lire et exporter, mais pas créer/éditer/supprimer
-    assert "forms.read_list" in lecture_perms
-    assert "forms.read_detail" in lecture_perms
-    assert "forms.export" in lecture_perms
-
-    assert "forms.create" not in lecture_perms
-    assert "forms.edit" not in lecture_perms
-    assert "forms.delete" not in lecture_perms
-
-    print(f"   lecture est bien limite a la lecture/export [PASS]")
+def test_redaction_group_cannot_see_other_services_dossiers():
+    """Confidentialité entre services : redaction ne doit voir que les dossiers de son propre service."""
+    perms = _group_perms("redaction")
+    assert "forms.view_all" not in perms
+    assert "forms.read_list" in perms
+    assert "forms.create" in perms
 
 
-def test_has_permission_in_group():
-    """Teste la fonction has_permission_in_group."""
-    print("\n[OK] Test 4: Tester has_permission_in_group()")
-
-    # Admin doit avoir toutes les perms
-    assert has_permission_in_group("admin", "users.manage")
-    assert has_permission_in_group("admin", "forms.read_list")
-
-    # Lecture ne doit pas avoir forms.create
-    assert not has_permission_in_group("lecture", "forms.create")
-
-    # Groupe inexistant retourne []
-    assert not has_permission_in_group("inexistant", "forms.read_list")
-
-    print(f"   has_permission_in_group() fonctionne correctement [PASS]")
+def test_lecture_group_is_read_only():
+    perms = set(_group_perms("lecture"))
+    assert {"forms.read_list", "forms.read_detail", "forms.export"} <= perms
+    assert not {"forms.create", "forms.edit", "forms.delete"} & perms
 
 
-def test_get_group_permissions():
-    """Teste la fonction get_group_permissions."""
-    print("\n[OK] Test 5: Tester get_group_permissions()")
-
-    admin_perms = get_group_permissions("admin")
-    assert isinstance(admin_perms, list)
-    assert len(admin_perms) > 0
-    assert "users.manage" in admin_perms
-
-    # Groupe inexistant retourne []
-    unknown_perms = get_group_permissions("inexistant")
-    assert unknown_perms == []
-
-    print(f"   get_group_permissions() fonctionne correctement [PASS]")
+def test_admin_group_has_every_toggleable_permission():
+    perms = set(_group_perms("admin"))
+    assert TOGGLEABLE_PERMISSIONS <= perms, f"admin devrait porter tous les droits cochables, manque : {TOGGLEABLE_PERMISSIONS - perms}"
 
 
-def test_routes_coverage():
-    """Vérifie que les routes principales sont couvertes."""
-    print("\n[OK] Test 6: Verifier la couverture des routes")
-
-    critical_routes = [
-        "/api/forms",
-        "/api/admin/users",
-        "/api/admin/services",
-    ]
-
-    for route in critical_routes:
-        found = False
-        for defined_route in ROUTES_REQUIRED_PERMISSIONS.keys():
-            if route in defined_route:
-                found = True
-                break
-        assert found, f"Route critique {route} n'est pas couverte par la validation"
-
-    print(f"   Toutes les routes critiques sont couvertes [PASS]")
+def test_every_group_permission_is_a_known_toggleable_permission():
+    """Un groupe qui porte un droit absent de TOGGLEABLE_PERMISSIONS ne pourrait jamais être retiré/réattribué
+    depuis Admin > Comptes : signe d'un droit ajouté à DEFAULT_GROUPS sans être rendu éditable."""
+    for key, _label, _desc, perms, _scope in DEFAULT_GROUPS:
+        unknown = set(perms) - TOGGLEABLE_PERMISSIONS - {"*"}
+        assert not unknown, f"Le groupe {key} porte un droit absent de TOGGLEABLE_PERMISSIONS : {unknown}"
 
 
-if __name__ == "__main__":
-    print("=" * 80)
-    print("TEST DU SYSTÈME DE VALIDATION DES PERMISSIONS")
-    print("=" * 80)
+def test_permission_info_matches_toggleable_permissions():
+    """TOGGLEABLE_PERMISSIONS (backend/routes/admin.py, les droits cochables dans Admin > Comptes) et
+    PERMISSION_INFO (frontend/js/admin.js, les libellés affichés) sont deux copies à la main de la même liste :
+    un droit ajouté à l'une et oublié dans l'autre reste invisible (sans libellé) ou incochable, en silence
+    (constat de l'audit de pérennité du 22/11/2026)."""
+    admin_js = (ROOT / "frontend" / "js" / "admin.js").read_text(encoding="utf-8")
+    match = re.search(r"const PERMISSION_INFO = \[(.*?)\];", admin_js, re.DOTALL)
+    assert match, "PERMISSION_INFO introuvable dans frontend/js/admin.js"
+    displayed_keys = set(re.findall(r'key:\s*"([^"]+)"', match.group(1)))
 
-    try:
-        test_all_required_permissions_exist()
-        test_redaction_confidentiality()
-        test_lecture_group_limited_perms()
-        test_has_permission_in_group()
-        test_get_group_permissions()
-        test_routes_coverage()
-
-        print("\n" + "=" * 80)
-        print("[OK] TOUS LES TESTS PASSENT")
-        print("=" * 80)
-
-    except AssertionError as e:
-        print(f"\n[FAIL] TEST ÉCHOUÉ: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n[FAIL] ERREUR: {e}")
-        sys.exit(1)
+    assert displayed_keys == TOGGLEABLE_PERMISSIONS, (
+        "PERMISSION_INFO (frontend/js/admin.js) et TOGGLEABLE_PERMISSIONS (backend/routes/admin.py) ont divergé.\n"
+        f"Dans PERMISSION_INFO mais pas TOGGLEABLE_PERMISSIONS : {displayed_keys - TOGGLEABLE_PERMISSIONS}\n"
+        f"Dans TOGGLEABLE_PERMISSIONS mais pas PERMISSION_INFO : {TOGGLEABLE_PERMISSIONS - displayed_keys}"
+    )

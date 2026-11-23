@@ -206,7 +206,7 @@ def test_csrf_missing_header_is_rejected():
 
     client = app.test_client()
     with client.session_transaction() as sess:
-        sess["user"] = "test_csrf_user"
+        sess["user"] = "admin"  # compte reel : une session d'un compte inconnu est refusee (401) avant le controle CSRF
         sess["csrf_token"] = "expected-token-123"
 
     resp = client.put("/api/admin/resources/does-not-exist", json={"label": "x"})
@@ -220,7 +220,7 @@ def test_csrf_valid_header_passes_check():
 
     client = app.test_client()
     with client.session_transaction() as sess:
-        sess["user"] = "test_csrf_user"
+        sess["user"] = "admin"  # compte reel : une session d'un compte inconnu est refusee (401) avant le controle CSRF
         sess["csrf_token"] = "expected-token-123"
 
     resp = client.put(

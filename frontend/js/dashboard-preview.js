@@ -192,23 +192,25 @@ function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
   }
 
   const additional = data.resources?.additional || [];
-  const returnedStates = ["returned", "returned_damaged", "transferred", "conforme", "degrade"];
+  // Etats "regles" : seul "non_restitue" laisse un objet en attente (voir RESOLVED_RESTITUTION_STATES,
+  // backend/models/workflow.py - garder les deux synchronises).
+  const returnedStates = ["returned", "returned_damaged", "transferred", "conforme", "degrade", "perdu", "autre", "mutualise"];
+  const immaterielActions = restitution.immaterielActions || {};
+  // Une ressource immaterielle (email, VPN, zone alarme...) n'est jamais "rendue" au sens physique : sa
+  // resolution se lit dans immaterielActions (actionDone), jamais dans restitutionItems (qui resterait
+  // indefiniment "en attente" pour elle - constat du 22/11 sur les dossiers de Dominique GIRAUD et Alexia
+  // LEROUYER, memes fonctions que backend/models/workflow.py:summarize_restitution_progress).
+  const isItemResolved = (key, category) => category === "immateriel"
+    ? Boolean(immaterielActions[key]?.actionDone)
+    : Boolean(restitutionItems[key] && returnedStates.includes(restitutionItems[key].state));
 
   if (additional.length) {
     // Nouveau format dynamique
     const returnableResources = additional.filter((r) => r.requiresReturn && r.selected);
-    const returnedCount = returnableResources.filter((r) => {
-      const code = r.id || r.code;
-      const item = restitutionItems[code];
-      return item && returnedStates.includes(item.state);
-    }).length;
+    const returnedCount = returnableResources.filter((r) => isItemResolved(r.id || r.code, r.category)).length;
     sections.push(`Progression restitution : ${returnedCount}/${returnableResources.length} ressource(s) restituée(s)`);
     const pendingLabels = returnableResources
-      .filter((r) => {
-        const code = r.id || r.code;
-        const item = restitutionItems[code];
-        return !item || !returnedStates.includes(item.state);
-      })
+      .filter((r) => !isItemResolved(r.id || r.code, r.category))
       .map((r) => r.label || r.id || r.code);
     if (pendingLabels.length) {
       sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
@@ -218,19 +220,13 @@ function buildRestitutionTimingPreview(data, restitution, restitutionItems) {
     const materiel = data.materiel || {};
     const immateriel = data.immateriel || {};
     const allOld = [
-      ...Object.entries(materiel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k })),
-      ...Object.entries(immateriel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k })),
+      ...Object.entries(materiel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k, category: "materiel" })),
+      ...Object.entries(immateriel).filter(([, v]) => v?.selected).map(([k, v]) => ({ key: k, label: v.label || k, category: "immateriel" })),
     ];
-    const returnedCount = allOld.filter(({ key }) => {
-      const item = restitutionItems[key];
-      return item && returnedStates.includes(item.state);
-    }).length;
+    const returnedCount = allOld.filter(({ key, category }) => isItemResolved(key, category)).length;
     sections.push(`Progression restitution : ${returnedCount}/${allOld.length} ressource(s) restituée(s)`);
     const pendingLabels = allOld
-      .filter(({ key }) => {
-        const item = restitutionItems[key];
-        return !item || !returnedStates.includes(item.state);
-      })
+      .filter(({ key, category }) => !isItemResolved(key, category))
       .map(({ label }) => label);
     if (pendingLabels.length) {
       sections.push(`En attente de restitution : ${pendingLabels.join(", ")}`);
