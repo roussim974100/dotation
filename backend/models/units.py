@@ -312,11 +312,14 @@ def sync_units_for_form(connection, form_id, keys=None):
         event = ("returned" if condition in READY_CONDITIONS else "returned_degraded" if condition in DEGRADED_CONDITIONS
                  else "lost" if condition == "non_restitue" else None)
         fallback_note = None
-        if not event and form["status"] == "returned":
-            # Dossier clos (restitution terminee) sans etat de retour explicite pour cet objet (saisie
-            # incomplete au moment de la finalisation, constat du 23/11) : on ne peut pas laisser
-            # l'unite « attribuee » indefiniment a un dossier deja termine, ca bloquerait tout autre dossier
-            # qui saisirait plus tard le meme identifiant pour un materiel legitimement reattribue.
+        if not event and condition == "pending" and form["status"] == "returned":
+            # Dossier clos (restitution terminee) SANS etat de retour renseigne pour cet objet (saisie
+            # incomplete au moment de la finalisation, constat du 23/11) : on ne peut pas laisser l'unite
+            # « attribuee » indefiniment a un dossier deja termine, ca bloquerait tout autre dossier qui
+            # saisirait plus tard le meme identifiant pour un materiel legitimement reattribue.
+            # Ne s'applique qu'a "pending" (rien de saisi) : un etat explicite non mappe ici (perdu, autre,
+            # mutualise - cf. RESOLVED_RESTITUTION_STATES dans workflow.py) reste tel quel, ce n'est pas une
+            # saisie manquante (reperage Codex sur la 1re version de ce correctif).
             event = "returned"
             condition = "conforme"
             fallback_note = "État de retour non renseigné à la clôture du dossier ; objet considéré rendu par défaut"
